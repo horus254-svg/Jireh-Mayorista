@@ -87,12 +87,27 @@ function agregarCarrito(codigo){
       p => p.CODIGO == codigo
     );
 
-    carrito.push(producto);
+    const existente =
+    carrito.find(
+      p => p.CODIGO == codigo
+    );
+
+    if(existente){
+
+        existente.cantidad++;
+
+    }else{
+
+        carrito.push({
+            ...producto,
+            cantidad:1
+        });
+
+    }
 
     guardarCarrito();
 
 }
-
 function guardarCarrito(){
 
     localStorage.setItem(
@@ -103,13 +118,58 @@ function guardarCarrito(){
     actualizarContador();
 
 }
+function cambiarCantidad(codigo,cambio){
+
+    const item =
+    carrito.find(
+      p => p.CODIGO == codigo
+    );
+
+    if(!item) return;
+
+    item.cantidad += cambio;
+
+    if(item.cantidad <= 0){
+
+        carrito =
+        carrito.filter(
+          p => p.CODIGO != codigo
+        );
+
+    }
+
+    guardarCarrito();
+
+    abrirCarrito();
+
+}
+
+function vaciarCarrito(){
+
+    if(!confirm("¿Vaciar carrito?"))
+        return;
+
+    carrito = [];
+
+    guardarCarrito();
+
+    abrirCarrito();
+
+}
 
 function actualizarContador(){
+
+    const cantidad =
+    carrito.reduce(
+      (acc,item)=>
+      acc + item.cantidad,
+      0
+    );
 
     document.getElementById(
       "cart-count"
     ).innerText =
-    carrito.length;
+    cantidad;
 
 }
 
@@ -121,24 +181,62 @@ function abrirCarrito(){
 
     carrito.forEach(item=>{
 
-        total +=
-        Number(item.PRECIO);
+        const subtotal =
+        item.PRECIO * item.cantidad;
+
+        total += subtotal;
 
         html += `
 
-        <div class="border-bottom mb-2">
+        <div class="border-bottom py-3">
 
+            <strong>
             ${item.PRODUCTO}
+            </strong>
 
-            - $
+            <div class="mt-2">
 
-            ${Number(item.PRECIO).toLocaleString('es-AR')}
+                <button
+                class="btn btn-sm btn-outline-secondary"
+                onclick="cambiarCantidad('${item.CODIGO}',-1)">
+                -
+                </button>
+
+                <span class="mx-2">
+                ${item.cantidad}
+                </span>
+
+                <button
+                class="btn btn-sm btn-outline-secondary"
+                onclick="cambiarCantidad('${item.CODIGO}',1)">
+                +
+                </button>
+
+            </div>
+
+            <div class="mt-2">
+
+                $${subtotal.toLocaleString('es-AR')}
+
+            </div>
 
         </div>
 
         `;
 
     });
+
+    html += `
+
+    <button
+    class="btn btn-danger w-100 mt-3"
+    onclick="vaciarCarrito()">
+
+    Vaciar carrito
+
+    </button>
+
+    `;
 
     document.getElementById(
       "cart-items"
@@ -159,33 +257,78 @@ function abrirCarrito(){
 
 function checkoutWhatsapp(){
 
-    let mensaje =
-`*Pedido Jireh Mayorista*%0A%0A`;
+    const nombre =
+    document.getElementById(
+      "clienteNombre"
+    ).value;
+
+    const empresa =
+    document.getElementById(
+      "clienteEmpresa"
+    ).value;
+
+    const localidad =
+    document.getElementById(
+      "clienteLocalidad"
+    ).value;
+
+    const telefono =
+    document.getElementById(
+      "clienteTelefono"
+    ).value;
+
+    if(nombre === ""){
+
+        alert(
+        "Ingrese su nombre"
+        );
+
+        return;
+
+    }
 
     let total = 0;
 
+    let mensaje =
+`*PEDIDO JIREH MAYORISTA*%0A%0A`;
+
+    mensaje +=
+`👤 Cliente: ${nombre}%0A`;
+
+    mensaje +=
+`🏢 Empresa: ${empresa}%0A`;
+
+    mensaje +=
+`📍 Localidad: ${localidad}%0A`;
+
+    mensaje +=
+`📞 Teléfono: ${telefono}%0A%0A`;
+
     carrito.forEach(item=>{
 
-        total +=
-        Number(item.PRECIO);
+        const subtotal =
+        item.PRECIO *
+        item.cantidad;
+
+        total += subtotal;
 
         mensaje +=
+`• ${item.PRODUCTO}%0A`;
 
-`${item.PRODUCTO}
-- $${item.PRECIO}%0A`;
+        mensaje +=
+`Cantidad: ${item.cantidad}%0A`;
+
+        mensaje +=
+`Subtotal: $${subtotal.toLocaleString('es-AR')}%0A%0A`;
 
     });
 
     mensaje +=
-
-`%0A*TOTAL:* $${total}`;
+`💰 TOTAL: $${total.toLocaleString('es-AR')}`;
 
     window.open(
-
 `https://wa.me/5491140975795?text=${mensaje}`,
-
 "_blank"
-
     );
 
 }
