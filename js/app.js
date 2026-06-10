@@ -70,12 +70,16 @@ function mostrarProductos(lista){
 
                <h5>
     ${
-        String(p.DESTACADO).trim().toUpperCase() === "SI"
-        ? '<span style="background:red;color:white;padding:5px;">
-⭐ DESTACADO
-</span>'
-        : ''
-    }
+    String(p.DESTACADO || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim()
+      .toUpperCase()
+      .includes("SI")
+
+    ? '<span style="background:red;color:white;padding:5px;">⭐ DESTACADO</span>'
+    : ''
+}
 
     ${p.PRODUCTO}
 
