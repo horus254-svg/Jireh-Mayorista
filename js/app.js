@@ -62,8 +62,26 @@ function mostrarProductos(lista){
 
         <div class="col-md-3 mb-4">
 
-        <div class="card-product">
+        <div class="card-product position-relative">
+${
+String(p.DESTACADO || "").trim().length > 0
+? `
+<div class="ribbon-destacado">
+⭐ DESTACADO
+</div>
+`
+: ''
+}
 
+${
+String(p.OFERTA || "").trim().length > 0
+? `
+<div class="ribbon-oferta">
+🔥 OFERTA
+</div>
+`
+: ''
+}
             <img src="${p.IMAGEN}">
 
             <div class="p-3">
