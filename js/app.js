@@ -22,7 +22,9 @@ async function cargarProductos(){
     await res.json();
 
     productos =
-    data.productos;
+data.productos.filter(
+  p => Number(p.STOCK) > 0
+);
 
     mostrarProductos(productos);
 
