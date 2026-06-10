@@ -13,7 +13,52 @@
 </head>
 <body>
 
+<div class="header-fijo">
+
 <nav class="navbar navbar-dark bg-dark">
+    <div class="container">
+
+        <span class="navbar-brand">
+            🛒 Jireh Mayorista
+        </span>
+
+        <button class="btn btn-success" onclick="abrirCarrito()">
+            Carrito (<span id="cart-count">0</span>)
+        </button>
+
+    </div>
+</nav>
+
+<div class="container py-3">
+
+    <div class="row">
+
+        <div class="col-md-6">
+            <input
+                id="search"
+                class="form-control"
+                placeholder="Buscar producto..."
+                onkeyup="buscarProductos()">
+        </div>
+
+        <div class="col-md-6">
+            <select
+                id="categorias"
+                class="form-select"
+                onchange="filtrarCategoria()">
+
+                <option value="">
+                    Todas las categorías
+                </option>
+
+            </select>
+        </div>
+
+    </div>
+
+</div>
+
+</div>
 <div class="container">
 
 <span class="navbar-brand">
