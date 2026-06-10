@@ -68,22 +68,20 @@ function mostrarProductos(lista){
 
             <div class="p-3">
 
-                <h5>
+               <h5>
+    ${
+        String(p.DESTACADO).trim().toUpperCase() === "SI"
+        ? '<span class="badge bg-warning text-dark me-2">⭐ DESTACADO</span>'
+        : ''
+    }
 
-${p.PRODUCTO}
+    ${p.PRODUCTO}
 
-${
-String(p.OFERTA)
-.trim()
-.toUpperCase() === "SI"
-
-? `<span class="badge bg-danger ms-2">
-OFERTA
-</span>`
-
-: ""
-}
-
+    ${
+        String(p.OFERTA).trim().toUpperCase() === "SI"
+        ? '<span class="badge bg-danger ms-2">OFERTA</span>'
+        : ''
+    }
 </h5>
 
                 <p>${p.CATEGORIA}</p>
