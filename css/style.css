@@ -1,5 +1,7 @@
 .card-product {
 
+    position: relative;
+
     border: 1px solid #ddd;
     border-radius: 10px;
     overflow: hidden;
@@ -27,4 +29,42 @@
     font-weight: bold;
     color: green;
 
+}
+
+.ribbon-destacado{
+
+    position:absolute;
+    top:10px;
+    left:10px;
+
+    background:#ffc107;
+    color:#000;
+
+    font-weight:bold;
+    font-size:12px;
+
+    padding:6px 10px;
+
+    border-radius:20px;
+
+    z-index:100;
+}
+
+.ribbon-oferta{
+
+    position:absolute;
+    top:10px;
+    right:10px;
+
+    background:#dc3545;
+    color:#fff;
+
+    font-weight:bold;
+    font-size:12px;
+
+    padding:6px 10px;
+
+    border-radius:20px;
+
+    z-index:100;
 }
