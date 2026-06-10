@@ -89,3 +89,52 @@ body{
 
     z-index:100;
 }
+/* =========================
+   AJUSTES PARA CELULARES
+========================= */
+
+@media (max-width: 768px){
+
+    .navbar{
+        padding-top: 5px;
+        padding-bottom: 5px;
+    }
+
+    .navbar-brand{
+        font-size: 14px;
+    }
+
+    .navbar .btn{
+        font-size: 12px;
+        padding: 4px 8px;
+    }
+
+    .header-fijo .container.py-3{
+        padding-top: 8px !important;
+        padding-bottom: 8px !important;
+    }
+
+    #search,
+    #categorias{
+        height: 40px;
+        font-size: 14px;
+    }
+
+    .row{
+        row-gap: 8px;
+    }
+
+    body{
+        padding-top: 155px;
+    }
+
+    /* El modal del carrito queda por encima */
+    .modal{
+        z-index: 11000 !important;
+    }
+
+    .modal-backdrop{
+        z-index: 10990 !important;
+    }
+
+}
