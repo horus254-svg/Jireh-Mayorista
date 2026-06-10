@@ -86,9 +86,7 @@ String(p.OFERTA || "").trim().length > 0
 
             <div class="p-3">
 
-               <h5>
-    ${p.PRODUCTO}
-</h5>
+     <h5>${p.PRODUCTO}</h5>
                 <p>${p.CATEGORIA}</p>
 
                 <div class="price">
