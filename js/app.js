@@ -8,7 +8,7 @@ localStorage.getItem("carrito")
 ) || [];
 
 cargarProductos();
-
+console.log(data.productos);
 actualizarContador();
 
 async function cargarProductos(){
