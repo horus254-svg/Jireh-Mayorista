@@ -71,7 +71,9 @@ function mostrarProductos(lista){
                <h5>
     ${
         String(p.DESTACADO).trim().toUpperCase() === "SI"
-        ? '<span class="badge bg-warning text-dark me-2">⭐ DESTACADO</span>'
+        ? '<span style="background:red;color:white;padding:5px;">
+⭐ DESTACADO
+</span>'
         : ''
     }
 
