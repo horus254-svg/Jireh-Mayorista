@@ -21,9 +21,25 @@ async function cargarProductos(){
     const data =
     await res.json();
 
-productos = data.productos.filter(
+productos = data.productos
+.filter(
   p => Number(String(p.STOCK).trim()) > 0
-);
+)
+.sort((a,b)=>{
+
+    const da =
+    String(a.DESTACADO)
+    .trim()
+    .toUpperCase();
+
+    const db =
+    String(b.DESTACADO)
+    .trim()
+    .toUpperCase();
+
+    return db.localeCompare(da);
+
+});
 
     mostrarProductos(productos);
 
