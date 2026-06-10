@@ -21,9 +21,8 @@ async function cargarProductos(){
     const data =
     await res.json();
 
-    productos =
-data.productos.filter(
-  p => Number(p.STOCK) > 0
+productos = data.productos.filter(
+  p => Number(String(p.STOCK).trim()) > 0
 );
 
     mostrarProductos(productos);
