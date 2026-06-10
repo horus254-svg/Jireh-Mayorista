@@ -69,11 +69,13 @@ function mostrarProductos(lista){
             <div class="p-3">
 
                <h5>
-    ${
-   String(p.DESTACADO).trim().toUpperCase() === "SI"
+${
+String(p.DESTACADO || "")
+.trim()
+.length > 0
 
-    ? '<span style="background:red;color:white;padding:5px;">⭐ DESTACADO</span>'
-    : ''
+? '<span class="badge bg-warning text-dark me-2">⭐ DESTACADO</span>'
+: ''
 }
 
     ${p.PRODUCTO}
