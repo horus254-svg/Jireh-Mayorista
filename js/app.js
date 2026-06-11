@@ -328,23 +328,47 @@ modal.show();
 
 async function checkoutWhatsapp(){
 
-   const url =
-API_URL +
-"?action=guardarPedido" +
-"&nombre=" + encodeURIComponent(nombre) +
-"&empresa=" + encodeURIComponent(empresa) +
-"&direccion=" + encodeURIComponent(direccion) +
-"&dni=" + encodeURIComponent(dni) +
-"&total=" + total +
-"&carrito=" + encodeURIComponent(
-JSON.stringify(carrito)
-);
+    const nombre =
+    document.getElementById("clienteNombre").value;
 
-const response =
-await fetch(url);
+    const empresa =
+    document.getElementById("clienteEmpresa").value;
 
-const resultado =
-await response.json();
+    const direccion =
+    document.getElementById("clienteDireccion").value;
+
+    const dni =
+    document.getElementById("clienteDni").value;
+
+    if(nombre === "" || direccion === "" || dni === ""){
+        alert("Complete Nombre, Dirección y DNI");
+        return;
+    }
+
+    let total = 0;
+
+    carrito.forEach(item=>{
+        total += item.PRECIO * item.cantidad;
+    });
+
+    const url =
+    API_URL +
+    "?action=guardarPedido" +
+    "&nombre=" + encodeURIComponent(nombre) +
+    "&empresa=" + encodeURIComponent(empresa) +
+    "&direccion=" + encodeURIComponent(direccion) +
+    "&dni=" + encodeURIComponent(dni) +
+    "&total=" + total +
+    "&carrito=" + encodeURIComponent(
+      JSON.stringify(carrito)
+    );
+
+    try {
+
+        const response = await fetch(url);
+
+        const resultado =
+        await response.json();
 
         if(!resultado.success){
             alert("No se pudo guardar el pedido");
@@ -387,19 +411,15 @@ await response.json();
 
         mensaje +=
 `💰 TOTAL: $${total.toLocaleString('es-AR')}`;
-try {
+
         window.open(
 `https://wa.me/5491140975795?text=${mensaje}`,
 "_blank"
         );
 
-    }
-    catch(error){
+    } catch(error){
 
-        console.error(
-          "ERROR COMPLETO:",
-          error
-        );
+        console.error(error);
 
         alert(
           "Error al registrar el pedido"
@@ -407,9 +427,7 @@ try {
 
     }
 
-}
-
-function cargarCategorias(){
+}function cargarCategorias(){
 
     const select =
     document.getElementById(
