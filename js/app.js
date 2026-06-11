@@ -358,6 +358,9 @@ async function checkoutWhatsapp(){
             headers:{
                 "Content-Type":"application/json"
             },
+
+            console.log(response);
+        
             body:JSON.stringify({
                 action:"guardarPedido",
                 nombre,
@@ -418,15 +421,17 @@ async function checkoutWhatsapp(){
 "_blank"
         );
 
-    }catch(error){
+catch(error){
 
-        console.error(error);
+    console.error(
+      "ERROR COMPLETO:",
+      error
+    );
 
-        alert(
-          "Error al registrar el pedido"
-        );
-
-    }
+    alert(
+      "Error al registrar el pedido: " +
+      error
+    );
 
 }
 
