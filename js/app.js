@@ -327,8 +327,6 @@ modal.show();
 }
 
 async function checkoutWhatsapp(){
-
-```
 const nombre =
 document.getElementById(
   "clienteNombre"
