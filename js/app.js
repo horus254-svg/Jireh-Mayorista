@@ -354,26 +354,17 @@ async function checkoutWhatsapp(){
     try{
 
         const response = await fetch(API_URL,{
-            method:"POST",
-            headers:{
-                "Content-Type":"application/json"
-            },
-
-            console.log(response);
-        
-            body:JSON.stringify({
-                action:"guardarPedido",
-                nombre,
-                empresa,
-                direccion,
-                dni,
-                total,
-                carrito
-            })
-        });
-
-        const resultado = await response.json();
-
+    method:"POST",
+    body: JSON.stringify({
+        action:"guardarPedido",
+        nombre,
+        empresa,
+        direccion,
+        dni,
+        total,
+        carrito
+    })
+});
         if(!resultado.success){
             alert("No se pudo guardar el pedido");
             return;
