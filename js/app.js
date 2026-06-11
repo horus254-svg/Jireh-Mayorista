@@ -375,57 +375,40 @@ async function checkoutWhatsapp(){
             return;
         }
 
-        let mensaje =
-`*PEDIDO JIREH MAYORISTA*%0A%0A`;
+        let mensaje = `*PEDIDO JIREH MAYORISTA*
 
-        mensaje +=
-`🧾 Pedido: ${resultado.pedidoId}%0A%0A`;
+🧾 Pedido: ${resultado.pedidoId}
 
-        mensaje +=
-`👤 Cliente: ${nombre}%0A`;
+👤 Cliente: ${nombre}
+🏢 Empresa: ${empresa}
+🏠 Dirección: ${direccion}
+🆔 DNI: ${dni}
 
-        mensaje +=
-`🏢 Empresa: ${empresa}%0A`;
+`;
 
-        mensaje +=
-`🏠 Dirección: ${direccion}%0A`;
+carrito.forEach(item => {
 
-        mensaje +=
-`🆔 DNI: ${dni}%0A%0A`;
+    const subtotal =
+    item.PRECIO * item.cantidad;
 
-        carrito.forEach(item=>{
+    mensaje += `
+• ${item.PRODUCTO}
+Cantidad: ${item.cantidad}
+Subtotal: $${subtotal.toLocaleString('es-AR')}
 
-            const subtotal =
-            item.PRECIO * item.cantidad;
+`;
 
-            mensaje +=
-`• ${item.PRODUCTO}%0A`;
+});
 
-            mensaje +=
-`Cantidad: ${item.cantidad}%0A`;
+mensaje += `
+💰 TOTAL: $${total.toLocaleString('es-AR')}
+`;
 
-            mensaje +=
-`Subtotal: $${subtotal.toLocaleString('es-AR')}%0A%0A`;
-
-        });
-
-        mensaje +=
-`💰 TOTAL: $${total.toLocaleString('es-AR')}`;
-
-        window.open(
-`https://wa.me/5491140975795?text=${mensaje}`,
+window.open(
+`https://wa.me/5491140975795?text=${encodeURIComponent(mensaje)}`,
 "_blank"
-        );
-
-    } catch(error){
-
-        console.error(error);
-
-        alert(
-          "Error al registrar el pedido"
-        );
-
-    }
+);
+}
 }
 }function cargarCategorias(){
 
