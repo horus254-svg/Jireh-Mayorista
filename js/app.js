@@ -420,7 +420,7 @@ window.open(
 }
 
 }
-}function cargarCategorias(){
+function cargarCategorias(){
 
     const select =
     document.getElementById(
