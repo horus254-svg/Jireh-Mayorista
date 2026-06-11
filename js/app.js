@@ -353,41 +353,82 @@ async function checkoutWhatsapp(){
 
     try{
 
-       const response = await fetch(API_URL,{
-    method:"POST",
-    body: JSON.stringify({
-        action:"guardarPedido",
-        nombre,
-        empresa,
-        direccion,
-        dni,
-        total,
-        carrito
-    })
-});
+        const response = await fetch(API_URL,{
+            method:"POST",
+            body: JSON.stringify({
+                action:"guardarPedido",
+                nombre,
+                empresa,
+                direccion,
+                dni,
+                total,
+                carrito
+            })
+        });
 
-const resultado = await response.json();
+        const resultado =
+        await response.json();
 
-if(!resultado.success){
-    alert("No se pudo guardar el pedido");
-    return;
-}
+        if(!resultado.success){
+            alert("No se pudo guardar el pedido");
+            return;
+        }
+
+        let mensaje =
+`*PEDIDO JIREH MAYORISTA*%0A%0A`;
+
+        mensaje +=
+`🧾 Pedido: ${resultado.pedidoId}%0A%0A`;
+
+        mensaje +=
+`👤 Cliente: ${nombre}%0A`;
+
+        mensaje +=
+`🏢 Empresa: ${empresa}%0A`;
+
+        mensaje +=
+`🏠 Dirección: ${direccion}%0A`;
+
+        mensaje +=
+`🆔 DNI: ${dni}%0A%0A`;
+
+        carrito.forEach(item=>{
+
+            const subtotal =
+            item.PRECIO * item.cantidad;
+
+            mensaje +=
+`• ${item.PRODUCTO}%0A`;
+
+            mensaje +=
+`Cantidad: ${item.cantidad}%0A`;
+
+            mensaje +=
+`Subtotal: $${subtotal.toLocaleString('es-AR')}%0A%0A`;
+
+        });
+
+        mensaje +=
+`💰 TOTAL: $${total.toLocaleString('es-AR')}`;
+
         window.open(
 `https://wa.me/5491140975795?text=${mensaje}`,
 "_blank"
         );
-}
-catch(error){
 
-    console.error(
-      "ERROR COMPLETO:",
-      error
-    );
+    }
+    catch(error){
 
-    alert(
-      "Error al registrar el pedido: " +
-      error
-    );
+        console.error(
+          "ERROR COMPLETO:",
+          error
+        );
+
+        alert(
+          "Error al registrar el pedido"
+        );
+
+    }
 
 }
 
