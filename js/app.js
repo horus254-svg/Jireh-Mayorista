@@ -376,7 +376,7 @@ if(!resultado.success){
 `https://wa.me/5491140975795?text=${mensaje}`,
 "_blank"
         );
-
+}
 catch(error){
 
     console.error(
