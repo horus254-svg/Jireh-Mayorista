@@ -408,7 +408,17 @@ window.open(
 `https://wa.me/5491140975795?text=${encodeURIComponent(mensaje)}`,
 "_blank"
 );
+
+} catch(error){
+
+    console.error(error);
+
+    alert(
+      "Error al registrar el pedido"
+    );
+
 }
+
 }
 }function cargarCategorias(){
 
