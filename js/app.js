@@ -326,7 +326,6 @@ modal.show();
 
 }
 
-:::writing{variant="document" id="71384"}
 async function checkoutWhatsapp(){
 
     const nombre =
