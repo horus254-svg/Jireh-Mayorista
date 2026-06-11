@@ -328,46 +328,23 @@ modal.show();
 
 async function checkoutWhatsapp(){
 
-    const nombre =
-    document.getElementById("clienteNombre").value;
+   const url =
+API_URL +
+"?action=guardarPedido" +
+"&nombre=" + encodeURIComponent(nombre) +
+"&empresa=" + encodeURIComponent(empresa) +
+"&direccion=" + encodeURIComponent(direccion) +
+"&dni=" + encodeURIComponent(dni) +
+"&total=" + total +
+"&carrito=" + encodeURIComponent(
+JSON.stringify(carrito)
+);
 
-    const empresa =
-    document.getElementById("clienteEmpresa").value;
+const response =
+await fetch(url);
 
-    const direccion =
-    document.getElementById("clienteDireccion").value;
-
-    const dni =
-    document.getElementById("clienteDni").value;
-
-    if(nombre === "" || direccion === "" || dni === ""){
-        alert("Complete Nombre, Dirección y DNI");
-        return;
-    }
-
-    let total = 0;
-
-    carrito.forEach(item=>{
-        total += item.PRECIO * item.cantidad;
-    });
-
-    try{
-
-        const response = await fetch(API_URL,{
-            method:"POST",
-            body: JSON.stringify({
-                action:"guardarPedido",
-                nombre,
-                empresa,
-                direccion,
-                dni,
-                total,
-                carrito
-            })
-        });
-
-        const resultado =
-        await response.json();
+const resultado =
+await response.json();
 
         if(!resultado.success){
             alert("No se pudo guardar el pedido");
