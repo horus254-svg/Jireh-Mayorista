@@ -353,7 +353,7 @@ async function checkoutWhatsapp(){
 
     try{
 
-        const response = await fetch(API_URL,{
+       const response = await fetch(API_URL,{
     method:"POST",
     body: JSON.stringify({
         action:"guardarPedido",
@@ -365,48 +365,13 @@ async function checkoutWhatsapp(){
         carrito
     })
 });
-        if(!resultado.success){
-            alert("No se pudo guardar el pedido");
-            return;
-        }
 
-        let mensaje =
-`*PEDIDO JIREH MAYORISTA*%0A%0A`;
+const resultado = await response.json();
 
-        mensaje +=
-`🧾 Pedido: ${resultado.pedidoId}%0A%0A`;
-
-        mensaje +=
-`👤 Cliente: ${nombre}%0A`;
-
-        mensaje +=
-`🏢 Empresa: ${empresa}%0A`;
-
-        mensaje +=
-`🏠 Dirección: ${direccion}%0A`;
-
-        mensaje +=
-`🆔 DNI: ${dni}%0A%0A`;
-
-        carrito.forEach(item=>{
-
-            const subtotal =
-            item.PRECIO * item.cantidad;
-
-            mensaje +=
-`• ${item.PRODUCTO}%0A`;
-
-            mensaje +=
-`Cantidad: ${item.cantidad}%0A`;
-
-            mensaje +=
-`Subtotal: $${subtotal.toLocaleString('es-AR')}%0A%0A`;
-
-        });
-
-        mensaje +=
-`💰 TOTAL: $${total.toLocaleString('es-AR')}`;
-
+if(!resultado.success){
+    alert("No se pudo guardar el pedido");
+    return;
+}
         window.open(
 `https://wa.me/5491140975795?text=${mensaje}`,
 "_blank"
