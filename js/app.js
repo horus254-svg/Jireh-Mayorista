@@ -387,7 +387,7 @@ await response.json();
 
         mensaje +=
 `💰 TOTAL: $${total.toLocaleString('es-AR')}`;
-
+try {
         window.open(
 `https://wa.me/5491140975795?text=${mensaje}`,
 "_blank"
