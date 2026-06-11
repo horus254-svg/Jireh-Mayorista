@@ -426,7 +426,7 @@ async function checkoutWhatsapp(){
         );
 
     }
-
+}
 }function cargarCategorias(){
 
     const select =
