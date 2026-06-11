@@ -326,181 +326,110 @@ modal.show();
 
 }
 
+:::writing{variant="document" id="71384"}
 async function checkoutWhatsapp(){
-const nombre =
-document.getElementById(
-  "clienteNombre"
-).value;
 
-const empresa =
-document.getElementById(
-  "clienteEmpresa"
-).value;
+    const nombre =
+    document.getElementById("clienteNombre").value;
 
-const direccion =
-document.getElementById(
-  "clienteDireccion"
-).value;
+    const empresa =
+    document.getElementById("clienteEmpresa").value;
 
-const dni =
-document.getElementById(
-  "clienteDni"
-).value;
+    const direccion =
+    document.getElementById("clienteDireccion").value;
 
-if(
-  nombre === "" ||
-  direccion === "" ||
-  dni === ""
-){
-    alert(
-      "Complete Nombre, Dirección y DNI"
-    );
-    return;
-}
+    const dni =
+    document.getElementById("clienteDni").value;
 
-let total = 0;
+    if(nombre === "" || direccion === "" || dni === ""){
+        alert("Complete Nombre, Dirección y DNI");
+        return;
+    }
 
-carrito.forEach(item=>{
-    total +=
-    item.PRECIO *
-    item.cantidad;
-});
+    let total = 0;
 
-try{
-
-    const response =
-    await fetch(API_URL,{
-
-        method:"POST",
-
-        headers:{
-          "Content-Type":
-          "application/json"
-        },
-
-        body:JSON.stringify({
-
-            action:"guardarPedido",
-
-            nombre:nombre,
-
-            empresa:empresa,
-
-            direccion:direccion,
-
-            dni:dni,
-
-            total:total,
-
-            carrito:carrito
-
-        })
-
+    carrito.forEach(item=>{
+        total += item.PRECIO * item.cantidad;
     });
 
-    const resultado =
-    await response.json();
+    try{
 
-    if(!resultado.success){
+        const response = await fetch(API_URL,{
+            method:"POST",
+            headers:{
+                "Content-Type":"application/json"
+            },
+            body:JSON.stringify({
+                action:"guardarPedido",
+                nombre,
+                empresa,
+                direccion,
+                dni,
+                total,
+                carrito
+            })
+        });
 
-        alert(
-          "No se pudo guardar el pedido"
+        const resultado = await response.json();
+
+        if(!resultado.success){
+            alert("No se pudo guardar el pedido");
+            return;
+        }
+
+        let mensaje =
+`*PEDIDO JIREH MAYORISTA*%0A%0A`;
+
+        mensaje +=
+`🧾 Pedido: ${resultado.pedidoId}%0A%0A`;
+
+        mensaje +=
+`👤 Cliente: ${nombre}%0A`;
+
+        mensaje +=
+`🏢 Empresa: ${empresa}%0A`;
+
+        mensaje +=
+`🏠 Dirección: ${direccion}%0A`;
+
+        mensaje +=
+`🆔 DNI: ${dni}%0A%0A`;
+
+        carrito.forEach(item=>{
+
+            const subtotal =
+            item.PRECIO * item.cantidad;
+
+            mensaje +=
+`• ${item.PRODUCTO}%0A`;
+
+            mensaje +=
+`Cantidad: ${item.cantidad}%0A`;
+
+            mensaje +=
+`Subtotal: $${subtotal.toLocaleString('es-AR')}%0A%0A`;
+
+        });
+
+        mensaje +=
+`💰 TOTAL: $${total.toLocaleString('es-AR')}`;
+
+        window.open(
+`https://wa.me/5491140975795?text=${mensaje}`,
+"_blank"
         );
 
-        return;
+    }catch(error){
+
+        console.error(error);
+
+        alert(
+          "Error al registrar el pedido"
+        );
 
     }
 
-    let mensaje =
-```
-
-`*PEDIDO JIREH MAYORISTA*%0A%0A`;
-
-```
-    mensaje +=
-```
-
-`🧾 Pedido: ${resultado.pedidoId}%0A%0A`;
-
-```
-    mensaje +=
-```
-
-`👤 Cliente: ${nombre}%0A`;
-
-```
-    mensaje +=
-```
-
-`🏢 Empresa: ${empresa}%0A`;
-
-```
-    mensaje +=
-```
-
-`🏠 Dirección: ${direccion}%0A`;
-
-```
-    mensaje +=
-```
-
-`🆔 DNI: ${dni}%0A%0A`;
-
-```
-    carrito.forEach(item=>{
-
-        const subtotal =
-        item.PRECIO *
-        item.cantidad;
-
-        mensaje +=
-```
-
-`• ${item.PRODUCTO}%0A`;
-
-```
-        mensaje +=
-```
-
-`Cantidad: ${item.cantidad}%0A`;
-
-```
-        mensaje +=
-```
-
-`Subtotal: $${subtotal.toLocaleString('es-AR')}%0A%0A`;
-
-```
-    });
-
-    mensaje +=
-```
-
-`💰 TOTAL: $${total.toLocaleString('es-AR')}`;
-
-```
-    window.open(
-```
-
-`https://wa.me/5491140975795?text=${mensaje}`,
-"_blank"
-);
-
-```
 }
-catch(error){
-
-    console.error(error);
-
-    alert(
-      "Error al registrar el pedido"
-    );
-
-}
-```
-
-}
-
 
 function cargarCategorias(){
 
