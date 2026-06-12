@@ -337,6 +337,9 @@ async function checkoutWhatsapp(){
     const direccion =
     document.getElementById("clienteDireccion").value;
 
+    const telefono =
+    document.getElementById("clienteTelefono").value;
+
     const dni =
     document.getElementById("clienteDni").value;
 
