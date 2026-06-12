@@ -343,7 +343,7 @@ async function checkoutWhatsapp(){
     const dni =
     document.getElementById("clienteDni").value;
 
-    if(nombre === "" || direccion === "" || dni === ""){
+    if(nombre === "" ||direccion === "" ||telefono === "" ||dni === ""){
         alert("Complete Nombre, Dirección y DNI");
         return;
     }
