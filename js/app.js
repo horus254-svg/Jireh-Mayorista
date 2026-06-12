@@ -425,10 +425,12 @@ mensaje += `
 ${resultado.pdfUrl}
 `;
 
-window.open(
-`https://wa.me/5491140975795?text=${encodeURIComponent(mensaje)}`,
-"_blank"
-);
+window.open(resultado.pdfUrl, "_blank");
+
+const whatsappUrl =
+`https://api.whatsapp.com/send?phone=5491140975795&text=${encodeURIComponent(mensaje)}`;
+
+window.location.href = whatsappUrl;
 
 } catch(error){
 
