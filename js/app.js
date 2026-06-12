@@ -402,7 +402,11 @@ Subtotal: $${subtotal.toLocaleString('es-AR')}
 
 `;
 
-});
+}); // ← aquí termina el forEach
+
+mensaje += `
+💰 TOTAL: $${total.toLocaleString('es-AR')}
+`;
 
 carrito = [];
 
@@ -416,25 +420,24 @@ document.getElementById("cart-total").innerText = "0";
 
 actualizarContador();
 
+const modalElement =
+document.getElementById("cartModal");
+
+const modal =
+bootstrap.Modal.getInstance(modalElement);
+
+if(modal){
+    modal.hide();
+}
+
 setTimeout(() => {
 
     window.location.href =
     `https://api.whatsapp.com/send?phone=5491140975795&text=${encodeURIComponent(mensaje)}`;
 
 }, 300);
-
-} catch(error){
-
-    console.error(error);
-
-    alert(
-      "Error al registrar el pedido"
-    );
-
-}
-}
-
-function cargarCategorias(){
+    
+    function cargarCategorias(){
 
     const select =
     document.getElementById(
