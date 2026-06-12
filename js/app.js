@@ -534,7 +534,14 @@ window.addEventListener("pageshow", function () {
     actualizarContador();
 
 });
-async function descargarCatalogo() {
+function descargarCatalogo() {
+
+    const productosActivos =
+    productos.filter(p => Number(p.STOCK) > 0);
+
+    console.log(productosActivos);
+
+    async function descargarCatalogo() {
 
     const { jsPDF } = window.jspdf;
 
@@ -546,39 +553,64 @@ async function descargarCatalogo() {
         p => Number(p.STOCK) > 0
     );
 
+    doc.setFontSize(16);
+    doc.text("CATÁLOGO MAYORISTA", 10, y);
+
+    y += 10;
+
     for (let i = 0; i < productosActivos.length; i++) {
 
         const p = productosActivos[i];
 
+        // nombre producto
         doc.setFontSize(12);
         doc.text(p.PRODUCTO, 10, y);
 
+        // precio
         doc.setFontSize(10);
-        doc.text("Precio: $" + Number(p.PRECIO).toLocaleString('es-AR'), 10, y + 6);
+        doc.text(
+            "Precio: $" + Number(p.PRECIO).toLocaleString('es-AR'),
+            10,
+            y + 6
+        );
 
-        // imagen
-        const img = await fetch(p.IMAGEN);
-        const blob = await img.blob();
-        const reader = new FileReader();
+        // imagen (opcional pero recomendado)
+        try {
+            const img = await fetch(p.IMAGEN);
+            const blob = await img.blob();
 
-        await new Promise(resolve => {
+            const reader = new FileReader();
 
-            reader.onload = function (e) {
-                doc.addImage(e.target.result, "JPEG", 10, y + 10, 40, 40);
-                resolve();
-            };
+            await new Promise(resolve => {
 
-            reader.readAsDataURL(blob);
+                reader.onload = function (e) {
+                    doc.addImage(
+                        e.target.result,
+                        "JPEG",
+                        10,
+                        y + 10,
+                        40,
+                        40
+                    );
+                    resolve();
+                };
 
-        });
+                reader.readAsDataURL(blob);
+            });
+
+        } catch (error) {
+            console.log("Error imagen:", error);
+        }
 
         y += 60;
 
-        if (y > 270) {
+        // salto de página
+        if (y > 260) {
             doc.addPage();
             y = 10;
         }
     }
 
     doc.save("catalogo.pdf");
+}// generar PDF aquí
 }
