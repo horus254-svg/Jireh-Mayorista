@@ -344,7 +344,7 @@ async function checkoutWhatsapp(){
     document.getElementById("clienteDni").value;
 
     if(nombre === "" ||direccion === "" ||telefono === "" ||dni === ""){
-        alert("Complete Nombre, Dirección y DNI");
+        alert("Complete Nombre, Dirección y DNI o CUIT");
         return;
     }
 
@@ -386,7 +386,7 @@ async function checkoutWhatsapp(){
 🏢 Empresa: ${empresa}
 🏠 Dirección: ${direccion}
 📱 Teléfono: ${telefono}
-🆔 DNI: ${dni}
+🆔 DNI/CUIT: ${dni}
 
 `;
 
