@@ -406,6 +406,10 @@ Subtotal: $${subtotal.toLocaleString('es-AR')}
 
 mensaje += `
 💰 TOTAL: $${total.toLocaleString('es-AR')}
+`;
+
+carrito = [];
+guardarCarrito();
 
 window.location.href =
 `https://api.whatsapp.com/send?phone=5491140975795&text=${encodeURIComponent(mensaje)}`;
