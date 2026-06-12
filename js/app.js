@@ -408,11 +408,18 @@ mensaje += `
 💰 TOTAL: $${total.toLocaleString('es-AR')}
 `;
 
-carrito = [];
-guardarCarrito();
+localStorage.removeItem("carrito");
 
-window.location.href =
-`https://api.whatsapp.com/send?phone=5491140975795&text=${encodeURIComponent(mensaje)}`;
+carrito = [];
+
+actualizarContador();
+
+setTimeout(() => {
+
+    window.location.href =
+    `https://api.whatsapp.com/send?phone=5491140975795&text=${encodeURIComponent(mensaje)}`;
+
+}, 300);
 
 } catch(error){
 
