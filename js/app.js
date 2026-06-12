@@ -610,5 +610,5 @@ async function descargarCatalogo() {
 
     doc.save("catalogo.pdf");
 }
-});
+window.descargarCatalogo = descargarCatalogo;
 
