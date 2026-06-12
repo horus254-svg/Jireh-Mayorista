@@ -539,8 +539,6 @@ function descargarCatalogo() {
     const productosActivos =
     productos.filter(p => Number(p.STOCK) > 0);
 
-    console.log(productosActivos);
-
     async function descargarCatalogo() {
 
     const { jsPDF } = window.jspdf;
