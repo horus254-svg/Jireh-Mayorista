@@ -378,21 +378,7 @@ async function checkoutWhatsapp(){
             alert("No se pudo guardar el pedido");
             return;
         }
-alert(
-`✅ Pedido registrado
-
-Pedido: ${resultado.pedidoId}
-
-Total: $${total.toLocaleString('es-AR')}
-
-Se abrirá el PDF en una nueva pestaña.`
-);
-
-window.open(
-  resultado.pdfUrl,
-  "_blank"
-);
-        let mensaje = `*PEDIDO JIREH MAYORISTA*
+         let mensaje = `*PEDIDO JIREH MAYORISTA*
 
 🧾 Pedido: ${resultado.pedidoId}
 
@@ -443,6 +429,70 @@ window.location.href = whatsappUrl;
 }
 
 }
+const modalHtml = `
+
+<div id="pedidoExitoso" style="
+position:fixed;
+top:0;
+left:0;
+width:100%;
+height:100%;
+background:rgba(0,0,0,.7);
+display:flex;
+justify-content:center;
+align-items:center;
+z-index:9999;
+">
+
+<div style="
+background:white;
+padding:25px;
+border-radius:12px;
+max-width:400px;
+width:90%;
+text-align:center;
+">
+
+<h3>✅ Pedido registrado</h3>
+
+<p><strong>Pedido:</strong><br>${resultado.pedidoId}</p>
+
+<p><strong>Total:</strong><br>$${total.toLocaleString('es-AR')}</p>
+
+<div style="display:flex;flex-direction:column;gap:10px;">
+
+<a
+href="${resultado.pdfUrl}"
+target="_blank"
+class="btn btn-primary">
+📄 Ver PDF </a>
+
+<button
+id="btnWhatsapp"
+class="btn btn-success">
+📱 Enviar por WhatsApp </button>
+
+</div>
+
+</div>
+</div>
+`;
+
+document.body.insertAdjacentHTML(
+"beforeend",
+modalHtml
+);
+
+document
+.getElementById("btnWhatsapp")
+.addEventListener("click", ()=>{
+
+window.location.href =
+`https://api.whatsapp.com/send?phone=5491140975795&text=${encodeURIComponent(mensaje)}`;
+
+});
+
+       
 function cargarCategorias(){
 
     const select =
