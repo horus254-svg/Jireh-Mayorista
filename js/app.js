@@ -378,7 +378,20 @@ async function checkoutWhatsapp(){
             alert("No se pudo guardar el pedido");
             return;
         }
+alert(
+`✅ Pedido registrado
 
+Pedido: ${resultado.pedidoId}
+
+Total: $${total.toLocaleString('es-AR')}
+
+Se abrirá el PDF en una nueva pestaña.`
+);
+
+window.open(
+  resultado.pdfUrl,
+  "_blank"
+);
         let mensaje = `*PEDIDO JIREH MAYORISTA*
 
 🧾 Pedido: ${resultado.pedidoId}
@@ -407,6 +420,9 @@ Subtotal: $${subtotal.toLocaleString('es-AR')}
 
 mensaje += `
 💰 TOTAL: $${total.toLocaleString('es-AR')}
+
+📄 PDF DEL PEDIDO:
+${resultado.pdfUrl}
 `;
 
 window.open(
