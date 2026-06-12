@@ -411,24 +411,6 @@ mensaje += `
 ${resultado.pdfUrl}
 `;
 
-window.open(resultado.pdfUrl, "_blank");
-
-const whatsappUrl =
-`https://api.whatsapp.com/send?phone=5491140975795&text=${encodeURIComponent(mensaje)}`;
-
-window.location.href = whatsappUrl;
-
-} catch(error){
-
-    console.error(error);
-
-    alert(
-      "Error al registrar el pedido"
-    );
-
-}
-
-}
 const modalHtml = `
 
 <div id="pedidoExitoso" style="
@@ -477,7 +459,12 @@ class="btn btn-success">
 </div>
 </div>
 `;
+const modalExistente =
+document.getElementById("pedidoExitoso");
 
+if(modalExistente){
+    modalExistente.remove();
+}
 document.body.insertAdjacentHTML(
 "beforeend",
 modalHtml
@@ -492,7 +479,18 @@ window.location.href =
 
 });
 
-       
+
+} catch(error){
+
+    console.error(error);
+
+    alert(
+      "Error al registrar el pedido"
+    );
+
+}
+}
+
 function cargarCategorias(){
 
     const select =
