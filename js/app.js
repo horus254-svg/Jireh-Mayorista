@@ -404,13 +404,15 @@ Subtotal: $${subtotal.toLocaleString('es-AR')}
 
 });
 
-mensaje += `
-💰 TOTAL: $${total.toLocaleString('es-AR')}
-`;
+carrito = [];
 
 localStorage.removeItem("carrito");
 
-carrito = [];
+guardarCarrito();
+
+document.getElementById("cart-items").innerHTML = "";
+
+document.getElementById("cart-total").innerText = "0";
 
 actualizarContador();
 
@@ -509,3 +511,13 @@ function buscarProductos(){
     );
 
 }
+window.addEventListener("pageshow", function () {
+
+    carrito =
+    JSON.parse(
+        localStorage.getItem("carrito")
+    ) || [];
+
+    actualizarContador();
+
+});
