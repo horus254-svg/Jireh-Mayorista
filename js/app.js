@@ -436,7 +436,17 @@ setTimeout(() => {
     `https://api.whatsapp.com/send?phone=5491140975795&text=${encodeURIComponent(mensaje)}`;
 
 }, 300);
-    
+    } catch(error){
+
+    console.error(error);
+
+    alert(
+      "Error al registrar el pedido"
+    );
+
+}
+
+}
     function cargarCategorias(){
 
     const select =
