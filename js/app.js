@@ -534,3 +534,51 @@ window.addEventListener("pageshow", function () {
     actualizarContador();
 
 });
+async function descargarCatalogo() {
+
+    const { jsPDF } = window.jspdf;
+
+    const doc = new jsPDF();
+
+    let y = 10;
+
+    const productosActivos = productos.filter(
+        p => Number(p.STOCK) > 0
+    );
+
+    for (let i = 0; i < productosActivos.length; i++) {
+
+        const p = productosActivos[i];
+
+        doc.setFontSize(12);
+        doc.text(p.PRODUCTO, 10, y);
+
+        doc.setFontSize(10);
+        doc.text("Precio: $" + Number(p.PRECIO).toLocaleString('es-AR'), 10, y + 6);
+
+        // imagen
+        const img = await fetch(p.IMAGEN);
+        const blob = await img.blob();
+        const reader = new FileReader();
+
+        await new Promise(resolve => {
+
+            reader.onload = function (e) {
+                doc.addImage(e.target.result, "JPEG", 10, y + 10, 40, 40);
+                resolve();
+            };
+
+            reader.readAsDataURL(blob);
+
+        });
+
+        y += 60;
+
+        if (y > 270) {
+            doc.addPage();
+            y = 10;
+        }
+    }
+
+    doc.save("catalogo.pdf");
+}
