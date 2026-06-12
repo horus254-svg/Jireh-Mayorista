@@ -360,6 +360,7 @@ async function checkoutWhatsapp(){
     "&nombre=" + encodeURIComponent(nombre) +
     "&empresa=" + encodeURIComponent(empresa) +
     "&direccion=" + encodeURIComponent(direccion) +
+    "&telefono=" + encodeURIComponent(telefono) +
     "&dni=" + encodeURIComponent(dni) +
     "&total=" + total +
     "&carrito=" + encodeURIComponent(
@@ -385,6 +386,7 @@ async function checkoutWhatsapp(){
 👤 Cliente: ${nombre}
 🏢 Empresa: ${empresa}
 🏠 Dirección: ${direccion}
+📱 Teléfono: ${telefono}
 🆔 DNI: ${dni}
 
 `;
