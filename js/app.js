@@ -532,3 +532,4 @@ window.addEventListener("pageshow", function () {
     ) || [];
 
     actualizarContador();
+}
