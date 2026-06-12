@@ -532,17 +532,83 @@ window.addEventListener("pageshow", function () {
     ) || [];
 
     actualizarContador();
-
-});
 async function descargarCatalogo() {
 
-    console.log("BOTÓN PRESIONADO");
-
     const { jsPDF } = window.jspdf;
-
     const doc = new jsPDF();
 
-    doc.text("TEST PDF OK", 10, 10);
+    let y = 10;
 
-    doc.save("test.pdf");
+    const productosActivos = productos.filter(
+        p => Number(p.STOCK) > 0
+    );
+
+    console.log("Productos catálogo:", productosActivos.length);
+
+    doc.setFontSize(16);
+    doc.text("CATÁLOGO MAYORISTA", 10, y);
+
+    y += 10;
+
+    for (let i = 0; i < productosActivos.length; i++) {
+
+        const p = productosActivos[i];
+
+        try {
+
+            doc.setFontSize(12);
+            doc.text(p.PRODUCTO, 10, y);
+
+            doc.setFontSize(10);
+            doc.text(
+                "Precio: $" + Number(p.PRECIO).toLocaleString('es-AR'),
+                10,
+                y + 6
+            );
+
+            // 🔥 IMAGEN OPCIONAL (NO ROMPE SI FALLA)
+            if (p.IMAGEN) {
+                try {
+                    const img = await fetch(p.IMAGEN);
+                    const blob = await img.blob();
+
+                    const reader = new FileReader();
+
+                    await new Promise(resolve => {
+
+                        reader.onload = function (e) {
+                            doc.addImage(
+                                e.target.result,
+                                "JPEG",
+                                10,
+                                y + 10,
+                                40,
+                                40
+                            );
+                            resolve();
+                        };
+
+                        reader.readAsDataURL(blob);
+                    });
+
+                } catch (imgErr) {
+                    console.log("Imagen falló:", p.PRODUCTO);
+                }
+            }
+
+        } catch (err) {
+            console.log("Error producto:", p.PRODUCTO, err);
+        }
+
+        y += 60;
+
+        if (y > 260) {
+            doc.addPage();
+            y = 10;
+        }
+    }
+
+    doc.save("catalogo.pdf");
 }
+});
+
