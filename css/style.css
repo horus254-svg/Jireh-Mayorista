@@ -263,3 +263,23 @@ body{
         z-index:10990 !important;
     }
 }
+.card-product h5{
+    font-size:15px;
+    line-height:1.4;
+    min-height:42px;
+    font-weight:600;
+}
+
+.card-product .btn-primary{
+    background:#2563eb;
+    border:none;
+}
+
+.card-product .btn-primary:hover{
+    background:#1d4ed8;
+}
+
+.card-product small{
+    text-transform:uppercase;
+    letter-spacing:.5px;
+}
