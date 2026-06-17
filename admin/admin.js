@@ -1,17 +1,47 @@
 if(sessionStorage.getItem("admin") !== "true"){
 
-    window.location.href = "login.html";
+window.location.href = "login.html";
 
 }
+
 const API_URL =
 "https://script.google.com/macros/s/AKfycbw1eY_mXImG503rU0Cqddx1WBuGIOhxaW_SXGoIMsug_CjsSC-HLsb2XzYwrovaGBU/exec";
 
 document.addEventListener(
 "DOMContentLoaded",
 () => {
+
+mostrarSeccion("dashboard");
+
 cargarPedidos();
+
 }
 );
+
+function mostrarSeccion(id){
+
+document
+.querySelectorAll(".seccion")
+.forEach(s => {
+s.style.display = "none";
+});
+
+const seccion =
+document.getElementById(id);
+
+if(seccion){
+seccion.style.display = "block";
+}
+
+if(id === "pedidos"){
+cargarPedidos();
+}
+
+if(id === "productos"){
+cargarProductos();
+}
+
+}
 
 async function cargarPedidos(){
 
@@ -19,7 +49,7 @@ try{
 
 const res =
 await fetch(
-  API_URL + "?action=pedidos"
+API_URL + "?action=pedidos"
 );
 
 const data =
@@ -38,132 +68,136 @@ const mesActual =
 new Date().getMonth();
 
 if(!data.pedidos){
-  console.error("No llegaron pedidos");
-  return;
+return;
 }
 
 data.pedidos.forEach(p=>{
 
-  if(p.ESTADO === "NUEVO"){
-    nuevos++;
-  }
+if(p.ESTADO === "NUEVO"){
+nuevos++;
+}
 
-  const fecha =
-  new Date(p.FECHA);
+const fecha =
+new Date(p.FECHA);
 
-  if(fecha.toDateString() === hoy){
-    ventasHoy += Number(p.TOTAL || 0);
-  }
+if(fecha.toDateString() === hoy){
+ventasHoy += Number(
+p.TOTAL || 0
+);
+}
 
-  if(fecha.getMonth() === mesActual){
-    ventasMes += Number(p.TOTAL || 0);
-  }
+if(fecha.getMonth() === mesActual){
+ventasMes += Number(
+p.TOTAL || 0
+);
+}
 
-  const colorEstado =
-  p.ESTADO === "NUEVO"
-  ? "table-warning"
-  : "";
+const colorEstado =
+p.ESTADO === "NUEVO"
+? "table-warning"
+: "";
 
-  html += `
-  <tr class="${colorEstado}">
+html += `
 
-    <td>${p.PEDIDO_ID || ""}</td>
+<tr class="${colorEstado}">
 
-    <td>
-    ${new Date(p.FECHA)
-    .toLocaleString("es-AR")}
-    </td>
+<td>${p.PEDIDO_ID || ""}</td>
 
-    <td>${p.NOMBRE || ""}</td>
+<td>
+${new Date(
+p.FECHA
+).toLocaleString("es-AR")}
+</td>
 
-    <td>
-    $${Number(
-      p.TOTAL || 0
-    ).toLocaleString("es-AR")}
-    </td>
+<td>${p.CLIENTE || ""}</td>
 
-    <td>
+<td>
+$${Number(
+p.TOTAL || 0
+).toLocaleString("es-AR")}
+</td>
 
-      <select
-      class="form-select form-select-sm"
-      onchange="
-      cambiarEstado(
-      '${p.PEDIDO_ID}',
-      this.value
-      )">
+<td>
 
-        <option
-        value="NUEVO"
-        ${p.ESTADO==="NUEVO"?"selected":""}>
-        NUEVO
-        </option>
+<select
+class="form-select form-select-sm"
+onchange="
+cambiarEstado(
+'${p.PEDIDO_ID}',
+this.value
+)">
 
-        <option
-        value="PREPARANDO"
-        ${p.ESTADO==="PREPARANDO"?"selected":""}>
-        PREPARANDO
-        </option>
+<option
+value="NUEVO"
+${p.ESTADO==="NUEVO"?"selected":""}>
+NUEVO
+</option>
 
-        <option
-        value="ENVIADO"
-        ${p.ESTADO==="ENVIADO"?"selected":""}>
-        ENVIADO
-        </option>
+<option
+value="PREPARANDO"
+${p.ESTADO==="PREPARANDO"?"selected":""}>
+PREPARANDO
+</option>
 
-        <option
-        value="ENTREGADO"
-        ${p.ESTADO==="ENTREGADO"?"selected":""}>
-        ENTREGADO
-        </option>
+<option
+value="ENVIADO"
+${p.ESTADO==="ENVIADO"?"selected":""}>
+ENVIADO
+</option>
 
-        <option
-        value="CANCELADO"
-        ${p.ESTADO==="CANCELADO"?"selected":""}>
-        CANCELADO
-        </option>
+<option
+value="ENTREGADO"
+${p.ESTADO==="ENTREGADO"?"selected":""}>
+ENTREGADO
+</option>
 
-      </select>
+<option
+value="CANCELADO"
+${p.ESTADO==="CANCELADO"?"selected":""}>
+CANCELADO
+</option>
 
-    </td>
+</select>
 
-    <td>
+</td>
 
-      ${
-        p.PDF_URL
-        ?
-        `<a
-          href="${p.PDF_URL}"
-          target="_blank"
-          class="btn btn-sm btn-primary">
-          PDF
-        </a>`
-        :
-        "-"
-      }
+<td>
 
-    </td>
+${
+p.PDF_URL
+?
+`<a
+href="${p.PDF_URL}"
+target="_blank"
+class="btn btn-sm btn-primary">
+PDF </a>`
+:
+"-"
+}
 
-  </tr>
-  `;
+</td>
+
+</tr>
+`;
 
 });
 
 document.getElementById(
-  "tablaPedidos"
+"tablaPedidos"
 ).innerHTML = html;
 
 document.getElementById(
-  "pedidosNuevos"
+"pedidosNuevos"
 ).innerText = nuevos;
 
 document.getElementById(
-  "ventasHoy"
+"ventasHoy"
 ).innerText =
 "$" +
 ventasHoy.toLocaleString("es-AR");
 
 document.getElementById(
-  "ventasMes"
+"ventasMes"
 ).innerText =
 "$" +
 ventasMes.toLocaleString("es-AR");
@@ -172,8 +206,8 @@ ventasMes.toLocaleString("es-AR");
 catch(error){
 
 console.error(
-  "Error cargando pedidos:",
-  error
+"Error cargando pedidos:",
+error
 );
 
 }
@@ -190,21 +224,21 @@ try{
 const res =
 await fetch(
 
-  API_URL +
+API_URL +
 
-  "?action=actualizarEstado" +
+"?action=actualizarEstado" +
 
-  "&pedidoId=" +
+"&pedidoId=" +
 
-  encodeURIComponent(
-    pedidoId
-  ) +
+encodeURIComponent(
+pedidoId
+) +
 
-  "&estado=" +
+"&estado=" +
 
-  encodeURIComponent(
-    estado
-  )
+encodeURIComponent(
+estado
+)
 
 );
 
@@ -213,37 +247,142 @@ await res.json();
 
 if(!data.success){
 
-  alert(
-    "No se pudo actualizar el estado"
-  );
+alert(
+"No se pudo actualizar el estado"
+);
 
-  return;
+return;
 
 }
 
 console.log(
-  "Estado actualizado"
+"Estado actualizado"
 );
 
 }
 catch(error){
 
 console.error(
-  "Error actualizando estado:",
-  error
+"Error actualizando estado:",
+error
 );
 
 alert(
-  "Error de conexión"
+"Error de conexión"
 );
 
 }
 
 }
+
+async function cargarProductos(){
+
+try{
+
+const res =
+await fetch(
+API_URL + "?action=productos"
+);
+
+const data =
+await res.json();
+
+let html = "";
+
+data.productos.forEach(p => {
+
+html += `
+
+<tr>
+
+<td>${p.CODIGO || ""}</td>
+
+<td>${p.PRODUCTO || ""}</td>
+
+<td>
+$${Number(
+p.PRECIO || 0
+).toLocaleString("es-AR")}
+</td>
+
+<td>
+
+<button
+class="btn btn-primary btn-sm"
+onclick="editarProducto('${p.CODIGO}')">
+
+Editar
+
+</button>
+
+<button
+class="btn btn-danger btn-sm ms-2"
+onclick="eliminarProducto('${p.CODIGO}')">
+
+Eliminar
+
+</button>
+
+</td>
+
+</tr>
+`;
+
+});
+
+document.getElementById(
+"tablaProductos"
+).innerHTML = html;
+
+}
+catch(error){
+
+console.error(
+"Error cargando productos:",
+error
+);
+
+}
+
+}
+
+function nuevoProducto(){
+
+alert(
+"Próximo paso: formulario alta producto"
+);
+
+}
+
+function editarProducto(codigo){
+
+alert(
+"Editar producto: " + codigo
+);
+
+}
+
+function eliminarProducto(codigo){
+
+if(
+!confirm(
+"¿Eliminar producto?"
+)
+){
+return;
+}
+
+alert(
+"Eliminar producto: " + codigo
+);
+
+}
+
 function logout(){
 
-    sessionStorage.removeItem("admin");
+sessionStorage.removeItem("admin");
 
-    window.location.href = "login.html";
+window.location.href =
+"login.html";
 
 }
