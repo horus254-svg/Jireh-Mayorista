@@ -50,9 +50,7 @@ productos = data.productos
 function mostrarProductos(lista){
 
     const container =
-    document.getElementById(
-      "productos"
-    );
+    document.getElementById("productos");
 
     let html = "";
 
@@ -120,9 +118,11 @@ function mostrarProductos(lista){
 
 `;
 
+    }); 
+
     container.innerHTML = html;
 
-}
+} 
 
 function agregarCarrito(codigo){
 
