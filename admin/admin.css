@@ -77,3 +77,16 @@ body{
   }
 
 }
+.card{
+    border:none;
+    border-radius:15px;
+    box-shadow:0 4px 12px rgba(0,0,0,.08);
+}
+
+.card h2{
+    font-weight:700;
+}
+
+.card h5{
+    color:#666;
+}
