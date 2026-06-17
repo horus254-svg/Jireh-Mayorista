@@ -1,13 +1,20 @@
 const API_URL =
 "https://script.google.com/macros/s/AKfycbw1eY_mXImG503rU0Cqddx1WBuGIOhxaW_SXGoIMsug_CjsSC-HLsb2XzYwrovaGBU/exec";
 
+document.addEventListener(
+"DOMContentLoaded",
+() => {
 cargarPedidos();
+}
+);
 
 async function cargarPedidos(){
 
+try{
+
 const res =
 await fetch(
-API_URL + "?action=pedidos"
+  API_URL + "?action=pedidos"
 );
 
 const data =
@@ -25,125 +32,146 @@ new Date().toDateString();
 const mesActual =
 new Date().getMonth();
 
+if(!data.pedidos){
+  console.error("No llegaron pedidos");
+  return;
+}
+
 data.pedidos.forEach(p=>{
 
-```
-if(p.ESTADO === "NUEVO")
-  nuevos++;
+  if(p.ESTADO === "NUEVO"){
+    nuevos++;
+  }
 
-const fecha =
-new Date(p.FECHA);
+  const fecha =
+  new Date(p.FECHA);
 
-if(fecha.toDateString() === hoy)
-  ventasHoy += Number(p.TOTAL);
+  if(fecha.toDateString() === hoy){
+    ventasHoy += Number(p.TOTAL || 0);
+  }
 
-if(fecha.getMonth() === mesActual)
-  ventasMes += Number(p.TOTAL);
+  if(fecha.getMonth() === mesActual){
+    ventasMes += Number(p.TOTAL || 0);
+  }
 
-const colorEstado =
-p.ESTADO === "NUEVO"
-? "table-warning"
-: "";
+  const colorEstado =
+  p.ESTADO === "NUEVO"
+  ? "table-warning"
+  : "";
 
-html += `
-<tr class="${colorEstado}">
+  html += `
+  <tr class="${colorEstado}">
 
-  <td>${p.PEDIDO_ID}</td>
+    <td>${p.PEDIDO_ID || ""}</td>
 
-  <td>
-  ${new Date(p.FECHA)
-  .toLocaleString('es-AR')}
-  </td>
+    <td>
+    ${new Date(p.FECHA)
+    .toLocaleString("es-AR")}
+    </td>
 
-  <td>${p.NOMBRE}</td>
+    <td>${p.NOMBRE || ""}</td>
 
-  <td>
-  $${Number(p.TOTAL)
-  .toLocaleString('es-AR')}
-  </td>
+    <td>
+    $${Number(
+      p.TOTAL || 0
+    ).toLocaleString("es-AR")}
+    </td>
 
-  <td>
+    <td>
 
-  <select
-  class="form-select form-select-sm"
-  onchange="
-  cambiarEstado(
-  '${p.PEDIDO_ID}',
-  this.value
-  )">
+      <select
+      class="form-select form-select-sm"
+      onchange="
+      cambiarEstado(
+      '${p.PEDIDO_ID}',
+      this.value
+      )">
 
-  <option
-  value="NUEVO"
-  ${p.ESTADO==="NUEVO"?"selected":""}>
-  NUEVO
-  </option>
+        <option
+        value="NUEVO"
+        ${p.ESTADO==="NUEVO"?"selected":""}>
+        NUEVO
+        </option>
 
-  <option
-  value="PREPARANDO"
-  ${p.ESTADO==="PREPARANDO"?"selected":""}>
-  PREPARANDO
-  </option>
+        <option
+        value="PREPARANDO"
+        ${p.ESTADO==="PREPARANDO"?"selected":""}>
+        PREPARANDO
+        </option>
 
-  <option
-  value="ENVIADO"
-  ${p.ESTADO==="ENVIADO"?"selected":""}>
-  ENVIADO
-  </option>
+        <option
+        value="ENVIADO"
+        ${p.ESTADO==="ENVIADO"?"selected":""}>
+        ENVIADO
+        </option>
 
-  <option
-  value="ENTREGADO"
-  ${p.ESTADO==="ENTREGADO"?"selected":""}>
-  ENTREGADO
-  </option>
+        <option
+        value="ENTREGADO"
+        ${p.ESTADO==="ENTREGADO"?"selected":""}>
+        ENTREGADO
+        </option>
 
-  <option
-  value="CANCELADO"
-  ${p.ESTADO==="CANCELADO"?"selected":""}>
-  CANCELADO
-  </option>
+        <option
+        value="CANCELADO"
+        ${p.ESTADO==="CANCELADO"?"selected":""}>
+        CANCELADO
+        </option>
 
-  </select>
+      </select>
 
-  </td>
+    </td>
 
-  <td>
+    <td>
 
-  <a
-  href="${p.PDF_URL}"
-  target="_blank"
-  class="btn btn-sm btn-primary">
+      ${
+        p.PDF_URL
+        ?
+        `<a
+          href="${p.PDF_URL}"
+          target="_blank"
+          class="btn btn-sm btn-primary">
+          PDF
+        </a>`
+        :
+        "-"
+      }
 
-  PDF
+    </td>
 
-  </a>
-
-  </td>
-
-</tr>
-`;
-```
+  </tr>
+  `;
 
 });
 
 document.getElementById(
-"tablaPedidos"
+  "tablaPedidos"
 ).innerHTML = html;
 
 document.getElementById(
-"pedidosNuevos"
+  "pedidosNuevos"
 ).innerText = nuevos;
 
 document.getElementById(
-"ventasHoy"
+  "ventasHoy"
 ).innerText =
 "$" +
-ventasHoy.toLocaleString('es-AR');
+ventasHoy.toLocaleString("es-AR");
 
 document.getElementById(
-"ventasMes"
+  "ventasMes"
 ).innerText =
 "$" +
-ventasMes.toLocaleString('es-AR');
+ventasMes.toLocaleString("es-AR");
+
+}
+catch(error){
+
+console.error(
+  "Error cargando pedidos:",
+  error
+);
+
+}
 
 }
 
@@ -152,26 +180,26 @@ pedidoId,
 estado
 ){
 
+try{
+
 const res =
 await fetch(
 
-```
-API_URL +
+  API_URL +
 
-"?action=actualizarEstado" +
+  "?action=actualizarEstado" +
 
-"&pedidoId=" +
+  "&pedidoId=" +
 
-encodeURIComponent(
-  pedidoId
-) +
+  encodeURIComponent(
+    pedidoId
+  ) +
 
-"&estado=" +
+  "&estado=" +
 
-encodeURIComponent(
-  estado
-)
-```
+  encodeURIComponent(
+    estado
+  )
 
 );
 
@@ -180,13 +208,29 @@ await res.json();
 
 if(!data.success){
 
-```
-alert(
-  "No se pudo actualizar el estado"
+  alert(
+    "No se pudo actualizar el estado"
+  );
+
+  return;
+
+}
+
+console.log(
+  "Estado actualizado"
 );
 
-return;
-```
+}
+catch(error){
+
+console.error(
+  "Error actualizando estado:",
+  error
+);
+
+alert(
+  "Error de conexión"
+);
 
 }
 
