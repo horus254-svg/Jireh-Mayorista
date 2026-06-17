@@ -1,0 +1,33 @@
+body{
+margin:0;
+font-family:Arial;
+background:#f5f5f5;
+}
+
+.sidebar{
+width:250px;
+height:100vh;
+background:#111827;
+color:white;
+position:fixed;
+padding:20px;
+}
+
+.sidebar a{
+display:block;
+color:white;
+text-decoration:none;
+padding:10px 0;
+}
+
+.sidebar a:hover
+
+.content{
+margin-left:270px;
+padding:20px;
+}
+
+.card{
+border:none;
+box-shadow:0 2px 10px rgba(0,0,0,.1);
+}
