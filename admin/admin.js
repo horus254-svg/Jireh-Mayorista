@@ -6,6 +6,71 @@ window.location.href = "login.html";
 
 const API_URL =
 "https://script.google.com/macros/s/AKfycbw1eY_mXImG503rU0Cqddx1WBuGIOhxaW_SXGoIMsug_CjsSC-HLsb2XzYwrovaGBU/exec";
+async function cargarMetricas(){
+
+  try{
+
+    const response =
+      await fetch(
+        API_URL + "?action=metricas"
+      );
+
+    const data =
+      await response.json();
+
+    document.getElementById(
+      "pedidosNuevos"
+    ).textContent =
+      data.pedidosNuevos;
+
+    document.getElementById(
+      "ventasHoy"
+    ).textContent =
+      "$" + data.ventasHoy.toLocaleString();
+
+    document.getElementById(
+      "ventasMes"
+    ).textContent =
+      "$" + data.ventasMes.toLocaleString();
+
+    document.getElementById(
+      "productosActivos"
+    ).textContent =
+      data.productosActivos;
+
+    document.getElementById(
+      "stockBajo"
+    ).textContent =
+      data.stockBajo;
+
+    document.getElementById(
+      "agotados"
+    ).textContent =
+      data.agotados;
+
+    document.getElementById(
+      "totalPedidos"
+    ).textContent =
+      data.totalPedidos;
+
+    document.getElementById(
+      "ticketPromedio"
+    ).textContent =
+      "$" +
+      Math.round(
+        data.ticketPromedio
+      ).toLocaleString();
+
+  }catch(error){
+
+    console.error(
+      "Error cargando métricas:",
+      error
+    );
+
+  }
+
+}
 
 document.addEventListener(
 "DOMContentLoaded",
