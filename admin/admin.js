@@ -85,6 +85,8 @@ mostrarSeccion("dashboard");
 
 await cargarMetricas();
 
+cargarPedidos();
+
 }
 );
 
@@ -255,22 +257,6 @@ PDF </a>`
 document.getElementById(
 "tablaPedidos"
 ).innerHTML = html;
-
-document.getElementById(
-"pedidosNuevos"
-).innerText = nuevos;
-
-document.getElementById(
-"ventasHoy"
-).innerText =
-"$" +
-ventasHoy.toLocaleString("es-AR");
-
-document.getElementById(
-"ventasMes"
-).innerText =
-"$" +
-ventasMes.toLocaleString("es-AR");
 
 }
 catch(error){
