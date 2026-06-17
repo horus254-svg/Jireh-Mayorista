@@ -53,18 +53,30 @@ async function cargarMetricas(){
 ).textContent =
   data.clientesUnicos;
 
-    document.getElementById(
-      "totalPedidos"
-    ).textContent =
-      data.totalPedidos;
+   const totalPedidos =
+document.getElementById("totalPedidos");
 
-    document.getElementById(
-      "ticketPromedio"
-    ).textContent =
-      "$" +
-      Math.round(
-        data.ticketPromedio
-      ).toLocaleString();
+const ticketPromedio =
+document.getElementById("ticketPromedio");
+
+
+if(totalPedidos){
+
+totalPedidos.textContent =
+data.totalPedidos;
+
+}
+
+
+if(ticketPromedio){
+
+ticketPromedio.textContent =
+"$" +
+Math.round(
+data.ticketPromedio
+).toLocaleString("es-AR");
+
+}
 
   }catch(error){
 
@@ -84,8 +96,6 @@ async () => {
 mostrarSeccion("dashboard");
 
 await cargarMetricas();
-
-cargarPedidos();
 
 }
 );
