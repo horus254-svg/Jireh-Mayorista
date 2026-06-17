@@ -77,6 +77,11 @@ data.ticketPromedio
 ).toLocaleString("es-AR");
 
 }
+    setTimeout(()=>{
+
+cargarMetricas();
+
+},2000);
 
   }catch(error){
 
