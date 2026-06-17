@@ -283,3 +283,37 @@ body{
     text-transform:uppercase;
     letter-spacing:.5px;
 }
+.card-product{
+    cursor:pointer;
+}
+
+.card-product img{
+    transition:transform .3s ease;
+}
+
+.card-product:hover img{
+    transform:scale(1.05);
+}
+
+.price{
+    font-size:1.6rem;
+    font-weight:700;
+    margin-top:10px;
+}
+
+.card-product .btn{
+    font-weight:600;
+    border-radius:12px;
+}
+
+.card-product{
+    background:white;
+}
+
+.card-product h5{
+    color:#1f2937;
+}
+
+.card-product p{
+    margin-bottom:8px;
+}
