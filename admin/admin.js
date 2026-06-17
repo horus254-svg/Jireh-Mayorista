@@ -5,71 +5,189 @@ cargarPedidos();
 
 async function cargarPedidos(){
 
-  const res =
-  await fetch(
-    API_URL + "?action=pedidos"
-  );
+const res =
+await fetch(
+API_URL + "?action=pedidos"
+);
 
-  const data =
-  await res.json();
+const data =
+await res.json();
 
-  let html = "";
+let html = "";
 
-  let nuevos = 0;
-  let ventasHoy = 0;
-  let ventasMes = 0;
+let nuevos = 0;
+let ventasHoy = 0;
+let ventasMes = 0;
 
-  const hoy =
-  new Date().toDateString();
+const hoy =
+new Date().toDateString();
 
-  const mesActual =
-  new Date().getMonth();
+const mesActual =
+new Date().getMonth();
 
-  data.pedidos.forEach(p=>{
+data.pedidos.forEach(p=>{
 
-    if(p.ESTADO==="NUEVO")
-      nuevos++;
+```
+if(p.ESTADO === "NUEVO")
+  nuevos++;
 
-    const fecha =
-    new Date(p.FECHA);
+const fecha =
+new Date(p.FECHA);
 
-    if(fecha.toDateString()===hoy)
-      ventasHoy += Number(p.TOTAL);
+if(fecha.toDateString() === hoy)
+  ventasHoy += Number(p.TOTAL);
 
-    if(fecha.getMonth()===mesActual)
-      ventasMes += Number(p.TOTAL);
+if(fecha.getMonth() === mesActual)
+  ventasMes += Number(p.TOTAL);
 
-    html += `
-    <tr>
-      <td>${p.PEDIDO_ID}</td>
-      <td>${p.FECHA}</td>
-      <td>${p.NOMBRE}</td>
-      <td>$${Number(p.TOTAL).toLocaleString('es-AR')}</td>
-      <td>${p.ESTADO}</td>
-      <td>
-        <a href="${p.PDF_URL}" target="_blank">
-        Ver PDF
-        </a>
-      </td>
-    </tr>
-    `;
-  });
+const colorEstado =
+p.ESTADO === "NUEVO"
+? "table-warning"
+: "";
 
-  document.getElementById(
-    "tablaPedidos"
-  ).innerHTML = html;
+html += `
+<tr class="${colorEstado}">
 
-  document.getElementById(
-    "pedidosNuevos"
-  ).innerText = nuevos;
+  <td>${p.PEDIDO_ID}</td>
 
-  document.getElementById(
-    "ventasHoy"
-  ).innerText =
-  "$" + ventasHoy.toLocaleString('es-AR');
+  <td>
+  ${new Date(p.FECHA)
+  .toLocaleString('es-AR')}
+  </td>
 
-  document.getElementById(
-    "ventasMes"
-  ).innerText =
-  "$" + ventasMes.toLocaleString('es-AR');
+  <td>${p.NOMBRE}</td>
+
+  <td>
+  $${Number(p.TOTAL)
+  .toLocaleString('es-AR')}
+  </td>
+
+  <td>
+
+  <select
+  class="form-select form-select-sm"
+  onchange="
+  cambiarEstado(
+  '${p.PEDIDO_ID}',
+  this.value
+  )">
+
+  <option
+  value="NUEVO"
+  ${p.ESTADO==="NUEVO"?"selected":""}>
+  NUEVO
+  </option>
+
+  <option
+  value="PREPARANDO"
+  ${p.ESTADO==="PREPARANDO"?"selected":""}>
+  PREPARANDO
+  </option>
+
+  <option
+  value="ENVIADO"
+  ${p.ESTADO==="ENVIADO"?"selected":""}>
+  ENVIADO
+  </option>
+
+  <option
+  value="ENTREGADO"
+  ${p.ESTADO==="ENTREGADO"?"selected":""}>
+  ENTREGADO
+  </option>
+
+  <option
+  value="CANCELADO"
+  ${p.ESTADO==="CANCELADO"?"selected":""}>
+  CANCELADO
+  </option>
+
+  </select>
+
+  </td>
+
+  <td>
+
+  <a
+  href="${p.PDF_URL}"
+  target="_blank"
+  class="btn btn-sm btn-primary">
+
+  PDF
+
+  </a>
+
+  </td>
+
+</tr>
+`;
+```
+
+});
+
+document.getElementById(
+"tablaPedidos"
+).innerHTML = html;
+
+document.getElementById(
+"pedidosNuevos"
+).innerText = nuevos;
+
+document.getElementById(
+"ventasHoy"
+).innerText =
+"$" +
+ventasHoy.toLocaleString('es-AR');
+
+document.getElementById(
+"ventasMes"
+).innerText =
+"$" +
+ventasMes.toLocaleString('es-AR');
+
+}
+
+async function cambiarEstado(
+pedidoId,
+estado
+){
+
+const res =
+await fetch(
+
+```
+API_URL +
+
+"?action=actualizarEstado" +
+
+"&pedidoId=" +
+
+encodeURIComponent(
+  pedidoId
+) +
+
+"&estado=" +
+
+encodeURIComponent(
+  estado
+)
+```
+
+);
+
+const data =
+await res.json();
+
+if(!data.success){
+
+```
+alert(
+  "No se pudo actualizar el estado"
+);
+
+return;
+```
+
+}
+
 }
