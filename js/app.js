@@ -84,33 +84,29 @@ function mostrarProductos(lista){
 
         <img src="${p.IMAGEN}" alt="${p.PRODUCTO}">
 
-        <div class="p-3 d-flex flex-column h-100">
+        <div class="p-3">
 
-            <small class="text-muted mb-2">
-                ${p.CATEGORIA}
-            </small>
+    <small class="text-muted">
+        ${p.CATEGORIA}
+    </small>
 
-            <h5>
-                ${p.PRODUCTO}
-            </h5>
+    <h5 class="mt-2">
+        ${p.PRODUCTO}
+    </h5>
 
-            <div class="mt-auto">
+    <div class="price mt-3">
+        $${Number(p.PRECIO).toLocaleString('es-AR')}
+    </div>
 
-                <div class="price">
-                    $${Number(p.PRECIO).toLocaleString('es-AR')}
-                </div>
+    <button
+        class="btn btn-primary w-100 mt-3"
+        onclick="agregarCarrito('${p.CODIGO}')">
 
-                <button
-                    class="btn btn-primary w-100 mt-3"
-                    onclick="agregarCarrito('${p.CODIGO}')">
+        🛒 Agregar al carrito
 
-                    🛒 Agregar al carrito
+    </button>
 
-                </button>
-
-            </div>
-
-        </div>
+</div>
 
     </div>
 
