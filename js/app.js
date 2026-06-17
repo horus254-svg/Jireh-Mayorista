@@ -60,44 +60,53 @@ function mostrarProductos(lista){
 
         html += `
 
-        <div class="col-md-3 mb-4">
+<div class="col-xl-3 col-lg-4 col-md-6 col-sm-6 mb-4">
 
-        <div class="card-product position-relative">
-${
-String(p.DESTACADO || "").trim().length > 0
-? `
-<div class="ribbon-destacado">
-⭐ DESTACADO
-</div>
-`
-: ''
-}
+    <div class="card-product position-relative h-100">
 
-${
-String(p.OFERTA || "").trim().length > 0
-? `
-<div class="ribbon-oferta">
-🔥 OFERTA
-</div>
-`
-: ''
-}
-            <img src="${p.IMAGEN}">
+        ${
+        String(p.DESTACADO || "").trim().length > 0
+        ? `
+        <div class="ribbon-destacado">
+            ⭐ DESTACADO
+        </div>
+        `
+        : ''
+        }
 
-            <div class="p-3">
+        ${
+        String(p.OFERTA || "").trim().length > 0
+        ? `
+        <div class="ribbon-oferta">
+            🔥 OFERTA
+        </div>
+        `
+        : ''
+        }
 
-     <h5>${p.PRODUCTO}</h5>
-                <p>${p.CATEGORIA}</p>
+        <img src="${p.IMAGEN}" alt="${p.PRODUCTO}">
+
+        <div class="p-3 d-flex flex-column h-100">
+
+            <small class="text-muted mb-2">
+                ${p.CATEGORIA}
+            </small>
+
+            <h5>
+                ${p.PRODUCTO}
+            </h5>
+
+            <div class="mt-auto">
 
                 <div class="price">
                     $${Number(p.PRECIO).toLocaleString('es-AR')}
                 </div>
 
                 <button
-                  class="btn btn-primary w-100 mt-2"
-                  onclick="agregarCarrito('${p.CODIGO}')">
+                    class="btn btn-primary w-100 mt-3"
+                    onclick="agregarCarrito('${p.CODIGO}')">
 
-                  Agregar
+                    🛒 Agregar al carrito
 
                 </button>
 
@@ -105,10 +114,11 @@ String(p.OFERTA || "").trim().length > 0
 
         </div>
 
-        </div>
+    </div>
 
-        `;
-    });
+</div>
+
+`;
 
     container.innerHTML = html;
 
