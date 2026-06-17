@@ -47,6 +47,11 @@ async function cargarMetricas(){
       "agotados"
     ).textContent =
       data.agotados;
+    
+    document.getElementById(
+  "clientesUnicos"
+).textContent =
+  data.clientesUnicos;
 
     document.getElementById(
       "totalPedidos"
@@ -74,11 +79,11 @@ async function cargarMetricas(){
 
 document.addEventListener(
 "DOMContentLoaded",
-() => {
+async () => {
 
 mostrarSeccion("dashboard");
 
-cargarPedidos();
+await cargarMetricas();
 
 }
 );
