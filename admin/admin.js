@@ -1,3 +1,8 @@
+if(sessionStorage.getItem("admin") !== "true"){
+
+    window.location.href = "login.html";
+
+}
 const API_URL =
 "https://script.google.com/macros/s/AKfycbw1eY_mXImG503rU0Cqddx1WBuGIOhxaW_SXGoIMsug_CjsSC-HLsb2XzYwrovaGBU/exec";
 
@@ -233,5 +238,12 @@ alert(
 );
 
 }
+
+}
+function logout(){
+
+    sessionStorage.removeItem("admin");
+
+    window.location.href = "login.html";
 
 }

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Login Admin</title>
+</head>
+<body>
+
+<h2>Acceso Administrativo</h2>
+
+<input type="text" id="usuario" placeholder="Usuario">
+<input type="password" id="password" placeholder="Contraseña">
+
+<button onclick="login()">Ingresar</button>
+
+<script>
+const API_URL = "TU_WEBAPP_URL";
+
+async function login(){
+
+  const usuario = document.getElementById("usuario").value;
+  const password = document.getElementById("password").value;
+
+  const r = await fetch(
+    `${API_URL}?action=login&usuario=${encodeURIComponent(usuario)}&password=${encodeURIComponent(password)}`
+  );
+
+  const data = await r.json();
+
+  if(data.success){
+
+    sessionStorage.setItem("admin", "true");
+
+    window.location.href = "admin.html";
+
+  }else{
+
+    alert("Usuario o contraseña incorrectos");
+
+  }
+
+}
+</script>
+
+</body>
+</html>
