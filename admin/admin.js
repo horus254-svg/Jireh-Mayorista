@@ -1,459 +1,470 @@
-if(sessionStorage.getItem("admin") !== "true"){
-
-window.location.href = "login.html";
-
-}
-
 const API_URL =
 "https://script.google.com/macros/s/AKfycbw1eY_mXImG503rU0Cqddx1WBuGIOhxaW_SXGoIMsug_CjsSC-HLsb2XzYwrovaGBU/exec";
-async function cargarMetricas(){
 
-  try{
-
-    const response =
-      await fetch(
-        API_URL + "?action=metricas"
-      );
-
-    const data =
-      await response.json();
-
-    document.getElementById(
-      "pedidosNuevos"
-    ).textContent =
-      data.pedidosNuevos;
-
-    document.getElementById(
-      "ventasHoy"
-    ).textContent =
-      "$" + data.ventasHoy.toLocaleString();
-
-    document.getElementById(
-      "ventasMes"
-    ).textContent =
-      "$" + data.ventasMes.toLocaleString();
-
-    document.getElementById(
-      "productosActivos"
-    ).textContent =
-      data.productosActivos;
-
-    document.getElementById(
-      "stockBajo"
-    ).textContent =
-      data.stockBajo;
-
-    document.getElementById(
-      "agotados"
-    ).textContent =
-      data.agotados;
-    
-    document.getElementById(
-  "clientesUnicos"
-).textContent =
-  data.clientesUnicos;
-
-   const totalPedidos =
-document.getElementById("totalPedidos");
-
-const ticketPromedio =
-document.getElementById("ticketPromedio");
-
-
-if(totalPedidos){
-
-totalPedidos.textContent =
-data.totalPedidos;
-
+if (sessionStorage.getItem("admin") !== "true") {
+window.location.href = "login.html";
 }
 
+document.addEventListener("DOMContentLoaded", async () => {
 
-if(ticketPromedio){
-
-ticketPromedio.textContent =
-"$" +
-Math.round(
-data.ticketPromedio
-).toLocaleString("es-AR");
-
-}
-    setTimeout(()=>{
-
-cargarMetricas();
-
-},2000);
-
-  }catch(error){
-
-    console.error(
-      "Error cargando métricas:",
-      error
-    );
-
-  }
-
-}
-
-document.addEventListener(
-"DOMContentLoaded",
-async () => {
-
+```
 mostrarSeccion("dashboard");
 
 await cargarMetricas();
 
-}
-);
+setInterval(cargarMetricas, 5000);
+```
 
-function mostrarSeccion(id){
-
-document
-.querySelectorAll(".seccion")
-.forEach(s => {
-s.style.display = "none";
 });
+
+function escapeHtml(text) {
+
+```
+const div = document.createElement("div");
+
+div.textContent = text || "";
+
+return div.innerHTML;
+```
+
+}
+
+function actualizarElemento(id, valor) {
+
+```
+const el = document.getElementById(id);
+
+if (el) {
+    el.textContent = valor;
+}
+```
+
+}
+
+async function cargarMetricas() {
+
+```
+try {
+
+    const response =
+        await fetch(
+            API_URL + "?action=metricas"
+        );
+
+    const data =
+        await response.json();
+
+    actualizarElemento(
+        "pedidosNuevos",
+        data.pedidosNuevos || 0
+    );
+
+    actualizarElemento(
+        "ventasHoy",
+        "$" +
+        Number(
+            data.ventasHoy || 0
+        ).toLocaleString("es-AR")
+    );
+
+    actualizarElemento(
+        "ventasMes",
+        "$" +
+        Number(
+            data.ventasMes || 0
+        ).toLocaleString("es-AR")
+    );
+
+    actualizarElemento(
+        "productosActivos",
+        data.productosActivos || 0
+    );
+
+    actualizarElemento(
+        "stockBajo",
+        data.stockBajo || 0
+    );
+
+    actualizarElemento(
+        "agotados",
+        data.agotados || 0
+    );
+
+    actualizarElemento(
+        "clientesUnicos",
+        data.clientesUnicos || 0
+    );
+
+    actualizarElemento(
+        "TotalPedidos",
+        data.totalPedidos || 0
+    );
+
+    actualizarElemento(
+        "totalPedidos",
+        data.totalPedidos || 0
+    );
+
+    actualizarElemento(
+        "TicketPromedio",
+        "$" +
+        Math.round(
+            data.ticketPromedio || 0
+        ).toLocaleString("es-AR")
+    );
+
+    actualizarElemento(
+        "ticketPromedio",
+        "$" +
+        Math.round(
+            data.ticketPromedio || 0
+        ).toLocaleString("es-AR")
+    );
+
+    actualizarElemento(
+        "ventasTotales",
+        "$" +
+        Number(
+            data.ventasMes || 0
+        ).toLocaleString("es-AR")
+    );
+
+}
+catch (error) {
+
+    console.error(
+        "Error métricas:",
+        error
+    );
+
+}
+```
+
+}
+
+function mostrarSeccion(id) {
+
+```
+document
+    .querySelectorAll(".seccion")
+    .forEach(sec => {
+        sec.style.display = "none";
+    });
 
 const seccion =
-document.getElementById(id);
+    document.getElementById(id);
 
-if(seccion){
-seccion.style.display = "block";
+if (seccion) {
+    seccion.style.display = "block";
 }
 
-if(id === "pedidos"){
-cargarPedidos();
+if (id === "pedidos") {
+    cargarPedidos();
 }
 
-if(id === "productos"){
-cargarProductos();
+if (id === "productos") {
+    cargarProductos();
+}
+```
+
 }
 
-}
+async function cargarPedidos() {
 
-async function cargarPedidos(){
+```
+try {
 
-try{
+    const response =
+        await fetch(
+            API_URL + "?action=pedidos"
+        );
 
-const res =
-await fetch(
-API_URL + "?action=pedidos"
-);
+    const data =
+        await response.json();
 
-const data =
-await res.json();
+    let html = "";
 
-let html = "";
+    if (!data.pedidos) {
+        return;
+    }
 
-let nuevos = 0;
-let ventasHoy = 0;
-let ventasMes = 0;
+    data.pedidos.forEach(p => {
 
-const hoy =
-new Date().toDateString();
+        const estadoColor =
+            p.ESTADO === "NUEVO"
+            ? "table-warning"
+            : "";
 
-const mesActual =
-new Date().getMonth();
+        html += `
+        <tr class="${estadoColor}">
 
-if(!data.pedidos){
-return;
-}
+            <td>${escapeHtml(p.PEDIDO_ID)}</td>
 
-data.pedidos.forEach(p=>{
+            <td>
+                ${new Date(
+                    p.FECHA
+                ).toLocaleString("es-AR")}
+            </td>
 
-if(p.ESTADO === "NUEVO"){
-nuevos++;
-}
+            <td>
+                ${escapeHtml(p.CLIENTE)}
+            </td>
 
-const fecha =
-new Date(p.FECHA);
+            <td>
+                $${Number(
+                    p.TOTAL || 0
+                ).toLocaleString("es-AR")}
+            </td>
 
-if(fecha.toDateString() === hoy){
-ventasHoy += Number(
-p.TOTAL || 0
-);
-}
+            <td>
 
-if(fecha.getMonth() === mesActual){
-ventasMes += Number(
-p.TOTAL || 0
-);
-}
+                <select
+                    class="form-select form-select-sm"
+                    onchange="cambiarEstado('${p.PEDIDO_ID}',this.value)">
 
-const colorEstado =
-p.ESTADO === "NUEVO"
-? "table-warning"
-: "";
+                    <option value="NUEVO" ${p.ESTADO==="NUEVO"?"selected":""}>
+                        NUEVO
+                    </option>
 
-html += `
+                    <option value="PREPARANDO" ${p.ESTADO==="PREPARANDO"?"selected":""}>
+                        PREPARANDO
+                    </option>
 
-<tr class="${colorEstado}">
+                    <option value="ENVIADO" ${p.ESTADO==="ENVIADO"?"selected":""}>
+                        ENVIADO
+                    </option>
 
-<td>${p.PEDIDO_ID || ""}</td>
+                    <option value="ENTREGADO" ${p.ESTADO==="ENTREGADO"?"selected":""}>
+                        ENTREGADO
+                    </option>
 
-<td>
-${new Date(
-p.FECHA
-).toLocaleString("es-AR")}
-</td>
+                    <option value="CANCELADO" ${p.ESTADO==="CANCELADO"?"selected":""}>
+                        CANCELADO
+                    </option>
 
-<td>${p.CLIENTE || ""}</td>
+                </select>
 
-<td>
-$${Number(
-p.TOTAL || 0
-).toLocaleString("es-AR")}
-</td>
+            </td>
 
-<td>
+            <td>
 
-<select
-class="form-select form-select-sm"
-onchange="
-cambiarEstado(
-'${p.PEDIDO_ID}',
-this.value
-)">
+                ${
+                    p.PDF_URL
+                    ?
+                    `<a
+                        href="${p.PDF_URL}"
+                        target="_blank"
+                        class="btn btn-primary btn-sm">
+                        PDF
+                    </a>`
+                    :
+                    "-"
+                }
 
-<option
-value="NUEVO"
-${p.ESTADO==="NUEVO"?"selected":""}>
-NUEVO
-</option>
+            </td>
 
-<option
-value="PREPARANDO"
-${p.ESTADO==="PREPARANDO"?"selected":""}>
-PREPARANDO
-</option>
+        </tr>
+        `;
 
-<option
-value="ENVIADO"
-${p.ESTADO==="ENVIADO"?"selected":""}>
-ENVIADO
-</option>
+    });
 
-<option
-value="ENTREGADO"
-${p.ESTADO==="ENTREGADO"?"selected":""}>
-ENTREGADO
-</option>
-
-<option
-value="CANCELADO"
-${p.ESTADO==="CANCELADO"?"selected":""}>
-CANCELADO
-</option>
-
-</select>
-
-</td>
-
-<td>
-
-${
-p.PDF_URL
-?
-`<a
-href="${p.PDF_URL}"
-target="_blank"
-class="btn btn-sm btn-primary">
-PDF </a>`
-:
-"-"
-}
-
-</td>
-
-</tr>
-`;
-
-});
-
-document.getElementById(
-"tablaPedidos"
-).innerHTML = html;
+    document.getElementById(
+        "tablaPedidos"
+    ).innerHTML = html;
 
 }
-catch(error){
+catch (error) {
 
-console.error(
-"Error cargando pedidos:",
-error
-);
+    console.error(
+        "Error pedidos:",
+        error
+    );
 
 }
+```
 
 }
 
 async function cambiarEstado(
 pedidoId,
 estado
-){
+) {
 
-try{
+```
+try {
 
-const res =
-await fetch(
+    const response =
+        await fetch(
 
-API_URL +
+            API_URL +
 
-"?action=actualizarEstado" +
+            "?action=actualizarEstado" +
 
-"&pedidoId=" +
+            "&pedidoId=" +
+            encodeURIComponent(
+                pedidoId
+            ) +
 
-encodeURIComponent(
-pedidoId
-) +
+            "&estado=" +
+            encodeURIComponent(
+                estado
+            )
 
-"&estado=" +
+        );
 
-encodeURIComponent(
-estado
-)
+    const data =
+        await response.json();
 
+    if (!data.success) {
+
+        alert(
+            "No se pudo actualizar"
+        );
+
+        return;
+    }
+
+}
+catch (error) {
+
+    console.error(error);
+
+    alert(
+        "Error de conexión"
+    );
+
+}
+```
+
+}
+
+async function cargarProductos() {
+
+```
+try {
+
+    const response =
+        await fetch(
+            API_URL + "?action=productos"
+        );
+
+    const data =
+        await response.json();
+
+    let html = "";
+
+    if (!data.productos) {
+        return;
+    }
+
+    data.productos.forEach(p => {
+
+        html += `
+        <tr>
+
+            <td>
+                ${escapeHtml(p.CODIGO)}
+            </td>
+
+            <td>
+                ${escapeHtml(p.PRODUCTO)}
+            </td>
+
+            <td>
+                $${Number(
+                    p.PRECIO || 0
+                ).toLocaleString("es-AR")}
+            </td>
+
+            <td>
+
+                <button
+                    class="btn btn-primary btn-sm"
+                    onclick="editarProducto('${p.CODIGO}')">
+
+                    Editar
+
+                </button>
+
+                <button
+                    class="btn btn-danger btn-sm ms-2"
+                    onclick="eliminarProducto('${p.CODIGO}')">
+
+                    Eliminar
+
+                </button>
+
+            </td>
+
+        </tr>
+        `;
+
+    });
+
+    document.getElementById(
+        "tablaProductos"
+    ).innerHTML = html;
+
+}
+catch (error) {
+
+    console.error(
+        "Error productos:",
+        error
+    );
+
+}
+```
+
+}
+
+function nuevoProducto() {
+
+```
+alert(
+    "Debes crear la acción crearProducto en Apps Script."
 );
+```
 
-const data =
-await res.json();
+}
 
-if(!data.success){
+function editarProducto(codigo) {
+
+```
+alert(
+    "Editar producto: " + codigo
+);
+```
+
+}
+
+function eliminarProducto(codigo) {
+
+```
+if (
+    !confirm(
+        "¿Eliminar producto?"
+    )
+) {
+    return;
+}
 
 alert(
-"No se pudo actualizar el estado"
+    "Debes crear la acción eliminarProducto en Apps Script.\nCódigo: " + codigo
 );
-
-return;
+```
 
 }
 
-console.log(
-"Estado actualizado"
+function logout() {
+
+```
+sessionStorage.removeItem(
+    "admin"
 );
-
-}
-catch(error){
-
-console.error(
-"Error actualizando estado:",
-error
-);
-
-alert(
-"Error de conexión"
-);
-
-}
-
-}
-
-async function cargarProductos(){
-
-try{
-
-const res =
-await fetch(
-API_URL + "?action=productos"
-);
-
-const data =
-await res.json();
-
-let html = "";
-
-data.productos.forEach(p => {
-
-html += `
-
-<tr>
-
-<td>${p.CODIGO || ""}</td>
-
-<td>${p.PRODUCTO || ""}</td>
-
-<td>
-$${Number(
-p.PRECIO || 0
-).toLocaleString("es-AR")}
-</td>
-
-<td>
-
-<button
-class="btn btn-primary btn-sm"
-onclick="editarProducto('${p.CODIGO}')">
-
-Editar
-
-</button>
-
-<button
-class="btn btn-danger btn-sm ms-2"
-onclick="eliminarProducto('${p.CODIGO}')">
-
-Eliminar
-
-</button>
-
-</td>
-
-</tr>
-`;
-
-});
-
-document.getElementById(
-"tablaProductos"
-).innerHTML = html;
-
-}
-catch(error){
-
-console.error(
-"Error cargando productos:",
-error
-);
-
-}
-
-}
-
-function nuevoProducto(){
-
-alert(
-"Próximo paso: formulario alta producto"
-);
-
-}
-
-function editarProducto(codigo){
-
-alert(
-"Editar producto: " + codigo
-);
-
-}
-
-function eliminarProducto(codigo){
-
-if(
-!confirm(
-"¿Eliminar producto?"
-)
-){
-return;
-}
-
-alert(
-"Eliminar producto: " + codigo
-);
-
-}
-
-function logout(){
-
-sessionStorage.removeItem("admin");
 
 window.location.href =
-"login.html";
+    "login.html";
+```
 
 }
