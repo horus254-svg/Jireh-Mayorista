@@ -404,9 +404,17 @@ body{
     transition:.3s;
 }
 
+.whatsapp-float-text img{
+
+    width:28px;
+    height:28px;
+}
+
 .whatsapp-float-text:hover{
 
     transform:scale(1.05);
 
     color:white;
+
+    text-decoration:none;
 }
