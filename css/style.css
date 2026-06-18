@@ -418,3 +418,44 @@ body{
 
     text-decoration:none;
 }
+.navbar{
+    min-height:70px;
+}
+
+.navbar .form-control{
+    max-width:400px;
+}
+
+.navbar .form-select{
+    max-width:220px;
+}
+@media(max-width:768px){
+
+    .navbar .container{
+        flex-wrap:wrap;
+        gap:8px;
+    }
+
+    .navbar-brand{
+        width:100%;
+        text-align:center;
+    }
+
+    .navbar .d-flex{
+        width:100%;
+        margin:0 !important;
+    }
+
+    .navbar .form-control,
+    .navbar .form-select{
+        max-width:none;
+    }
+
+    .navbar .btn-success{
+        width:100%;
+    }
+
+    .hero{
+        margin-top:130px;
+    }
+}
