@@ -14,51 +14,46 @@
 
     <!-- NAVBAR -->
 
-    <nav class="navbar navbar-dark bg-dark fixed-top">
-        <div class="container">
+   <nav class="navbar navbar-dark fixed-top">
 
-            <span class="navbar-brand fw-bold">
-                🛒 Jireh Mayorista
-            </span>
-             <section class="container mb-4">
+    <div class="container">
 
-        <div class="row g-3">
+        <span class="navbar-brand fw-bold">
+            🛒 Jireh Mayorista
+        </span>
 
-            <div class="col-12 col-md-6">
+        <div class="d-flex flex-grow-1 mx-3 gap-2">
 
-                <input
-                    id="search"
-                    class="form-control"
-                    placeholder="🔍 Buscar producto..."
-                    onkeyup="buscarProductos()">
+            <input
+                id="search"
+                class="form-control"
+                placeholder="🔍 Buscar producto..."
+                onkeyup="buscarProductos()">
 
-            </div>
+            <select
+                id="categorias"
+                class="form-select"
+                onchange="filtrarCategoria()">
 
-            <div class="col-12 col-md-6">
+                <option value="">
+                    Todas las categorías
+                </option>
 
-                <select
-                    id="categorias"
-                    class="form-select"
-                    onchange="filtrarCategoria()">
-
-                    <option value="">
-                        Todas las categorías
-                    </option>
-
-                </select>
-
-            </div>
+            </select>
 
         </div>
 
-    </section>
+        <button
+            class="btn btn-success"
+            onclick="abrirCarrito()">
 
-            <button class="btn btn-success" onclick="abrirCarrito()">
-                Carrito (<span id="cart-count">0</span>)
-            </button>
+            Carrito (<span id="cart-count">0</span>)
 
-        </div>
-    </nav>
+        </button>
+
+    </div>
+
+</nav>
 
     <!-- HERO -->
 
