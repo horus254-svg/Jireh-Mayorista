@@ -443,3 +443,38 @@ window.location.href =
     "login.html";
 
 }
+async function cargarClientes(){
+
+const response =
+await fetch(
+API_URL + "?action=clientes"
+);
+
+const data =
+await response.json();
+
+let html = "";
+
+data.clientes.forEach(c => {
+
+html += `
+<tr>
+
+<td>${c.CLIENTE}</td>
+<td>${c.EMPRESA}</td>
+<td>${c.DIRECCION}</td>
+<td>${c.TELEFONO}</td>
+<td>${c.DNI}</td>
+<td>${c.PEDIDOS}</td>
+<td>$${c.TOTAL.toLocaleString("es-AR")}</td>
+
+</tr>
+`;
+
+});
+
+document.getElementById(
+"tablaClientes"
+).innerHTML = html;
+
+}
