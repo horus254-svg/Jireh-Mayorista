@@ -169,6 +169,47 @@ onclick="mostrarSeccion('pedidos')">
 
 </div>
 
+<div id="ventaLocal" class="seccion">
+
+  <div class="card p-3">
+
+    <h4>🛒 Venta Local</h4>
+
+    <input
+      type="text"
+      id="codigoBarras"
+      class="form-control mb-3"
+      placeholder="Escanear código..."
+      onkeypress="
+      if(event.key==='Enter'){
+        agregarProductoVenta(this.value);
+        this.value='';
+      }">
+
+    <table class="table">
+
+      <thead>
+        <tr>
+          <th>Código</th>
+          <th>Producto</th>
+          <th>Cant.</th>
+          <th>Precio</th>
+          <th>Subtotal</th>
+        </tr>
+      </thead>
+
+      <tbody id="tablaVentaLocal"></tbody>
+
+    </table>
+
+    <h3>
+      Total:
+      <span id="totalVentaLocal">$0</span>
+    </h3>
+
+  </div>
+
+</div>
 <!-- CLIENTES -->
 
 <div id="clientes" class="seccion">
