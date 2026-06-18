@@ -102,7 +102,7 @@ function mostrarProductos(lista){
         class="btn btn-primary w-100 mt-3"
         onclick="agregar('${p.CODIGO}')">
 
-        🛒 Agregar al 
+        🛒 Agregar
 
     </button>
 
