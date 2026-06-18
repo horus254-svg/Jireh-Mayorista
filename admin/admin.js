@@ -839,3 +839,20 @@ function renderVentaLocal(){
     "$" + total.toLocaleString("es-AR");
 
 }
+function buscarProductoPOS(){
+
+  const texto =
+    document.getElementById("buscarPOS")
+    .value
+    .trim();
+
+  if(texto === ""){
+    return;
+  }
+
+  agregarProductoVenta(texto);
+
+  document.getElementById("buscarPOS")
+    .value = "";
+
+}
