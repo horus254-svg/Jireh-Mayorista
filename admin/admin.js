@@ -527,3 +527,71 @@ error
 }
 
 }
+async function cargarStockBajo() {
+
+    mostrarSeccion("productos");
+
+    const response =
+        await fetch(API_URL + "?action=productos");
+
+    const data =
+        await response.json();
+
+    let html = "";
+
+    data.productos
+    .filter(p => Number(p.STOCK || 0) < 5)
+    .forEach(p => {
+
+        html += `
+        <tr>
+            <td>${p.CODIGO}</td>
+            <td>${p.PRODUCTO}</td>
+            <td>$${Number(p.PRECIO || 0).toLocaleString("es-AR")}</td>
+            <td>
+                Stock: ${p.STOCK}
+            </td>
+        </tr>
+        `;
+
+    });
+
+    document.getElementById(
+        "tablaProductos"
+    ).innerHTML = html;
+
+}
+async function cargarAgotados() {
+
+    mostrarSeccion("productos");
+
+    const response =
+        await fetch(API_URL + "?action=productos");
+
+    const data =
+        await response.json();
+
+    let html = "";
+
+    data.productos
+    .filter(p => Number(p.STOCK || 0) === 0)
+    .forEach(p => {
+
+        html += `
+        <tr>
+            <td>${p.CODIGO}</td>
+            <td>${p.PRODUCTO}</td>
+            <td>$${Number(p.PRECIO || 0).toLocaleString("es-AR")}</td>
+            <td>
+                AGOTADO
+            </td>
+        </tr>
+        `;
+
+    });
+
+    document.getElementById(
+        "tablaProductos"
+    ).innerHTML = html;
+
+}
