@@ -7,43 +7,36 @@ window.location.href = "login.html";
 
 document.addEventListener("DOMContentLoaded", async () => {
 
-```
 mostrarSeccion("dashboard");
 
 await cargarMetricas();
 
 setInterval(cargarMetricas, 5000);
-```
 
 });
 
 function escapeHtml(text) {
 
-```
 const div = document.createElement("div");
 
 div.textContent = text || "";
 
 return div.innerHTML;
-```
 
 }
 
 function actualizarElemento(id, valor) {
 
-```
 const el = document.getElementById(id);
 
 if (el) {
     el.textContent = valor;
 }
-```
 
 }
 
 async function cargarMetricas() {
 
-```
 try {
 
     const response =
@@ -138,13 +131,10 @@ catch (error) {
     );
 
 }
-```
-
 }
 
 function mostrarSeccion(id) {
 
-```
 document
     .querySelectorAll(".seccion")
     .forEach(sec => {
@@ -165,13 +155,11 @@ if (id === "pedidos") {
 if (id === "productos") {
     cargarProductos();
 }
-```
 
 }
 
 async function cargarPedidos() {
 
-```
 try {
 
     const response =
@@ -281,7 +269,6 @@ catch (error) {
     );
 
 }
-```
 
 }
 
@@ -290,7 +277,6 @@ pedidoId,
 estado
 ) {
 
-```
 try {
 
     const response =
@@ -334,13 +320,11 @@ catch (error) {
     );
 
 }
-```
 
 }
 
 async function cargarProductos() {
 
-```
 try {
 
     const response =
@@ -414,33 +398,27 @@ catch (error) {
     );
 
 }
-```
 
 }
 
 function nuevoProducto() {
 
-```
 alert(
     "Debes crear la acción crearProducto en Apps Script."
 );
-```
 
 }
 
 function editarProducto(codigo) {
 
-```
 alert(
     "Editar producto: " + codigo
 );
-```
 
 }
 
 function eliminarProducto(codigo) {
 
-```
 if (
     !confirm(
         "¿Eliminar producto?"
@@ -452,19 +430,16 @@ if (
 alert(
     "Debes crear la acción eliminarProducto en Apps Script.\nCódigo: " + codigo
 );
-```
 
 }
 
 function logout() {
 
-```
 sessionStorage.removeItem(
     "admin"
 );
 
 window.location.href =
     "login.html";
-```
 
 }
