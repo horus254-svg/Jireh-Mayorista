@@ -795,3 +795,47 @@ function agregarProductoVenta(codigo){
   renderVentaLocal();
 
 }
+function renderVentaLocal(){
+
+  let html = "";
+  let total = 0;
+
+  ventaLocal.forEach(item => {
+
+    const subtotal =
+      item.PRECIO * item.cantidad;
+
+    total += subtotal;
+
+    html += `
+      <tr>
+
+        <td>${item.CODIGO}</td>
+
+        <td>${item.PRODUCTO}</td>
+
+        <td>${item.cantidad}</td>
+
+        <td>
+          $${item.PRECIO.toLocaleString("es-AR")}
+        </td>
+
+        <td>
+          $${subtotal.toLocaleString("es-AR")}
+        </td>
+
+      </tr>
+    `;
+
+  });
+
+  document.getElementById(
+    "tablaVentaLocal"
+  ).innerHTML = html;
+
+  document.getElementById(
+    "totalVentaLocal"
+  ).innerText =
+    "$" + total.toLocaleString("es-AR");
+
+}
