@@ -478,3 +478,52 @@ document.getElementById(
 ).innerHTML = html;
 
 }
+async function cargarClientes(){
+
+try{
+
+const response =
+await fetch(
+API_URL + "?action=clientes"
+);
+
+const data =
+await response.json();
+
+let html = "";
+
+if(!data.clientes){
+return;
+}
+
+data.clientes.forEach(c => {
+
+html += `
+<tr>
+<td>${escapeHtml(c.CLIENTE)}</td>
+<td>${escapeHtml(c.EMPRESA)}</td>
+<td>${escapeHtml(c.DIRECCION)}</td>
+<td>${escapeHtml(c.TELEFONO)}</td>
+<td>${escapeHtml(c.DNI)}</td>
+<td>${c.PEDIDOS}</td>
+<td>$${Number(c.TOTAL || 0).toLocaleString("es-AR")}</td>
+</tr>
+`;
+
+});
+
+document.getElementById(
+"tablaClientes"
+).innerHTML = html;
+
+}
+catch(error){
+
+console.error(
+"Error clientes:",
+error
+);
+
+}
+
+}
