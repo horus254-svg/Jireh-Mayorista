@@ -529,69 +529,91 @@ error
 }
 async function cargarStockBajo() {
 
-    mostrarSeccion("productos");
+    mostrarSeccion("stockBajoProductos");
 
-    const response =
-        await fetch(API_URL + "?action=productos");
+    try {
 
-    const data =
-        await response.json();
+        const response =
+            await fetch(API_URL + "?action=productos");
 
-    let html = "";
+        const data =
+            await response.json();
 
-    data.productos
-    .filter(p => Number(p.STOCK || 0) < 5)
-    .forEach(p => {
+        let html = "";
 
-        html += `
-        <tr>
-            <td>${p.CODIGO}</td>
-            <td>${p.PRODUCTO}</td>
-            <td>$${Number(p.PRECIO || 0).toLocaleString("es-AR")}</td>
-            <td>
-                Stock: ${p.STOCK}
-            </td>
-        </tr>
-        `;
+        data.productos
+        .filter(p => {
+            const stock = Number(p.STOCK || 0);
+            return stock > 0 && stock <= 5;
+        })
+        .forEach(p => {
 
-    });
+            html += `
+            <tr>
+                <td>${escapeHtml(p.CODIGO)}</td>
+                <td>${escapeHtml(p.PRODUCTO)}</td>
+                <td>${p.STOCK}</td>
+            </tr>
+            `;
 
-    document.getElementById(
-        "tablaProductos"
-    ).innerHTML = html;
+        });
+
+        document.getElementById(
+            "tablaStockBajo"
+        ).innerHTML = html;
+
+    }
+    catch(error){
+
+        console.error(
+            "Error stock bajo:",
+            error
+        );
+
+    }
 
 }
+
 async function cargarAgotados() {
 
-    mostrarSeccion("productos");
+    mostrarSeccion("productosAgotados");
 
-    const response =
-        await fetch(API_URL + "?action=productos");
+    try {
 
-    const data =
-        await response.json();
+        const response =
+            await fetch(API_URL + "?action=productos");
 
-    let html = "";
+        const data =
+            await response.json();
 
-    data.productos
-    .filter(p => Number(p.STOCK || 0) === 0)
-    .forEach(p => {
+        let html = "";
 
-        html += `
-        <tr>
-            <td>${p.CODIGO}</td>
-            <td>${p.PRODUCTO}</td>
-            <td>$${Number(p.PRECIO || 0).toLocaleString("es-AR")}</td>
-            <td>
-                AGOTADO
-            </td>
-        </tr>
-        `;
+        data.productos
+        .filter(p => Number(p.STOCK || 0) === 0)
+        .forEach(p => {
 
-    });
+            html += `
+            <tr>
+                <td>${escapeHtml(p.CODIGO)}</td>
+                <td>${escapeHtml(p.PRODUCTO)}</td>
+                <td>0</td>
+            </tr>
+            `;
 
-    document.getElementById(
-        "tablaProductos"
-    ).innerHTML = html;
+        });
+
+        document.getElementById(
+            "tablaAgotados"
+        ).innerHTML = html;
+
+    }
+    catch(error){
+
+        console.error(
+            "Error agotados:",
+            error
+        );
+
+    }
 
 }
