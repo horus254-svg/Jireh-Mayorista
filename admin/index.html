@@ -275,24 +275,38 @@ onclick="mostrarSeccion('pedidos')">
 
 <!-- PEDIDOS -->
 
+<!-- PEDIDOS -->
+
 <div id="pedidos" class="seccion">
 
 <div class="card p-3">
 
 <div class="d-flex justify-content-between align-items-center mb-3">
 
-  <h4>Pedidos</h4>
+<h4>Pedidos</h4>
 
-  <input
-    type="text"
-    id="buscarPedido"
-    class="form-control"
-    style="max-width:300px"
-    placeholder="Buscar pedido, cliente o DNI..."
-    onkeyup="filtrarPedidos()"
-  >
+<input
+type="text"
+id="buscarPedido"
+class="form-control"
+style="max-width:300px"
+placeholder="Buscar pedido, cliente o DNI..."
+onkeyup="filtrarPedidos()">
 
 </div>
+
+<table class="table table-striped">
+
+<thead>
+<tr>
+<th>Pedido</th>
+<th>Fecha</th>
+<th>Cliente</th>
+<th>Total</th>
+<th>Estado</th>
+<th>PDF</th>
+</tr>
+</thead>
 
 <tbody id="tablaPedidos">
 </tbody>
