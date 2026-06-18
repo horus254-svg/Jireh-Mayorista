@@ -195,7 +195,7 @@ try {
             </td>
 
             <td>
-                ${escapeHtml(p.NOMBRE)}
+                ${escapeHtml(p.CLIENTE)}
             </td>
 
             <td>
