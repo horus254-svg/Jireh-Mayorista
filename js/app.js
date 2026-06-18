@@ -128,7 +128,7 @@ function agregar(codigo){
     );
 
     const existente =
-    .find(
+    carrito.find(
       p => p.CODIGO == codigo
     );
 
@@ -138,21 +138,22 @@ function agregar(codigo){
 
     }else{
 
-        .push({
+        carrito.push({
             ...producto,
             cantidad:1
         });
 
     }
 
-    guardar();
+    guardarCarrito();
 
 }
-function guardar(){
+
+function guardarCarrito(){
 
     localStorage.setItem(
-      "",
-      JSON.stringify()
+      "carrito",
+      JSON.stringify(carrito)
     );
 
     actualizarContador();
