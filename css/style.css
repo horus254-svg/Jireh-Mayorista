@@ -418,3 +418,12 @@ body{
 
     text-decoration:none;
 }
+.dashboard-card{
+cursor:pointer;
+transition:.2s;
+}
+
+.dashboard-card:hover{
+transform:translateY(-3px);
+box-shadow:0 4px 12px rgba(0,0,0,.15);
+}
