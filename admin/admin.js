@@ -1,6 +1,8 @@
 const API_URL =
 "https://script.google.com/macros/s/AKfycbw1eY_mXImG503rU0Cqddx1WBuGIOhxaW_SXGoIMsug_CjsSC-HLsb2XzYwrovaGBU/exec";
 
+let pedidosGlobal = [];
+
 if (sessionStorage.getItem("admin") !== "true") {
 window.location.href = "login.html";
 }
