@@ -617,3 +617,44 @@ async function cargarAgotados() {
     }
 
 }
+async function cargarMasVendidos(){
+
+try{
+
+const response =
+await fetch(
+API_URL + "?action=masVendidos"
+);
+
+const data =
+await response.json();
+
+let html = "";
+
+data.productos.forEach(p => {
+
+html += `
+<tr>
+<td>${p.CODIGO}</td>
+<td>${p.PRODUCTO}</td>
+<td>${p.VENDIDOS}</td>
+</tr>
+`;
+
+});
+
+document.getElementById(
+"tablaMasVendidos"
+).innerHTML = html;
+
+}
+catch(error){
+
+console.error(
+"Error más vendidos:",
+error
+);
+
+}
+
+}
