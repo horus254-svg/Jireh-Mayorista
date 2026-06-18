@@ -171,6 +171,7 @@ try {
 
     const data =
         await response.json();
+    pedidosGlobal = data.pedidos || [];
 
     let html = "";
 
@@ -178,7 +179,7 @@ try {
         return;
     }
 
-    data.pedidos.forEach(p => {
+   pedidosGlobal.forEach(p=>{
 
         const estadoColor =
             p.ESTADO === "NUEVO"
@@ -658,5 +659,90 @@ error
 );
 
 }
+
+}
+function filtrarPedidos(){
+
+  const texto =
+    document.getElementById(
+      "buscarPedido"
+    ).value.toLowerCase();
+
+  const filtrados =
+    pedidosGlobal.filter(p => {
+
+      return (
+        String(p.PEDIDO_ID || "")
+          .toLowerCase()
+          .includes(texto)
+
+        ||
+
+        String(p.CLIENTE || "")
+          .toLowerCase()
+          .includes(texto)
+
+        ||
+
+        String(p.DNI || "")
+          .toLowerCase()
+          .includes(texto)
+      );
+
+    });
+
+  renderPedidos(filtrados);
+
+}
+
+function renderPedidos(lista){
+
+  let html = "";
+
+  lista.forEach(p => {
+
+    html += `
+      <tr>
+
+        <td>${p.PEDIDO_ID || ""}</td>
+
+        <td>
+          ${new Date(
+            p.FECHA
+          ).toLocaleString("es-AR")}
+        </td>
+
+        <td>${p.CLIENTE || ""}</td>
+
+        <td>
+          $${Number(
+            p.TOTAL || 0
+          ).toLocaleString("es-AR")}
+        </td>
+
+        <td>${p.ESTADO || ""}</td>
+
+        <td>
+          ${
+            p.PDF_URL
+            ?
+            `<a href="${p.PDF_URL}"
+               target="_blank"
+               class="btn btn-primary btn-sm">
+               PDF
+             </a>`
+            :
+            "-"
+          }
+        </td>
+
+      </tr>
+    `;
+
+  });
+
+  document.getElementById(
+    "tablaPedidos"
+  ).innerHTML = html;
 
 }
