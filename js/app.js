@@ -100,9 +100,9 @@ function mostrarProductos(lista){
 
     <button
         class="btn btn-primary w-100 mt-3"
-        onclick="agregarCarrito('${p.CODIGO}')">
+        onclick="agregar('${p.CODIGO}')">
 
-        🛒 Agregar al carrito
+        🛒 Agregar al 
 
     </button>
 
@@ -120,7 +120,7 @@ function mostrarProductos(lista){
 
 } 
 
-function agregarCarrito(codigo){
+function agregar(codigo){
 
     const producto =
     productos.find(
@@ -128,7 +128,7 @@ function agregarCarrito(codigo){
     );
 
     const existente =
-    carrito.find(
+    .find(
       p => p.CODIGO == codigo
     );
 
@@ -138,21 +138,21 @@ function agregarCarrito(codigo){
 
     }else{
 
-        carrito.push({
+        .push({
             ...producto,
             cantidad:1
         });
 
     }
 
-    guardarCarrito();
+    guardar();
 
 }
-function guardarCarrito(){
+function guardar(){
 
     localStorage.setItem(
-      "carrito",
-      JSON.stringify(carrito)
+      "",
+      JSON.stringify()
     );
 
     actualizarContador();
@@ -161,7 +161,7 @@ function guardarCarrito(){
 function cambiarCantidad(codigo,cambio){
 
     const item =
-    carrito.find(
+    .find(
       p => p.CODIGO == codigo
     );
 
@@ -171,12 +171,34 @@ function cambiarCantidad(codigo,cambio){
 
     if(item.cantidad <= 0){
 
-        carrito =
+         =
         carrito.filter(
           p => p.CODIGO != codigo
         );
 
     }
+
+    guardarCarrito();
+
+    abrirCarrito();
+
+}
+function actualizarCantidadManual(codigo,cantidad){
+
+    const item =
+    carrito.find(
+      p => p.CODIGO == codigo
+    );
+
+    if(!item) return;
+
+    cantidad = parseInt(cantidad);
+
+    if(isNaN(cantidad) || cantidad < 1){
+        cantidad = 1;
+    }
+
+    item.cantidad = cantidad;
 
     guardarCarrito();
 
@@ -266,25 +288,30 @@ html += `
 
     </div>
 
-    <div class="mt-2">
+    <div class="mt-2 d-flex align-items-center gap-2">
 
-        <button
-        class="btn btn-sm btn-outline-secondary"
-        onclick="cambiarCantidad('${item.CODIGO}',-1)">
-        -
-        </button>
+    <button
+    class="btn btn-sm btn-outline-secondary"
+    onclick="cambiarCantidad('${item.CODIGO}',-1)">
+    -
+    </button>
 
-        <span class="mx-2">
-        ${item.cantidad}
-        </span>
+    <input
+      type="number"
+      min="1"
+      value="${item.cantidad}"
+      class="form-control form-control-sm"
+      style="width:80px;text-align:center"
+      onchange="actualizarCantidadManual('${item.CODIGO}', this.value)"
+    >
 
-        <button
-        class="btn btn-sm btn-outline-secondary"
-        onclick="cambiarCantidad('${item.CODIGO}',1)">
-        +
-        </button>
+    <button
+    class="btn btn-sm btn-outline-secondary"
+    onclick="cambiarCantidad('${item.CODIGO}',1)">
+    +
+    </button>
 
-    </div>
+</div>
 
     <div class="mt-2">
 
