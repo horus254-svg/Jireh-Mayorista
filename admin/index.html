@@ -362,6 +362,120 @@ Nuevo Producto
 
 </div>
 
+<!-- POS -->
+
+<div id="pos" class="seccion">
+
+<div class="card p-3">
+
+<h4>🏪 Punto de Venta</h4>
+
+<div class="row mb-3">
+
+  <div class="col-md-6">
+
+    <input
+      type="text"
+      id="posBusqueda"
+      class="form-control"
+      placeholder="Código o nombre del producto"
+      onkeyup="buscarProductoPOS()"
+    >
+
+  </div>
+
+  <div class="col-md-2">
+
+    <button
+      class="btn btn-primary w-100"
+      onclick="buscarProductoPOS()">
+
+      Buscar
+
+    </button>
+
+  </div>
+
+</div>
+
+<div id="resultadosPOS" class="mb-4"></div>
+
+<hr>
+
+<h5>Ticket</h5>
+
+<table class="table">
+
+<thead>
+
+<tr>
+<th>Producto</th>
+<th>Cant.</th>
+<th>Precio</th>
+<th>Subtotal</th>
+<th></th>
+</tr>
+
+</thead>
+
+<tbody id="ticketPOS">
+</tbody>
+
+</table>
+
+<div class="text-end">
+
+<h3>
+
+Total:
+$<span id="totalPOS">0</span>
+
+</h3>
+
+</div>
+
+<div class="row mt-3">
+
+<div class="col-md-4">
+
+<select
+id="formaPagoPOS"
+class="form-select">
+
+<option value="EFECTIVO">
+Efectivo
+</option>
+
+<option value="TRANSFERENCIA">
+Transferencia
+</option>
+
+<option value="TARJETA">
+Tarjeta
+</option>
+
+</select>
+
+</div>
+
+<div class="col-md-4">
+
+<button
+class="btn btn-success w-100"
+onclick="finalizarVentaPOS()">
+
+💰 Finalizar Venta
+
+</button>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
 <!-- REPORTES -->
 
 <div id="reportes" class="seccion">
