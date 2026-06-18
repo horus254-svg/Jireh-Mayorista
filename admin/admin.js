@@ -9,11 +9,23 @@ window.location.href = "login.html";
 
 document.addEventListener("DOMContentLoaded", async () => {
 
-mostrarSeccion("dashboard");
+  mostrarSeccion("dashboard");
 
-await cargarMetricas();
+  await cargarMetricas();
 
-setInterval(cargarMetricas, 5000);
+  setInterval(() => {
+
+    cargarMetricas();
+
+    if(document.getElementById("pedidos").style.display === "block"){
+      cargarPedidos();
+    }
+
+    if(document.getElementById("clientes").style.display === "block"){
+      cargarClientes();
+    }
+
+  }, 5000);
 
 });
 
