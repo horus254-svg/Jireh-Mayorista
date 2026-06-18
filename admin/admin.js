@@ -856,3 +856,77 @@ function buscarProductoPOS(){
     .value = "";
 
 }
+let productosPOS = [];
+let ticketPOS = [];
+
+async function buscarProductoPOS(){
+
+  const input =
+    document.getElementById("posBusqueda");
+
+  if(!input){
+    return;
+  }
+
+  const texto =
+    input.value.toLowerCase().trim();
+
+  if(texto.length < 2){
+
+    document.getElementById(
+      "resultadosPOS"
+    ).innerHTML = "";
+
+    return;
+  }
+
+  if(productosPOS.length === 0){
+
+    const response =
+      await fetch(
+        API_URL + "?action=productos"
+      );
+
+    const data =
+      await response.json();
+
+    productosPOS =
+      data.productos || [];
+  }
+
+  const resultados =
+    productosPOS.filter(p =>
+
+      String(p.CODIGO)
+        .toLowerCase()
+        .includes(texto)
+
+      ||
+
+      String(p.PRODUCTO)
+        .toLowerCase()
+        .includes(texto)
+
+    ).slice(0,10);
+
+  let html = "";
+
+  resultados.forEach(p => {
+
+    html += `
+      <button
+        class="btn btn-outline-primary m-1"
+        onclick="agregarProductoPOS('${p.CODIGO}')">
+
+        ${p.CODIGO} - ${p.PRODUCTO}
+
+      </button>
+    `;
+
+  });
+
+  document.getElementById(
+    "resultadosPOS"
+  ).innerHTML = html;
+
+}
