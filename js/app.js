@@ -162,7 +162,7 @@ function guardarCarrito(){
 function cambiarCantidad(codigo,cambio){
 
     const item =
-    .find(
+    carrito.find(
       p => p.CODIGO == codigo
     );
 
@@ -172,7 +172,7 @@ function cambiarCantidad(codigo,cambio){
 
     if(item.cantidad <= 0){
 
-         =
+        carrito =
         carrito.filter(
           p => p.CODIGO != codigo
         );
