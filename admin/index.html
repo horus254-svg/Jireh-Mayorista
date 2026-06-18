@@ -11,9 +11,21 @@
 <link rel="stylesheet" href="admin.css">
 
 <style>
+
 .seccion{
 display:none;
 }
+
+.dashboard-card{
+cursor:pointer;
+transition:.2s;
+}
+
+.dashboard-card:hover{
+transform:translateY(-3px);
+box-shadow:0 4px 12px rgba(0,0,0,.15);
+}
+
 </style>
 
 </head>
@@ -36,6 +48,11 @@ display:none;
 🛒 Productos
 </a>
 
+<a href="#"
+onclick="mostrarSeccion('clientes'); cargarClientes();">
+👥 Clientes
+</a>
+
 <a href="#" onclick="mostrarSeccion('reportes')">
 📈 Reportes
 </a>
@@ -54,79 +71,97 @@ Cerrar sesión
 
 <div class="row g-3">
 
-  <div class="col-md-3">
-    <div class="card p-3">
-      <h6>🛒 Productos Activos</h6>
-      <h2 id="productosActivos">0</h2>
-    </div>
-  </div>
+<div class="col-md-3">
+<div class="card p-3">
+<h6>🛒 Productos Activos</h6>
+<h2 id="productosActivos">0</h2>
+</div>
+</div>
 
-  <div class="col-md-3">
-    <div class="card p-3">
-      <h6>⚠️ Stock Bajo</h6>
-      <h2 id="stockBajo">0</h2>
-    </div>
-  </div>
+<div class="col-md-3">
+<div class="card p-3 dashboard-card"
+onclick="mostrarSeccion('stockBajoProductos'); cargarStockBajo();">
 
-  <div class="col-md-3">
-    <div class="card p-3">
-      <h6>❌ Agotados</h6>
-      <h2 id="agotados">0</h2>
-    </div>
-  </div>
+<h6>⚠️ Stock Bajo</h6>
+<h2 id="stockBajo">0</h2>
 
-  <div class="col-md-3">
-    <div class="card p-3">
-      <h6>👥 Clientes</h6>
-      <h2 id="clientesUnicos">0</h2>
-    </div>
-  </div>
+</div>
+</div>
 
-  <div class="col-md-3">
-    <div class="card p-3">
-      <h6>📦 Pedidos Nuevos</h6>
-      <h2 id="pedidosNuevos">0</h2>
-    </div>
-  </div>
+<div class="col-md-3">
+<div class="card p-3 dashboard-card"
+onclick="mostrarSeccion('productosAgotados'); cargarAgotados();">
 
-  <div class="col-md-3">
-    <div class="card p-3">
-      <h6>💰 Ventas Hoy</h6>
-      <h2 id="ventasHoy">$0</h2>
-    </div>
-  </div>
+<h6>❌ Agotados</h6>
+<h2 id="agotados">0</h2>
 
-  <div class="col-md-3">
-    <div class="card p-3">
-      <h6>📈 Ventas Mes</h6>
-      <h2 id="ventasMes">$0</h2>
-    </div>
-  </div>
+</div>
+</div>
 
-  <div class="col-md-3">
-    <div class="card p-3">
-      <h6>📦 Total Pedidos</h6>
-      <h2 id="TotalPedidos">0</h2>
-    </div>
-  </div>
+<div class="col-md-3">
+<div class="card p-3 dashboard-card"
+onclick="mostrarSeccion('clientes'); cargarClientes();">
 
-  <div class="col-md-3">
-    <div class="card p-3">
-      <h6>💵 Ticket Promedio</h6>
-      <h2 id="TicketPromedio">$0</h2>
-    </div>
-  </div>
+<h6>👥 Clientes</h6>
+<h2 id="clientesUnicos">0</h2>
 
+</div>
+</div>
+
+<div class="col-md-3">
+<div class="card p-3 dashboard-card"
+onclick="mostrarSeccion('pedidos')">
+
+<h6>📦 Pedidos Nuevos</h6>
+<h2 id="pedidosNuevos">0</h2>
+
+</div>
+</div>
+
+<div class="col-md-3">
+<div class="card p-3">
+<h6>💰 Ventas Hoy</h6>
+<h2 id="ventasHoy">$0</h2>
+</div>
+</div>
+
+<div class="col-md-3">
+<div class="card p-3">
+<h6>📈 Ventas Mes</h6>
+<h2 id="ventasMes">$0</h2>
+</div>
+</div>
+
+<div class="col-md-3">
+<div class="card p-3 dashboard-card"
+onclick="mostrarSeccion('pedidos')">
+
+<h6>📦 Total Pedidos</h6>
+<h2 id="TotalPedidos">0</h2>
+
+</div>
+</div>
+
+<div class="col-md-3">
+<div class="card p-3">
+<h6>💵 Ticket Promedio</h6>
+<h2 id="TicketPromedio">$0</h2>
+</div>
 </div>
 
 </div>
+
+</div>
+
+<!-- CLIENTES -->
+
 <div id="clientes" class="seccion">
 
 <div class="card p-3">
 
 <h4>Clientes</h4>
 
-<table class="table">
+<table class="table table-striped">
 
 <thead>
 <tr>
@@ -140,13 +175,69 @@ Cerrar sesión
 </tr>
 </thead>
 
-<tbody id="tablaClientes"></tbody>
+<tbody id="tablaClientes">
+</tbody>
 
 </table>
 
 </div>
 
 </div>
+
+<!-- PRODUCTOS AGOTADOS -->
+
+<div id="productosAgotados" class="seccion">
+
+<div class="card p-3">
+
+<h4>Productos Agotados</h4>
+
+<table class="table table-striped">
+
+<thead>
+<tr>
+<th>Código</th>
+<th>Producto</th>
+<th>Stock</th>
+</tr>
+</thead>
+
+<tbody id="tablaAgotados">
+</tbody>
+
+</table>
+
+</div>
+
+</div>
+
+<!-- STOCK BAJO -->
+
+<div id="stockBajoProductos" class="seccion">
+
+<div class="card p-3">
+
+<h4>Productos con Stock Bajo</h4>
+
+<table class="table table-striped">
+
+<thead>
+<tr>
+<th>Código</th>
+<th>Producto</th>
+<th>Stock</th>
+</tr>
+</thead>
+
+<tbody id="tablaStockBajo">
+</tbody>
+
+</table>
+
+</div>
+
+</div>
+
 <!-- PEDIDOS -->
 
 <div id="pedidos" class="seccion">
@@ -169,7 +260,6 @@ Cerrar sesión
 </thead>
 
 <tbody id="tablaPedidos">
-
 </tbody>
 
 </table>
@@ -191,7 +281,8 @@ Cerrar sesión
 <button
 class="btn btn-success"
 onclick="nuevoProducto()">
-Nuevo Producto </button>
+Nuevo Producto
+</button>
 
 </div>
 
@@ -207,7 +298,6 @@ Nuevo Producto </button>
 </thead>
 
 <tbody id="tablaProductos">
-
 </tbody>
 
 </table>
