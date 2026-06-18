@@ -758,3 +758,40 @@ function renderPedidos(lista){
   ).innerHTML = html;
 
 }
+let ventaLocal = [];
+
+function agregarProductoVenta(codigo){
+
+  codigo = String(codigo).trim();
+
+  const producto = productos.find(
+    p => String(p.CODIGO).trim() === codigo
+  );
+
+  if(!producto){
+    alert("Producto no encontrado");
+    return;
+  }
+
+  const existente = ventaLocal.find(
+    p => p.CODIGO === codigo
+  );
+
+  if(existente){
+
+    existente.cantidad++;
+
+  }else{
+
+    ventaLocal.push({
+      CODIGO: producto.CODIGO,
+      PRODUCTO: producto.PRODUCTO,
+      PRECIO: Number(producto.PRECIO),
+      cantidad: 1
+    });
+
+  }
+
+  renderVentaLocal();
+
+}
