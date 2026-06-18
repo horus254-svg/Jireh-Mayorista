@@ -70,6 +70,15 @@ Cerrar sesión
 <div id="dashboard" class="seccion">
 
 <div class="row g-3">
+  <div class="col-md-3">
+<div class="card p-3 dashboard-card"
+onclick="mostrarSeccion('masVendidos'); cargarMasVendidos();">
+
+<h6>🏆 Más Vendidos</h6>
+<h2 id="cantidadMasVendidos">Ver</h2>
+
+</div>
+</div>
 
 <div class="col-md-3">
 <div class="card p-3">
@@ -230,6 +239,32 @@ onclick="mostrarSeccion('pedidos')">
 </thead>
 
 <tbody id="tablaStockBajo">
+</tbody>
+
+</table>
+
+</div>
+
+</div>
+<!-- PRODUCTOS MAS VENDIDOS -->
+
+<div id="masVendidos" class="seccion">
+
+<div class="card p-3">
+
+<h4>🏆 Productos Más Vendidos</h4>
+
+<table class="table table-striped">
+
+<thead>
+<tr>
+<th>Código</th>
+<th>Producto</th>
+<th>Unidades Vendidas</th>
+</tr>
+</thead>
+
+<tbody id="tablaMasVendidos">
 </tbody>
 
 </table>
