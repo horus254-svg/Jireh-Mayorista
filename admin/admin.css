@@ -839,28 +839,29 @@ html,body{
 .thermal-receipt{
   width:72mm;
   font-family:'Courier New', Courier, monospace;
-  font-size:11pt;
+  font-size:13pt;
+  font-weight:bold;
   color:#000;
   padding:3mm 0;
-  line-height:1.4;
+  line-height:1.45;
 }
 .thermal-receipt .th-center{ text-align:center; }
 .thermal-receipt .th-bold{ font-weight:bold; }
-.thermal-receipt .th-big{ font-size:14pt; font-weight:bold; }
+.thermal-receipt .th-big{ font-size:16pt; font-weight:bold; }
 .thermal-receipt .th-sep{
   border:none; border-top:1px dashed #000; margin:3mm 0;
 }
 .thermal-receipt .th-sep-solid{
   border:none; border-top:1px solid #000; margin:3mm 0;
 }
-.thermal-receipt table{ width:100%; border-collapse:collapse; font-size:10pt; }
-.thermal-receipt table td{ padding:1mm 0; vertical-align:top; }
+.thermal-receipt table{ width:100%; border-collapse:collapse; font-size:12pt; font-weight:bold; }
+.thermal-receipt table td{ padding:1.2mm 0; vertical-align:top; }
 .thermal-receipt table td:last-child{ text-align:right; }
 .thermal-receipt .th-total-row td{
-  font-weight:bold; font-size:12pt; border-top:1px solid #000; padding-top:2mm;
+  font-weight:bold; font-size:14pt; border-top:1px solid #000; padding-top:2mm;
 }
 .thermal-receipt .th-footer{
-  text-align:center; font-size:9pt; color:#555; margin-top:3mm;
+  text-align:center; font-size:11pt; font-weight:bold; color:#555; margin-top:3mm;
 }
 
 /* ===================== RESPONSIVE ===================== */
@@ -994,3 +995,13 @@ html,body{
   font-size:13px; color:var(--slate-500); line-height:1.5;
 }
 .config-preview-hint .ic{ flex-shrink:0; font-size:15px; }
+
+.usb-print-status{
+  display:flex; align-items:center; gap:8px;
+  background:var(--slate-50); border-radius:10px;
+  padding:10px 12px; font-size:13px; font-weight:600; color:var(--slate-600);
+}
+.usb-print-status .ic{ font-size:15px; flex-shrink:0; }
+.usb-print-status.ok{ background:var(--green-50); color:var(--green-600); }
+.usb-print-status.warn{ background:var(--amber-50); color:var(--amber-500); }
+.usb-print-status.err{ background:var(--red-50); color:var(--red-500); }

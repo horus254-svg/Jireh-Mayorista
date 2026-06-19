@@ -581,6 +581,38 @@
         Estos datos se guardan en la hoja de cálculo (pestaña "CONFIGURACION") y se usan para armar el encabezado de todos los tickets impresos (ventas y cierres de caja). Como quedan en la planilla, se ven igual sin importar desde qué computadora o navegador entres al panel.
       </div>
     </div>
+
+    <div class="card p-3 mt-3" id="usbPrintCard">
+      <h6 style="margin-bottom:6px;">🔌 Impresión directa por USB</h6>
+      <p class="text-muted" style="font-size:13px; margin-bottom:14px;">
+        Conectá la impresora térmica una sola vez para imprimir sin el cartel de "Imprimir" de Chrome. Solo funciona en Chrome o Edge, en esta misma computadora.
+      </p>
+
+      <div id="usbPrintUnsupported" class="usb-print-status warn" style="display:none;">
+        <span class="ic">⚠️</span>
+        Este navegador no soporta impresión directa (Web Serial). Vas a seguir usando el cartel de impresión normal — funciona igual, solo con un paso más.
+      </div>
+
+      <div id="usbPrintSupported" style="display:none;">
+        <div class="usb-print-status" id="usbPrintStatus">
+          <span class="ic">🔌</span>
+          <span id="usbPrintStatusText">Impresora no conectada</span>
+        </div>
+
+        <div class="d-flex gap-2 flex-wrap mt-2">
+          <button class="btn btn-outline-primary btn-sm" id="btnConectarImpresora" onclick="conectarImpresoraUSB()">🔌 Conectar impresora</button>
+          <button class="btn btn-outline-secondary btn-sm" id="btnDesconectarImpresora" onclick="desconectarImpresoraUSB()" style="display:none;">Desconectar</button>
+          <button class="btn btn-outline-secondary btn-sm" id="btnProbarImpresora" onclick="probarImpresoraUSB()" style="display:none;">🧪 Imprimir prueba</button>
+        </div>
+
+        <div class="pm-switches mt-3">
+          <label class="pm-switch">
+            <input type="checkbox" id="usbPrintToggle" onchange="onToggleUsbPrint()">
+            <span>Usar impresión directa en vez del cartel de impresión</span>
+          </label>
+        </div>
+      </div>
+    </div>
   </div>
 
 </div><!-- .content -->

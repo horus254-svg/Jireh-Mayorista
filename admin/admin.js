@@ -24,6 +24,7 @@ if (sessionStorage.getItem("admin") !== "true") {
 document.addEventListener("DOMContentLoaded", async () => {
   mostrarSeccion("dashboard");
   cargarConfigNegocioDesdeBackend(); // refresca el caché en memoria para los tickets impresos
+  reconectarImpresoraUSBSiPosible(); // intenta reconectar la impresora térmica sin mostrar el selector
   await cargarMetricas();
   cargarVentasPOS();
 
@@ -455,7 +456,7 @@ function mostrarSeccion(id) {
   if (id === "pedidos")   cargarPedidos();
   if (id === "productos") cargarProductos();
   if (id === "ventasPOS") cargarVentasPOSHistorial();
-  if (id === "configuracion") cargarConfigNegocioForm();
+  if (id === "configuracion") { cargarConfigNegocioForm(); actualizarEstadoUSBPrint(); }
 
   if (id === "pos") {
     asegurarProductosPOS().then(renderPosGrid);
@@ -1389,14 +1390,14 @@ function buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, cf
   // Encabezado: nombre + subtítulo + dirección + teléfono(s), todos configurables
   let encabezado = `<div class="th-center th-big">${escapeHtml(cfg.nombre)}</div>`;
   if (cfg.subtitulo) {
-    encabezado += `<div class="th-center" style="font-size:9pt;">${escapeHtml(cfg.subtitulo)}</div>`;
+    encabezado += `<div class="th-center" style="font-size:11pt;font-weight:bold;">${escapeHtml(cfg.subtitulo)}</div>`;
   }
   if (cfg.direccion) {
-    encabezado += `<div class="th-center" style="font-size:8.5pt;color:#555;">${escapeHtml(cfg.direccion)}</div>`;
+    encabezado += `<div class="th-center" style="font-size:10.5pt;font-weight:bold;color:#555;">${escapeHtml(cfg.direccion)}</div>`;
   }
   const telefonos = [cfg.telefono1, cfg.telefono2].filter(Boolean).join(" · ");
   if (telefonos) {
-    encabezado += `<div class="th-center" style="font-size:8.5pt;color:#555;margin-bottom:2mm;">Tel: ${escapeHtml(telefonos)}</div>`;
+    encabezado += `<div class="th-center" style="font-size:10.5pt;font-weight:bold;color:#555;margin-bottom:2mm;">Tel: ${escapeHtml(telefonos)}</div>`;
   } else {
     encabezado += `<div style="margin-bottom:2mm;"></div>`;
   }
@@ -1424,6 +1425,355 @@ function buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, cf
       ${pie}
       <br><br>
     </div>`;
+}
+
+/* ===================================================================
+   IMPRESIÓN DIRECTA USB (Web Serial API — Chrome/Edge, sin diálogo)
+   Construye los mismos tickets que buildThermalHTML/buildThermalCierreHTML
+   pero como comandos ESC/POS en bytes crudos, enviados directo al
+   puerto USB de la impresora. Es un camino alternativo: si está
+   desactivado (o el navegador no lo soporta), todo sigue imprimiendo
+   con el diálogo normal de Chrome, sin ningún cambio.
+=================================================================== */
+
+const USB_PRINT_PREF_KEY = "jireh_usb_print_enabled";
+const ANCHO_TICKET_USB = 42; // columnas para fuente normal en 80mm (12 cpl aprox.)
+
+let puertoImpresoraUSB = null; // SerialPort activo, o null si no hay conexión
+
+/** Whether the browser supports Web Serial at all */
+function soportaImpresionUSB() {
+  return "serial" in navigator;
+}
+
+/** Reads the saved on/off preference for USB direct printing (per-browser, default off) */
+function usbPrintHabilitado() {
+  return soportaImpresionUSB() && localStorage.getItem(USB_PRINT_PREF_KEY) === "true";
+}
+
+/* ---------------------- ESC/POS byte builders ---------------------- */
+
+const ESC = 0x1B;
+const GS  = 0x1D;
+
+const ESCPOS = {
+  INIT:          [ESC, 0x40],             // reset printer
+  ALIGN_LEFT:    [ESC, 0x61, 0x00],
+  ALIGN_CENTER:  [ESC, 0x61, 0x01],
+  BOLD_ON:       [ESC, 0x45, 0x01],
+  BOLD_OFF:      [ESC, 0x45, 0x00],
+  SIZE_NORMAL:   [GS, 0x21, 0x00],
+  SIZE_DOUBLE_H: [GS, 0x21, 0x01],         // double height
+  SIZE_BIG:      [GS, 0x21, 0x11],         // double width + height
+  CUT:           [GS, 0x56, 0x01],         // partial cut
+  FEED:          (n) => [ESC, 0x64, n]     // feed n lines
+};
+
+/** Builds the raw byte buffer (Uint8Array) for a sale ticket, mirroring buildThermalHTML */
+function buildThermalESCPOS(ventaId, items, total, formaPago, fecha, descuento, cfgOverride) {
+  const cfg = cfgOverride || obtenerConfigNegocio();
+  const b = new EscPosBuilder();
+
+  const fechaStr = (fecha || new Date()).toLocaleString("es-AR", {
+    day:"2-digit", month:"2-digit", year:"numeric",
+    hour:"2-digit", minute:"2-digit"
+  });
+
+  b.init();
+  b.center(); b.big(); b.text(cfg.nombre); b.feed(1);
+  b.normal();
+  if (cfg.subtitulo) { b.center(); b.bold(); b.text(cfg.subtitulo); b.feed(1); b.boldOff(); }
+  if (cfg.direccion) { b.center(); b.bold(); b.text(cfg.direccion); b.feed(1); b.boldOff(); }
+  const telefonos = [cfg.telefono1, cfg.telefono2].filter(Boolean).join(" / ");
+  if (telefonos) { b.center(); b.bold(); b.text("Tel: " + telefonos); b.feed(1); b.boldOff(); }
+
+  b.left();
+  b.sepSolid();
+  b.bold();
+  b.text("Fecha: " + fechaStr); b.feed(1);
+  b.text("Venta: #" + String(ventaId || "—")); b.feed(1);
+  b.text("Pago: " + String(formaPago || "—")); b.feed(1);
+  b.sep();
+
+  let subtotal = 0;
+  items.forEach(item => {
+    const sub = item.PRECIO * item.cantidad;
+    subtotal += sub;
+    b.text(item.PRODUCTO); b.feed(1);
+    b.row(`${item.cantidad} x $${money(item.PRECIO)}`, "$" + money(sub));
+  });
+
+  const tieneDescuento = descuento && Number(descuento.monto) > 0;
+  if (tieneDescuento) {
+    b.sep();
+    b.row("Subtotal", "$" + money(subtotal));
+    const etiquetaDesc = descuento.etiqueta ? `Descuento (${descuento.etiqueta})` : "Descuento";
+    b.row(etiquetaDesc, "-$" + money(descuento.monto));
+  }
+
+  b.sepSolid();
+  b.doubleH();
+  b.row("TOTAL", "$" + money(total));
+  b.normal();
+  b.sep();
+
+  if (cfg.pie) { b.center(); b.text(cfg.pie); b.feed(1); }
+  b.center(); b.text(cfg.nombre + " - Sistema POS"); b.feed(1);
+  b.boldOff();
+
+  b.feed(3);
+  b.cut();
+
+  return b.build();
+}
+
+/** Builds the raw byte buffer for a cierre de caja receipt, mirroring buildThermalCierreHTML */
+function buildThermalCierreESCPOS(resumen) {
+  const cfg = obtenerConfigNegocio();
+  const b = new EscPosBuilder();
+
+  const fechaStr = formatearFechaCierre(resumen.fecha);
+  const horaStr = new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+
+  function filaMetodo(etiqueta, m) {
+    const signo = m.diferencia > 0 ? "+" : "";
+    b.bold(); b.text(etiqueta); b.feed(1); b.boldOff();
+    b.row("Esperado", "$" + money(m.esperado));
+    b.row("Contado", "$" + money(m.contado));
+    b.row("Diferencia", signo + "$" + money(Math.round(m.diferencia)));
+  }
+
+  b.init();
+  b.center(); b.big(); b.text(cfg.nombre); b.feed(1);
+  b.normal();
+  b.center(); b.bold(); b.text("Cierre de Caja"); b.feed(1); b.boldOff();
+  if (cfg.direccion) { b.center(); b.bold(); b.text(cfg.direccion); b.feed(1); b.boldOff(); }
+  const telefonos = [cfg.telefono1, cfg.telefono2].filter(Boolean).join(" / ");
+  if (telefonos) { b.center(); b.bold(); b.text("Tel: " + telefonos); b.feed(1); b.boldOff(); }
+
+  b.left();
+  b.sepSolid();
+  b.bold();
+  b.text("Fecha: " + fechaStr); b.feed(1);
+  b.text("Hora impresión: " + horaStr); b.feed(1);
+  b.text("Cierre: #" + String(resumen.cierreId || "—")); b.feed(1);
+  b.text("Vendedor: " + String(resumen.vendedor || "—")); b.feed(1);
+  b.sep();
+
+  filaMetodo("EFECTIVO", resumen.efectivo); b.feed(1);
+  filaMetodo("TRANSFERENCIA", resumen.transferencia); b.feed(1);
+  filaMetodo("TARJETA", resumen.tarjeta);
+
+  b.sepSolid();
+  const signoTotal = resumen.total.diferencia > 0 ? "+" : "";
+  b.row("TOTAL ESPERADO", "$" + money(resumen.total.esperado));
+  b.row("TOTAL CONTADO", "$" + money(resumen.total.contado));
+  b.row("DIFERENCIA", signoTotal + "$" + money(Math.round(resumen.total.diferencia)));
+  b.sep();
+
+  if (resumen.observaciones) {
+    b.text("Obs: " + resumen.observaciones); b.feed(1);
+    b.sep();
+  }
+
+  b.text("Cierre generado por " + cfg.nombre + " POS"); b.feed(1);
+  b.boldOff();
+
+  b.feed(3);
+  b.cut();
+
+  return b.build();
+}
+
+function money(n) {
+  return Number(n || 0).toLocaleString("es-AR");
+}
+
+/** Small helper that accumulates ESC/POS bytes with simple word-wrap and two-column row support */
+class EscPosBuilder {
+  constructor() {
+    this.bytes = [];
+  }
+  push(arr) { this.bytes.push(...arr); }
+  init()    { this.push(ESCPOS.INIT); }
+  center()  { this.push(ESCPOS.ALIGN_CENTER); }
+  left()    { this.push(ESCPOS.ALIGN_LEFT); }
+  bold()    { this.push(ESCPOS.BOLD_ON); }
+  boldOff() { this.push(ESCPOS.BOLD_OFF); }
+  normal()  { this.push(ESCPOS.SIZE_NORMAL); }
+  doubleH() { this.push(ESCPOS.SIZE_DOUBLE_H); }
+  big()     { this.push(ESCPOS.SIZE_BIG); }
+  cut()     { this.push(ESCPOS.CUT); }
+  feed(n)   { this.push(ESCPOS.FEED(n)); }
+
+  /** Encodes text as bytes (Latin-1, which covers Spanish accents on most ESC/POS printers) */
+  text(str) {
+    const encoder = new TextEncoder(); // UTF-8; most modern POS80 controllers accept it fine
+    this.push(Array.from(encoder.encode(String(str))));
+  }
+
+  sep() {
+    this.bold();
+    this.text("-".repeat(ANCHO_TICKET_USB));
+    this.feed(1);
+    this.boldOff();
+  }
+
+  sepSolid() {
+    this.bold();
+    this.text("=".repeat(ANCHO_TICKET_USB));
+    this.feed(1);
+    this.boldOff();
+  }
+
+  /** Prints a left label and a right-aligned value on the same 42-col line (wraps the label if too long) */
+  row(left, right) {
+    const rightStr = String(right);
+    const maxLeft = ANCHO_TICKET_USB - rightStr.length - 1;
+    let leftStr = String(left);
+    if (leftStr.length > maxLeft) leftStr = leftStr.slice(0, Math.max(0, maxLeft));
+    const spaces = Math.max(1, ANCHO_TICKET_USB - leftStr.length - rightStr.length);
+    this.text(leftStr + " ".repeat(spaces) + rightStr);
+    this.feed(1);
+  }
+
+  build() {
+    return new Uint8Array(this.bytes);
+  }
+}
+
+/* ---------------------- Web Serial connection ---------------------- */
+
+/** Prompts the browser's port picker and opens the connection (must be called from a user gesture) */
+async function conectarImpresoraUSB() {
+  if (!soportaImpresionUSB()) {
+    toast("Este navegador no soporta impresión directa", "error");
+    return;
+  }
+  try {
+    const port = await navigator.serial.requestPort();
+    await port.open({ baudRate: 9600 });
+    puertoImpresoraUSB = port;
+    actualizarEstadoUSBPrint();
+    toast("Impresora conectada", "success");
+  } catch (error) {
+    if (error.name !== "NotFoundError") { // user just closed the picker without choosing
+      console.error("Error al conectar la impresora USB:", error);
+      toast("No se pudo conectar con la impresora", "error");
+    }
+  }
+}
+
+async function desconectarImpresoraUSB() {
+  if (puertoImpresoraUSB) {
+    try { await puertoImpresoraUSB.close(); } catch (e) { /* ignore */ }
+  }
+  puertoImpresoraUSB = null;
+  actualizarEstadoUSBPrint();
+  toast("Impresora desconectada", "success");
+}
+
+/** Tries to silently reconnect to a previously-authorized port (no picker shown) when the app loads */
+async function reconectarImpresoraUSBSiPosible() {
+  if (!soportaImpresionUSB()) return;
+  try {
+    const ports = await navigator.serial.getPorts();
+    if (ports.length > 0) {
+      const port = ports[0];
+      await port.open({ baudRate: 9600 });
+      puertoImpresoraUSB = port;
+    }
+  } catch (error) {
+    // Port may be in use or unplugged — just leave it disconnected, the admin can reconnect manually
+    puertoImpresoraUSB = null;
+  }
+  actualizarEstadoUSBPrint();
+}
+
+/** Sends a raw byte buffer to the connected printer over Web Serial */
+async function enviarBytesAImpresoraUSB(bytes) {
+  if (!puertoImpresoraUSB || !puertoImpresoraUSB.writable) {
+    throw new Error("La impresora USB no está conectada");
+  }
+  const writer = puertoImpresoraUSB.writable.getWriter();
+  try {
+    await writer.write(bytes);
+  } finally {
+    writer.releaseLock();
+  }
+}
+
+function probarImpresoraUSB() {
+  const b = new EscPosBuilder();
+  b.init();
+  b.center(); b.big(); b.text("PRUEBA"); b.feed(2);
+  b.normal(); b.bold();
+  b.text("Si ves esto, la impresión"); b.feed(1);
+  b.text("directa por USB funciona bien."); b.feed(1);
+  b.boldOff();
+  b.feed(3);
+  b.cut();
+
+  enviarBytesAImpresoraUSB(b.build())
+    .then(() => toast("Ticket de prueba enviado", "success"))
+    .catch(error => {
+      console.error("Error en impresión de prueba:", error);
+      toast("No se pudo imprimir: revisá la conexión USB", "error");
+    });
+}
+
+function onToggleUsbPrint() {
+  const checked = document.getElementById("usbPrintToggle").checked;
+  if (checked && !puertoImpresoraUSB) {
+    toast("Conectá la impresora primero", "error");
+    document.getElementById("usbPrintToggle").checked = false;
+    return;
+  }
+  localStorage.setItem(USB_PRINT_PREF_KEY, checked ? "true" : "false");
+  toast(checked ? "Impresión directa activada" : "Impresión directa desactivada", "success");
+}
+
+/** Refreshes the Configuración card UI to reflect support/connection state */
+function actualizarEstadoUSBPrint() {
+  const unsupportedEl = document.getElementById("usbPrintUnsupported");
+  const supportedEl   = document.getElementById("usbPrintSupported");
+  if (!unsupportedEl || !supportedEl) return; // section not in the DOM yet
+
+  if (!soportaImpresionUSB()) {
+    unsupportedEl.style.display = "flex";
+    supportedEl.style.display = "none";
+    return;
+  }
+
+  unsupportedEl.style.display = "none";
+  supportedEl.style.display = "block";
+
+  const statusEl     = document.getElementById("usbPrintStatus");
+  const statusTextEl = document.getElementById("usbPrintStatusText");
+  const btnConectar   = document.getElementById("btnConectarImpresora");
+  const btnDesconectar = document.getElementById("btnDesconectarImpresora");
+  const btnProbar      = document.getElementById("btnProbarImpresora");
+  const toggle          = document.getElementById("usbPrintToggle");
+
+  if (puertoImpresoraUSB) {
+    statusEl.className = "usb-print-status ok";
+    statusTextEl.textContent = "Impresora conectada";
+    btnConectar.style.display = "none";
+    btnDesconectar.style.display = "inline-block";
+    btnProbar.style.display = "inline-block";
+  } else {
+    statusEl.className = "usb-print-status";
+    statusTextEl.textContent = "Impresora no conectada";
+    btnConectar.style.display = "inline-block";
+    btnDesconectar.style.display = "none";
+    btnProbar.style.display = "none";
+
+    // Can't keep "impresión directa" on if there's nothing connected
+    if (toggle) toggle.checked = false;
+    localStorage.setItem(USB_PRINT_PREF_KEY, "false");
+  }
+
+  if (toggle) toggle.checked = usbPrintHabilitado();
 }
 
 /** Print the current (unsaved) ticket as a pre-sale receipt */
@@ -1485,10 +1835,25 @@ function imprimirVentaDesdeData(ventaObj) {
 }
 
 function _ejecutarImpresion(ventaId, items, total, formaPago, fecha, descuento) {
+  if (usbPrintHabilitado() && puertoImpresoraUSB) {
+    const bytes = buildThermalESCPOS(ventaId, items, total, formaPago, fecha, descuento);
+    enviarBytesAImpresoraUSB(bytes).catch(error => {
+      console.error("Error al imprimir por USB:", error);
+      toast("Error al imprimir por USB — se abre el diálogo normal", "error");
+      _imprimirConDialogo(buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento));
+    });
+    return;
+  }
+
+  _imprimirConDialogo(buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento));
+}
+
+/** Falls back to the regular browser print dialog (used when USB printing is off, unsupported, or fails) */
+function _imprimirConDialogo(html) {
   const frame = document.getElementById("thermalPrintFrame");
   if (!frame) { toast("Error: frame de impresión no encontrado", "error"); return; }
 
-  frame.innerHTML = buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento);
+  frame.innerHTML = html;
 
   // Small delay to let the DOM paint before triggering print dialog
   setTimeout(() => {
@@ -1538,13 +1903,13 @@ function buildThermalCierreHTML(resumen) {
 
   // Encabezado: nombre del local + dirección + teléfono(s) (sin subtítulo, este ticket no es de venta)
   let encabezado = `<div class="th-center th-big">${escapeHtml(cfg.nombre)}</div>`;
-  encabezado += `<div class="th-center" style="font-size:9pt;">Cierre de Caja</div>`;
+  encabezado += `<div class="th-center" style="font-size:11pt;font-weight:bold;">Cierre de Caja</div>`;
   if (cfg.direccion) {
-    encabezado += `<div class="th-center" style="font-size:8.5pt;color:#555;">${escapeHtml(cfg.direccion)}</div>`;
+    encabezado += `<div class="th-center" style="font-size:10.5pt;font-weight:bold;color:#555;">${escapeHtml(cfg.direccion)}</div>`;
   }
   const telefonos = [cfg.telefono1, cfg.telefono2].filter(Boolean).join(" · ");
   if (telefonos) {
-    encabezado += `<div class="th-center" style="font-size:8.5pt;color:#555;margin-bottom:2mm;">Tel: ${escapeHtml(telefonos)}</div>`;
+    encabezado += `<div class="th-center" style="font-size:10.5pt;font-weight:bold;color:#555;margin-bottom:2mm;">Tel: ${escapeHtml(telefonos)}</div>`;
   } else {
     encabezado += `<div style="margin-bottom:2mm;"></div>`;
   }
@@ -1578,7 +1943,7 @@ function buildThermalCierreHTML(resumen) {
         </tr>
       </table>
       <hr class="th-sep">
-      ${resumen.observaciones ? `<div style="font-size:9pt;">Obs: ${escapeHtml(resumen.observaciones)}</div><hr class="th-sep">` : ""}
+      ${resumen.observaciones ? `<div style="font-size:11pt;font-weight:bold;">Obs: ${escapeHtml(resumen.observaciones)}</div><hr class="th-sep">` : ""}
       <div class="th-footer">Cierre generado por ${escapeHtml(cfg.nombre)} POS</div>
       <br><br>
     </div>`;
@@ -1637,14 +2002,17 @@ function imprimirCierreCaja() {
     }
   };
 
-  const frame = document.getElementById("thermalPrintFrame");
-  if (!frame) { toast("Error: frame de impresión no encontrado", "error"); return; }
+  if (usbPrintHabilitado() && puertoImpresoraUSB) {
+    const bytes = buildThermalCierreESCPOS(resumen);
+    enviarBytesAImpresoraUSB(bytes).catch(error => {
+      console.error("Error al imprimir cierre por USB:", error);
+      toast("Error al imprimir por USB — se abre el diálogo normal", "error");
+      _imprimirConDialogo(buildThermalCierreHTML(resumen));
+    });
+    return;
+  }
 
-  frame.innerHTML = buildThermalCierreHTML(resumen);
-
-  setTimeout(() => {
-    window.print();
-  }, 120);
+  _imprimirConDialogo(buildThermalCierreHTML(resumen));
 }
 
 /* ===================================================================
