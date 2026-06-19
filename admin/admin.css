@@ -294,11 +294,17 @@ html,body{
   display:grid;
   grid-template-columns:minmax(0, 680px) 380px;
   gap:18px;
-  align-items:start;
+  align-items:stretch;
   height:calc(100vh - 110px);
+  max-height:calc(100vh - 110px);
 }
 
-.pos-left{ display:flex; flex-direction:column; height:100%; gap:14px; min-width:0; }
+.pos-left{
+  display:flex; flex-direction:column;
+  height:100%; max-height:100%;
+  gap:14px; min-width:0;
+  overflow:hidden;
+}
 
 .pos-scanbar{
   background:#fff; border:1px solid var(--slate-200);
@@ -369,7 +375,9 @@ html,body{
 
 /* Product list */
 .pos-grid-wrap{
-  flex:1; background:#fff; border:1px solid var(--slate-200);
+  flex:1;
+  min-height:0;        /* crucial: lets flex child shrink below content size */
+  background:#fff; border:1px solid var(--slate-200);
   border-radius:var(--radius-lg); box-shadow:var(--shadow-card);
   padding:10px 12px; overflow-y:auto; min-width:0;
 }
@@ -749,9 +757,13 @@ html,body{
 
 /* Tablet */
 @media(max-width:1100px){
-  .pos-wrap{ grid-template-columns:1fr; height:auto; }
+  .pos-wrap{
+    grid-template-columns:1fr;
+    height:auto; max-height:none;
+  }
+  .pos-left{ height:auto; max-height:none; overflow:visible; }
   .ticket-panel{ height:520px; }
-  .pos-grid-wrap{ max-height:420px; }
+  .pos-grid-wrap{ flex:none; height:380px; max-height:380px; }
 }
 
 /* Mobile */
@@ -768,9 +780,11 @@ html,body{
 
   .pos-wrap{
     grid-template-columns:1fr;
-    height:auto;
+    height:auto; max-height:none;
     gap:14px;
   }
+
+  .pos-left{ height:auto; max-height:none; overflow:visible; }
 
   /* On mobile the ticket sits below the grid */
   .ticket-panel{
@@ -779,7 +793,7 @@ html,body{
     max-height:none;
   }
 
-  .pos-grid-wrap{ max-height:400px; }
+  .pos-grid-wrap{ flex:none; height:320px; max-height:320px; }
 
   .product-tile{ padding:10px 8px; }
   .product-tile .tile-name{ font-size:13px; }
