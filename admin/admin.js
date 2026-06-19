@@ -430,22 +430,32 @@ function renderPosGrid(filtroTexto) {
   const visibleList = lista.slice(0, 60);
 
   visibleList.forEach((p, idx) => {
-    const stock  = p.STOCK !== undefined ? Number(p.STOCK) : null;
+    const stock     = p.STOCK !== undefined ? Number(p.STOCK) : null;
     const agotado   = stock !== null && stock <= 0;
     const stockBajo = stock !== null && stock > 0 && stock <= 5;
+
     let stockBadge = "";
-    if (agotado)   stockBadge = `<span class="tile-stock out">Sin stock</span>`;
-    else if (stockBajo) stockBadge = `<span class="tile-stock low">${stock} left</span>`;
+    if (agotado)        stockBadge = `<span class="tile-stock out">Sin stock</span>`;
+    else if (stockBajo) stockBadge = `<span class="tile-stock low">Stock: ${stock}</span>`;
+    else if (stock !== null) stockBadge = `<span class="tile-stock ok">Stock: ${stock}</span>`;
+
+    const cat = p.CATEGORIA ? escapeHtml(String(p.CATEGORIA).trim()) : "";
 
     html += `
       <button type="button"
         class="product-tile ${agotado ? "disabled" : ""}"
         data-idx="${idx}"
         ${agotado ? "disabled" : ""}>
-        ${stockBadge}
-        <span class="tile-code">${escapeHtml(p.CODIGO)}</span>
-        <span class="tile-name">${escapeHtml(p.PRODUCTO)}</span>
-        <span class="tile-price">$${Number(p.PRECIO || 0).toLocaleString("es-AR")}</span>
+        <div class="tile-info">
+          <span class="tile-code">${escapeHtml(p.CODIGO)}</span>
+          <span class="tile-name">${escapeHtml(p.PRODUCTO)}</span>
+          ${cat ? `<span class="tile-cat">${cat}</span>` : ""}
+        </div>
+        <div class="tile-right">
+          <span class="tile-price">$${Number(p.PRECIO || 0).toLocaleString("es-AR")}</span>
+          ${stockBadge}
+        </div>
+        <span class="tile-add">+</span>
       </button>`;
   });
 
