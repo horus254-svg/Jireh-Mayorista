@@ -723,9 +723,14 @@ async function cargarMasVendidos() {
 =================================================================== */
 
 let productosPOS    = [];
-let ticketPOS       = [];
+let ticketPOS        = [];
 let categoriaActivaPOS = "TODAS";
 let formaPagoPOS    = "EFECTIVO";
+
+// Descuento aplicado al ticket actual
+let descuentoTipoPOS   = "PORCENTAJE"; // "PORCENTAJE" | "MONTO"
+let descuentoValorPOS  = 0;            // valor ingresado (ej: 10 para 10%, o 500 para $500)
+let descuentoActivoPOS = false;
 
 async function asegurarProductosPOS() {
   if (productosPOS.length === 0) {
@@ -903,6 +908,7 @@ function vaciarTicketPOS() {
   if (ticketPOS.length === 0) return;
   if (!confirm("¿Vaciar el ticket actual?")) return;
   ticketPOS = [];
+  resetearDescuentoPOS();
   renderTicketPOS();
 }
 
@@ -910,12 +916,12 @@ function vaciarTicketPOS() {
 
 function renderTicketPOS() {
   let html = "";
-  let total = 0;
+  let subtotal = 0;
   let totalItems = 0;
 
   ticketPOS.forEach(item => {
-    const subtotal = item.PRECIO * item.cantidad;
-    total += subtotal;
+    const sub = item.PRECIO * item.cantidad;
+    subtotal += sub;
     totalItems += item.cantidad;
     html += `
       <div class="ticket-row">
@@ -928,7 +934,7 @@ function renderTicketPOS() {
           <span class="qty-val">${item.cantidad}</span>
           <button class="qty-btn" onclick="cambiarCantidadPOS('${item.CODIGO}', 1)">+</button>
         </div>
-        <div class="ti-sub money">$${subtotal.toLocaleString("es-AR")}</div>
+        <div class="ti-sub money">$${sub.toLocaleString("es-AR")}</div>
         <button class="ti-remove" onclick="quitarProductoPOS('${item.CODIGO}')" title="Quitar">✕</button>
       </div>`;
   });
@@ -938,6 +944,22 @@ function renderTicketPOS() {
 
   const emptyState = document.getElementById("ticketEmptyState");
   if (emptyState) emptyState.style.display = ticketPOS.length === 0 ? "flex" : "none";
+
+  const { montoDescuento, total } = calcularDescuentoPOS(subtotal);
+
+  const subtotalEl = document.getElementById("subtotalPOS");
+  if (subtotalEl) subtotalEl.innerText = subtotal.toLocaleString("es-AR");
+
+  const rowDescuentoEl = document.getElementById("rowDescuentoPOS");
+  const descuentoMontoEl = document.getElementById("descuentoMontoPOS");
+  if (rowDescuentoEl && descuentoMontoEl) {
+    if (descuentoActivoPOS && montoDescuento > 0) {
+      rowDescuentoEl.style.display = "flex";
+      descuentoMontoEl.innerText = "-$" + montoDescuento.toLocaleString("es-AR");
+    } else {
+      rowDescuentoEl.style.display = "none";
+    }
+  }
 
   const totalEl = document.getElementById("totalPOS");
   if (totalEl) totalEl.innerText = total.toLocaleString("es-AR");
@@ -953,6 +975,104 @@ function renderTicketPOS() {
 
   const printBtn = document.getElementById("btnImprimirTicket");
   if (printBtn) printBtn.disabled = ticketPOS.length === 0;
+
+  actualizarUIDescuentoPOS();
+}
+
+/* ---- discount ---- */
+
+/** Computes the discount amount (clamped to the subtotal) and the resulting total */
+function calcularDescuentoPOS(subtotal) {
+  if (!descuentoActivoPOS || descuentoValorPOS <= 0) {
+    return { montoDescuento: 0, total: subtotal };
+  }
+
+  let monto = descuentoTipoPOS === "PORCENTAJE"
+    ? subtotal * (descuentoValorPOS / 100)
+    : descuentoValorPOS;
+
+  monto = Math.max(0, Math.min(monto, subtotal)); // nunca negativo ni mayor al subtotal
+
+  return { montoDescuento: monto, total: subtotal - monto };
+}
+
+function toggleDescuentoPOS() {
+  const panel = document.getElementById("discountPanel");
+  if (!panel) return;
+  const abierto = panel.style.display !== "none";
+  panel.style.display = abierto ? "none" : "flex";
+  if (!abierto) {
+    setTimeout(() => {
+      const input = document.getElementById("descuentoValorInput");
+      if (input) input.focus();
+    }, 50);
+  }
+}
+
+function elegirTipoDescuento(el, tipo) {
+  descuentoTipoPOS = tipo;
+  document.querySelectorAll(".discount-type-btn").forEach(b => b.classList.remove("active"));
+  el.classList.add("active");
+
+  const input = document.getElementById("descuentoValorInput");
+  if (input) input.placeholder = tipo === "PORCENTAJE" ? "Ej: 10" : "Ej: 500";
+
+  aplicarDescuentoPOS();
+}
+
+function aplicarDescuentoPOS() {
+  const input = document.getElementById("descuentoValorInput");
+  const valor = Number(input ? input.value : 0) || 0;
+
+  descuentoValorPOS = Math.max(0, valor);
+  descuentoActivoPOS = descuentoValorPOS > 0;
+
+  renderTicketPOS();
+}
+
+function quitarDescuentoPOS() {
+  resetearDescuentoPOS();
+  const panel = document.getElementById("discountPanel");
+  if (panel) panel.style.display = "none";
+  renderTicketPOS();
+}
+
+function resetearDescuentoPOS() {
+  descuentoActivoPOS = false;
+  descuentoValorPOS = 0;
+  const input = document.getElementById("descuentoValorInput");
+  if (input) input.value = "";
+  const motivo = document.getElementById("descuentoMotivoInput");
+  if (motivo) motivo.value = "";
+}
+
+/** Returns a short human-readable label for the active discount, e.g. "10% (-$500)" or "-$300" */
+function obtenerEtiquetaDescuentoPOS(subtotal) {
+  if (!descuentoActivoPOS || descuentoValorPOS <= 0) return "";
+  const { montoDescuento } = calcularDescuentoPOS(subtotal);
+  const motivo = (document.getElementById("descuentoMotivoInput") || {}).value || "";
+  let etiqueta = descuentoTipoPOS === "PORCENTAJE"
+    ? `${descuentoValorPOS}% (-$${Math.round(montoDescuento).toLocaleString("es-AR")})`
+    : `-$${Math.round(montoDescuento).toLocaleString("es-AR")}`;
+  if (motivo.trim()) etiqueta += ` — ${motivo.trim()}`;
+  return etiqueta;
+}
+
+/** Keeps the toggle button label/style in sync with the current discount state */
+function actualizarUIDescuentoPOS() {
+  const btn = document.getElementById("btnToggleDescuento");
+  const label = document.getElementById("discountToggleLabel");
+  if (!btn || !label) return;
+
+  if (descuentoActivoPOS && descuentoValorPOS > 0) {
+    btn.classList.add("has-discount");
+    label.innerText = descuentoTipoPOS === "PORCENTAJE"
+      ? `Descuento aplicado: ${descuentoValorPOS}%`
+      : `Descuento aplicado: $${descuentoValorPOS.toLocaleString("es-AR")}`;
+  } else {
+    btn.classList.remove("has-discount");
+    label.innerText = "Agregar descuento";
+  }
 }
 
 /* ---- payment method ---- */
@@ -968,7 +1088,9 @@ function elegirFormaPago(el, valor) {
 async function finalizarVentaPOS() {
   if (ticketPOS.length === 0) { toast("El ticket está vacío", "error"); return; }
 
-  const total = ticketPOS.reduce((acc, item) => acc + (item.PRECIO * item.cantidad), 0);
+  const subtotal = ticketPOS.reduce((acc, item) => acc + (item.PRECIO * item.cantidad), 0);
+  const { montoDescuento, total } = calcularDescuentoPOS(subtotal);
+  const etiquetaDescuento = obtenerEtiquetaDescuentoPOS(subtotal);
 
   const btn = document.getElementById("btnFinalizarVenta");
   const textoOriginal = btn ? btn.innerHTML : "";
@@ -978,9 +1100,10 @@ async function finalizarVentaPOS() {
     const response = await fetch(
       API_URL +
       "?action=guardarVenta" +
-      "&total="      + encodeURIComponent(total) +
-      "&formaPago="  + encodeURIComponent(formaPagoPOS) +
-      "&carrito="    + encodeURIComponent(JSON.stringify(ticketPOS))
+      "&total="         + encodeURIComponent(total) +
+      "&formaPago="     + encodeURIComponent(formaPagoPOS) +
+      "&observaciones=" + encodeURIComponent(etiquetaDescuento ? "Descuento: " + etiquetaDescuento : "") +
+      "&carrito="       + encodeURIComponent(JSON.stringify(ticketPOS))
     );
     const data = await response.json();
 
@@ -992,15 +1115,19 @@ async function finalizarVentaPOS() {
 
     // Save a copy for thermal printing from receipt modal
     ultimaVentaImprimible = {
-      ventaId:   data.ventaId,
-      items:     [...ticketPOS],
-      total:     total,
-      formaPago: formaPagoPOS,
-      fecha:     new Date()
+      ventaId:    data.ventaId,
+      items:      [...ticketPOS],
+      total:      total,
+      subtotal:   subtotal,
+      descuento:  montoDescuento,
+      descuentoEtiqueta: etiquetaDescuento,
+      formaPago:  formaPagoPOS,
+      fecha:      new Date()
     };
 
-    mostrarRecibo(data.ventaId, ticketPOS, total);
+    mostrarRecibo(data.ventaId, ticketPOS, total, subtotal, montoDescuento);
     ticketPOS = [];
+    resetearDescuentoPOS();
     renderTicketPOS();
 
     productosPOS = [];
@@ -1019,7 +1146,7 @@ async function finalizarVentaPOS() {
 
 /* ---- receipt modal ---- */
 
-function mostrarRecibo(ventaId, items, total) {
+function mostrarRecibo(ventaId, items, total, subtotal, montoDescuento) {
   document.getElementById("receiptId").innerText = "#" + (ventaId || "—");
 
   let html = "";
@@ -1031,6 +1158,18 @@ function mostrarRecibo(ventaId, items, total) {
         <td style="text-align:right;">$${sub.toLocaleString("es-AR")}</td>
       </tr>`;
   });
+
+  if (montoDescuento > 0) {
+    html += `
+      <tr>
+        <td>Subtotal</td>
+        <td style="text-align:right;">$${Number(subtotal).toLocaleString("es-AR")}</td>
+      </tr>
+      <tr>
+        <td style="color:var(--red-500);">Descuento</td>
+        <td style="text-align:right;color:var(--red-500);">-$${Math.round(montoDescuento).toLocaleString("es-AR")}</td>
+      </tr>`;
+  }
 
   document.getElementById("receiptItems").innerHTML = html;
   document.getElementById("receiptTotal").innerText = "$" + total.toLocaleString("es-AR");
@@ -1062,16 +1201,19 @@ function nuevaVentaPOS() {
  * @param {number}  total
  * @param {string}  formaPago
  * @param {Date}    fecha
+ * @param {Object}  [descuento] — { monto, etiqueta } opcional, si la venta tuvo descuento
  */
-function buildThermalHTML(ventaId, items, total, formaPago, fecha) {
+function buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento) {
   const fechaStr = (fecha || new Date()).toLocaleString("es-AR", {
     day:"2-digit", month:"2-digit", year:"numeric",
     hour:"2-digit", minute:"2-digit"
   });
 
   let rows = "";
+  let subtotal = 0;
   items.forEach(item => {
-    const sub = (item.PRECIO * item.cantidad).toLocaleString("es-AR");
+    const sub = item.PRECIO * item.cantidad;
+    subtotal += sub;
     const unitStr = `${item.cantidad} x $${Number(item.PRECIO).toLocaleString("es-AR")}`;
     rows += `
       <tr>
@@ -1079,9 +1221,29 @@ function buildThermalHTML(ventaId, items, total, formaPago, fecha) {
       </tr>
       <tr>
         <td style="color:#555;">${unitStr}</td>
-        <td style="text-align:right;">$${sub}</td>
+        <td style="text-align:right;">$${sub.toLocaleString("es-AR")}</td>
       </tr>`;
   });
+
+  const tieneDescuento = descuento && Number(descuento.monto) > 0;
+
+  let filasTotales = "";
+  if (tieneDescuento) {
+    filasTotales += `
+      <tr>
+        <td>Subtotal</td>
+        <td style="text-align:right;">$${subtotal.toLocaleString("es-AR")}</td>
+      </tr>
+      <tr>
+        <td>Descuento${descuento.etiqueta ? " (" + escapeHtml(descuento.etiqueta) + ")" : ""}</td>
+        <td style="text-align:right;">-$${Math.round(descuento.monto).toLocaleString("es-AR")}</td>
+      </tr>`;
+  }
+  filasTotales += `
+    <tr class="th-total-row">
+      <td><strong>TOTAL</strong></td>
+      <td style="text-align:right;"><strong>$${Number(total).toLocaleString("es-AR")}</strong></td>
+    </tr>`;
 
   return `
     <div class="thermal-receipt">
@@ -1094,10 +1256,7 @@ function buildThermalHTML(ventaId, items, total, formaPago, fecha) {
       <hr class="th-sep">
       <table>
         <tbody>${rows}</tbody>
-        <tr class="th-total-row">
-          <td><strong>TOTAL</strong></td>
-          <td style="text-align:right;"><strong>$${Number(total).toLocaleString("es-AR")}</strong></td>
-        </tr>
+        ${filasTotales}
       </table>
       <hr class="th-sep">
       <div class="th-footer">¡Gracias por su compra!</div>
@@ -1109,18 +1268,22 @@ function buildThermalHTML(ventaId, items, total, formaPago, fecha) {
 /** Print the current (unsaved) ticket as a pre-sale receipt */
 function imprimirTicketThermal() {
   if (ticketPOS.length === 0) { toast("El ticket está vacío", "error"); return; }
-  const total = ticketPOS.reduce((acc, i) => acc + i.PRECIO * i.cantidad, 0);
-  _ejecutarImpresion("PREVIO", ticketPOS, total, formaPagoPOS, new Date());
+  const subtotal = ticketPOS.reduce((acc, i) => acc + i.PRECIO * i.cantidad, 0);
+  const { montoDescuento, total } = calcularDescuentoPOS(subtotal);
+  const etiqueta = obtenerEtiquetaDescuentoPOS(subtotal);
+  _ejecutarImpresion("PREVIO", ticketPOS, total, formaPagoPOS, new Date(),
+    montoDescuento > 0 ? { monto: montoDescuento, etiqueta } : null);
 }
 
 /** Print after a completed sale (from receipt modal) */
 function imprimirUltimoRecibo() {
   if (!ultimaVentaImprimible) { toast("No hay venta para imprimir", "error"); return; }
   const u = ultimaVentaImprimible;
-  _ejecutarImpresion(u.ventaId, u.items, u.total, u.formaPago, u.fecha);
+  _ejecutarImpresion(u.ventaId, u.items, u.total, u.formaPago, u.fecha,
+    u.descuento > 0 ? { monto: u.descuento, etiqueta: u.descuentoEtiqueta } : null);
 }
 
-/** Print a sale from the dashboard recent-sales table */
+/** Print a sale from the dashboard recent-sales table or the Ventas POS history */
 function imprimirVentaDesdeData(ventaObj) {
   const items = [];
   // Try to parse items if stored as JSON string or array
@@ -1136,20 +1299,35 @@ function imprimirVentaDesdeData(ventaObj) {
   if (items.length === 0) {
     items.push({ PRODUCTO: ventaObj.DETALLE || "Venta", PRECIO: Number(ventaObj.TOTAL || 0), cantidad: 1 });
   }
+
+  // El descuento (si lo hubo) quedó guardado como texto en OBSERVACIONES,
+  // ej: "Descuento: 10% (-$500) — cliente frecuente". Lo reconstruimos
+  // calculando subtotal real de items vs. el TOTAL guardado (ya con descuento).
+  const subtotalItems = items.reduce((acc, i) => acc + Number(i.PRECIO) * Number(i.cantidad), 0);
+  const totalGuardado = Number(ventaObj.TOTAL || 0);
+  const diferencia = subtotalItems - totalGuardado;
+
+  const obs = String(ventaObj.OBSERVACIONES || "");
+  let descuentoInfo = null;
+  if (diferencia > 0.5 && /descuento/i.test(obs)) {
+    descuentoInfo = { monto: diferencia, etiqueta: obs.replace(/^Descuento:\s*/i, "") };
+  }
+
   _ejecutarImpresion(
     ventaObj.VENTA_ID || ventaObj.ID || "—",
     items,
-    Number(ventaObj.TOTAL || 0),
+    totalGuardado,
     ventaObj.FORMA_PAGO || ventaObj.PAGO || "—",
-    ventaObj.FECHA ? new Date(ventaObj.FECHA) : new Date()
+    ventaObj.FECHA ? new Date(ventaObj.FECHA) : new Date(),
+    descuentoInfo
   );
 }
 
-function _ejecutarImpresion(ventaId, items, total, formaPago, fecha) {
+function _ejecutarImpresion(ventaId, items, total, formaPago, fecha, descuento) {
   const frame = document.getElementById("thermalPrintFrame");
   if (!frame) { toast("Error: frame de impresión no encontrado", "error"); return; }
 
-  frame.innerHTML = buildThermalHTML(ventaId, items, total, formaPago, fecha);
+  frame.innerHTML = buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento);
 
   // Small delay to let the DOM paint before triggering print dialog
   setTimeout(() => {

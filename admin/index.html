@@ -325,7 +325,31 @@
         <div class="ticket-footer">
           <div class="ticket-totals">
             <div class="trow"><span>Artículos</span><span class="money" id="ticketItemsCount">0</span></div>
+            <div class="trow"><span>Subtotal</span><span class="money">$<span id="subtotalPOS">0</span></span></div>
+            <div class="trow" id="rowDescuentoPOS" style="display:none;">
+              <span>Descuento</span>
+              <span class="money" id="descuentoMontoPOS" style="color:var(--red-500);">-$0</span>
+            </div>
             <div class="trow grand"><span>Total</span><span class="money">$<span id="totalPOS">0</span></span></div>
+          </div>
+
+          <div class="discount-box" id="discountBox">
+            <button class="discount-toggle" id="btnToggleDescuento" onclick="toggleDescuentoPOS()">
+              <span class="ic">🏷️</span>
+              <span id="discountToggleLabel">Agregar descuento</span>
+            </button>
+
+            <div class="discount-panel" id="discountPanel" style="display:none;">
+              <div class="discount-type-row">
+                <button class="discount-type-btn active" data-tipo="PORCENTAJE" onclick="elegirTipoDescuento(this,'PORCENTAJE')">%</button>
+                <button class="discount-type-btn" data-tipo="MONTO" onclick="elegirTipoDescuento(this,'MONTO')">$</button>
+                <input type="number" id="descuentoValorInput" class="form-control form-control-sm" placeholder="0" min="0" step="1" oninput="aplicarDescuentoPOS()">
+                <button class="discount-clear" id="btnQuitarDescuento" onclick="quitarDescuentoPOS()" title="Quitar descuento">✕</button>
+              </div>
+              <div class="discount-motivo-row">
+                <input type="text" id="descuentoMotivoInput" class="form-control form-control-sm" placeholder="Motivo (opcional, ej: cliente frecuente)" oninput="renderTicketPOS()">
+              </div>
+            </div>
           </div>
 
           <div class="pay-methods" id="payMethods">
