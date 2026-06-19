@@ -18,6 +18,7 @@
   <nav id="navLinks">
     <a href="#" data-target="dashboard"        onclick="mostrarSeccion('dashboard')"><span class="ic">🏠</span> Dashboard</a>
     <a href="#" data-target="pos"              onclick="mostrarSeccion('pos')"><span class="ic">🏪</span> Punto de Venta</a>
+    <a href="#" data-target="cierreCaja"        onclick="mostrarSeccion('cierreCaja')"><span class="ic">🧮</span> Cierre de Caja</a>
     <a href="#" data-target="pedidos"          onclick="mostrarSeccion('pedidos')"><span class="ic">📦</span> Pedidos</a>
     <a href="#" data-target="productos"        onclick="mostrarSeccion('productos')"><span class="ic">🛒</span> Productos</a>
     <a href="#" data-target="clientes"         onclick="mostrarSeccion('clientes'); cargarClientes();"><span class="ic">👥</span> Clientes</a>
@@ -31,6 +32,7 @@
   <nav id="bottomNavLinks">
     <a href="#" data-target="dashboard" onclick="mostrarSeccion('dashboard')"><span class="ic">🏠</span>Inicio</a>
     <a href="#" data-target="pos"       onclick="mostrarSeccion('pos')"><span class="ic">🏪</span>Venta</a>
+    <a href="#" data-target="cierreCaja" onclick="mostrarSeccion('cierreCaja')"><span class="ic">🧮</span>Caja</a>
     <a href="#" data-target="pedidos"   onclick="mostrarSeccion('pedidos')"><span class="ic">📦</span>Pedidos</a>
     <a href="#" data-target="productos" onclick="mostrarSeccion('productos')"><span class="ic">🛒</span>Stock</a>
     <a href="#" data-target="reportes"  onclick="mostrarSeccion('reportes')"><span class="ic">📈</span>Reportes</a>
@@ -68,7 +70,7 @@
         <div class="ps-value" id="posTotalPedBanner">0</div>
       </div>
       <div style="margin-left:auto;">
-        <span class="ps-badge">📊 POS en tiempo real</span>
+        <span class="ps-badge" id="posLiveBadge">📊 POS en tiempo real</span>
       </div>
     </div>
 
@@ -308,6 +310,112 @@
             <button class="btn-finalize"     id="btnFinalizarVenta" onclick="finalizarVentaPOS()">✅ Finalizar Venta</button>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== CIERRE DE CAJA ===== -->
+  <div id="cierreCaja" class="seccion">
+    <div class="page-header">
+      <div><h1>🧮 Cierre de Caja</h1><div class="sub">Reconciliación diaria — compará lo esperado contra lo contado</div></div>
+      <button class="btn btn-outline-secondary btn-sm" onclick="cargarResumenCierreCaja()">↻ Recalcular</button>
+    </div>
+
+    <div class="card p-3 mb-3">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+        <div>
+          <div class="sub" style="margin:0;">Fecha del cierre</div>
+          <h5 style="margin:0;" id="ccFechaLabel">—</h5>
+        </div>
+        <div class="text-end">
+          <div class="sub" style="margin:0;">Ventas registradas hoy</div>
+          <h5 style="margin:0;" id="ccCantidadVentas">0 ventas</h5>
+        </div>
+      </div>
+      <div class="cc-estado" id="cierreCajaEstado"></div>
+    </div>
+
+    <div class="cc-grid">
+      <!-- EFECTIVO -->
+      <div class="card p-3 cc-card">
+        <div class="cc-card-head">
+          <span class="cc-ic">💵</span>
+          <h6>Efectivo</h6>
+        </div>
+        <div class="cc-row"><span>Esperado (según ventas)</span><strong id="ccEfectivoEsperado">$0</strong></div>
+        <div class="cc-row">
+          <span>Contado físicamente</span>
+          <input type="number" class="form-control form-control-sm cc-input" id="ccEfectivoContado" placeholder="0" min="0" step="1" oninput="calcularDiferenciasCierreCaja()">
+        </div>
+        <div class="cc-row cc-diff-row"><span>Diferencia</span><strong id="ccEfectivoDif" class="cc-dif-ok">$0</strong></div>
+      </div>
+
+      <!-- TRANSFERENCIA -->
+      <div class="card p-3 cc-card">
+        <div class="cc-card-head">
+          <span class="cc-ic">📲</span>
+          <h6>Transferencia</h6>
+        </div>
+        <div class="cc-row"><span>Esperado (según ventas)</span><strong id="ccTransferenciaEsperado">$0</strong></div>
+        <div class="cc-row">
+          <span>Contado / conciliado</span>
+          <input type="number" class="form-control form-control-sm cc-input" id="ccTransferenciaContado" placeholder="0" min="0" step="1" oninput="calcularDiferenciasCierreCaja()">
+        </div>
+        <div class="cc-row cc-diff-row"><span>Diferencia</span><strong id="ccTransferenciaDif" class="cc-dif-ok">$0</strong></div>
+      </div>
+
+      <!-- TARJETA -->
+      <div class="card p-3 cc-card">
+        <div class="cc-card-head">
+          <span class="cc-ic">💳</span>
+          <h6>Tarjeta</h6>
+        </div>
+        <div class="cc-row"><span>Esperado (según ventas)</span><strong id="ccTarjetaEsperado">$0</strong></div>
+        <div class="cc-row">
+          <span>Contado / conciliado</span>
+          <input type="number" class="form-control form-control-sm cc-input" id="ccTarjetaContado" placeholder="0" min="0" step="1" oninput="calcularDiferenciasCierreCaja()">
+        </div>
+        <div class="cc-row cc-diff-row"><span>Diferencia</span><strong id="ccTarjetaDif" class="cc-dif-ok">$0</strong></div>
+      </div>
+    </div>
+
+    <!-- TOTALES -->
+    <div class="card p-3 mt-3 cc-total-card">
+      <div class="cc-total-row">
+        <div>
+          <div class="ps-label" style="color:var(--slate-500);">Total Esperado</div>
+          <div class="cc-total-value" id="ccTotalEsperado">$0</div>
+        </div>
+        <div>
+          <div class="ps-label" style="color:var(--slate-500);">Total Contado</div>
+          <div class="cc-total-value" id="ccTotalContado">$0</div>
+        </div>
+        <div>
+          <div class="ps-label" style="color:var(--slate-500);">Diferencia Total</div>
+          <div class="cc-total-value" id="ccTotalDif">$0</div>
+        </div>
+      </div>
+
+      <div class="mt-3">
+        <label class="form-label" style="font-size:13px;">Observaciones (opcional)</label>
+        <textarea class="form-control" id="ccObservaciones" rows="2" placeholder="Ej: faltante por vuelto mal dado, billete falso detectado, etc."></textarea>
+      </div>
+
+      <div class="mt-3 d-flex justify-content-end">
+        <button class="btn btn-success" id="btnGuardarCierreCaja" onclick="guardarCierreCajaForm()">💾 Guardar Cierre de Caja</button>
+      </div>
+    </div>
+
+    <!-- HISTORIAL -->
+    <div class="page-header mt-4 mb-2">
+      <div><h1 style="font-size:17px;">Historial de cierres</h1></div>
+    </div>
+    <div class="card p-3">
+      <div class="table-responsive">
+        <table class="table table-striped">
+          <thead><tr><th>Fecha</th><th>Esperado</th><th>Contado</th><th>Diferencia</th><th>Vendedor</th><th>Observaciones</th></tr></thead>
+          <tbody id="tablaCierresCaja"></tbody>
+        </table>
       </div>
     </div>
   </div>

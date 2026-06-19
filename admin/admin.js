@@ -27,11 +27,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   cargarVentasPOS();
 
   setInterval(() => {
-    cargarMetricas();
-    if (document.getElementById("pedidos").style.display === "block") cargarPedidos();
-    if (document.getElementById("clientes").style.display === "block") cargarClientes();
-    if (document.getElementById("dashboard").style.display === "block") cargarVentasPOS();
-  }, 30000); // 30 s — less aggressive than 5 s to avoid rate limits
+    const dashboardVisible = document.getElementById("dashboard").style.display === "block";
+    const pedidosVisible   = document.getElementById("pedidos").style.display === "block";
+    const clientesVisible  = document.getElementById("clientes").style.display === "block";
+
+    if (dashboardVisible) { cargarMetricas(); cargarVentasPOS(); }
+    else { cargarMetricas(); } // keep banner numbers fresh even off-screen, it's cheap
+
+    if (pedidosVisible)  cargarPedidos();
+    if (clientesVisible) cargarClientes();
+  }, 15000); // 15 s — near real-time without hammering the API
 
   setupScannerListener();
 });
@@ -95,9 +100,29 @@ async function cargarMetricas() {
     actualizarElemento("posTicketPromBanner", tp);
     actualizarElemento("posTotalPedBanner",   data.totalPedidos || 0);
 
+    marcarActualizacionEnVivo();
+
   } catch (error) {
     console.error("Error métricas:", error);
+    marcarActualizacionEnVivo(true);
   }
+}
+
+/** Updates the "live" badge on the dashboard so users can see the data is fresh */
+function marcarActualizacionEnVivo(fallo) {
+  const badge = document.getElementById("posLiveBadge");
+  if (!badge) return;
+  const hora = new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  if (fallo) {
+    badge.classList.add("ps-badge-error");
+    badge.innerHTML = `⚠️ Sin conexión`;
+    return;
+  }
+  badge.classList.remove("ps-badge-error");
+  badge.innerHTML = `📊 En vivo · ${hora}`;
+  badge.classList.remove("pulse");
+  void badge.offsetWidth;
+  badge.classList.add("pulse");
 }
 
 /* ===================== POS VENTAS RECIENTES (dashboard) ===================== */
@@ -177,6 +202,8 @@ function mostrarSeccion(id) {
       if (input) input.focus();
     }, 80);
   }
+
+  if (id === "cierreCaja") cargarResumenCierreCaja();
 }
 
 /* ===================== PEDIDOS ===================== */
@@ -919,4 +946,208 @@ function cerrarCamaraScan() {
   document.getElementById("scanVideoWrap").innerHTML = `
     <video id="scanVideo" autoplay playsinline muted></video>
     <div class="scan-reticle"></div>`;
+}
+
+/* ===================================================================
+   CIERRE DE CAJA — RECONCILIACION DIARIA
+   Compara lo esperado (según VENTAS_LOCAL, por forma de pago) contra
+   lo contado físicamente al cierre del día. Guarda el resultado en
+   la hoja "CIERRES_CAJA" vía el backend.
+=================================================================== */
+
+let cierreCajaResumenActual = null; // último resumen "esperado" cargado del backend
+
+/** Loads today's expected totals by payment method and pre-fills the form */
+async function cargarResumenCierreCaja(fecha) {
+  const estadoEl = document.getElementById("cierreCajaEstado");
+  if (estadoEl) estadoEl.textContent = "Calculando ventas del día...";
+
+  try {
+    const url = API_URL + "?action=cierreCajaResumen" + (fecha ? "&fecha=" + encodeURIComponent(fecha) : "");
+    const response = await fetch(url);
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo calcular el resumen de caja", "error");
+      if (estadoEl) estadoEl.textContent = "";
+      return;
+    }
+
+    cierreCajaResumenActual = data;
+
+    actualizarElemento("ccFechaLabel", formatearFechaCierre(data.fecha));
+    actualizarElemento("ccCantidadVentas", data.cantidadVentas + (data.cantidadVentas === 1 ? " venta" : " ventas"));
+
+    actualizarElemento("ccEfectivoEsperado",      "$" + Number(data.esperado.EFECTIVO).toLocaleString("es-AR"));
+    actualizarElemento("ccTransferenciaEsperado", "$" + Number(data.esperado.TRANSFERENCIA).toLocaleString("es-AR"));
+    actualizarElemento("ccTarjetaEsperado",       "$" + Number(data.esperado.TARJETA).toLocaleString("es-AR"));
+    actualizarElemento("ccTotalEsperado",         "$" + Number(data.esperado.TOTAL).toLocaleString("es-AR"));
+
+    // If a closing already exists for this date, pre-fill counted amounts so the user can review/edit
+    const inputEfectivo      = document.getElementById("ccEfectivoContado");
+    const inputTransferencia = document.getElementById("ccTransferenciaContado");
+    const inputTarjeta       = document.getElementById("ccTarjetaContado");
+
+    if (data.yaCerrado && data.cierreExistente) {
+      const c = data.cierreExistente;
+      if (inputEfectivo)      inputEfectivo.value      = Number(c.EFECTIVO_CONTADO || 0);
+      if (inputTransferencia) inputTransferencia.value = Number(c.TRANSFERENCIA_CONTADO || 0);
+      if (inputTarjeta)       inputTarjeta.value        = Number(c.TARJETA_CONTADO || 0);
+      const obsEl = document.getElementById("ccObservaciones");
+      if (obsEl) obsEl.value = c.OBSERVACIONES || "";
+      if (estadoEl) estadoEl.innerHTML = `⚠️ Ya existe un cierre guardado para esta fecha. Guardar de nuevo lo actualizará.`;
+    } else {
+      if (inputEfectivo)      inputEfectivo.value      = "";
+      if (inputTransferencia) inputTransferencia.value = "";
+      if (inputTarjeta)       inputTarjeta.value        = "";
+      if (estadoEl) estadoEl.textContent = "";
+    }
+
+    calcularDiferenciasCierreCaja();
+    cargarHistorialCierres();
+
+  } catch (error) {
+    console.error("Error al cargar resumen de cierre de caja:", error);
+    toast("Error de conexión al calcular el cierre de caja", "error");
+    if (estadoEl) estadoEl.textContent = "";
+  }
+}
+
+function formatearFechaCierre(fechaStr) {
+  if (!fechaStr) return "—";
+  const [y, m, d] = fechaStr.split("-");
+  return `${d}/${m}/${y}`;
+}
+
+/** Recalculates differences live as the user types counted amounts */
+function calcularDiferenciasCierreCaja() {
+  if (!cierreCajaResumenActual) return;
+
+  const efectivoContado      = Number(document.getElementById("ccEfectivoContado").value || 0);
+  const transferenciaContado = Number(document.getElementById("ccTransferenciaContado").value || 0);
+  const tarjetaContado       = Number(document.getElementById("ccTarjetaContado").value || 0);
+
+  const esp = cierreCajaResumenActual.esperado;
+
+  const difEfectivo      = efectivoContado - esp.EFECTIVO;
+  const difTransferencia = transferenciaContado - esp.TRANSFERENCIA;
+  const difTarjeta       = tarjetaContado - esp.TARJETA;
+  const difTotal         = difEfectivo + difTransferencia + difTarjeta;
+
+  pintarDiferencia("ccEfectivoDif", difEfectivo);
+  pintarDiferencia("ccTransferenciaDif", difTransferencia);
+  pintarDiferencia("ccTarjetaDif", difTarjeta);
+  pintarDiferencia("ccTotalDif", difTotal, true);
+
+  const totalContado = efectivoContado + transferenciaContado + tarjetaContado;
+  actualizarElemento("ccTotalContado", "$" + totalContado.toLocaleString("es-AR"));
+}
+
+function pintarDiferencia(id, valor, esTotal) {
+  const el = document.getElementById(id);
+  if (!el) return;
+
+  const signo = valor > 0 ? "+" : "";
+  el.textContent = signo + "$" + Math.round(valor).toLocaleString("es-AR");
+
+  el.classList.remove("cc-dif-ok", "cc-dif-sobra", "cc-dif-falta");
+
+  if (Math.abs(valor) < 1)      el.classList.add("cc-dif-ok");
+  else if (valor > 0)           el.classList.add("cc-dif-sobra");
+  else                          el.classList.add("cc-dif-falta");
+}
+
+/** Saves the daily reconciliation to the backend (CIERRES_CAJA sheet) */
+async function guardarCierreCajaForm() {
+  if (!cierreCajaResumenActual) { toast("Esperá a que se calculen las ventas del día", "error"); return; }
+
+  const efectivoContado      = document.getElementById("ccEfectivoContado").value;
+  const transferenciaContado = document.getElementById("ccTransferenciaContado").value;
+  const tarjetaContado       = document.getElementById("ccTarjetaContado").value;
+  const observaciones        = document.getElementById("ccObservaciones").value;
+
+  if (efectivoContado === "" && transferenciaContado === "" && tarjetaContado === "") {
+    toast("Ingresá al menos un monto contado", "error");
+    return;
+  }
+
+  const btn = document.getElementById("btnGuardarCierreCaja");
+  const textoOriginal = btn ? btn.innerHTML : "";
+  if (btn) { btn.disabled = true; btn.innerHTML = "Guardando..."; }
+
+  try {
+    const params = new URLSearchParams({
+      action: "guardarCierreCaja",
+      fecha: cierreCajaResumenActual.fecha,
+      efectivoEsperado:      cierreCajaResumenActual.esperado.EFECTIVO,
+      efectivoContado:       efectivoContado || 0,
+      transferenciaEsperado: cierreCajaResumenActual.esperado.TRANSFERENCIA,
+      transferenciaContado:  transferenciaContado || 0,
+      tarjetaEsperado:       cierreCajaResumenActual.esperado.TARJETA,
+      tarjetaContado:        tarjetaContado || 0,
+      observaciones:         observaciones || ""
+    });
+
+    const response = await fetch(API_URL + "?" + params.toString());
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo guardar el cierre de caja", "error");
+      return;
+    }
+
+    toast(data.actualizado ? "Cierre de caja actualizado" : "Cierre de caja guardado", "success");
+    cargarHistorialCierres();
+
+  } catch (error) {
+    console.error("Error al guardar cierre de caja:", error);
+    toast("Error de conexión al guardar el cierre", "error");
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = textoOriginal; }
+  }
+}
+
+/** Loads the recent reconciliation history table */
+async function cargarHistorialCierres() {
+  const tbody = document.getElementById("tablaCierresCaja");
+  if (!tbody) return;
+
+  try {
+    const response = await fetch(API_URL + "?action=historialCierres");
+    const data = await response.json();
+    const lista = data.cierres || [];
+
+    if (lista.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-3">Todavía no hay cierres guardados</td></tr>`;
+      return;
+    }
+
+    let html = "";
+    lista.forEach(c => {
+      const fecha = formatearFechaCierre(
+        c.FECHA instanceof Date
+          ? c.FECHA.toISOString().slice(0, 10)
+          : String(c.FECHA).slice(0, 10)
+      );
+      const totalDif = Number(c.TOTAL_DIFERENCIA || 0);
+      const claseDif = Math.abs(totalDif) < 1 ? "cc-dif-ok" : (totalDif > 0 ? "cc-dif-sobra" : "cc-dif-falta");
+      const signo = totalDif > 0 ? "+" : "";
+
+      html += `
+        <tr>
+          <td>${escapeHtml(fecha)}</td>
+          <td class="money">$${Number(c.TOTAL_ESPERADO || 0).toLocaleString("es-AR")}</td>
+          <td class="money">$${Number(c.TOTAL_CONTADO || 0).toLocaleString("es-AR")}</td>
+          <td class="money ${claseDif}">${signo}$${Math.round(totalDif).toLocaleString("es-AR")}</td>
+          <td>${escapeHtml(c.VENDEDOR || "—")}</td>
+          <td>${escapeHtml(c.OBSERVACIONES || "—")}</td>
+        </tr>`;
+    });
+
+    tbody.innerHTML = html;
+
+  } catch (error) {
+    console.error("Error al cargar historial de cierres:", error);
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-3">Error al cargar el historial</td></tr>`;
+  }
 }

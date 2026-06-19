@@ -240,6 +240,72 @@ html,body{
 .pos-summary-card .ps-badge{
   font-size:11px; font-weight:700; padding:3px 9px; border-radius:20px;
   background:rgba(255,255,255,.12); color:rgba(255,255,255,.8);
+  transition:background .25s;
+}
+.pos-summary-card .ps-badge.ps-badge-error{
+  background:rgba(220,38,38,.25); color:#fecaca;
+}
+.pos-summary-card .ps-badge.pulse{
+  animation:ps-badge-pulse .6s ease-out;
+}
+@keyframes ps-badge-pulse{
+  0%   { box-shadow:0 0 0 0 rgba(255,255,255,.35); }
+  100% { box-shadow:0 0 0 8px rgba(255,255,255,0); }
+}
+
+/* ===================== CIERRE DE CAJA ===================== */
+
+.cc-estado{
+  font-size:13px; color:var(--amber-500); font-weight:600; min-height:18px;
+}
+
+.cc-grid{
+  display:grid; grid-template-columns:repeat(3, 1fr); gap:16px;
+}
+@media (max-width:900px){
+  .cc-grid{ grid-template-columns:1fr; }
+}
+
+.cc-card{ display:flex; flex-direction:column; gap:10px; }
+.cc-card-head{ display:flex; align-items:center; gap:10px; margin-bottom:4px; }
+.cc-card-head .cc-ic{ font-size:20px; }
+.cc-card-head h6{
+  font-size:13px; font-weight:700; color:var(--slate-700); margin:0;
+  text-transform:uppercase; letter-spacing:.04em;
+}
+
+.cc-row{
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  font-size:13.5px; color:var(--slate-600);
+}
+.cc-row strong{
+  font-family:var(--font-mono); color:var(--navy-900); font-size:15px;
+}
+.cc-row .cc-input{
+  max-width:130px; text-align:right; font-family:var(--font-mono);
+}
+.cc-diff-row{
+  border-top:1px dashed var(--slate-200); padding-top:8px; margin-top:2px;
+}
+
+.cc-dif-ok    { color:var(--green-600) !important; }
+.cc-dif-sobra { color:var(--blue-500)  !important; }
+.cc-dif-falta { color:var(--red-600)   !important; }
+
+.cc-total-card{ background:var(--slate-50); }
+.cc-total-row{
+  display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap;
+}
+.cc-total-row > div{ flex:1; min-width:140px; }
+.cc-total-value{
+  font-family:var(--font-mono); font-size:24px; font-weight:800; color:var(--navy-900);
+}
+#ccTotalDif.cc-dif-sobra, #ccTotalDif.cc-dif-falta, #ccTotalDif.cc-dif-ok{
+  font-size:24px;
+}
+
+@media (max-width:600px){
+  .cc-total-value{ font-size:20px; }
 }
 
 /* ===================== TABLES ===================== */
