@@ -2,235 +2,267 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>JIREH · Punto de Venta</title>
-
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="admin.css">
 </head>
-
 <body>
 
-<!-- SIDEBAR -->
+<!-- =================== SIDEBAR (desktop) =================== -->
 <div class="sidebar">
-
   <div class="sidebar-brand">
     <div class="mark">J</div>
     <div class="label">JIREH<small>PANEL ADMIN</small></div>
   </div>
-
   <nav id="navLinks">
-    <a href="#" data-target="dashboard" onclick="mostrarSeccion('dashboard')"><span class="ic">🏠</span> Dashboard</a>
-    <a href="#" data-target="pos" onclick="mostrarSeccion('pos')"><span class="ic">🏪</span> Punto de Venta</a>
-    <a href="#" data-target="pedidos" onclick="mostrarSeccion('pedidos')"><span class="ic">📦</span> Pedidos</a>
-    <a href="#" data-target="productos" onclick="mostrarSeccion('productos')"><span class="ic">🛒</span> Productos</a>
-    <a href="#" data-target="clientes" onclick="mostrarSeccion('clientes'); cargarClientes();"><span class="ic">👥</span> Clientes</a>
-    <a href="#" data-target="reportes" onclick="mostrarSeccion('reportes')"><span class="ic">📈</span> Reportes</a>
+    <a href="#" data-target="dashboard"        onclick="mostrarSeccion('dashboard')"><span class="ic">🏠</span> Dashboard</a>
+    <a href="#" data-target="pos"              onclick="mostrarSeccion('pos')"><span class="ic">🏪</span> Punto de Venta</a>
+    <a href="#" data-target="pedidos"          onclick="mostrarSeccion('pedidos')"><span class="ic">📦</span> Pedidos</a>
+    <a href="#" data-target="productos"        onclick="mostrarSeccion('productos')"><span class="ic">🛒</span> Productos</a>
+    <a href="#" data-target="clientes"         onclick="mostrarSeccion('clientes'); cargarClientes();"><span class="ic">👥</span> Clientes</a>
+    <a href="#" data-target="reportes"         onclick="mostrarSeccion('reportes')"><span class="ic">📈</span> Reportes</a>
   </nav>
-
   <button class="logout-btn" onclick="logout()">⏻ Cerrar sesión</button>
-
 </div>
 
-<!-- MAIN CONTENT -->
+<!-- =================== BOTTOM NAV (mobile) =================== -->
+<div class="bottom-nav">
+  <nav id="bottomNavLinks">
+    <a href="#" data-target="dashboard" onclick="mostrarSeccion('dashboard')"><span class="ic">🏠</span>Inicio</a>
+    <a href="#" data-target="pos"       onclick="mostrarSeccion('pos')"><span class="ic">🏪</span>Venta</a>
+    <a href="#" data-target="pedidos"   onclick="mostrarSeccion('pedidos')"><span class="ic">📦</span>Pedidos</a>
+    <a href="#" data-target="productos" onclick="mostrarSeccion('productos')"><span class="ic">🛒</span>Stock</a>
+    <a href="#" data-target="reportes"  onclick="mostrarSeccion('reportes')"><span class="ic">📈</span>Reportes</a>
+  </nav>
+</div>
+
+<!-- =================== MAIN CONTENT =================== -->
 <div class="content">
 
-  <!-- DASHBOARD -->
+  <!-- ===== DASHBOARD ===== -->
   <div id="dashboard" class="seccion">
-
     <div class="page-header">
+      <div><h1>Dashboard</h1><div class="sub">Resumen general del negocio</div></div>
+    </div>
+
+    <!-- POS daily summary banner -->
+    <div class="pos-summary-card mb-3" id="posSummaryBanner">
       <div>
-        <h1>Dashboard</h1>
-        <div class="sub">Resumen general del negocio</div>
+        <div class="ps-label">Ventas Hoy (POS)</div>
+        <div class="ps-value" id="posVentasHoyBanner">$0</div>
+      </div>
+      <div class="ps-divider"></div>
+      <div>
+        <div class="ps-label">Ventas Mes (POS)</div>
+        <div class="ps-value" id="posVentasMesBanner">$0</div>
+      </div>
+      <div class="ps-divider"></div>
+      <div>
+        <div class="ps-label">Ticket Promedio</div>
+        <div class="ps-value" id="posTicketPromBanner">$0</div>
+      </div>
+      <div class="ps-divider"></div>
+      <div>
+        <div class="ps-label">Total Pedidos</div>
+        <div class="ps-value" id="posTotalPedBanner">0</div>
+      </div>
+      <div style="margin-left:auto;">
+        <span class="ps-badge">📊 POS en tiempo real</span>
       </div>
     </div>
 
     <div class="row g-3">
-
-      <div class="col-md-3">
+      <div class="col-6 col-md-3">
         <div class="card p-3 dashboard-card metric-card" onclick="mostrarSeccion('masVendidos'); cargarMasVendidos();">
           <div class="metric-icon bg-tint-amber">🏆</div>
           <h6>Más Vendidos</h6>
           <h2 id="cantidadMasVendidos" style="font-size:18px;">Ver ranking →</h2>
         </div>
       </div>
-
-      <div class="col-md-3">
+      <div class="col-6 col-md-3">
         <div class="card p-3 metric-card">
           <div class="metric-icon bg-tint-blue">🛒</div>
           <h6>Productos Activos</h6>
           <h2 id="productosActivos">0</h2>
         </div>
       </div>
-
-      <div class="col-md-3">
+      <div class="col-6 col-md-3">
         <div class="card p-3 dashboard-card metric-card" onclick="mostrarSeccion('stockBajoProductos'); cargarStockBajo();">
           <div class="metric-icon bg-tint-amber">⚠️</div>
           <h6>Stock Bajo</h6>
           <h2 id="stockBajo">0</h2>
         </div>
       </div>
-
-      <div class="col-md-3">
+      <div class="col-6 col-md-3">
         <div class="card p-3 dashboard-card metric-card" onclick="mostrarSeccion('productosAgotados'); cargarAgotados();">
           <div class="metric-icon bg-tint-red">❌</div>
           <h6>Agotados</h6>
           <h2 id="agotados">0</h2>
         </div>
       </div>
-
-      <div class="col-md-3">
+      <div class="col-6 col-md-3">
         <div class="card p-3 dashboard-card metric-card" onclick="mostrarSeccion('clientes'); cargarClientes();">
           <div class="metric-icon bg-tint-blue">👥</div>
           <h6>Clientes</h6>
           <h2 id="clientesUnicos">0</h2>
         </div>
       </div>
-
-      <div class="col-md-3">
+      <div class="col-6 col-md-3">
         <div class="card p-3 dashboard-card metric-card" onclick="mostrarSeccion('pedidos')">
           <div class="metric-icon bg-tint-blue">📦</div>
           <h6>Pedidos Nuevos</h6>
           <h2 id="pedidosNuevos">0</h2>
         </div>
       </div>
-
-      <div class="col-md-3">
+      <div class="col-6 col-md-3">
         <div class="card p-3 metric-card">
           <div class="metric-icon bg-tint-green">💰</div>
           <h6>Ventas Hoy</h6>
           <h2 id="ventasHoy">$0</h2>
         </div>
       </div>
-
-      <div class="col-md-3">
+      <div class="col-6 col-md-3">
         <div class="card p-3 metric-card">
           <div class="metric-icon bg-tint-green">📈</div>
           <h6>Ventas Mes</h6>
           <h2 id="ventasMes">$0</h2>
         </div>
       </div>
-
-      <div class="col-md-3">
+      <div class="col-6 col-md-3">
         <div class="card p-3 dashboard-card metric-card" onclick="mostrarSeccion('pedidos')">
           <div class="metric-icon bg-tint-blue">📦</div>
           <h6>Total Pedidos</h6>
           <h2 id="TotalPedidos">0</h2>
         </div>
       </div>
-
-      <div class="col-md-3">
+      <div class="col-6 col-md-3">
         <div class="card p-3 metric-card">
           <div class="metric-icon bg-tint-green">💵</div>
           <h6>Ticket Promedio</h6>
           <h2 id="TicketPromedio">$0</h2>
         </div>
       </div>
+    </div>
 
+    <!-- POS recent sales table -->
+    <div class="page-header mt-4 mb-2">
+      <div><h1 style="font-size:17px;">Últimas ventas del día (POS)</h1></div>
+      <button class="btn btn-outline-secondary btn-sm" onclick="cargarVentasPOS()">↻ Actualizar</button>
+    </div>
+    <div class="card p-3">
+      <div class="table-responsive">
+        <table class="table table-striped">
+          <thead><tr><th>#Venta</th><th>Hora</th><th>Items</th><th>Forma de Pago</th><th>Total</th><th>Imprimir</th></tr></thead>
+          <tbody id="tablaPOSRecientes"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 
-  <!-- CLIENTES -->
+  <!-- ===== CLIENTES ===== -->
   <div id="clientes" class="seccion">
     <div class="page-header"><div><h1>Clientes</h1><div class="sub">Historial de compra por cliente</div></div></div>
     <div class="card p-3">
-      <table class="table table-striped">
-        <thead><tr><th>Cliente</th><th>Empresa</th><th>Dirección</th><th>Teléfono</th><th>DNI</th><th>Pedidos</th><th>Total Comprado</th></tr></thead>
-        <tbody id="tablaClientes"></tbody>
-      </table>
+      <div class="table-responsive">
+        <table class="table table-striped">
+          <thead><tr><th>Cliente</th><th>Empresa</th><th>Dirección</th><th>Teléfono</th><th>DNI</th><th>Pedidos</th><th>Total Comprado</th></tr></thead>
+          <tbody id="tablaClientes"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 
-  <!-- PRODUCTOS AGOTADOS -->
+  <!-- ===== PRODUCTOS AGOTADOS ===== -->
   <div id="productosAgotados" class="seccion">
     <div class="page-header"><div><h1>Productos Agotados</h1><div class="sub">Sin stock disponible</div></div></div>
     <div class="card p-3">
-      <table class="table table-striped">
-        <thead><tr><th>Código</th><th>Producto</th><th>Stock</th></tr></thead>
-        <tbody id="tablaAgotados"></tbody>
-      </table>
+      <div class="table-responsive">
+        <table class="table table-striped">
+          <thead><tr><th>Código</th><th>Producto</th><th>Stock</th></tr></thead>
+          <tbody id="tablaAgotados"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 
-  <!-- STOCK BAJO -->
+  <!-- ===== STOCK BAJO ===== -->
   <div id="stockBajoProductos" class="seccion">
     <div class="page-header"><div><h1>Stock Bajo</h1><div class="sub">Productos por reponer pronto</div></div></div>
     <div class="card p-3">
-      <table class="table table-striped">
-        <thead><tr><th>Código</th><th>Producto</th><th>Stock</th></tr></thead>
-        <tbody id="tablaStockBajo"></tbody>
-      </table>
+      <div class="table-responsive">
+        <table class="table table-striped">
+          <thead><tr><th>Código</th><th>Producto</th><th>Stock</th></tr></thead>
+          <tbody id="tablaStockBajo"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 
-  <!-- MAS VENDIDOS -->
+  <!-- ===== MAS VENDIDOS ===== -->
   <div id="masVendidos" class="seccion">
     <div class="page-header"><div><h1>🏆 Más Vendidos</h1><div class="sub">Ranking de productos por unidades vendidas</div></div></div>
     <div class="card p-3">
-      <table class="table table-striped">
-        <thead><tr><th>Código</th><th>Producto</th><th>Unidades Vendidas</th></tr></thead>
-        <tbody id="tablaMasVendidos"></tbody>
-      </table>
+      <div class="table-responsive">
+        <table class="table table-striped">
+          <thead><tr><th>Código</th><th>Producto</th><th>Unidades Vendidas</th></tr></thead>
+          <tbody id="tablaMasVendidos"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 
-  <!-- PEDIDOS -->
+  <!-- ===== PEDIDOS ===== -->
   <div id="pedidos" class="seccion">
     <div class="page-header"><div><h1>Pedidos</h1><div class="sub">Seguimiento y estado de pedidos</div></div></div>
     <div class="card p-3">
-      <div class="d-flex justify-content-between align-items-center mb-3">
+      <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
         <span class="text-muted" style="font-size:13px;">Buscá por pedido, cliente o DNI</span>
         <input type="text" id="buscarPedido" class="form-control" style="max-width:300px" placeholder="Buscar pedido, cliente o DNI..." onkeyup="filtrarPedidos()">
       </div>
-      <table class="table table-striped">
-        <thead><tr><th>Pedido</th><th>Fecha</th><th>Cliente</th><th>Total</th><th>Estado</th><th>PDF</th></tr></thead>
-        <tbody id="tablaPedidos"></tbody>
-      </table>
+      <div class="table-responsive">
+        <table class="table table-striped">
+          <thead><tr><th>Pedido</th><th>Fecha</th><th>Cliente</th><th>Total</th><th>Estado</th><th>PDF</th></tr></thead>
+          <tbody id="tablaPedidos"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 
-  <!-- PRODUCTOS -->
+  <!-- ===== PRODUCTOS ===== -->
   <div id="productos" class="seccion">
     <div class="page-header">
       <div><h1>Productos</h1><div class="sub">Catálogo e inventario</div></div>
       <button class="btn btn-success" onclick="nuevoProducto()">+ Nuevo Producto</button>
     </div>
     <div class="card p-3">
-      <table class="table table-striped">
-        <thead><tr><th>Código</th><th>Producto</th><th>Precio</th><th>Acciones</th></tr></thead>
-        <tbody id="tablaProductos"></tbody>
-      </table>
+      <div class="table-responsive">
+        <table class="table table-striped">
+          <thead><tr><th>Código</th><th>Producto</th><th>Precio</th><th>Acciones</th></tr></thead>
+          <tbody id="tablaProductos"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 
-  <!-- ============ POS — PUNTO DE VENTA UNIFICADO ============ -->
+  <!-- ===== POS ===== -->
   <div id="pos" class="seccion">
-
     <div class="page-header">
       <div><h1>Punto de Venta</h1><div class="sub">Escaneá, buscá o tocá un producto para agregarlo al ticket</div></div>
     </div>
 
     <div class="pos-wrap">
-
-      <!-- LEFT: scan bar + categories + product grid -->
+      <!-- LEFT -->
       <div class="pos-left">
-
         <div class="pos-scanbar">
-          <div class="scan-icon">🔎
-            <span></span>
-          </div>
-
+          <div class="scan-icon">🔎<span></span></div>
           <input
-            type="text"
-            id="posBusqueda"
-            autocomplete="off"
-            placeholder="Escaneá un código de barras o escribí para buscar..."
-            onkeyup="onPosInputKeyup(event)"
-          >
-
+            type="text" id="posBusqueda" autocomplete="off"
+            inputmode="text"
+            placeholder="Escaneá o escribí para buscar..."
+            onkeyup="onPosInputKeyup(event)">
           <span id="scannerStatus" class="scanner-status idle"><span class="dot"></span> Listo</span>
-
-          <button class="btn-camera-scan" id="btnCameraScan" onclick="abrirCamaraScan()" title="Escanear con la cámara">📷</button>
+          <button class="btn-camera-scan" id="btnCameraScan" onclick="abrirCamaraScan()" title="Escanear con cámara">📷</button>
         </div>
 
         <div class="pos-categories" id="posCategorias"></div>
@@ -238,15 +270,13 @@
         <div class="pos-grid-wrap">
           <div id="posProductGrid" class="pos-product-grid"></div>
         </div>
-
       </div>
 
       <!-- RIGHT: ticket -->
       <div class="ticket-panel">
-
         <div class="ticket-header">
           <h5>🧾 Ticket</h5>
-          <div style="display:flex; align-items:center; gap:10px;">
+          <div style="display:flex;align-items:center;gap:10px;">
             <span class="count-pill" id="ticketCount">0</span>
             <button class="ticket-clear" id="btnVaciarTicket" onclick="vaciarTicketPOS()">Vaciar</button>
           </div>
@@ -262,47 +292,44 @@
         </div>
 
         <div class="ticket-footer">
-
           <div class="ticket-totals">
             <div class="trow"><span>Artículos</span><span class="money" id="ticketItemsCount">0</span></div>
             <div class="trow grand"><span>Total</span><span class="money">$<span id="totalPOS">0</span></span></div>
           </div>
 
           <div class="pay-methods" id="payMethods">
-            <button class="pay-method-btn active" data-val="EFECTIVO" onclick="elegirFormaPago(this,'EFECTIVO')"><span class="ic">💵</span>Efectivo</button>
-            <button class="pay-method-btn" data-val="TRANSFERENCIA" onclick="elegirFormaPago(this,'TRANSFERENCIA')"><span class="ic">📲</span>Transfer.</button>
-            <button class="pay-method-btn" data-val="TARJETA" onclick="elegirFormaPago(this,'TARJETA')"><span class="ic">💳</span>Tarjeta</button>
+            <button class="pay-method-btn active" data-val="EFECTIVO"      onclick="elegirFormaPago(this,'EFECTIVO')"><span class="ic">💵</span>Efectivo</button>
+            <button class="pay-method-btn"        data-val="TRANSFERENCIA" onclick="elegirFormaPago(this,'TRANSFERENCIA')"><span class="ic">📲</span>Transfer.</button>
+            <button class="pay-method-btn"        data-val="TARJETA"       onclick="elegirFormaPago(this,'TARJETA')"><span class="ic">💳</span>Tarjeta</button>
           </div>
 
-          <button class="btn-finalize" id="btnFinalizarVenta" onclick="finalizarVentaPOS()">
-            ✅ Finalizar Venta
-          </button>
-
+          <div class="ticket-action-row">
+            <button class="btn-print-ticket" id="btnImprimirTicket" onclick="imprimirTicketThermal()" title="Imprimir ticket" disabled>🖨️</button>
+            <button class="btn-finalize"     id="btnFinalizarVenta" onclick="finalizarVentaPOS()">✅ Finalizar Venta</button>
+          </div>
         </div>
-
       </div>
-
     </div>
   </div>
 
-  <!-- REPORTES -->
+  <!-- ===== REPORTES ===== -->
   <div id="reportes" class="seccion">
     <div class="page-header"><div><h1>Reportes</h1><div class="sub">Indicadores generales de venta</div></div></div>
     <div class="card p-3">
       <div class="row g-3">
-        <div class="col-md-4"><div class="card p-3 metric-card"><div class="metric-icon bg-tint-green">💰</div><h6>Ventas Totales</h6><h2 id="ventasTotales">$0</h2></div></div>
-        <div class="col-md-4"><div class="card p-3 metric-card"><div class="metric-icon bg-tint-blue">📦</div><h6>Total Pedidos</h6><h2 id="totalPedidos">0</h2></div></div>
-        <div class="col-md-4"><div class="card p-3 metric-card"><div class="metric-icon bg-tint-green">💵</div><h6>Ticket Promedio</h6><h2 id="ticketPromedio">$0</h2></div></div>
+        <div class="col-6 col-md-4"><div class="card p-3 metric-card"><div class="metric-icon bg-tint-green">💰</div><h6>Ventas Totales</h6><h2 id="ventasTotales">$0</h2></div></div>
+        <div class="col-6 col-md-4"><div class="card p-3 metric-card"><div class="metric-icon bg-tint-blue">📦</div><h6>Total Pedidos</h6><h2 id="totalPedidos">0</h2></div></div>
+        <div class="col-6 col-md-4"><div class="card p-3 metric-card"><div class="metric-icon bg-tint-green">💵</div><h6>Ticket Promedio</h6><h2 id="ticketPromedio">$0</h2></div></div>
       </div>
     </div>
   </div>
 
-</div>
+</div><!-- .content -->
 
-<!-- TOASTS -->
+<!-- ===== TOASTS ===== -->
 <div class="toast-stack" id="toastStack"></div>
 
-<!-- CAMERA SCAN MODAL -->
+<!-- ===== CAMERA MODAL ===== -->
 <div class="scan-modal-backdrop" id="scanModalBackdrop">
   <div class="scan-modal">
     <div class="scan-modal-header">
@@ -317,39 +344,43 @@
   </div>
 </div>
 
-<!-- RECEIPT / SUCCESS MODAL -->
+<!-- ===== RECEIPT MODAL ===== -->
 <div class="receipt-backdrop" id="receiptBackdrop">
   <div class="receipt-modal">
     <div class="receipt-success-icon">✓</div>
     <h4>Venta registrada</h4>
     <div class="rid" id="receiptId">#000000</div>
     <div class="receipt-body">
-      <table>
-        <tbody id="receiptItems"></tbody>
-      </table>
+      <table><tbody id="receiptItems"></tbody></table>
     </div>
     <div class="receipt-total-line"><span>Total</span><span class="money" id="receiptTotal">$0</span></div>
     <div class="receipt-actions">
       <button class="btn btn-outline-primary" onclick="cerrarRecibo()">Cerrar</button>
+      <button class="btn btn-outline-secondary" onclick="imprimirUltimoRecibo()">🖨️ Imprimir</button>
       <button class="btn btn-success" onclick="nuevaVentaPOS()">Nueva venta</button>
     </div>
   </div>
 </div>
 
+<!-- ===== THERMAL PRINT FRAME ===== -->
+<div id="thermalPrintFrame"></div>
+
 <script src="admin.js"></script>
-
 <script>
-
 function logout(){
   sessionStorage.removeItem("admin");
   window.location.href = "login.html";
 }
-
 function nuevoProducto(){
   alert("Próximo paso: formulario CRUD");
 }
-
+function editarProducto(codigo){
+  alert("Editar producto: " + codigo);
+}
+function eliminarProducto(codigo){
+  if(!confirm("¿Eliminar producto?")) return;
+  alert("Debes crear la acción eliminarProducto en Apps Script.\nCódigo: " + codigo);
+}
 </script>
-
 </body>
 </html>
