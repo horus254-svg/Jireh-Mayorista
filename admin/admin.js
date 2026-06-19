@@ -460,41 +460,6 @@ window.location.href =
 }
 async function cargarClientes(){
 
-const response =
-await fetch(
-API_URL + "?action=clientes"
-);
-
-const data =
-await response.json();
-
-let html = "";
-
-data.clientes.forEach(c => {
-
-html += `
-<tr>
-
-<td>${c.CLIENTE}</td>
-<td>${c.EMPRESA}</td>
-<td>${c.DIRECCION}</td>
-<td>${c.TELEFONO}</td>
-<td>${c.DNI}</td>
-<td>${c.PEDIDOS}</td>
-<td>$${c.TOTAL.toLocaleString("es-AR")}</td>
-
-</tr>
-`;
-
-});
-
-document.getElementById(
-"tablaClientes"
-).innerHTML = html;
-
-}
-async function cargarClientes(){
-
 try{
 
 const response =
@@ -758,11 +723,38 @@ function renderPedidos(lista){
   ).innerHTML = html;
 
 }
+let productosPOS = [];
+let ticketPOS = [];
 let ventaLocal = [];
 
-function agregarProductoVenta(codigo){
+async function asegurarProductosPOS(){
+
+  if(productosPOS.length === 0){
+
+    const response =
+      await fetch(
+        API_URL + "?action=productos"
+      );
+
+    const data =
+      await response.json();
+
+    productosPOS =
+      data.productos || [];
+
+  }
+
+}
+
+async function agregarProductoVenta(codigo){
 
   codigo = String(codigo).trim();
+
+  if(codigo === ""){
+    return;
+  }
+
+  await asegurarProductosPOS();
 
   const producto = productosPOS.find(
     p => String(p.CODIGO).trim() === codigo
@@ -774,7 +766,7 @@ function agregarProductoVenta(codigo){
   }
 
   const existente = ventaLocal.find(
-    p => p.CODIGO === codigo
+    p => p.CODIGO === producto.CODIGO
   );
 
   if(existente){
@@ -786,7 +778,7 @@ function agregarProductoVenta(codigo){
     ventaLocal.push({
       CODIGO: producto.CODIGO,
       PRODUCTO: producto.PRODUCTO,
-      PRECIO: Number(producto.PRECIO),
+      PRECIO: Number(producto.PRECIO || 0),
       cantidad: 1
     });
 
@@ -795,6 +787,7 @@ function agregarProductoVenta(codigo){
   renderVentaLocal();
 
 }
+
 function renderVentaLocal(){
 
   let html = "";
@@ -810,9 +803,9 @@ function renderVentaLocal(){
     html += `
       <tr>
 
-        <td>${item.CODIGO}</td>
+        <td>${escapeHtml(item.CODIGO)}</td>
 
-        <td>${item.PRODUCTO}</td>
+        <td>${escapeHtml(item.PRODUCTO)}</td>
 
         <td>${item.cantidad}</td>
 
@@ -829,98 +822,159 @@ function renderVentaLocal(){
 
   });
 
-  document.getElementById(
-    "tablaVentaLocal"
-  ).innerHTML = html;
+  const tabla =
+    document.getElementById("tablaVentaLocal");
 
-  document.getElementById(
-    "totalVentaLocal"
-  ).innerText =
-    "$" + total.toLocaleString("es-AR");
+  if(tabla){
+    tabla.innerHTML = html;
+  }
+
+  const totalEl =
+    document.getElementById("totalVentaLocal");
+
+  if(totalEl){
+    totalEl.innerText =
+      "$" + total.toLocaleString("es-AR");
+  }
 
 }
-function buscarProductoPOS(){
 
-  const texto =
-    document.getElementById("buscarPOS")
-    .value
-    .trim();
+async function buscarProductoPOS(){
 
-  if(texto === ""){
+  const input =
+    document.getElementById("posBusqueda");
+
+  if(!input){
     return;
   }
 
-  agregarProductoVenta(texto);
+  const texto =
+    input.value.toLowerCase().trim();
 
-  document.getElementById("buscarPOS")
-    .value = "";
+  if(texto.length < 2){
 
-}
-let productosPOS = [];
-let ticketPOS = [];
+    document.getElementById(
+      "resultadosPOS"
+    ).innerHTML = "";
 
-// ===============================
-// POS - VENTAS DEL LOCAL
-// ===============================
-
-async function cargarProductosPOS(){
-
-  try{
-
-    const response =
-      await fetch(API_URL + "?action=productos");
-
-    const data =
-      await response.json();
-
-    productosPOS =
-      data.productos || [];
-
+    return;
   }
-  catch(error){
 
-    console.error(
-      "Error cargando productos POS:",
-      error
-    );
+  await asegurarProductosPOS();
 
-  }
+  const resultados =
+    productosPOS.filter(p =>
+
+      String(p.CODIGO)
+        .toLowerCase()
+        .includes(texto)
+
+      ||
+
+      String(p.PRODUCTO)
+        .toLowerCase()
+        .includes(texto)
+
+    ).slice(0,10);
+
+  let html = "";
+
+  resultados.forEach(p => {
+
+    html += `
+      <button
+        class="btn btn-outline-primary m-1"
+        onclick="agregarProductoPOS('${p.CODIGO}')">
+
+        ${p.CODIGO} - ${p.PRODUCTO}
+
+      </button>
+    `;
+
+  });
+
+  document.getElementById(
+    "resultadosPOS"
+  ).innerHTML = html;
 
 }
 
 function agregarProductoPOS(codigo){
 
-  const producto =
-    productosPOS.find(
-      p => String(p.CODIGO) === String(codigo)
-    );
+  codigo = String(codigo).trim();
+
+  const producto = productosPOS.find(
+    p => String(p.CODIGO).trim() === codigo
+  );
 
   if(!producto){
     alert("Producto no encontrado");
     return;
   }
 
-  const existente =
-    ticketPOS.find(
-      p => p.CODIGO === producto.CODIGO
-    );
+  const existente = ticketPOS.find(
+    item => String(item.CODIGO).trim() === codigo
+  );
 
   if(existente){
 
-    existente.CANTIDAD++;
+    existente.cantidad++;
 
-  }else{
+  } else {
 
     ticketPOS.push({
-
       CODIGO: producto.CODIGO,
       PRODUCTO: producto.PRODUCTO,
       PRECIO: Number(producto.PRECIO || 0),
-      CANTIDAD: 1
-
+      cantidad: 1
     });
 
   }
+
+  renderTicketPOS();
+
+  const input =
+    document.getElementById("posBusqueda");
+
+  if(input){
+    input.value = "";
+  }
+
+  const resultados =
+    document.getElementById("resultadosPOS");
+
+  if(resultados){
+    resultados.innerHTML = "";
+  }
+
+}
+
+function cambiarCantidadPOS(codigo, delta){
+
+  const item = ticketPOS.find(
+    i => String(i.CODIGO).trim() === String(codigo).trim()
+  );
+
+  if(!item){
+    return;
+  }
+
+  item.cantidad += delta;
+
+  if(item.cantidad <= 0){
+    quitarProductoPOS(codigo);
+    return;
+  }
+
+  renderTicketPOS();
+
+}
+
+function quitarProductoPOS(codigo){
+
+  ticketPOS = ticketPOS.filter(
+    i => String(i.CODIGO).trim() !== String(codigo).trim()
+  );
 
   renderTicketPOS();
 
@@ -931,53 +985,44 @@ function renderTicketPOS(){
   let html = "";
   let total = 0;
 
-  ticketPOS.forEach((item,index)=>{
+  ticketPOS.forEach(item => {
 
-    const subtotal =
-      item.PRECIO * item.CANTIDAD;
-
+    const subtotal = item.PRECIO * item.cantidad;
     total += subtotal;
 
     html += `
       <tr>
 
-        <td>${item.CODIGO}</td>
-
-        <td>${item.PRODUCTO}</td>
+        <td>${escapeHtml(item.PRODUCTO)}</td>
 
         <td>
-
-          <input
-            type="number"
-            min="1"
-            value="${item.CANTIDAD}"
-            class="form-control form-control-sm"
-            onchange="actualizarCantidadPOS(${index},this.value)">
-
+          <button
+            class="btn btn-sm btn-outline-secondary"
+            onclick="cambiarCantidadPOS('${item.CODIGO}', -1)">
+            -
+          </button>
+          ${item.cantidad}
+          <button
+            class="btn btn-sm btn-outline-secondary"
+            onclick="cambiarCantidadPOS('${item.CODIGO}', 1)">
+            +
+          </button>
         </td>
 
         <td>
-
           $${item.PRECIO.toLocaleString("es-AR")}
-
         </td>
 
         <td>
-
           $${subtotal.toLocaleString("es-AR")}
-
         </td>
 
         <td>
-
           <button
             class="btn btn-danger btn-sm"
-            onclick="eliminarItemPOS(${index})">
-
-            X
-
+            onclick="quitarProductoPOS('${item.CODIGO}')">
+            Quitar
           </button>
-
         </td>
 
       </tr>
@@ -986,130 +1031,72 @@ function renderTicketPOS(){
   });
 
   const tabla =
-    document.getElementById("tablaPOS");
+    document.getElementById("ticketPOS");
 
   if(tabla){
     tabla.innerHTML = html;
   }
 
-  const totalPOS =
+  const totalEl =
     document.getElementById("totalPOS");
 
-  if(totalPOS){
-
-    totalPOS.innerText =
-      "$" + total.toLocaleString("es-AR");
-
+  if(totalEl){
+    totalEl.innerText =
+      total.toLocaleString("es-AR");
   }
-
-}
-
-function actualizarCantidadPOS(
-  index,
-  cantidad
-){
-
-  cantidad = Number(cantidad);
-
-  if(cantidad <= 0){
-
-    ticketPOS.splice(index,1);
-
-  }else{
-
-    ticketPOS[index].CANTIDAD =
-      cantidad;
-
-  }
-
-  renderTicketPOS();
-
-}
-
-function eliminarItemPOS(index){
-
-  ticketPOS.splice(index,1);
-
-  renderTicketPOS();
-
-}
-
-function limpiarPOS(){
-
-  ticketPOS = [];
-
-  renderTicketPOS();
 
 }
 
 async function finalizarVentaPOS(){
 
   if(ticketPOS.length === 0){
-
-    alert(
-      "No hay productos en el ticket"
-    );
-
+    alert("El ticket está vacío");
     return;
-
   }
 
-  try{
+  const formaPagoEl =
+    document.getElementById("formaPagoPOS");
 
-    const response =
-      await fetch(API_URL,{
+  const formaPago =
+    formaPagoEl ? formaPagoEl.value : "EFECTIVO";
 
-        method:"POST",
+  const total = ticketPOS.reduce(
+    (acc, item) => acc + (item.PRECIO * item.cantidad),
+    0
+  );
 
-        headers:{
-          "Content-Type":
-          "application/json"
-        },
+  try {
 
-        body:JSON.stringify({
+    const response = await fetch(
+      API_URL +
+      "?action=guardarVenta" +
+      "&total=" + encodeURIComponent(total) +
+      "&formaPago=" + encodeURIComponent(formaPago) +
+      "&carrito=" + encodeURIComponent(JSON.stringify(ticketPOS))
+    );
 
-          action:"ventaLocal",
+    const data = await response.json();
 
-          productos:ticketPOS
-
-        })
-
-      });
-
-    const data =
-      await response.json();
-
-    if(data.success){
-
-      alert(
-        "Venta registrada correctamente"
-      );
-
-      ticketPOS = [];
-
-      renderTicketPOS();
-
-      cargarMetricas();
-
-      cargarProductos();
-
-    }else{
-
-      alert(
-        data.message ||
-        "Error al guardar venta"
-      );
-
+    if(!data.success){
+      alert(data.message || "No se pudo registrar la venta");
+      return;
     }
 
-  }
-  catch(error){
+    alert("Venta registrada con éxito (" + data.ventaId + ")");
 
-    console.error(error);
+    ticketPOS = [];
+    renderTicketPOS();
 
-    alert(
-      "Error de conexión"
+    cargarMetricas();
+
+  } catch(error){
+
+    console.error(
+      "Error al finalizar venta:",
+      error
     );
+
+    alert("Error de conexión al registrar la venta");
 
   }
 
