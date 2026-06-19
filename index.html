@@ -3,8 +3,12 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Jireh Mayorista</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
@@ -14,50 +18,55 @@
 
     <!-- NAVBAR -->
 
-   <nav class="navbar navbar-dark fixed-top">
+    <nav class="navbar navbar-dark fixed-top">
 
-    <div class="container">
+        <div class="container">
 
-        <span class="navbar-brand fw-bold">
-            🛒 Jireh Mayorista
-        </span>
+            <div class="navbar-top">
 
-        <div class="d-flex flex-grow-1 mx-3 gap-2">
+                <span class="navbar-brand fw-bold">
+                    🛒 Jireh Mayorista
+                </span>
 
-            <input
-                id="search"
-                class="form-control"
-                placeholder="🔍 Buscar producto..."
-                onkeyup="buscarProductos()">
+                <button
+                    class="btn btn-cart-top"
+                    onclick="abrirCarrito()">
 
-            <select
-                id="categorias"
-                class="form-select"
-                onchange="filtrarCategoria()">
+                    🛍️ <span id="cart-count">0</span>
 
-                <option value="">
-                    Todas las categorías
-                </option>
+                </button>
 
-            </select>
+            </div>
+
+            <div class="navbar-search-row">
+
+                <div class="search-wrap">
+                    <span class="search-icon">🔍</span>
+                    <input
+                        id="search"
+                        class="form-control"
+                        placeholder="Buscar producto..."
+                        autocomplete="off"
+                        oninput="buscarProductos()">
+                    <button
+                        id="search-clear"
+                        class="search-clear"
+                        type="button"
+                        aria-label="Limpiar búsqueda"
+                        onclick="limpiarBusqueda()">
+                        ✕
+                    </button>
+                </div>
+
+            </div>
 
         </div>
 
-        <button
-            class="btn btn-success"
-            onclick="abrirCarrito()">
-
-            Carrito (<span id="cart-count">0</span>)
-
-        </button>
-
-    </div>
-
-</nav>
+    </nav>
 
     <!-- HERO -->
 
-    <section class="hero py-5">
+    <section class="hero">
         <div class="container text-center">
 
             <h1 class="display-5 fw-bold">
@@ -70,39 +79,55 @@
 
         </div>
     </section>
-<section class="beneficios">
 
-    <div class="container">
+    <section class="beneficios">
 
-        <div class="row text-center">
+        <div class="container">
 
-            <div class="col-md-3 col-6 mb-3">
-                ✅ Stock actualizado
-            </div>
+            <div class="row text-center gy-2">
 
-            <div class="col-md-3 col-6 mb-3">
-                🚚 Envíos a todo el país
-            </div>
+                <div class="col-md-3 col-6">
+                    <span class="beneficio-item">✅ Stock actualizado</span>
+                </div>
 
-            <div class="col-md-3 col-6 mb-3">
-                📦 Venta mayorista
-            </div>
+                <div class="col-md-3 col-6">
+                    <span class="beneficio-item">🚚 Envíos a todo el país</span>
+                </div>
 
-            <div class="col-md-3 col-6 mb-3">
-                💬 Pedidos por WhatsApp al 1140975795 - 1134724637
+                <div class="col-md-3 col-6">
+                    <span class="beneficio-item">📦 Venta mayorista</span>
+                </div>
+
+                <div class="col-md-3 col-6">
+                    <span class="beneficio-item">💬 WhatsApp 11&#8209;4097&#8209;5795</span>
+                </div>
+
             </div>
 
         </div>
 
-    </div>
+    </section>
 
-</section>
+    <!-- CATEGORÍAS -->
+
+    <section class="container categorias-section">
+        <div id="categoria-chips" class="chip-scroll" role="tablist" aria-label="Filtrar por categoría"></div>
+    </section>
 
     <!-- PRODUCTOS -->
 
     <section class="container">
 
+        <div id="resultados-info" class="resultados-info"></div>
+
         <div id="productos" class="row"></div>
+
+        <div id="sin-resultados" class="sin-resultados d-none">
+            <div class="sin-resultados-icon">🔍</div>
+            <h5>No encontramos productos</h5>
+            <p>Probá con otra palabra o elegí otra categoría.</p>
+            <button class="btn btn-outline-primary" onclick="limpiarFiltros()">Quitar filtros</button>
+        </div>
 
     </section>
 
@@ -110,19 +135,20 @@
 
     <div class="modal fade" id="cartModal" tabindex="-1">
 
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-dialog-scrollable">
 
             <div class="modal-content">
 
                 <div class="modal-header">
 
                     <h5 class="modal-title">
-                        Carrito
+                        🛍️ Tu carrito
                     </h5>
 
                     <button
                         class="btn-close"
-                        data-bs-dismiss="modal">
+                        data-bs-dismiss="modal"
+                        aria-label="Cerrar">
                     </button>
 
                 </div>
@@ -131,20 +157,27 @@
 
                     <div id="cart-items"></div>
 
-                    <hr>
-
-                    <h5>
-                        Total: $
-                        <span id="cart-total">0</span>
-                    </h5>
+                    <div id="cart-empty" class="cart-empty d-none">
+                        <div class="cart-empty-icon">🛒</div>
+                        <p>Tu carrito está vacío.</p>
+                    </div>
 
                     <hr>
+
+                    <div class="cart-total-row">
+                        <span>Total</span>
+                        <h5 class="mb-0">$<span id="cart-total">0</span></h5>
+                    </div>
+
+                    <hr>
+
+                    <p class="form-section-label">Datos para el pedido</p>
 
                     <input
                         type="text"
                         id="clienteNombre"
                         class="form-control mb-2"
-                        placeholder="Nombre y Apellido">
+                        placeholder="Nombre y Apellido *">
 
                     <input
                         type="text"
@@ -156,19 +189,19 @@
                         type="text"
                         id="clienteDireccion"
                         class="form-control mb-2"
-                        placeholder="Dirección">
+                        placeholder="Dirección *">
 
                     <input
-                        type="text"
+                        type="tel"
                         id="clienteTelefono"
                         class="form-control mb-2"
-                        placeholder="Teléfono">
+                        placeholder="Teléfono *">
 
                     <input
                         type="text"
                         id="clienteDni"
                         class="form-control mb-2"
-                        placeholder="DNI o CUIT">
+                        placeholder="DNI o CUIT *">
 
                 </div>
 
@@ -181,9 +214,10 @@
                     </button>
 
                     <button
+                        id="btn-checkout"
                         class="btn btn-success"
                         onclick="checkoutWhatsapp()">
-                        Enviar Pedido
+                        Enviar pedido por WhatsApp
                     </button>
 
                 </div>
@@ -194,6 +228,65 @@
 
     </div>
 
+    <!-- MODAL VISTA RÁPIDA -->
+
+    <div class="modal fade" id="quickViewModal" tabindex="-1">
+
+        <div class="modal-dialog modal-dialog-centered">
+
+            <div class="modal-content">
+
+                <div class="modal-header">
+                    <h5 class="modal-title" id="qv-titulo"></h5>
+                    <button class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+
+                <div class="modal-body">
+
+                    <img id="qv-imagen" src="" alt="" class="qv-img">
+
+                    <small id="qv-categoria" class="text-muted d-block mt-2"></small>
+
+                    <div class="price mt-1" id="qv-precio"></div>
+
+                    <div class="qty-stepper mt-3">
+                        <button class="qty-btn" onclick="cambiarQtyInput('qv-cantidad',-1)" aria-label="Restar">−</button>
+                        <input type="number" id="qv-cantidad" class="qty-input" value="1" min="1">
+                        <button class="qty-btn" onclick="cambiarQtyInput('qv-cantidad',1)" aria-label="Sumar">+</button>
+                    </div>
+
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn btn-primary w-100" id="qv-agregar">
+                        🛒 Agregar al carrito
+                    </button>
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- TOASTS -->
+    <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+    <!-- BARRA INFERIOR CARRITO (MOBILE) -->
+    <button id="mobile-cart-bar" class="mobile-cart-bar d-none" onclick="abrirCarrito()">
+        <span class="mcb-left">
+            🛍️ <span id="mcb-count">0</span> producto(s)
+        </span>
+        <span class="mcb-right">
+            Ver carrito · $<span id="mcb-total">0</span>
+        </span>
+    </button>
+
+    <!-- VOLVER ARRIBA -->
+    <button id="scroll-top-btn" class="scroll-top-btn d-none" onclick="window.scrollTo({top:0,behavior:'smooth'})" aria-label="Volver arriba">
+        ↑
+    </button>
+
     <!-- SCRIPTS -->
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -203,18 +296,24 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
     <script src="js/app.js"></script>
+
     <a
-    href="https://wa.me/5491140975795"
-    target="_blank"
-    class="whatsapp-float-text">
+        href="https://wa.me/5491140975795"
+        target="_blank"
+        rel="noopener"
+        class="whatsapp-float-text"
+        aria-label="Ayuda por WhatsApp">
 
-    <img
-        src="https://cdn-icons-png.flaticon.com/512/733/733585.png"
-        alt="WhatsApp">
+        <img
+            src="https://cdn-icons-png.flaticon.com/512/733/733585.png"
+            alt=""
+            width="28"
+            height="28"
+            loading="lazy">
 
-    <span>¿Necesitas ayuda?</span>
+        <span>¿Necesitás ayuda?</span>
 
-</a>
+    </a>
 
 </body>
 
