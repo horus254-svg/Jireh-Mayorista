@@ -205,6 +205,15 @@ select:focus-visible{
     font-size:.82rem;
 }
 
+.beneficio-link{
+    text-decoration:none;
+    cursor:pointer;
+}
+
+.beneficio-link:hover{
+    color:var(--indigo-600);
+}
+
 /* =========================================================
    CATEGORÍAS (CHIPS — tag motif with a punched hole)
 ========================================================= */

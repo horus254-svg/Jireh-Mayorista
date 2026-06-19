@@ -18,6 +18,11 @@ const estado = {
     categoria: ""
 };
 
+// Número de WhatsApp usado por el botón flotante y por el checkout.
+// Se sobreescribe con el valor de Sheets en aplicarApariencia(); este
+// es solo el valor por defecto mientras carga o si falla la conexión.
+let whatsappNumero = "5491140975795";
+
 let qvProductoActual = null;
 let debounceTimer = null;
 
@@ -703,7 +708,7 @@ Subtotal: $${formatearPrecio(subtotal)}
         btnCheckout.textContent = "Enviar pedido por WhatsApp";
 
         setTimeout(()=>{
-            window.location.href = `https://api.whatsapp.com/send?phone=5491140975795&text=${encodeURIComponent(mensaje)}`;
+            window.location.href = `https://api.whatsapp.com/send?phone=${whatsappNumero}&text=${encodeURIComponent(mensaje)}`;
         }, 300);
 
     }catch(error){
@@ -789,10 +794,100 @@ async function aplicarApariencia(){
             document.title = cfg.nombre;
         }
 
+        // --- Sección "Beneficios" (chips bajo el banner) ---
+        aplicarBeneficios(cfg);
+
     }catch(err){
         // Si falla, la página sigue mostrando los valores fijos del HTML.
         console.error("No se pudo cargar la apariencia desde Sheets:", err);
     }
+}
+
+/**
+ * Limpia un número de teléfono dejando solo dígitos y un "+" inicial
+ * opcional, para armar un link tel: válido a partir de lo que el
+ * admin haya escrito en Sheets (con guiones, espacios, paréntesis, etc).
+ */
+function limpiarTelefonoParaLink(telefono){
+    return String(telefono || "").trim().replace(/[^\d+]/g, "");
+}
+
+/**
+ * Muestra u oculta un chip de la sección Beneficios según tenga
+ * contenido o no, para no dejar espacios vacíos en la fila.
+ */
+function configurarChipBeneficio(wrapId, visible){
+    const wrap = document.getElementById(wrapId);
+    if(wrap) wrap.classList.toggle("d-none", !visible);
+}
+
+function aplicarBeneficios(cfg){
+
+    // --- WhatsApp: actualiza el botón flotante y la variable de checkout ---
+    const numeroWa = limpiarTelefonoParaLink(cfg.beneficioWhatsappNumero) || whatsappNumero;
+    whatsappNumero = numeroWa;
+
+    const btnFlotanteWa = document.getElementById("whatsapp-float-btn");
+    if(btnFlotanteWa){
+        btnFlotanteWa.href = `https://wa.me/${numeroWa}`;
+    }
+
+    // --- Instagram ---
+    const instagramUrl = (cfg.beneficioInstagramUrl || "").trim();
+    const instagramEl = document.getElementById("beneficio-instagram");
+    const instagramTextoEl = document.getElementById("beneficio-instagram-texto");
+
+    if(instagramEl && instagramTextoEl && instagramUrl){
+        instagramEl.href = instagramUrl;
+        // Si pegaron solo "@usuario" o "usuario", se usa como texto;
+        // si es una URL completa, se muestra "Instagram" como texto fijo.
+        instagramTextoEl.textContent = instagramUrl.startsWith("http")
+            ? "Instagram"
+            : instagramUrl;
+    }
+    configurarChipBeneficio("beneficio-instagram-wrap", !!instagramUrl);
+
+    // --- Teléfono 1 ---
+    const tel1 = (cfg.beneficioTelefono1 || "").trim();
+    const tel1El = document.getElementById("beneficio-telefono1");
+    const tel1TextoEl = document.getElementById("beneficio-telefono1-texto");
+
+    if(tel1El && tel1TextoEl && tel1){
+        tel1El.href = `tel:${limpiarTelefonoParaLink(tel1)}`;
+        tel1TextoEl.textContent = tel1;
+    }
+    configurarChipBeneficio("beneficio-telefono1-wrap", !!tel1);
+
+    // --- Teléfono 2 ---
+    const tel2 = (cfg.beneficioTelefono2 || "").trim();
+    const tel2El = document.getElementById("beneficio-telefono2");
+    const tel2TextoEl = document.getElementById("beneficio-telefono2-texto");
+
+    if(tel2El && tel2TextoEl && tel2){
+        tel2El.href = `tel:${limpiarTelefonoParaLink(tel2)}`;
+        tel2TextoEl.textContent = tel2;
+    }
+    configurarChipBeneficio("beneficio-telefono2-wrap", !!tel2);
+
+    // --- Dirección ---
+    const direccion = (cfg.beneficioDireccion || "").trim();
+    const direccionTextoEl = document.getElementById("beneficio-direccion-texto");
+
+    if(direccionTextoEl && direccion){
+        direccionTextoEl.textContent = direccion;
+    }
+    configurarChipBeneficio("beneficio-direccion-wrap", !!direccion);
+
+    // --- Textos libres ---
+    const texto1 = (cfg.beneficioTextoLibre1 || "").trim();
+    const texto1El = document.getElementById("beneficio-texto1");
+    if(texto1El) texto1El.textContent = texto1;
+    configurarChipBeneficio("beneficio-texto1-wrap", !!texto1);
+
+    const texto2 = (cfg.beneficioTextoLibre2 || "").trim();
+    const texto2El = document.getElementById("beneficio-texto2");
+    if(texto2El) texto2El.textContent = texto2;
+    configurarChipBeneficio("beneficio-texto2-wrap", !!texto2);
 }
 
 /* =========================================================

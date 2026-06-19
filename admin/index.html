@@ -623,6 +623,62 @@
       </div>
     </div>
 
+    <div class="card p-3 mt-3">
+      <h6 style="margin-bottom:14px;">🏷️ Beneficios del catálogo (debajo del banner)</h6>
+      <p class="text-muted" style="font-size:12.5px; margin-top:-8px; margin-bottom:14px;">
+        Estos son los 6 carteles cortos que aparecen debajo del banner del catálogo. El que dejes vacío, simplemente no se muestra.
+      </p>
+
+      <div class="mb-3">
+        <label class="form-label">WhatsApp <span class="text-muted" style="font-size:11px;">(número, solo para este botón y para recibir pedidos)</span></label>
+        <input type="text" class="form-control" id="cfgBeneficioWhatsapp" placeholder="Ej: 5491140975795">
+        <div class="form-text" style="font-size:11.5px;">Con código de país y de área, sin espacios ni signos. Ej: 5491140975795.</div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Instagram <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+        <input type="text" class="form-control" id="cfgBeneficioInstagram" placeholder="https://instagram.com/tu_cuenta">
+      </div>
+
+      <div class="row g-2 mb-3">
+        <div class="col-6">
+          <label class="form-label">Teléfono 1 <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+          <input type="text" class="form-control" id="cfgBeneficioTelefono1" placeholder="Ej: 11-2345-6789">
+        </div>
+        <div class="col-6">
+          <label class="form-label">Teléfono 2 <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+          <input type="text" class="form-control" id="cfgBeneficioTelefono2" placeholder="Ej: 11-9876-5432">
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Dirección <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+        <input type="text" class="form-control" id="cfgBeneficioDireccion" placeholder="Ej: Av. Siempre Viva 123, Buenos Aires">
+      </div>
+
+      <div class="row g-2 mb-3">
+        <div class="col-6">
+          <label class="form-label">Texto libre 1 <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+          <input type="text" class="form-control" id="cfgBeneficioTexto1" placeholder="Ej: ✅ Stock actualizado">
+        </div>
+        <div class="col-6">
+          <label class="form-label">Texto libre 2 <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+          <input type="text" class="form-control" id="cfgBeneficioTexto2" placeholder="Ej: 🚚 Envíos a todo el país">
+        </div>
+      </div>
+
+      <div class="d-flex justify-content-end mt-3">
+        <button class="btn btn-success" id="btnGuardarBeneficios" onclick="guardarBeneficiosForm()">💾 Guardar beneficios</button>
+      </div>
+    </div>
+
+    <div class="card p-3 mt-3">
+      <div class="config-preview-hint">
+        <span class="ic">ℹ️</span>
+        El número de WhatsApp que pongas aquí es el que usa el botón flotante de ayuda y al que llegan los pedidos del catálogo.
+      </div>
+    </div>
+
     <div class="card p-3 mt-3" id="usbPrintCard">
       <h6 style="margin-bottom:6px;">🔌 Impresión directa por USB</h6>
       <p class="text-muted" style="font-size:13px; margin-bottom:14px;">

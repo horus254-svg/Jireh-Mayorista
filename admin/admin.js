@@ -113,6 +113,7 @@ async function cargarConfigNegocioForm() {
   document.getElementById("cfgPie").value         = cfg.pie;
 
   cargarAparienciaForm(cfg);
+  cargarBeneficiosForm(cfg);
 
   if (form) form.placeholder = "Ej: JIREH";
 }
@@ -263,6 +264,77 @@ async function guardarAparienciaForm() {
   } catch (error) {
     console.error("Error al guardar la apariencia:", error);
     toast("Error de conexión al guardar la apariencia", "error");
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = textoOriginal; }
+  }
+}
+
+/* ===================== BENEFICIOS DEL CATÁLOGO WEB (chips bajo el banner) ===================== */
+
+const BENEFICIOS_DEFAULT = {
+  beneficioWhatsappNumero: "5491140975795",
+  beneficioInstagramUrl:   "",
+  beneficioTelefono1:      "",
+  beneficioTelefono2:      "",
+  beneficioDireccion:      "",
+  beneficioTextoLibre1:    "",
+  beneficioTextoLibre2:    ""
+};
+
+/** Loads the saved "Beneficios" config into the form (called when Configuración opens) */
+function cargarBeneficiosForm(cfg) {
+  document.getElementById("cfgBeneficioWhatsapp").value  = cfg.beneficioWhatsappNumero ?? BENEFICIOS_DEFAULT.beneficioWhatsappNumero;
+  document.getElementById("cfgBeneficioInstagram").value = cfg.beneficioInstagramUrl   ?? BENEFICIOS_DEFAULT.beneficioInstagramUrl;
+  document.getElementById("cfgBeneficioTelefono1").value = cfg.beneficioTelefono1      ?? BENEFICIOS_DEFAULT.beneficioTelefono1;
+  document.getElementById("cfgBeneficioTelefono2").value = cfg.beneficioTelefono2      ?? BENEFICIOS_DEFAULT.beneficioTelefono2;
+  document.getElementById("cfgBeneficioDireccion").value = cfg.beneficioDireccion      ?? BENEFICIOS_DEFAULT.beneficioDireccion;
+  document.getElementById("cfgBeneficioTexto1").value    = cfg.beneficioTextoLibre1    ?? BENEFICIOS_DEFAULT.beneficioTextoLibre1;
+  document.getElementById("cfgBeneficioTexto2").value    = cfg.beneficioTextoLibre2    ?? BENEFICIOS_DEFAULT.beneficioTextoLibre2;
+}
+
+/** Reads the "Beneficios" form fields and saves them to the backend (hoja CONFIGURACION) */
+async function guardarBeneficiosForm() {
+  const nombre = document.getElementById("cfgNombreLocal").value.trim();
+
+  if (!nombre) {
+    toast("Completá primero el nombre del local, arriba", "error");
+    return;
+  }
+
+  const whatsapp = document.getElementById("cfgBeneficioWhatsapp").value.trim();
+
+  const cfg = {
+    nombre,
+
+    beneficioWhatsappNumero: whatsapp || BENEFICIOS_DEFAULT.beneficioWhatsappNumero,
+    beneficioInstagramUrl:   document.getElementById("cfgBeneficioInstagram").value.trim(),
+    beneficioTelefono1:      document.getElementById("cfgBeneficioTelefono1").value.trim(),
+    beneficioTelefono2:      document.getElementById("cfgBeneficioTelefono2").value.trim(),
+    beneficioDireccion:      document.getElementById("cfgBeneficioDireccion").value.trim(),
+    beneficioTextoLibre1:    document.getElementById("cfgBeneficioTexto1").value.trim(),
+    beneficioTextoLibre2:    document.getElementById("cfgBeneficioTexto2").value.trim()
+  };
+
+  const btn = document.getElementById("btnGuardarBeneficios");
+  const textoOriginal = btn ? btn.innerHTML : "";
+  if (btn) { btn.disabled = true; btn.innerHTML = "Guardando..."; }
+
+  try {
+    const params = new URLSearchParams({ action: "guardarConfiguracionNegocio", ...cfg });
+    const response = await fetch(API_URL + "?" + params.toString());
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudieron guardar los beneficios", "error");
+      return;
+    }
+
+    configNegocioCache = { ...configNegocioCache, ...cfg };
+    toast("Beneficios guardados — ya se ven en el catálogo", "success");
+
+  } catch (error) {
+    console.error("Error al guardar los beneficios:", error);
+    toast("Error de conexión al guardar los beneficios", "error");
   } finally {
     if (btn) { btn.disabled = false; btn.innerHTML = textoOriginal; }
   }
