@@ -35,6 +35,17 @@ function formatearPrecio(valor){
     return Number(valor || 0).toLocaleString("es-AR");
 }
 
+function obtenerEstadoStock(stock){
+
+    const n = Number(String(stock ?? "").trim());
+
+    if(isNaN(n)) return null;
+
+    return n < 5
+        ? { texto: "Últimas Unidades", clase: "stock-bajo" }
+        : { texto: "Disponible", clase: "stock-ok" };
+}
+
 /* =========================================================
    TOASTS
 ========================================================= */
@@ -240,22 +251,26 @@ function mostrarProductos(lista){
         const categoria = escapeHtml(p.CATEGORIA);
         const imagen = p.IMAGEN || "";
 
+        const stock = obtenerEstadoStock(p.STOCK);
+
         html += `
         <div class="col-xl-3 col-lg-4 col-md-6 col-sm-6 mb-4">
 
-            <div class="card-product h-100" data-code="${codigo}">
+            <div class="card-product h-100" data-code="${codigo}" data-action="quickview">
 
                 ${String(p.DESTACADO || "").trim().length > 0 ? `<div class="ribbon-destacado">⭐ DESTACADO</div>` : ""}
 
                 ${String(p.OFERTA || "").trim().length > 0 ? `<div class="ribbon-oferta">🔥 OFERTA</div>` : ""}
 
-                <div class="card-img-wrap" data-action="quickview">
+                <div class="card-img-wrap">
                     <img
                         src="${imagen}"
                         alt="${nombre}"
                         loading="lazy"
                         onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'">
                 </div>
+
+                <div class="ticket-perf"></div>
 
                 <div class="card-body-custom">
 
@@ -264,6 +279,8 @@ function mostrarProductos(lista){
                     <h5>${nombre}</h5>
 
                     <div class="price">$${formatearPrecio(p.PRECIO)}</div>
+
+                    ${stock ? `<div class="stock-badge ${stock.clase}">${stock.texto}</div>` : ""}
 
                     <div class="qty-stepper">
                         <button type="button" class="qty-btn" data-action="qty-minus" aria-label="Restar">−</button>
@@ -287,6 +304,8 @@ function mostrarProductos(lista){
 
 /* Delegación de eventos en la grilla de productos */
 document.getElementById("productos").addEventListener("click", function(e){
+
+    if(e.target.tagName === "INPUT") return;
 
     const actionEl = e.target.closest("[data-action]");
     if(!actionEl) return;
@@ -359,6 +378,18 @@ function abrirQuickView(producto){
 
     document.getElementById("qv-categoria").textContent = producto.CATEGORIA || "";
     document.getElementById("qv-precio").textContent = "$" + formatearPrecio(producto.PRECIO);
+
+    const stockEl = document.getElementById("qv-stock");
+    const stock = obtenerEstadoStock(producto.STOCK);
+
+    if(stock){
+        stockEl.textContent = stock.texto;
+        stockEl.className = "stock-badge " + stock.clase;
+        stockEl.classList.remove("d-none");
+    }else{
+        stockEl.classList.add("d-none");
+    }
+
     document.getElementById("qv-cantidad").value = 1;
 
     const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById("quickViewModal"));
