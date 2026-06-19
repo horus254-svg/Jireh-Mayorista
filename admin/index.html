@@ -78,12 +78,12 @@
       <div class="col-6 col-md-3">
         <div class="card p-3 dashboard-card metric-card" onclick="mostrarSeccion('masVendidos'); cargarMasVendidos();">
           <div class="metric-icon bg-tint-amber">🏆</div>
-          <h6>Más Vendidos</h6>
+          <h6>Más Vendido</h6>
           <h2 id="cantidadMasVendidos" style="font-size:18px;">Ver ranking →</h2>
         </div>
       </div>
       <div class="col-6 col-md-3">
-        <div class="card p-3 metric-card">
+        <div class="card p-3 dashboard-card metric-card" onclick="mostrarSeccion('productos')">
           <div class="metric-icon bg-tint-blue">🛒</div>
           <h6>Productos Activos</h6>
           <h2 id="productosActivos">0</h2>
@@ -99,7 +99,7 @@
       <div class="col-6 col-md-3">
         <div class="card p-3 dashboard-card metric-card" onclick="mostrarSeccion('productosAgotados'); cargarAgotados();">
           <div class="metric-icon bg-tint-red">❌</div>
-          <h6>Agotados</h6>
+          <h6>Stock 0</h6>
           <h2 id="agotados">0</h2>
         </div>
       </div>
@@ -118,20 +118,6 @@
         </div>
       </div>
       <div class="col-6 col-md-3">
-        <div class="card p-3 metric-card">
-          <div class="metric-icon bg-tint-green">💰</div>
-          <h6>Ventas Hoy</h6>
-          <h2 id="ventasHoy">$0</h2>
-        </div>
-      </div>
-      <div class="col-6 col-md-3">
-        <div class="card p-3 metric-card">
-          <div class="metric-icon bg-tint-green">📈</div>
-          <h6>Ventas Mes</h6>
-          <h2 id="ventasMes">$0</h2>
-        </div>
-      </div>
-      <div class="col-6 col-md-3">
         <div class="card p-3 dashboard-card metric-card" onclick="mostrarSeccion('pedidos')">
           <div class="metric-icon bg-tint-blue">📦</div>
           <h6>Total Pedidos</h6>
@@ -143,6 +129,34 @@
           <div class="metric-icon bg-tint-green">💵</div>
           <h6>Ticket Promedio</h6>
           <h2 id="TicketPromedio">$0</h2>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card p-3 dashboard-card metric-card" onclick="mostrarSeccion('pos')">
+          <div class="metric-icon bg-tint-green">🏪</div>
+          <h6>Ventas POS Hoy</h6>
+          <h2 id="ventasPOSHoy">$0</h2>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card p-3 dashboard-card metric-card" onclick="mostrarSeccion('pos')">
+          <div class="metric-icon bg-tint-green">🏪</div>
+          <h6>Ventas POS Mes</h6>
+          <h2 id="ventasPOSMes">$0</h2>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card p-3 dashboard-card metric-card" onclick="mostrarSeccion('pedidos')">
+          <div class="metric-icon bg-tint-blue">📦</div>
+          <h6>Ventas Pedidos Hoy</h6>
+          <h2 id="ventasPedidosHoy">$0</h2>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card p-3 dashboard-card metric-card" onclick="mostrarSeccion('pedidos')">
+          <div class="metric-icon bg-tint-blue">📦</div>
+          <h6>Ventas Pedidos Mes</h6>
+          <h2 id="ventasPedidosMes">$0</h2>
         </div>
       </div>
     </div>
@@ -318,7 +332,10 @@
   <div id="cierreCaja" class="seccion">
     <div class="page-header">
       <div><h1>🧮 Cierre de Caja</h1><div class="sub">Reconciliación diaria — compará lo esperado contra lo contado</div></div>
-      <button class="btn btn-outline-secondary btn-sm" onclick="cargarResumenCierreCaja()">↻ Recalcular</button>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-outline-secondary btn-sm" onclick="cargarResumenCierreCaja()">↻ Recalcular</button>
+        <button class="btn btn-outline-primary btn-sm" onclick="imprimirCierreCaja()">🖨️ Imprimir Cierre</button>
+      </div>
     </div>
 
     <div class="card p-3 mb-3">

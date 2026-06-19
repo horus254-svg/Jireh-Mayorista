@@ -78,27 +78,52 @@ async function cargarMetricas() {
     const response = await fetch(API_URL + "?action=metricas");
     const data = await response.json();
 
+    // Pedidos
     actualizarElemento("pedidosNuevos",   data.pedidosNuevos  || 0);
-    actualizarElemento("ventasHoy",       "$" + Number(data.ventasHoy  || 0).toLocaleString("es-AR"));
-    actualizarElemento("ventasMes",       "$" + Number(data.ventasMes  || 0).toLocaleString("es-AR"));
+    actualizarElemento("TotalPedidos",    data.totalPedidos   || 0);
+    actualizarElemento("totalPedidos",    data.totalPedidos   || 0);
+
+    // Productos / stock
     actualizarElemento("productosActivos", data.productosActivos || 0);
     actualizarElemento("stockBajo",       data.stockBajo || 0);
     actualizarElemento("agotados",        data.agotados  || 0);
     actualizarElemento("clientesUnicos",  data.clientesUnicos || 0);
-    actualizarElemento("TotalPedidos",    data.totalPedidos   || 0);
-    actualizarElemento("totalPedidos",    data.totalPedidos   || 0);
+
+    // Más vendido (tarjeta resumen del dashboard)
+    if (data.masVendidoCantidad > 0) {
+      actualizarElemento("cantidadMasVendidos", data.masVendidoCantidad + " uds · " + (data.masVendidoNombre || ""));
+    } else {
+      actualizarElemento("cantidadMasVendidos", "Ver ranking →");
+    }
+
+    // Ventas — combinadas (POS + Pedidos), usadas en tarjetas genéricas / Reportes
+    const ventasHoyTotal = Number(data.ventasHoy || 0);
+    const ventasMesTotal = Number(data.ventasMes || 0);
+    actualizarElemento("ventasHoy",     "$" + ventasHoyTotal.toLocaleString("es-AR"));
+    actualizarElemento("ventasMes",     "$" + ventasMesTotal.toLocaleString("es-AR"));
+    actualizarElemento("ventasTotales", "$" + ventasMesTotal.toLocaleString("es-AR"));
 
     const tp = "$" + Math.round(data.ticketPromedio || 0).toLocaleString("es-AR");
     actualizarElemento("TicketPromedio", tp);
     actualizarElemento("ticketPromedio", tp);
 
-    actualizarElemento("ventasTotales",   "$" + Number(data.ventasMes || 0).toLocaleString("es-AR"));
+    // Ventas — POS (mostrador) hoy/mes
+    const posHoy = Number(data.ventasPOSHoy || 0);
+    const posMes = Number(data.ventasPOSMes || 0);
+    actualizarElemento("ventasPOSHoy", "$" + posHoy.toLocaleString("es-AR"));
+    actualizarElemento("ventasPOSMes", "$" + posMes.toLocaleString("es-AR"));
 
-    // POS summary banner (dashboard)
-    actualizarElemento("posVentasHoyBanner",  "$" + Number(data.ventasHoy  || 0).toLocaleString("es-AR"));
-    actualizarElemento("posVentasMesBanner",  "$" + Number(data.ventasMes  || 0).toLocaleString("es-AR"));
+    // Ventas — Pedidos hoy/mes
+    const pedHoy = Number(data.ventasPedidosHoy || 0);
+    const pedMes = Number(data.ventasPedidosMes || 0);
+    actualizarElemento("ventasPedidosHoy", "$" + pedHoy.toLocaleString("es-AR"));
+    actualizarElemento("ventasPedidosMes", "$" + pedMes.toLocaleString("es-AR"));
+
+    // POS summary banner (dashboard) — usa específicamente las ventas de mostrador
+    actualizarElemento("posVentasHoyBanner",  "$" + posHoy.toLocaleString("es-AR"));
+    actualizarElemento("posVentasMesBanner",  "$" + posMes.toLocaleString("es-AR"));
     actualizarElemento("posTicketPromBanner", tp);
-    actualizarElemento("posTotalPedBanner",   data.totalPedidos || 0);
+    actualizarElemento("posTotalPedBanner",   data.totalVentasPOS || 0);
 
     marcarActualizacionEnVivo();
 
@@ -821,6 +846,143 @@ function _ejecutarImpresion(ventaId, items, total, formaPago, fecha) {
   frame.innerHTML = buildThermalHTML(ventaId, items, total, formaPago, fecha);
 
   // Small delay to let the DOM paint before triggering print dialog
+  setTimeout(() => {
+    window.print();
+  }, 120);
+}
+
+/* =====================================================
+   THERMAL PRINT — CIERRE DE CAJA (POS80 80mm)
+   Reusa el mismo #thermalPrintFrame y las reglas @media
+   print ya definidas para el ticket de venta.
+===================================================== */
+
+/**
+ * Build the thermal HTML string for a cash-register closing (cierre de caja).
+ * @param {Object} resumen  — { fecha, cierreId, vendedor, observaciones,
+ *                               efectivo:{esperado,contado,diferencia},
+ *                               transferencia:{...}, tarjeta:{...}, total:{...} }
+ */
+function buildThermalCierreHTML(resumen) {
+  const fechaStr = formatearFechaCierre(resumen.fecha);
+  const horaStr = new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+
+  function filaMetodo(etiqueta, m) {
+    const signo = m.diferencia > 0 ? "+" : "";
+    return `
+      <tr>
+        <td colspan="2" style="padding-top:2mm;"><strong>${etiqueta}</strong></td>
+      </tr>
+      <tr>
+        <td style="color:#555;">Esperado</td>
+        <td style="text-align:right;">$${Number(m.esperado).toLocaleString("es-AR")}</td>
+      </tr>
+      <tr>
+        <td style="color:#555;">Contado</td>
+        <td style="text-align:right;">$${Number(m.contado).toLocaleString("es-AR")}</td>
+      </tr>
+      <tr>
+        <td style="color:#555;">Diferencia</td>
+        <td style="text-align:right;">${signo}$${Math.round(m.diferencia).toLocaleString("es-AR")}</td>
+      </tr>`;
+  }
+
+  const signoTotal = resumen.total.diferencia > 0 ? "+" : "";
+
+  return `
+    <div class="thermal-receipt">
+      <div class="th-center th-big">JIREH</div>
+      <div class="th-center" style="font-size:9pt;margin-bottom:2mm;">Cierre de Caja</div>
+      <hr class="th-sep-solid">
+      <div>Fecha: ${escapeHtml(fechaStr)}</div>
+      <div>Hora impresión: ${escapeHtml(horaStr)}</div>
+      <div>Cierre: #${escapeHtml(String(resumen.cierreId || "—"))}</div>
+      <div>Vendedor: ${escapeHtml(String(resumen.vendedor || "—"))}</div>
+      <hr class="th-sep">
+      <table>
+        <tbody>
+          ${filaMetodo("EFECTIVO", resumen.efectivo)}
+          ${filaMetodo("TRANSFERENCIA", resumen.transferencia)}
+          ${filaMetodo("TARJETA", resumen.tarjeta)}
+        </tbody>
+        <tr class="th-total-row">
+          <td><strong>TOTAL ESPERADO</strong></td>
+          <td style="text-align:right;"><strong>$${Number(resumen.total.esperado).toLocaleString("es-AR")}</strong></td>
+        </tr>
+        <tr>
+          <td><strong>TOTAL CONTADO</strong></td>
+          <td style="text-align:right;"><strong>$${Number(resumen.total.contado).toLocaleString("es-AR")}</strong></td>
+        </tr>
+        <tr>
+          <td><strong>DIFERENCIA</strong></td>
+          <td style="text-align:right;"><strong>${signoTotal}$${Math.round(resumen.total.diferencia).toLocaleString("es-AR")}</strong></td>
+        </tr>
+      </table>
+      <hr class="th-sep">
+      ${resumen.observaciones ? `<div style="font-size:9pt;">Obs: ${escapeHtml(resumen.observaciones)}</div><hr class="th-sep">` : ""}
+      <div class="th-footer">Cierre generado por JIREH POS</div>
+      <br><br>
+    </div>`;
+}
+
+/**
+ * Imprime el cierre de caja actualmente visible en pantalla.
+ * Usa los montos "esperado" ya cargados (cierreCajaResumenActual)
+ * y los montos "contado" tal cual están en los inputs en este momento,
+ * sin necesidad de haber guardado el cierre primero.
+ */
+function imprimirCierreCaja() {
+  if (!cierreCajaResumenActual) {
+    toast("Esperá a que se calculen las ventas del día", "error");
+    return;
+  }
+
+  const esp = cierreCajaResumenActual.esperado;
+
+  const efectivoContado      = Number(document.getElementById("ccEfectivoContado").value || 0);
+  const transferenciaContado = Number(document.getElementById("ccTransferenciaContado").value || 0);
+  const tarjetaContado       = Number(document.getElementById("ccTarjetaContado").value || 0);
+  const observaciones        = document.getElementById("ccObservaciones").value || "";
+
+  const efectivo = {
+    esperado: esp.EFECTIVO,
+    contado: efectivoContado,
+    diferencia: efectivoContado - esp.EFECTIVO
+  };
+  const transferencia = {
+    esperado: esp.TRANSFERENCIA,
+    contado: transferenciaContado,
+    diferencia: transferenciaContado - esp.TRANSFERENCIA
+  };
+  const tarjeta = {
+    esperado: esp.TARJETA,
+    contado: tarjetaContado,
+    diferencia: tarjetaContado - esp.TARJETA
+  };
+
+  const totalEsperado = efectivo.esperado + transferencia.esperado + tarjeta.esperado;
+  const totalContado  = efectivo.contado  + transferencia.contado  + tarjeta.contado;
+
+  const resumen = {
+    fecha: cierreCajaResumenActual.fecha,
+    cierreId: (cierreCajaResumenActual.cierreExistente && cierreCajaResumenActual.cierreExistente.CIERRE_ID) || "PREVIO",
+    vendedor: (cierreCajaResumenActual.cierreExistente && cierreCajaResumenActual.cierreExistente.VENDEDOR) || "ADMIN",
+    observaciones,
+    efectivo,
+    transferencia,
+    tarjeta,
+    total: {
+      esperado: totalEsperado,
+      contado: totalContado,
+      diferencia: totalContado - totalEsperado
+    }
+  };
+
+  const frame = document.getElementById("thermalPrintFrame");
+  if (!frame) { toast("Error: frame de impresión no encontrado", "error"); return; }
+
+  frame.innerHTML = buildThermalCierreHTML(resumen);
+
   setTimeout(() => {
     window.print();
   }, 120);
