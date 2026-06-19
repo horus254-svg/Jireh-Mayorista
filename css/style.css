@@ -880,3 +880,48 @@ select:focus-visible{
         z-index:10990 !important;
     }
 }
+
+/* =========================================================
+   TEMAS DE COLOR (seleccionables desde el panel admin / Sheets)
+   Se activan poniendo data-tema="azul|verde|rojo" en <body>.
+   Sin el atributo (o con data-tema="navy") se usa la paleta
+   original. Solo se reemplazan navy/indigo: el resto de la
+   paleta (paper, ink, ámbar/coral de etiquetas, estados de
+   stock) se mantiene igual en todos los temas.
+========================================================= */
+
+body[data-tema="azul"]{
+    --navy-950:#0b1f3a;
+    --navy-800:#16335c;
+    --indigo-600:#2f7df5;
+    --indigo-700:#1f63d1;
+}
+
+body[data-tema="verde"]{
+    --navy-950:#0c2417;
+    --navy-800:#16402a;
+    --indigo-600:#1fa257;
+    --indigo-700:#168447;
+}
+
+body[data-tema="rojo"]{
+    --navy-950:#2a0f12;
+    --navy-800:#481a1f;
+    --indigo-600:#e0413f;
+    --indigo-700:#bf2e2e;
+}
+
+/* =========================================================
+   BANNER PERSONALIZADO (imagen de fondo opcional en el Hero)
+   Se activa agregando la clase .hero--imagen vía JS cuando
+   hay una URL de imagen configurada en Sheets.
+========================================================= */
+
+.hero.hero--imagen{
+    background-image:
+        linear-gradient(180deg, rgba(11,18,36,.62), rgba(11,18,36,.78)),
+        var(--hero-bg-img);
+    background-size:cover;
+    background-position:center;
+}
+

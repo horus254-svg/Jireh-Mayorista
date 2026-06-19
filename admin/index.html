@@ -582,6 +582,47 @@
       </div>
     </div>
 
+    <div class="card p-3 mt-3">
+      <h6 style="margin-bottom:14px;">🎨 Apariencia del catálogo web</h6>
+
+      <div class="mb-3">
+        <label class="form-label">Título del banner <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+        <input type="text" class="form-control" id="cfgBannerTitulo" placeholder="Ej: Mayorista Jireh">
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Subtítulo del banner <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+        <input type="text" class="form-control" id="cfgBannerSubtitulo" placeholder="Ej: Catálogo Mayorista Online">
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Imagen de fondo del banner <span class="text-muted" style="font-size:11px;">(opcional, URL de una imagen)</span></label>
+        <input type="url" class="form-control" id="cfgBannerImagen" placeholder="https://...">
+        <div class="form-text" style="font-size:11.5px;">Pegá un link directo a una imagen (termina en .jpg, .png, etc). Si lo dejás vacío, el banner queda con el fondo de color sin imagen.</div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Color del sitio</label>
+        <select class="form-select" id="cfgTema">
+          <option value="navy">Azul oscuro (original)</option>
+          <option value="azul">Azul</option>
+          <option value="verde">Verde</option>
+          <option value="rojo">Rojo</option>
+        </select>
+      </div>
+
+      <div class="d-flex justify-content-end mt-3">
+        <button class="btn btn-success" id="btnGuardarApariencia" onclick="guardarAparienciaForm()">💾 Guardar apariencia</button>
+      </div>
+    </div>
+
+    <div class="card p-3 mt-3">
+      <div class="config-preview-hint">
+        <span class="ic">ℹ️</span>
+        Estos cambios se ven directamente en la página del catálogo (banner y colores) apenas se guardan, sin tocar ningún archivo — quedan también en la hoja "CONFIGURACION" de la planilla.
+      </div>
+    </div>
+
     <div class="card p-3 mt-3" id="usbPrintCard">
       <h6 style="margin-bottom:6px;">🔌 Impresión directa por USB</h6>
       <p class="text-muted" style="font-size:13px; margin-bottom:14px;">

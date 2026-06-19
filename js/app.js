@@ -744,8 +744,61 @@ window.addEventListener("pageshow", function(){
 });
 
 /* =========================================================
+   APARIENCIA (BANNER + TEMA) — DESDE GOOGLE SHEETS
+   Se trae de la misma hoja CONFIGURACION que usa el panel
+   admin, así ambos quedan siempre sincronizados.
+========================================================= */
+
+async function aplicarApariencia(){
+
+    try{
+
+        const res = await fetch(API_URL + "?action=configuracionNegocio");
+        const data = await res.json();
+
+        if(!data.success || !data.config) return;
+
+        const cfg = data.config;
+
+        // --- Tema de color ---
+        const tema = (cfg.tema || "navy").toLowerCase();
+        document.body.setAttribute("data-tema", tema);
+
+        // --- Título / subtítulo del banner ---
+        const tituloEl = document.getElementById("hero-titulo");
+        const subtituloEl = document.getElementById("hero-subtitulo");
+
+        if(tituloEl && cfg.bannerTitulo){
+            tituloEl.textContent = cfg.bannerTitulo;
+        }
+
+        if(subtituloEl && cfg.bannerSubtitulo){
+            subtituloEl.textContent = cfg.bannerSubtitulo;
+        }
+
+        // --- Imagen de fondo del banner (opcional) ---
+        const heroEl = document.getElementById("hero");
+
+        if(heroEl && cfg.bannerImagen){
+            heroEl.style.setProperty("--hero-bg-img", `url("${cfg.bannerImagen}")`);
+            heroEl.classList.add("hero--imagen");
+        }
+
+        // --- Título de la pestaña del navegador ---
+        if(cfg.nombre){
+            document.title = cfg.nombre;
+        }
+
+    }catch(err){
+        // Si falla, la página sigue mostrando los valores fijos del HTML.
+        console.error("No se pudo cargar la apariencia desde Sheets:", err);
+    }
+}
+
+/* =========================================================
    INICIO
 ========================================================= */
 
+aplicarApariencia();
 actualizarContador();
 cargarProductos();

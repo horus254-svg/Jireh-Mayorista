@@ -66,7 +66,12 @@ const CONFIG_NEGOCIO_DEFAULT = {
   direccion:  "",
   telefono1:  "",
   telefono2:  "",
-  pie:        "¡Gracias por su compra!"
+  pie:        "¡Gracias por su compra!",
+
+  bannerTitulo:    "Mayorista Jireh",
+  bannerSubtitulo: "Catálogo Mayorista Online",
+  bannerImagen:    "",
+  tema:            "navy"
 };
 
 // Caché en memoria de la config, para que imprimir un ticket no tenga
@@ -106,6 +111,8 @@ async function cargarConfigNegocioForm() {
   document.getElementById("cfgTelefono1").value   = cfg.telefono1;
   document.getElementById("cfgTelefono2").value   = cfg.telefono2;
   document.getElementById("cfgPie").value         = cfg.pie;
+
+  cargarAparienciaForm(cfg);
 
   if (form) form.placeholder = "Ej: JIREH";
 }
@@ -190,6 +197,75 @@ function vistaPreviaTicketConfig() {
   frame.innerHTML = buildThermalHTML("PREVIEW", itemsEjemplo, total, "EFECTIVO", new Date(), null, cfgPreview);
 
   setTimeout(() => { window.print(); }, 120);
+}
+
+/* ===================== APARIENCIA DEL CATÁLOGO WEB (banner + tema) ===================== */
+
+const APARIENCIA_DEFAULT = {
+  bannerTitulo:    "Mayorista Jireh",
+  bannerSubtitulo: "Catálogo Mayorista Online",
+  bannerImagen:    "",
+  tema:            "navy"
+};
+
+/** Loads the saved banner/tema config into the "Apariencia" form (called when Configuración opens) */
+function cargarAparienciaForm(cfg) {
+  document.getElementById("cfgBannerTitulo").value    = cfg.bannerTitulo    ?? APARIENCIA_DEFAULT.bannerTitulo;
+  document.getElementById("cfgBannerSubtitulo").value = cfg.bannerSubtitulo ?? APARIENCIA_DEFAULT.bannerSubtitulo;
+  document.getElementById("cfgBannerImagen").value    = cfg.bannerImagen   ?? APARIENCIA_DEFAULT.bannerImagen;
+  document.getElementById("cfgTema").value            = cfg.tema           || APARIENCIA_DEFAULT.tema;
+}
+
+/**
+ * Saves both the ticket-header fields AND the banner/tema fields together,
+ * since both live in the same hoja CONFIGURACION and the backend expects
+ * the full set of keys in one call to guardarConfiguracionNegocio.
+ */
+async function guardarAparienciaForm() {
+  const nombre = document.getElementById("cfgNombreLocal").value.trim();
+
+  if (!nombre) {
+    toast("Completá primero el nombre del local, arriba", "error");
+    return;
+  }
+
+  const cfg = {
+    nombre,
+    subtitulo: document.getElementById("cfgSubtitulo").value.trim(),
+    direccion: document.getElementById("cfgDireccion").value.trim(),
+    telefono1: document.getElementById("cfgTelefono1").value.trim(),
+    telefono2: document.getElementById("cfgTelefono2").value.trim(),
+    pie:       document.getElementById("cfgPie").value.trim(),
+
+    bannerTitulo:    document.getElementById("cfgBannerTitulo").value.trim(),
+    bannerSubtitulo: document.getElementById("cfgBannerSubtitulo").value.trim(),
+    bannerImagen:    document.getElementById("cfgBannerImagen").value.trim(),
+    tema:            document.getElementById("cfgTema").value
+  };
+
+  const btn = document.getElementById("btnGuardarApariencia");
+  const textoOriginal = btn ? btn.innerHTML : "";
+  if (btn) { btn.disabled = true; btn.innerHTML = "Guardando..."; }
+
+  try {
+    const params = new URLSearchParams({ action: "guardarConfiguracionNegocio", ...cfg });
+    const response = await fetch(API_URL + "?" + params.toString());
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo guardar la apariencia", "error");
+      return;
+    }
+
+    configNegocioCache = { ...configNegocioCache, ...cfg };
+    toast("Apariencia guardada — ya se ve en el catálogo", "success");
+
+  } catch (error) {
+    console.error("Error al guardar la apariencia:", error);
+    toast("Error de conexión al guardar la apariencia", "error");
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = textoOriginal; }
+  }
 }
 
 /* ===================== TOASTS ===================== */
