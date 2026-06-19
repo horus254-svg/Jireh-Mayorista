@@ -854,14 +854,14 @@ html,body{
 .thermal-receipt .th-sep-solid{
   border:none; border-top:1px solid #000; margin:3mm 0;
 }
-.thermal-receipt table{ width:100%; border-collapse:collapse; font-size:12pt; font-weight:bold; }
+.thermal-receipt table{ width:100%; border-collapse:collapse; font-size:13pt; font-weight:bold; }
 .thermal-receipt table td{ padding:1.2mm 0; vertical-align:top; }
 .thermal-receipt table td:last-child{ text-align:right; }
 .thermal-receipt .th-total-row td{
   font-weight:bold; font-size:14pt; border-top:1px solid #000; padding-top:2mm;
 }
 .thermal-receipt .th-footer{
-  text-align:center; font-size:11pt; font-weight:bold; color:#555; margin-top:3mm;
+  text-align:center; font-size:13pt; font-weight:bold; color:#000; margin-top:3mm;
 }
 
 /* ===================== RESPONSIVE ===================== */

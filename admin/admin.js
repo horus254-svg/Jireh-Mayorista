@@ -1362,7 +1362,7 @@ function buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, cf
         <td colspan="2" style="padding-bottom:0;">${escapeHtml(item.PRODUCTO)}</td>
       </tr>
       <tr>
-        <td style="color:#555;">${unitStr}</td>
+        <td>${unitStr}</td>
         <td style="text-align:right;">$${sub.toLocaleString("es-AR")}</td>
       </tr>`;
   });
@@ -1499,6 +1499,7 @@ function buildThermalESCPOS(ventaId, items, total, formaPago, fecha, descuento, 
   items.forEach(item => {
     const sub = item.PRECIO * item.cantidad;
     subtotal += sub;
+    b.bold();
     b.text(item.PRODUCTO); b.feed(1);
     b.row(`${item.cantidad} x $${money(item.PRECIO)}`, "$" + money(sub));
   });
@@ -1517,6 +1518,7 @@ function buildThermalESCPOS(ventaId, items, total, formaPago, fecha, descuento, 
   b.normal();
   b.sep();
 
+  b.bold();
   if (cfg.pie) { b.center(); b.text(cfg.pie); b.feed(1); }
   b.center(); b.text(cfg.nombre + " - Sistema POS"); b.feed(1);
   b.boldOff();
@@ -1537,7 +1539,8 @@ function buildThermalCierreESCPOS(resumen) {
 
   function filaMetodo(etiqueta, m) {
     const signo = m.diferencia > 0 ? "+" : "";
-    b.bold(); b.text(etiqueta); b.feed(1); b.boldOff();
+    b.bold();
+    b.text(etiqueta); b.feed(1);
     b.row("Esperado", "$" + money(m.esperado));
     b.row("Contado", "$" + money(m.contado));
     b.row("Diferencia", signo + "$" + money(Math.round(m.diferencia)));
@@ -1572,10 +1575,12 @@ function buildThermalCierreESCPOS(resumen) {
   b.sep();
 
   if (resumen.observaciones) {
+    b.bold();
     b.text("Obs: " + resumen.observaciones); b.feed(1);
     b.sep();
   }
 
+  b.bold();
   b.text("Cierre generado por " + cfg.nombre + " POS"); b.feed(1);
   b.boldOff();
 
@@ -1886,15 +1891,15 @@ function buildThermalCierreHTML(resumen) {
         <td colspan="2" style="padding-top:2mm;"><strong>${etiqueta}</strong></td>
       </tr>
       <tr>
-        <td style="color:#555;">Esperado</td>
+        <td>Esperado</td>
         <td style="text-align:right;">$${Number(m.esperado).toLocaleString("es-AR")}</td>
       </tr>
       <tr>
-        <td style="color:#555;">Contado</td>
+        <td>Contado</td>
         <td style="text-align:right;">$${Number(m.contado).toLocaleString("es-AR")}</td>
       </tr>
       <tr>
-        <td style="color:#555;">Diferencia</td>
+        <td>Diferencia</td>
         <td style="text-align:right;">${signo}$${Math.round(m.diferencia).toLocaleString("es-AR")}</td>
       </tr>`;
   }
@@ -1903,13 +1908,13 @@ function buildThermalCierreHTML(resumen) {
 
   // Encabezado: nombre del local + dirección + teléfono(s) (sin subtítulo, este ticket no es de venta)
   let encabezado = `<div class="th-center th-big">${escapeHtml(cfg.nombre)}</div>`;
-  encabezado += `<div class="th-center" style="font-size:11pt;font-weight:bold;">Cierre de Caja</div>`;
+  encabezado += `<div class="th-center" style="font-size:13pt;font-weight:bold;">Cierre de Caja</div>`;
   if (cfg.direccion) {
-    encabezado += `<div class="th-center" style="font-size:10.5pt;font-weight:bold;color:#555;">${escapeHtml(cfg.direccion)}</div>`;
+    encabezado += `<div class="th-center" style="font-size:13pt;font-weight:bold;">${escapeHtml(cfg.direccion)}</div>`;
   }
   const telefonos = [cfg.telefono1, cfg.telefono2].filter(Boolean).join(" · ");
   if (telefonos) {
-    encabezado += `<div class="th-center" style="font-size:10.5pt;font-weight:bold;color:#555;margin-bottom:2mm;">Tel: ${escapeHtml(telefonos)}</div>`;
+    encabezado += `<div class="th-center" style="font-size:13pt;font-weight:bold;margin-bottom:2mm;">Tel: ${escapeHtml(telefonos)}</div>`;
   } else {
     encabezado += `<div style="margin-bottom:2mm;"></div>`;
   }
@@ -1943,7 +1948,7 @@ function buildThermalCierreHTML(resumen) {
         </tr>
       </table>
       <hr class="th-sep">
-      ${resumen.observaciones ? `<div style="font-size:11pt;font-weight:bold;">Obs: ${escapeHtml(resumen.observaciones)}</div><hr class="th-sep">` : ""}
+      ${resumen.observaciones ? `<div style="font-size:13pt;font-weight:bold;">Obs: ${escapeHtml(resumen.observaciones)}</div><hr class="th-sep">` : ""}
       <div class="th-footer">Cierre generado por ${escapeHtml(cfg.nombre)} POS</div>
       <br><br>
     </div>`;
