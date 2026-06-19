@@ -1,10 +1,15 @@
+/* ===================================================================
+   JIREH ADMIN — app logic
+   All original Apps Script API calls are preserved exactly as-is.
+=================================================================== */
+
 const API_URL =
 "https://script.google.com/macros/s/AKfycbw1eY_mXImG503rU0Cqddx1WBuGIOhxaW_SXGoIMsug_CjsSC-HLsb2XzYwrovaGBU/exec";
 
 let pedidosGlobal = [];
 
 if (sessionStorage.getItem("admin") !== "true") {
-window.location.href = "login.html";
+  window.location.href = "login.html";
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -27,645 +32,207 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   }, 5000);
 
+  setupScannerListener();
+
 });
 
 function escapeHtml(text) {
-
-const div = document.createElement("div");
-
-div.textContent = text || "";
-
-return div.innerHTML;
-
+  const div = document.createElement("div");
+  div.textContent = text || "";
+  return div.innerHTML;
 }
 
 function actualizarElemento(id, valor) {
-
-const el = document.getElementById(id);
-
-if (el) {
+  const el = document.getElementById(id);
+  if (el) {
     el.textContent = valor;
+  }
 }
 
+/* ===================== TOASTS ===================== */
+
+function toast(mensaje, tipo){
+
+  const stack = document.getElementById("toastStack");
+  if(!stack) return;
+
+  const el = document.createElement("div");
+  el.className = "toast-msg" + (tipo ? " " + tipo : "");
+
+  const icon = tipo === "error" ? "⚠️" : tipo === "success" ? "✓" : "ℹ️";
+  el.innerHTML = `<span>${icon}</span><span>${escapeHtml(mensaje)}</span>`;
+
+  stack.appendChild(el);
+
+  setTimeout(() => {
+    el.style.transition = "opacity .25s";
+    el.style.opacity = "0";
+    setTimeout(() => el.remove(), 250);
+  }, 2600);
+
 }
+
+/* ===================== METRICAS ===================== */
 
 async function cargarMetricas() {
 
-try {
+  try {
 
     const response =
-        await fetch(
-            API_URL + "?action=metricas"
-        );
+      await fetch(
+        API_URL + "?action=metricas"
+      );
 
     const data =
-        await response.json();
+      await response.json();
+
+    actualizarElemento("pedidosNuevos", data.pedidosNuevos || 0);
 
     actualizarElemento(
-        "pedidosNuevos",
-        data.pedidosNuevos || 0
+      "ventasHoy",
+      "$" + Number(data.ventasHoy || 0).toLocaleString("es-AR")
     );
 
     actualizarElemento(
-        "ventasHoy",
-        "$" +
-        Number(
-            data.ventasHoy || 0
-        ).toLocaleString("es-AR")
+      "ventasMes",
+      "$" + Number(data.ventasMes || 0).toLocaleString("es-AR")
+    );
+
+    actualizarElemento("productosActivos", data.productosActivos || 0);
+    actualizarElemento("stockBajo", data.stockBajo || 0);
+    actualizarElemento("agotados", data.agotados || 0);
+    actualizarElemento("clientesUnicos", data.clientesUnicos || 0);
+    actualizarElemento("TotalPedidos", data.totalPedidos || 0);
+    actualizarElemento("totalPedidos", data.totalPedidos || 0);
+
+    actualizarElemento(
+      "TicketPromedio",
+      "$" + Math.round(data.ticketPromedio || 0).toLocaleString("es-AR")
     );
 
     actualizarElemento(
-        "ventasMes",
-        "$" +
-        Number(
-            data.ventasMes || 0
-        ).toLocaleString("es-AR")
+      "ticketPromedio",
+      "$" + Math.round(data.ticketPromedio || 0).toLocaleString("es-AR")
     );
 
     actualizarElemento(
-        "productosActivos",
-        data.productosActivos || 0
+      "ventasTotales",
+      "$" + Number(data.ventasMes || 0).toLocaleString("es-AR")
     );
 
-    actualizarElemento(
-        "stockBajo",
-        data.stockBajo || 0
-    );
-
-    actualizarElemento(
-        "agotados",
-        data.agotados || 0
-    );
-
-    actualizarElemento(
-        "clientesUnicos",
-        data.clientesUnicos || 0
-    );
-
-    actualizarElemento(
-        "TotalPedidos",
-        data.totalPedidos || 0
-    );
-
-    actualizarElemento(
-        "totalPedidos",
-        data.totalPedidos || 0
-    );
-
-    actualizarElemento(
-        "TicketPromedio",
-        "$" +
-        Math.round(
-            data.ticketPromedio || 0
-        ).toLocaleString("es-AR")
-    );
-
-    actualizarElemento(
-        "ticketPromedio",
-        "$" +
-        Math.round(
-            data.ticketPromedio || 0
-        ).toLocaleString("es-AR")
-    );
-
-    actualizarElemento(
-        "ventasTotales",
-        "$" +
-        Number(
-            data.ventasMes || 0
-        ).toLocaleString("es-AR")
-    );
-
+  }
+  catch (error) {
+    console.error("Error métricas:", error);
+  }
 }
-catch (error) {
 
-    console.error(
-        "Error métricas:",
-        error
-    );
-
-}
-}
+/* ===================== NAVEGACION ===================== */
 
 function mostrarSeccion(id) {
 
-document
-    .querySelectorAll(".seccion")
-    .forEach(sec => {
-        sec.style.display = "none";
-    });
+  document.querySelectorAll(".seccion").forEach(sec => {
+    sec.style.display = "none";
+  });
 
-const seccion =
-    document.getElementById(id);
+  const seccion = document.getElementById(id);
 
-if (seccion) {
+  if (seccion) {
     seccion.style.display = "block";
-}
+  }
 
-if (id === "pedidos") {
+  document.querySelectorAll("#navLinks a").forEach(a => {
+    a.classList.toggle("active", a.getAttribute("data-target") === id);
+  });
+
+  if (id === "pedidos") {
     cargarPedidos();
-}
+  }
 
-if (id === "productos") {
+  if (id === "productos") {
     cargarProductos();
-}
+  }
+
+  if (id === "pos") {
+    asegurarProductosPOS().then(renderPosGrid);
+    setTimeout(() => {
+      const input = document.getElementById("posBusqueda");
+      if(input) input.focus();
+    }, 80);
+  }
 
 }
+
+/* ===================== PEDIDOS ===================== */
 
 async function cargarPedidos() {
 
-try {
+  try {
 
     const response =
-        await fetch(
-            API_URL + "?action=pedidos"
-        );
+      await fetch(
+        API_URL + "?action=pedidos"
+      );
 
     const data =
-        await response.json();
+      await response.json();
     pedidosGlobal = data.pedidos || [];
 
-    let html = "";
-
     if (!data.pedidos) {
-        return;
+      return;
     }
 
-   pedidosGlobal.forEach(p=>{
+    renderPedidos(pedidosGlobal);
 
-        const estadoColor =
-            p.ESTADO === "NUEVO"
-            ? "table-warning"
-            : "";
-
-        html += `
-        <tr class="${estadoColor}">
-
-            <td>${escapeHtml(p.PEDIDO_ID)}</td>
-
-            <td>
-                ${new Date(
-                    p.FECHA
-                ).toLocaleString("es-AR")}
-            </td>
-
-            <td>
-                ${escapeHtml(p.CLIENTE)}
-            </td>
-
-            <td>
-                $${Number(
-                    p.TOTAL || 0
-                ).toLocaleString("es-AR")}
-            </td>
-
-            <td>
-
-                <select
-                    class="form-select form-select-sm"
-                    onchange="cambiarEstado('${p.PEDIDO_ID}',this.value)">
-
-                    <option value="NUEVO" ${p.ESTADO==="NUEVO"?"selected":""}>
-                        NUEVO
-                    </option>
-
-                    <option value="PREPARANDO" ${p.ESTADO==="PREPARANDO"?"selected":""}>
-                        PREPARANDO
-                    </option>
-
-                    <option value="ENVIADO" ${p.ESTADO==="ENVIADO"?"selected":""}>
-                        ENVIADO
-                    </option>
-
-                    <option value="ENTREGADO" ${p.ESTADO==="ENTREGADO"?"selected":""}>
-                        ENTREGADO
-                    </option>
-
-                    <option value="CANCELADO" ${p.ESTADO==="CANCELADO"?"selected":""}>
-                        CANCELADO
-                    </option>
-
-                </select>
-
-            </td>
-
-            <td>
-
-                ${
-                    p.PDF_URL
-                    ?
-                    `<a
-                        href="${p.PDF_URL}"
-                        target="_blank"
-                        class="btn btn-primary btn-sm">
-                        PDF
-                    </a>`
-                    :
-                    "-"
-                }
-
-            </td>
-
-        </tr>
-        `;
-
-    });
-
-    document.getElementById(
-        "tablaPedidos"
-    ).innerHTML = html;
-
-}
-catch (error) {
-
-    console.error(
-        "Error pedidos:",
-        error
-    );
+  }
+  catch (error) {
+    console.error("Error pedidos:", error);
+  }
 
 }
 
-}
+async function cambiarEstado(pedidoId, estado) {
 
-async function cambiarEstado(
-pedidoId,
-estado
-) {
-
-try {
+  try {
 
     const response =
-        await fetch(
+      await fetch(
+        API_URL +
+        "?action=actualizarEstado" +
+        "&pedidoId=" + encodeURIComponent(pedidoId) +
+        "&estado=" + encodeURIComponent(estado)
+      );
 
-            API_URL +
-
-            "?action=actualizarEstado" +
-
-            "&pedidoId=" +
-            encodeURIComponent(
-                pedidoId
-            ) +
-
-            "&estado=" +
-            encodeURIComponent(
-                estado
-            )
-
-        );
-
-    const data =
-        await response.json();
+    const data = await response.json();
 
     if (!data.success) {
-
-        alert(
-            "No se pudo actualizar"
-        );
-
-        return;
+      toast("No se pudo actualizar el pedido", "error");
+      return;
     }
 
-}
-catch (error) {
+    toast("Estado actualizado", "success");
 
+  }
+  catch (error) {
     console.error(error);
-
-    alert(
-        "Error de conexión"
-    );
+    toast("Error de conexión", "error");
+  }
 
 }
 
-}
-
-async function cargarProductos() {
-
-try {
-
-    const response =
-        await fetch(
-            API_URL + "?action=productos"
-        );
-
-    const data =
-        await response.json();
-
-    let html = "";
-
-    if (!data.productos) {
-        return;
-    }
-
-    data.productos.forEach(p => {
-
-        html += `
-        <tr>
-
-            <td>
-                ${escapeHtml(p.CODIGO)}
-            </td>
-
-            <td>
-                ${escapeHtml(p.PRODUCTO)}
-            </td>
-
-            <td>
-                $${Number(
-                    p.PRECIO || 0
-                ).toLocaleString("es-AR")}
-            </td>
-
-            <td>
-
-                <button
-                    class="btn btn-primary btn-sm"
-                    onclick="editarProducto('${p.CODIGO}')">
-
-                    Editar
-
-                </button>
-
-                <button
-                    class="btn btn-danger btn-sm ms-2"
-                    onclick="eliminarProducto('${p.CODIGO}')">
-
-                    Eliminar
-
-                </button>
-
-            </td>
-
-        </tr>
-        `;
-
-    });
-
-    document.getElementById(
-        "tablaProductos"
-    ).innerHTML = html;
-
-}
-catch (error) {
-
-    console.error(
-        "Error productos:",
-        error
-    );
-
-}
-
-}
-
-function nuevoProducto() {
-
-alert(
-    "Debes crear la acción crearProducto en Apps Script."
-);
-
-}
-
-function editarProducto(codigo) {
-
-alert(
-    "Editar producto: " + codigo
-);
-
-}
-
-function eliminarProducto(codigo) {
-
-if (
-    !confirm(
-        "¿Eliminar producto?"
-    )
-) {
-    return;
-}
-
-alert(
-    "Debes crear la acción eliminarProducto en Apps Script.\nCódigo: " + codigo
-);
-
-}
-
-function logout() {
-
-sessionStorage.removeItem(
-    "admin"
-);
-
-window.location.href =
-    "login.html";
-
-}
-async function cargarClientes(){
-
-try{
-
-const response =
-await fetch(
-API_URL + "?action=clientes"
-);
-
-const data =
-await response.json();
-
-let html = "";
-
-if(!data.clientes){
-return;
-}
-
-data.clientes.forEach(c => {
-
-html += `
-<tr>
-<td>${escapeHtml(c.CLIENTE)}</td>
-<td>${escapeHtml(c.EMPRESA)}</td>
-<td>${escapeHtml(c.DIRECCION)}</td>
-<td>${escapeHtml(c.TELEFONO)}</td>
-<td>${escapeHtml(c.DNI)}</td>
-<td>${c.PEDIDOS}</td>
-<td>$${Number(c.TOTAL || 0).toLocaleString("es-AR")}</td>
-</tr>
-`;
-
-});
-
-document.getElementById(
-"tablaClientes"
-).innerHTML = html;
-
-}
-catch(error){
-
-console.error(
-"Error clientes:",
-error
-);
-
-}
-
-}
-async function cargarStockBajo() {
-
-    mostrarSeccion("stockBajoProductos");
-
-    try {
-
-        const response =
-            await fetch(API_URL + "?action=productos");
-
-        const data =
-            await response.json();
-
-        let html = "";
-
-        data.productos
-        .filter(p => {
-            const stock = Number(p.STOCK || 0);
-            return stock > 0 && stock <= 5;
-        })
-        .forEach(p => {
-
-            html += `
-            <tr>
-                <td>${escapeHtml(p.CODIGO)}</td>
-                <td>${escapeHtml(p.PRODUCTO)}</td>
-                <td>${p.STOCK}</td>
-            </tr>
-            `;
-
-        });
-
-        document.getElementById(
-            "tablaStockBajo"
-        ).innerHTML = html;
-
-    }
-    catch(error){
-
-        console.error(
-            "Error stock bajo:",
-            error
-        );
-
-    }
-
-}
-
-async function cargarAgotados() {
-
-    mostrarSeccion("productosAgotados");
-
-    try {
-
-        const response =
-            await fetch(API_URL + "?action=productos");
-
-        const data =
-            await response.json();
-
-        let html = "";
-
-        data.productos
-        .filter(p => Number(p.STOCK || 0) === 0)
-        .forEach(p => {
-
-            html += `
-            <tr>
-                <td>${escapeHtml(p.CODIGO)}</td>
-                <td>${escapeHtml(p.PRODUCTO)}</td>
-                <td>0</td>
-            </tr>
-            `;
-
-        });
-
-        document.getElementById(
-            "tablaAgotados"
-        ).innerHTML = html;
-
-    }
-    catch(error){
-
-        console.error(
-            "Error agotados:",
-            error
-        );
-
-    }
-
-}
-async function cargarMasVendidos(){
-
-try{
-
-const response =
-await fetch(
-API_URL + "?action=masVendidos"
-);
-
-const data =
-await response.json();
-
-let html = "";
-
-data.productos.forEach(p => {
-
-html += `
-<tr>
-<td>${p.CODIGO}</td>
-<td>${p.PRODUCTO}</td>
-<td>${p.VENDIDOS}</td>
-</tr>
-`;
-
-});
-
-document.getElementById(
-"tablaMasVendidos"
-).innerHTML = html;
-
-}
-catch(error){
-
-console.error(
-"Error más vendidos:",
-error
-);
-
-}
-
-}
 function filtrarPedidos(){
 
   const texto =
-    document.getElementById(
-      "buscarPedido"
-    ).value.toLowerCase();
+    document.getElementById("buscarPedido").value.toLowerCase();
 
   const filtrados =
     pedidosGlobal.filter(p => {
-
       return (
-        String(p.PEDIDO_ID || "")
-          .toLowerCase()
-          .includes(texto)
-
+        String(p.PEDIDO_ID || "").toLowerCase().includes(texto)
         ||
-
-        String(p.CLIENTE || "")
-          .toLowerCase()
-          .includes(texto)
-
+        String(p.CLIENTE || "").toLowerCase().includes(texto)
         ||
-
-        String(p.DNI || "")
-          .toLowerCase()
-          .includes(texto)
+        String(p.DNI || "").toLowerCase().includes(texto)
       );
-
     });
 
   renderPedidos(filtrados);
@@ -676,60 +243,51 @@ function renderPedidos(lista){
 
   let html = "";
 
-  lista.forEach(p => {
+  if(lista.length === 0){
+    html = `<tr><td colspan="6" class="text-center text-muted py-4">No se encontraron pedidos</td></tr>`;
+  }
+
+  lista.forEach(p=>{
+
+    const estadoColor =
+      p.ESTADO === "NUEVO" ? "table-warning" : "";
 
     html += `
-      <tr>
-
-        <td>${p.PEDIDO_ID || ""}</td>
-
-        <td>
-          ${new Date(
-            p.FECHA
-          ).toLocaleString("es-AR")}
-        </td>
-
-        <td>${p.CLIENTE || ""}</td>
-
-        <td>
-          $${Number(
-            p.TOTAL || 0
-          ).toLocaleString("es-AR")}
-        </td>
-
-        <td>${p.ESTADO || ""}</td>
-
-        <td>
-          ${
-            p.PDF_URL
-            ?
-            `<a href="${p.PDF_URL}"
-               target="_blank"
-               class="btn btn-primary btn-sm">
-               PDF
-             </a>`
-            :
-            "-"
-          }
-        </td>
-
-      </tr>
+    <tr class="${estadoColor}">
+      <td class="mono">${escapeHtml(p.PEDIDO_ID)}</td>
+      <td>${new Date(p.FECHA).toLocaleString("es-AR")}</td>
+      <td>${escapeHtml(p.CLIENTE)}</td>
+      <td class="money">$${Number(p.TOTAL || 0).toLocaleString("es-AR")}</td>
+      <td>
+        <select class="form-select form-select-sm" onchange="cambiarEstado('${p.PEDIDO_ID}',this.value)">
+          <option value="NUEVO" ${p.ESTADO==="NUEVO"?"selected":""}>NUEVO</option>
+          <option value="PREPARANDO" ${p.ESTADO==="PREPARANDO"?"selected":""}>PREPARANDO</option>
+          <option value="ENVIADO" ${p.ESTADO==="ENVIADO"?"selected":""}>ENVIADO</option>
+          <option value="ENTREGADO" ${p.ESTADO==="ENTREGADO"?"selected":""}>ENTREGADO</option>
+          <option value="CANCELADO" ${p.ESTADO==="CANCELADO"?"selected":""}>CANCELADO</option>
+        </select>
+      </td>
+      <td>
+        ${
+          p.PDF_URL
+          ? `<a href="${p.PDF_URL}" target="_blank" class="btn btn-primary btn-sm">PDF</a>`
+          : "-"
+        }
+      </td>
+    </tr>
     `;
 
   });
 
-  document.getElementById(
-    "tablaPedidos"
-  ).innerHTML = html;
+  document.getElementById("tablaPedidos").innerHTML = html;
 
 }
-let productosPOS = [];
-let ticketPOS = [];
-let ventaLocal = [];
 
-async function asegurarProductosPOS(){
+/* ===================== PRODUCTOS (tabla admin) ===================== */
 
-  if(productosPOS.length === 0){
+async function cargarProductos() {
+
+  try {
 
     const response =
       await fetch(
@@ -739,163 +297,397 @@ async function asegurarProductosPOS(){
     const data =
       await response.json();
 
-    productosPOS =
-      data.productos || [];
+    let html = "";
 
-  }
+    if (!data.productos) {
+      return;
+    }
 
-}
+    if(data.productos.length === 0){
+      html = `<tr><td colspan="4" class="text-center text-muted py-4">No hay productos</td></tr>`;
+    }
 
-async function agregarProductoVenta(codigo){
+    data.productos.forEach(p => {
 
-  codigo = String(codigo).trim();
+      html += `
+      <tr>
+        <td class="mono">${escapeHtml(p.CODIGO)}</td>
+        <td>${escapeHtml(p.PRODUCTO)}</td>
+        <td class="money">$${Number(p.PRECIO || 0).toLocaleString("es-AR")}</td>
+        <td>
+          <button class="btn btn-primary btn-sm" onclick="editarProducto('${p.CODIGO}')">Editar</button>
+          <button class="btn btn-danger btn-sm ms-2" onclick="eliminarProducto('${p.CODIGO}')">Eliminar</button>
+        </td>
+      </tr>
+      `;
 
-  if(codigo === ""){
-    return;
-  }
-
-  await asegurarProductosPOS();
-
-  const producto = productosPOS.find(
-    p => String(p.CODIGO).trim() === codigo
-  );
-
-  if(!producto){
-    alert("Producto no encontrado");
-    return;
-  }
-
-  const existente = ventaLocal.find(
-    p => p.CODIGO === producto.CODIGO
-  );
-
-  if(existente){
-
-    existente.cantidad++;
-
-  }else{
-
-    ventaLocal.push({
-      CODIGO: producto.CODIGO,
-      PRODUCTO: producto.PRODUCTO,
-      PRECIO: Number(producto.PRECIO || 0),
-      cantidad: 1
     });
 
-  }
+    document.getElementById("tablaProductos").innerHTML = html;
 
-  renderVentaLocal();
+  }
+  catch (error) {
+    console.error("Error productos:", error);
+  }
 
 }
 
-function renderVentaLocal(){
+function nuevoProducto() {
+  alert("Debes crear la acción crearProducto en Apps Script.");
+}
 
-  let html = "";
-  let total = 0;
+function editarProducto(codigo) {
+  alert("Editar producto: " + codigo);
+}
 
-  ventaLocal.forEach(item => {
+function eliminarProducto(codigo) {
+  if (!confirm("¿Eliminar producto?")) {
+    return;
+  }
+  alert("Debes crear la acción eliminarProducto en Apps Script.\nCódigo: " + codigo);
+}
 
-    const subtotal =
-      item.PRECIO * item.cantidad;
+function logout() {
+  sessionStorage.removeItem("admin");
+  window.location.href = "login.html";
+}
 
-    total += subtotal;
+/* ===================== CLIENTES ===================== */
 
-    html += `
+async function cargarClientes(){
+
+  try{
+
+    const response =
+      await fetch(API_URL + "?action=clientes");
+
+    const data = await response.json();
+
+    let html = "";
+
+    if(!data.clientes){
+      return;
+    }
+
+    if(data.clientes.length === 0){
+      html = `<tr><td colspan="7" class="text-center text-muted py-4">No hay clientes</td></tr>`;
+    }
+
+    data.clientes.forEach(c => {
+
+      html += `
       <tr>
-
-        <td>${escapeHtml(item.CODIGO)}</td>
-
-        <td>${escapeHtml(item.PRODUCTO)}</td>
-
-        <td>${item.cantidad}</td>
-
-        <td>
-          $${item.PRECIO.toLocaleString("es-AR")}
-        </td>
-
-        <td>
-          $${subtotal.toLocaleString("es-AR")}
-        </td>
-
+        <td>${escapeHtml(c.CLIENTE)}</td>
+        <td>${escapeHtml(c.EMPRESA)}</td>
+        <td>${escapeHtml(c.DIRECCION)}</td>
+        <td>${escapeHtml(c.TELEFONO)}</td>
+        <td>${escapeHtml(c.DNI)}</td>
+        <td>${c.PEDIDOS}</td>
+        <td class="money">$${Number(c.TOTAL || 0).toLocaleString("es-AR")}</td>
       </tr>
-    `;
+      `;
 
+    });
+
+    document.getElementById("tablaClientes").innerHTML = html;
+
+  }
+  catch(error){
+    console.error("Error clientes:", error);
+  }
+
+}
+
+/* ===================== STOCK BAJO / AGOTADOS / MAS VENDIDOS ===================== */
+
+async function cargarStockBajo() {
+
+  mostrarSeccion("stockBajoProductos");
+
+  try {
+
+    const response =
+      await fetch(API_URL + "?action=productos");
+
+    const data = await response.json();
+
+    let html = "";
+
+    const filtrados = data.productos.filter(p => {
+      const stock = Number(p.STOCK || 0);
+      return stock > 0 && stock <= 5;
+    });
+
+    if(filtrados.length === 0){
+      html = `<tr><td colspan="3" class="text-center text-muted py-4">Sin productos con stock bajo 🎉</td></tr>`;
+    }
+
+    filtrados.forEach(p => {
+      html += `
+      <tr>
+        <td class="mono">${escapeHtml(p.CODIGO)}</td>
+        <td>${escapeHtml(p.PRODUCTO)}</td>
+        <td>${p.STOCK}</td>
+      </tr>
+      `;
+    });
+
+    document.getElementById("tablaStockBajo").innerHTML = html;
+
+  }
+  catch(error){
+    console.error("Error stock bajo:", error);
+  }
+
+}
+
+async function cargarAgotados() {
+
+  mostrarSeccion("productosAgotados");
+
+  try {
+
+    const response =
+      await fetch(API_URL + "?action=productos");
+
+    const data = await response.json();
+
+    let html = "";
+
+    const filtrados = data.productos.filter(p => Number(p.STOCK || 0) === 0);
+
+    if(filtrados.length === 0){
+      html = `<tr><td colspan="3" class="text-center text-muted py-4">No hay productos agotados 🎉</td></tr>`;
+    }
+
+    filtrados.forEach(p => {
+      html += `
+      <tr>
+        <td class="mono">${escapeHtml(p.CODIGO)}</td>
+        <td>${escapeHtml(p.PRODUCTO)}</td>
+        <td>0</td>
+      </tr>
+      `;
+    });
+
+    document.getElementById("tablaAgotados").innerHTML = html;
+
+  }
+  catch(error){
+    console.error("Error agotados:", error);
+  }
+
+}
+
+async function cargarMasVendidos(){
+
+  try{
+
+    const response =
+      await fetch(API_URL + "?action=masVendidos");
+
+    const data = await response.json();
+
+    let html = "";
+
+    (data.productos || []).forEach(p => {
+      html += `
+      <tr>
+        <td class="mono">${p.CODIGO}</td>
+        <td>${p.PRODUCTO}</td>
+        <td>${p.VENDIDOS}</td>
+      </tr>
+      `;
+    });
+
+    document.getElementById("tablaMasVendidos").innerHTML = html;
+
+  }
+  catch(error){
+    console.error("Error más vendidos:", error);
+  }
+
+}
+
+/* ===================================================================
+   PUNTO DE VENTA — unified POS
+=================================================================== */
+
+let productosPOS = [];
+let ticketPOS = [];
+let categoriaActivaPOS = "TODAS";
+let formaPagoPOS = "EFECTIVO";
+
+async function asegurarProductosPOS(){
+
+  if(productosPOS.length === 0){
+
+    const response =
+      await fetch(API_URL + "?action=productos");
+
+    const data = await response.json();
+
+    productosPOS = data.productos || [];
+
+    construirCategoriasPOS();
+
+  }
+
+}
+
+function construirCategoriasPOS(){
+
+  const cont = document.getElementById("posCategorias");
+  if(!cont) return;
+
+  const categorias = new Set();
+
+  productosPOS.forEach(p => {
+    if(p.CATEGORIA){
+      categorias.add(String(p.CATEGORIA).trim());
+    }
   });
 
-  const tabla =
-    document.getElementById("tablaVentaLocal");
-
-  if(tabla){
-    tabla.innerHTML = html;
+  if(categorias.size === 0){
+    cont.innerHTML = "";
+    return;
   }
 
-  const totalEl =
-    document.getElementById("totalVentaLocal");
+  let html = `<div class="cat-chip active" data-cat="TODAS" onclick="filtrarCategoriaPOS('TODAS', this)">Todas</div>`;
 
-  if(totalEl){
-    totalEl.innerText =
-      "$" + total.toLocaleString("es-AR");
-  }
+  categorias.forEach(c => {
+    html += `<div class="cat-chip" data-cat="${escapeHtml(c)}" onclick="filtrarCategoriaPOS('${escapeHtml(c)}', this)">${escapeHtml(c)}</div>`;
+  });
+
+  cont.innerHTML = html;
 
 }
 
-async function buscarProductoPOS(){
+function filtrarCategoriaPOS(cat, el){
 
-  const input =
-    document.getElementById("posBusqueda");
+  categoriaActivaPOS = cat;
 
-  if(!input){
-    return;
+  document.querySelectorAll(".cat-chip").forEach(c => c.classList.remove("active"));
+  if(el) el.classList.add("active");
+
+  renderPosGrid();
+
+}
+
+/* ---- product grid ---- */
+
+function renderPosGrid(filtroTexto){
+
+  const grid = document.getElementById("posProductGrid");
+  if(!grid) return;
+
+  let lista = productosPOS;
+
+  if(categoriaActivaPOS && categoriaActivaPOS !== "TODAS"){
+    lista = lista.filter(p => String(p.CATEGORIA || "").trim() === categoriaActivaPOS);
   }
 
-  const texto =
-    input.value.toLowerCase().trim();
-
-  if(texto.length < 2){
-
-    document.getElementById(
-      "resultadosPOS"
-    ).innerHTML = "";
-
-    return;
-  }
-
-  await asegurarProductosPOS();
-
-  const resultados =
-    productosPOS.filter(p =>
-
-      String(p.CODIGO)
-        .toLowerCase()
-        .includes(texto)
-
+  if(filtroTexto){
+    const texto = filtroTexto.toLowerCase();
+    lista = lista.filter(p =>
+      String(p.CODIGO).toLowerCase().includes(texto)
       ||
+      String(p.PRODUCTO).toLowerCase().includes(texto)
+    );
+  }
 
-      String(p.PRODUCTO)
-        .toLowerCase()
-        .includes(texto)
-
-    ).slice(0,10);
+  if(lista.length === 0){
+    grid.innerHTML = `
+      <div class="pos-empty-state" style="grid-column:1/-1;">
+        <div class="ic">🔍</div>
+        <strong>Sin resultados</strong>
+        <span>Probá con otro código o nombre</span>
+      </div>
+    `;
+    return;
+  }
 
   let html = "";
 
-  resultados.forEach(p => {
+  const visibleList = lista.slice(0, 60);
+
+  visibleList.forEach((p, idx) => {
+
+    const stock = p.STOCK !== undefined ? Number(p.STOCK) : null;
+    const agotado = stock !== null && stock <= 0;
+    const stockBajo = stock !== null && stock > 0 && stock <= 5;
+
+    let stockBadge = "";
+    if(agotado) stockBadge = `<span class="tile-stock out">Sin stock</span>`;
+    else if(stockBajo) stockBadge = `<span class="tile-stock low">${stock} left</span>`;
 
     html += `
       <button
-        class="btn btn-outline-primary m-1"
-        onclick="agregarProductoPOS('${p.CODIGO}')">
-
-        ${p.CODIGO} - ${p.PRODUCTO}
-
+        type="button"
+        class="product-tile ${agotado ? "disabled" : ""}"
+        data-idx="${idx}"
+        ${agotado ? "disabled" : ""}>
+        ${stockBadge}
+        <span class="tile-code">${escapeHtml(p.CODIGO)}</span>
+        <span class="tile-name">${escapeHtml(p.PRODUCTO)}</span>
+        <span class="tile-price">$${Number(p.PRECIO || 0).toLocaleString("es-AR")}</span>
       </button>
     `;
 
   });
 
-  document.getElementById(
-    "resultadosPOS"
-  ).innerHTML = html;
+  grid.innerHTML = html;
+
+  // attach listeners safely — avoids any string-escaping issues with
+  // special characters (quotes, accents) inside product codes
+  grid.querySelectorAll(".product-tile[data-idx]").forEach(tile => {
+    const idx = Number(tile.getAttribute("data-idx"));
+    const producto = visibleList[idx];
+    if(producto && !tile.disabled){
+      tile.dataset.codigo = producto.CODIGO;
+      tile.addEventListener("click", () => agregarProductoPOS(producto.CODIGO));
+    }
+  });
+
+}
+
+function onPosInputKeyup(e){
+
+  const input = e.target;
+
+  if(e.key === "Enter"){
+    const valor = input.value.trim();
+    if(valor !== ""){
+      agregarProductoPorCodigo(valor);
+      input.value = "";
+      renderPosGrid();
+    }
+    return;
+  }
+
+  renderPosGrid(input.value.trim());
+
+}
+
+/* ---- adding items ---- */
+
+async function agregarProductoPorCodigo(codigo){
+
+  codigo = String(codigo).trim();
+  if(codigo === "") return;
+
+  await asegurarProductosPOS();
+
+  const producto = productosPOS.find(
+    p => String(p.CODIGO).trim().toLowerCase() === codigo.toLowerCase()
+  );
+
+  if(!producto){
+    toast(`Producto no encontrado: ${codigo}`, "error");
+    return;
+  }
+
+  agregarProductoPOS(producto.CODIGO);
 
 }
 
@@ -908,7 +700,13 @@ function agregarProductoPOS(codigo){
   );
 
   if(!producto){
-    alert("Producto no encontrado");
+    toast("Producto no encontrado", "error");
+    return;
+  }
+
+  const stock = producto.STOCK !== undefined ? Number(producto.STOCK) : null;
+  if(stock !== null && stock <= 0){
+    toast(`${producto.PRODUCTO} está sin stock`, "error");
     return;
   }
 
@@ -917,36 +715,42 @@ function agregarProductoPOS(codigo){
   );
 
   if(existente){
-
     existente.cantidad++;
-
   } else {
-
     ticketPOS.push({
       CODIGO: producto.CODIGO,
       PRODUCTO: producto.PRODUCTO,
       PRECIO: Number(producto.PRECIO || 0),
       cantidad: 1
     });
-
   }
 
   renderTicketPOS();
+  flashTile(codigo);
 
-  const input =
-    document.getElementById("posBusqueda");
-
+  const input = document.getElementById("posBusqueda");
   if(input){
     input.value = "";
+    input.focus();
   }
 
-  const resultados =
-    document.getElementById("resultadosPOS");
+}
 
-  if(resultados){
-    resultados.innerHTML = "";
-  }
+function flashTile(codigo){
 
+  const tile = document.querySelector(`.product-tile[data-codigo="${cssEscape(codigo)}"]`);
+  if(!tile) return;
+
+  tile.classList.remove("just-added");
+  // restart animation
+  void tile.offsetWidth;
+  tile.classList.add("just-added");
+
+}
+
+function cssEscape(value){
+  // minimal escaping for use inside an attribute selector string
+  return String(value).replace(/["\\]/g, "\\$&");
 }
 
 function cambiarCantidadPOS(codigo, delta){
@@ -955,9 +759,7 @@ function cambiarCantidadPOS(codigo, delta){
     i => String(i.CODIGO).trim() === String(codigo).trim()
   );
 
-  if(!item){
-    return;
-  }
+  if(!item) return;
 
   item.cantidad += delta;
 
@@ -980,90 +782,103 @@ function quitarProductoPOS(codigo){
 
 }
 
+function vaciarTicketPOS(){
+
+  if(ticketPOS.length === 0) return;
+
+  if(!confirm("¿Vaciar el ticket actual?")) return;
+
+  ticketPOS = [];
+  renderTicketPOS();
+
+}
+
+/* ---- ticket rendering ---- */
+
 function renderTicketPOS(){
 
   let html = "";
   let total = 0;
+  let totalItems = 0;
 
   ticketPOS.forEach(item => {
 
     const subtotal = item.PRECIO * item.cantidad;
     total += subtotal;
+    totalItems += item.cantidad;
 
     html += `
-      <tr>
+      <div class="ticket-row">
+        <div class="ti-info">
+          <div class="ti-name">${escapeHtml(item.PRODUCTO)}</div>
+          <div class="ti-price">$${item.PRECIO.toLocaleString("es-AR")} c/u</div>
+        </div>
 
-        <td>${escapeHtml(item.PRODUCTO)}</td>
+        <div class="ti-qty">
+          <button class="qty-btn" onclick="cambiarCantidadPOS('${item.CODIGO}', -1)">−</button>
+          <span class="qty-val">${item.cantidad}</span>
+          <button class="qty-btn" onclick="cambiarCantidadPOS('${item.CODIGO}', 1)">+</button>
+        </div>
 
-        <td>
-          <button
-            class="btn btn-sm btn-outline-secondary"
-            onclick="cambiarCantidadPOS('${item.CODIGO}', -1)">
-            -
-          </button>
-          ${item.cantidad}
-          <button
-            class="btn btn-sm btn-outline-secondary"
-            onclick="cambiarCantidadPOS('${item.CODIGO}', 1)">
-            +
-          </button>
-        </td>
+        <div class="ti-sub money">$${subtotal.toLocaleString("es-AR")}</div>
 
-        <td>
-          $${item.PRECIO.toLocaleString("es-AR")}
-        </td>
-
-        <td>
-          $${subtotal.toLocaleString("es-AR")}
-        </td>
-
-        <td>
-          <button
-            class="btn btn-danger btn-sm"
-            onclick="quitarProductoPOS('${item.CODIGO}')">
-            Quitar
-          </button>
-        </td>
-
-      </tr>
+        <button class="ti-remove" onclick="quitarProductoPOS('${item.CODIGO}')" title="Quitar">✕</button>
+      </div>
     `;
 
   });
 
-  const tabla =
-    document.getElementById("ticketPOS");
+  const tabla = document.getElementById("ticketPOS");
+  if(tabla) tabla.innerHTML = html;
 
-  if(tabla){
-    tabla.innerHTML = html;
-  }
+  const emptyState = document.getElementById("ticketEmptyState");
+  if(emptyState) emptyState.style.display = ticketPOS.length === 0 ? "flex" : "none";
 
-  const totalEl =
-    document.getElementById("totalPOS");
+  const totalEl = document.getElementById("totalPOS");
+  if(totalEl) totalEl.innerText = total.toLocaleString("es-AR");
 
-  if(totalEl){
-    totalEl.innerText =
-      total.toLocaleString("es-AR");
-  }
+  const countEl = document.getElementById("ticketCount");
+  if(countEl) countEl.innerText = ticketPOS.length;
+
+  const itemsCountEl = document.getElementById("ticketItemsCount");
+  if(itemsCountEl) itemsCountEl.innerText = totalItems;
+
+  const finalizeBtn = document.getElementById("btnFinalizarVenta");
+  if(finalizeBtn) finalizeBtn.disabled = ticketPOS.length === 0;
 
 }
+
+/* ---- payment method ---- */
+
+function elegirFormaPago(el, valor){
+
+  formaPagoPOS = valor;
+
+  document.querySelectorAll(".pay-method-btn").forEach(b => b.classList.remove("active"));
+  el.classList.add("active");
+
+}
+
+/* ---- finalize sale ---- */
 
 async function finalizarVentaPOS(){
 
   if(ticketPOS.length === 0){
-    alert("El ticket está vacío");
+    toast("El ticket está vacío", "error");
     return;
   }
-
-  const formaPagoEl =
-    document.getElementById("formaPagoPOS");
-
-  const formaPago =
-    formaPagoEl ? formaPagoEl.value : "EFECTIVO";
 
   const total = ticketPOS.reduce(
     (acc, item) => acc + (item.PRECIO * item.cantidad),
     0
   );
+
+  const btn = document.getElementById("btnFinalizarVenta");
+  const textoOriginal = btn ? btn.innerHTML : "";
+  if(btn){
+    btn.disabled = true;
+    btn.innerHTML = "Procesando...";
+  }
 
   try {
 
@@ -1071,33 +886,261 @@ async function finalizarVentaPOS(){
       API_URL +
       "?action=guardarVenta" +
       "&total=" + encodeURIComponent(total) +
-      "&formaPago=" + encodeURIComponent(formaPago) +
+      "&formaPago=" + encodeURIComponent(formaPagoPOS) +
       "&carrito=" + encodeURIComponent(JSON.stringify(ticketPOS))
     );
 
     const data = await response.json();
 
     if(!data.success){
-      alert(data.message || "No se pudo registrar la venta");
+      toast(data.message || "No se pudo registrar la venta", "error");
+      if(btn){ btn.disabled = false; btn.innerHTML = textoOriginal; }
       return;
     }
 
-    alert("Venta registrada con éxito (" + data.ventaId + ")");
+    mostrarRecibo(data.ventaId, ticketPOS, total);
 
     ticketPOS = [];
     renderTicketPOS();
+
+    // refrescar stock local para que la grilla refleje la venta
+    productosPOS = [];
+    await asegurarProductosPOS();
+    renderPosGrid();
 
     cargarMetricas();
 
   } catch(error){
 
-    console.error(
-      "Error al finalizar venta:",
-      error
-    );
+    console.error("Error al finalizar venta:", error);
+    toast("Error de conexión al registrar la venta", "error");
 
-    alert("Error de conexión al registrar la venta");
+  } finally {
+    if(btn){
+      btn.disabled = ticketPOS.length === 0;
+      btn.innerHTML = textoOriginal;
+    }
+  }
+
+}
+
+/* ---- receipt modal ---- */
+
+function mostrarRecibo(ventaId, items, total){
+
+  document.getElementById("receiptId").innerText = "#" + (ventaId || "—");
+
+  let html = "";
+  items.forEach(item => {
+    const sub = item.PRECIO * item.cantidad;
+    html += `
+      <tr>
+        <td>${item.cantidad}x ${escapeHtml(item.PRODUCTO)}</td>
+        <td style="text-align:right;">$${sub.toLocaleString("es-AR")}</td>
+      </tr>
+    `;
+  });
+
+  document.getElementById("receiptItems").innerHTML = html;
+  document.getElementById("receiptTotal").innerText = "$" + total.toLocaleString("es-AR");
+
+  document.getElementById("receiptBackdrop").classList.add("show");
+
+  toast("Venta registrada con éxito", "success");
+
+}
+
+function cerrarRecibo(){
+  document.getElementById("receiptBackdrop").classList.remove("show");
+}
+
+function nuevaVentaPOS(){
+  cerrarRecibo();
+  const input = document.getElementById("posBusqueda");
+  if(input) input.focus();
+}
+
+/* ===================================================================
+   BARCODE SCANNER SUPPORT
+   1) USB/hardware scanners type characters very fast and end with Enter
+      — they behave like a keyboard, so we detect "burst typing" globally
+      and route it into the POS search box even if focus is elsewhere.
+   2) Camera scanning via the native BarcodeDetector API (no dependencies).
+=================================================================== */
+
+let scanBuffer = "";
+let lastKeyTime = 0;
+const SCAN_KEY_THRESHOLD_MS = 40; // hardware scanners type much faster than humans
+
+function setupScannerListener(){
+
+  document.addEventListener("keydown", (e) => {
+
+    const posSection = document.getElementById("pos");
+    const posVisible = posSection && posSection.style.display === "block";
+
+    if(!posVisible) return;
+
+    // don't hijack typing inside normal inputs/selects/textareas other than our scan field
+    const activeTag = document.activeElement ? document.activeElement.tagName : "";
+    const isOurInput = document.activeElement && document.activeElement.id === "posBusqueda";
+
+    if(!isOurInput && (activeTag === "INPUT" || activeTag === "SELECT" || activeTag === "TEXTAREA")){
+      return;
+    }
+
+    const now = Date.now();
+    const elapsed = now - lastKeyTime;
+    lastKeyTime = now;
+
+    if(e.key === "Enter"){
+
+      if(scanBuffer.length >= 3){
+        agregarProductoPorCodigo(scanBuffer);
+        setScannerStatus("listening");
+      }
+
+      scanBuffer = "";
+      return;
+    }
+
+    if(e.key.length === 1){
+
+      if(elapsed > 250){
+        // too slow to be a scanner burst — treat as fresh buffer (manual typing handled by the input itself)
+        scanBuffer = "";
+      }
+
+      scanBuffer += e.key;
+
+      if(elapsed < SCAN_KEY_THRESHOLD_MS && scanBuffer.length >= 3){
+        setScannerStatus("listening");
+      }
+
+    }
+
+  });
+
+  // reset visual state to idle after a pause
+  setInterval(() => {
+    if(Date.now() - lastKeyTime > 1200){
+      setScannerStatus("idle");
+    }
+  }, 500);
+
+}
+
+function setScannerStatus(estado){
+
+  const el = document.getElementById("scannerStatus");
+  if(!el) return;
+
+  if(estado === "listening"){
+    el.className = "scanner-status listening";
+    el.innerHTML = `<span class="dot"></span> Leyendo...`;
+  } else if(estado === "camera"){
+    el.className = "scanner-status camera";
+    el.innerHTML = `<span class="dot"></span> Cámara activa`;
+  } else {
+    el.className = "scanner-status idle";
+    el.innerHTML = `<span class="dot"></span> Listo`;
+  }
+
+}
+
+/* ---- camera-based scanning ---- */
+
+let camaraStream = null;
+let camaraDetectorTimer = null;
+
+async function abrirCamaraScan(){
+
+  const backdrop = document.getElementById("scanModalBackdrop");
+  const videoWrap = document.getElementById("scanVideoWrap");
+  const video = document.getElementById("scanVideo");
+
+  backdrop.classList.add("show");
+
+  if(!("BarcodeDetector" in window)){
+
+    videoWrap.innerHTML = `
+      <div class="scan-unsupported">
+        Tu navegador no soporta el escaneo por cámara nativo.<br>
+        Usá un lector de código de barras USB, o probá con Chrome/Edge en Android.
+      </div>
+    `;
+    return;
+  }
+
+  try{
+
+    camaraStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "environment" }
+    });
+
+    video.srcObject = camaraStream;
+    setScannerStatus("camera");
+    document.getElementById("btnCameraScan").classList.add("active");
+
+    const detector = new BarcodeDetector({
+      formats: ["ean_13","ean_8","upc_a","upc_e","code_128","code_39","qr_code","itf"]
+    });
+
+    camaraDetectorTimer = setInterval(async () => {
+
+      try{
+
+        const codigos = await detector.detect(video);
+
+        if(codigos.length > 0){
+          const valor = codigos[0].rawValue;
+          cerrarCamaraScan();
+          agregarProductoPorCodigo(valor);
+        }
+
+      } catch(err){
+        // detection frame errors are expected occasionally — ignore
+      }
+
+    }, 350);
+
+  } catch(error){
+
+    console.error("Error de cámara:", error);
+
+    videoWrap.innerHTML = `
+      <div class="scan-unsupported">
+        No se pudo acceder a la cámara.<br>
+        Revisá los permisos del navegador e intentá nuevamente.
+      </div>
+    `;
 
   }
+
+}
+
+function cerrarCamaraScan(){
+
+  const backdrop = document.getElementById("scanModalBackdrop");
+  backdrop.classList.remove("show");
+
+  if(camaraDetectorTimer){
+    clearInterval(camaraDetectorTimer);
+    camaraDetectorTimer = null;
+  }
+
+  if(camaraStream){
+    camaraStream.getTracks().forEach(track => track.stop());
+    camaraStream = null;
+  }
+
+  document.getElementById("btnCameraScan").classList.remove("active");
+  setScannerStatus("idle");
+
+  // restore video wrap markup for next open
+  document.getElementById("scanVideoWrap").innerHTML = `
+    <video id="scanVideo" autoplay playsinline muted></video>
+    <div class="scan-reticle"></div>
+  `;
 
 }
