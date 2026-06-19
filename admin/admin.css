@@ -986,3 +986,11 @@ html,body{
   .product-modal-actions{ flex-direction:column-reverse; }
   .product-modal-actions .btn{ width:100%; }
 }
+
+/* ===================== CONFIGURACIÓN (datos del local) ===================== */
+
+.config-preview-hint{
+  display:flex; align-items:flex-start; gap:10px;
+  font-size:13px; color:var(--slate-500); line-height:1.5;
+}
+.config-preview-hint .ic{ flex-shrink:0; font-size:15px; }

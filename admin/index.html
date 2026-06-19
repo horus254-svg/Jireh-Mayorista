@@ -24,6 +24,7 @@
     <a href="#" data-target="productos"        onclick="mostrarSeccion('productos')"><span class="ic">🛒</span> Productos</a>
     <a href="#" data-target="clientes"         onclick="mostrarSeccion('clientes'); cargarClientes();"><span class="ic">👥</span> Clientes</a>
     <a href="#" data-target="reportes"         onclick="mostrarSeccion('reportes')"><span class="ic">📈</span> Reportes</a>
+    <a href="#" data-target="configuracion"    onclick="mostrarSeccion('configuracion')"><span class="ic">⚙️</span> Configuración</a>
   </nav>
   <button class="logout-btn" onclick="logout()">⏻ Cerrar sesión</button>
 </div>
@@ -521,6 +522,63 @@
         <div class="col-6 col-md-4"><div class="card p-3 metric-card"><div class="metric-icon bg-tint-green">💰</div><h6>Ventas Totales</h6><h2 id="ventasTotales">$0</h2></div></div>
         <div class="col-6 col-md-4"><div class="card p-3 metric-card"><div class="metric-icon bg-tint-blue">📦</div><h6>Total Pedidos</h6><h2 id="totalPedidos">0</h2></div></div>
         <div class="col-6 col-md-4"><div class="card p-3 metric-card"><div class="metric-icon bg-tint-green">💵</div><h6>Ticket Promedio</h6><h2 id="ticketPromedio">$0</h2></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== CONFIGURACION ===== -->
+  <div id="configuracion" class="seccion">
+    <div class="page-header">
+      <div><h1>⚙️ Configuración</h1><div class="sub">Datos del local que aparecen en el ticket impreso</div></div>
+    </div>
+
+    <div class="card p-3 mb-3">
+      <h6 style="margin-bottom:14px;">🧾 Encabezado del ticket (impresora térmica)</h6>
+
+      <div class="mb-3">
+        <label class="form-label">Nombre del local *</label>
+        <input type="text" class="form-control" id="cfgNombreLocal" placeholder="Ej: JIREH">
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Subtítulo / rubro <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+        <input type="text" class="form-control" id="cfgSubtitulo" placeholder="Ej: Punto de Venta">
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Dirección <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+        <input type="text" class="form-control" id="cfgDireccion" placeholder="Ej: Av. Siempre Viva 123, Buenos Aires">
+      </div>
+
+      <div class="row g-2 mb-3">
+        <div class="col-6">
+          <label class="form-label">Teléfono 1 <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+          <input type="text" class="form-control" id="cfgTelefono1" placeholder="Ej: 11-2345-6789">
+        </div>
+        <div class="col-6">
+          <label class="form-label">Teléfono 2 <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+          <input type="text" class="form-control" id="cfgTelefono2" placeholder="Ej: 11-9876-5432">
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Pie de página <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+        <input type="text" class="form-control" id="cfgPie" placeholder="Ej: ¡Gracias por su compra!">
+      </div>
+
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-3">
+        <button class="btn btn-outline-secondary btn-sm" onclick="restablecerConfigNegocio()">↺ Restablecer valores</button>
+        <div class="d-flex gap-2">
+          <button class="btn btn-outline-primary" onclick="vistaPreviaTicketConfig()">👁️ Vista previa</button>
+          <button class="btn btn-success" id="btnGuardarConfigNegocio" onclick="guardarConfigNegocioForm()">💾 Guardar</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card p-3">
+      <div class="config-preview-hint">
+        <span class="ic">ℹ️</span>
+        Estos datos se guardan en la hoja de cálculo (pestaña "CONFIGURACION") y se usan para armar el encabezado de todos los tickets impresos (ventas y cierres de caja). Como quedan en la planilla, se ven igual sin importar desde qué computadora o navegador entres al panel.
       </div>
     </div>
   </div>

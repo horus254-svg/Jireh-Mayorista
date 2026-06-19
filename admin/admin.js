@@ -23,6 +23,7 @@ if (sessionStorage.getItem("admin") !== "true") {
 
 document.addEventListener("DOMContentLoaded", async () => {
   mostrarSeccion("dashboard");
+  cargarConfigNegocioDesdeBackend(); // refresca el caché en memoria para los tickets impresos
   await cargarMetricas();
   cargarVentasPOS();
 
@@ -52,6 +53,142 @@ function escapeHtml(text) {
 function actualizarElemento(id, valor) {
   const el = document.getElementById(id);
   if (el) el.textContent = valor;
+}
+
+/* ===================== CONFIGURACIÓN DEL NEGOCIO (encabezado del ticket) ===================== */
+
+// Valores por defecto — son los que ya venía usando el ticket, así que
+// si todavía no cargó la config del servidor, todo se imprime igual que antes.
+const CONFIG_NEGOCIO_DEFAULT = {
+  nombre:     "JIREH",
+  subtitulo:  "Punto de Venta",
+  direccion:  "",
+  telefono1:  "",
+  telefono2:  "",
+  pie:        "¡Gracias por su compra!"
+};
+
+// Caché en memoria de la config, para que imprimir un ticket no tenga
+// que esperar una llamada al servidor cada vez. Se carga al iniciar la
+// app y se refresca cada vez que se guarda desde el formulario.
+let configNegocioCache = { ...CONFIG_NEGOCIO_DEFAULT };
+
+/** Synchronous read used by the print functions — always returns instantly from the in-memory cache */
+function obtenerConfigNegocio() {
+  return configNegocioCache;
+}
+
+/** Fetches the saved config from the backend (hoja CONFIGURACION) and refreshes the in-memory cache */
+async function cargarConfigNegocioDesdeBackend() {
+  try {
+    const response = await fetch(API_URL + "?action=configuracionNegocio");
+    const data = await response.json();
+    if (data.success && data.config) {
+      configNegocioCache = { ...CONFIG_NEGOCIO_DEFAULT, ...data.config };
+    }
+  } catch (error) {
+    console.warn("No se pudo cargar la configuración del negocio:", error);
+  }
+  return configNegocioCache;
+}
+
+/** Loads the saved config into the form fields (called when the Configuración section opens) */
+async function cargarConfigNegocioForm() {
+  const form = document.getElementById("cfgNombreLocal");
+  if (form) form.placeholder = "Cargando...";
+
+  const cfg = await cargarConfigNegocioDesdeBackend();
+
+  document.getElementById("cfgNombreLocal").value = cfg.nombre;
+  document.getElementById("cfgSubtitulo").value   = cfg.subtitulo;
+  document.getElementById("cfgDireccion").value   = cfg.direccion;
+  document.getElementById("cfgTelefono1").value   = cfg.telefono1;
+  document.getElementById("cfgTelefono2").value   = cfg.telefono2;
+  document.getElementById("cfgPie").value         = cfg.pie;
+
+  if (form) form.placeholder = "Ej: JIREH";
+}
+
+/** Reads the form fields and saves them to the backend (hoja CONFIGURACION) */
+async function guardarConfigNegocioForm() {
+  const nombre = document.getElementById("cfgNombreLocal").value.trim();
+
+  if (!nombre) {
+    toast("El nombre del local es obligatorio", "error");
+    return;
+  }
+
+  const cfg = {
+    nombre,
+    subtitulo: document.getElementById("cfgSubtitulo").value.trim(),
+    direccion: document.getElementById("cfgDireccion").value.trim(),
+    telefono1: document.getElementById("cfgTelefono1").value.trim(),
+    telefono2: document.getElementById("cfgTelefono2").value.trim(),
+    pie:       document.getElementById("cfgPie").value.trim()
+  };
+
+  const btn = document.getElementById("btnGuardarConfigNegocio");
+  const textoOriginal = btn ? btn.innerHTML : "";
+  if (btn) { btn.disabled = true; btn.innerHTML = "Guardando..."; }
+
+  try {
+    const params = new URLSearchParams({ action: "guardarConfiguracionNegocio", ...cfg });
+    const response = await fetch(API_URL + "?" + params.toString());
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo guardar la configuración", "error");
+      return;
+    }
+
+    configNegocioCache = { ...cfg };
+    toast("Configuración guardada", "success");
+
+  } catch (error) {
+    console.error("Error al guardar la configuración del negocio:", error);
+    toast("Error de conexión al guardar la configuración", "error");
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = textoOriginal; }
+  }
+}
+
+/** Resets the form (and the saved sheet values) back to the original JIREH defaults */
+async function restablecerConfigNegocio() {
+  if (!confirm("¿Restablecer los datos del local a los valores originales?")) return;
+
+  document.getElementById("cfgNombreLocal").value = CONFIG_NEGOCIO_DEFAULT.nombre;
+  document.getElementById("cfgSubtitulo").value   = CONFIG_NEGOCIO_DEFAULT.subtitulo;
+  document.getElementById("cfgDireccion").value   = CONFIG_NEGOCIO_DEFAULT.direccion;
+  document.getElementById("cfgTelefono1").value   = CONFIG_NEGOCIO_DEFAULT.telefono1;
+  document.getElementById("cfgTelefono2").value   = CONFIG_NEGOCIO_DEFAULT.telefono2;
+  document.getElementById("cfgPie").value         = CONFIG_NEGOCIO_DEFAULT.pie;
+
+  await guardarConfigNegocioForm();
+}
+
+/** Prints a sample receipt using the form's current (possibly unsaved) values, so the admin can check before saving */
+function vistaPreviaTicketConfig() {
+  const cfgPreview = {
+    nombre:    document.getElementById("cfgNombreLocal").value.trim() || CONFIG_NEGOCIO_DEFAULT.nombre,
+    subtitulo: document.getElementById("cfgSubtitulo").value.trim(),
+    direccion: document.getElementById("cfgDireccion").value.trim(),
+    telefono1: document.getElementById("cfgTelefono1").value.trim(),
+    telefono2: document.getElementById("cfgTelefono2").value.trim(),
+    pie:       document.getElementById("cfgPie").value.trim() || CONFIG_NEGOCIO_DEFAULT.pie
+  };
+
+  const itemsEjemplo = [
+    { PRODUCTO: "Producto de ejemplo", PRECIO: 1500, cantidad: 2 },
+    { PRODUCTO: "Otro producto", PRECIO: 800, cantidad: 1 }
+  ];
+  const total = itemsEjemplo.reduce((acc, i) => acc + i.PRECIO * i.cantidad, 0);
+
+  const frame = document.getElementById("thermalPrintFrame");
+  if (!frame) { toast("Error: frame de impresión no encontrado", "error"); return; }
+
+  frame.innerHTML = buildThermalHTML("PREVIEW", itemsEjemplo, total, "EFECTIVO", new Date(), null, cfgPreview);
+
+  setTimeout(() => { window.print(); }, 120);
 }
 
 /* ===================== TOASTS ===================== */
@@ -318,6 +455,7 @@ function mostrarSeccion(id) {
   if (id === "pedidos")   cargarPedidos();
   if (id === "productos") cargarProductos();
   if (id === "ventasPOS") cargarVentasPOSHistorial();
+  if (id === "configuracion") cargarConfigNegocioForm();
 
   if (id === "pos") {
     asegurarProductosPOS().then(renderPosGrid);
@@ -1202,8 +1340,11 @@ function nuevaVentaPOS() {
  * @param {string}  formaPago
  * @param {Date}    fecha
  * @param {Object}  [descuento] — { monto, etiqueta } opcional, si la venta tuvo descuento
+ * @param {Object}  [cfgOverride] — config del negocio a usar en vez de la guardada (solo para vista previa)
  */
-function buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento) {
+function buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, cfgOverride) {
+  const cfg = cfgOverride || obtenerConfigNegocio();
+
   const fechaStr = (fecha || new Date()).toLocaleString("es-AR", {
     day:"2-digit", month:"2-digit", year:"numeric",
     hour:"2-digit", minute:"2-digit"
@@ -1245,10 +1386,31 @@ function buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento) {
       <td style="text-align:right;"><strong>$${Number(total).toLocaleString("es-AR")}</strong></td>
     </tr>`;
 
+  // Encabezado: nombre + subtítulo + dirección + teléfono(s), todos configurables
+  let encabezado = `<div class="th-center th-big">${escapeHtml(cfg.nombre)}</div>`;
+  if (cfg.subtitulo) {
+    encabezado += `<div class="th-center" style="font-size:9pt;">${escapeHtml(cfg.subtitulo)}</div>`;
+  }
+  if (cfg.direccion) {
+    encabezado += `<div class="th-center" style="font-size:8.5pt;color:#555;">${escapeHtml(cfg.direccion)}</div>`;
+  }
+  const telefonos = [cfg.telefono1, cfg.telefono2].filter(Boolean).join(" · ");
+  if (telefonos) {
+    encabezado += `<div class="th-center" style="font-size:8.5pt;color:#555;margin-bottom:2mm;">Tel: ${escapeHtml(telefonos)}</div>`;
+  } else {
+    encabezado += `<div style="margin-bottom:2mm;"></div>`;
+  }
+
+  // Pie de página
+  let pie = "";
+  if (cfg.pie) {
+    pie += `<div class="th-footer">${escapeHtml(cfg.pie)}</div>`;
+  }
+  pie += `<div class="th-footer" style="margin-top:1mm;">${escapeHtml(cfg.nombre)} &bull; Sistema POS</div>`;
+
   return `
     <div class="thermal-receipt">
-      <div class="th-center th-big">JIREH</div>
-      <div class="th-center" style="font-size:9pt;margin-bottom:2mm;">Punto de Venta</div>
+      ${encabezado}
       <hr class="th-sep-solid">
       <div>Fecha: ${fechaStr}</div>
       <div>Venta: #${escapeHtml(String(ventaId || "—"))}</div>
@@ -1259,8 +1421,7 @@ function buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento) {
         ${filasTotales}
       </table>
       <hr class="th-sep">
-      <div class="th-footer">¡Gracias por su compra!</div>
-      <div class="th-footer" style="margin-top:1mm;">JIREH &bull; Sistema POS</div>
+      ${pie}
       <br><br>
     </div>`;
 }
@@ -1348,6 +1509,8 @@ function _ejecutarImpresion(ventaId, items, total, formaPago, fecha, descuento) 
  *                               transferencia:{...}, tarjeta:{...}, total:{...} }
  */
 function buildThermalCierreHTML(resumen) {
+  const cfg = obtenerConfigNegocio();
+
   const fechaStr = formatearFechaCierre(resumen.fecha);
   const horaStr = new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
 
@@ -1373,10 +1536,22 @@ function buildThermalCierreHTML(resumen) {
 
   const signoTotal = resumen.total.diferencia > 0 ? "+" : "";
 
+  // Encabezado: nombre del local + dirección + teléfono(s) (sin subtítulo, este ticket no es de venta)
+  let encabezado = `<div class="th-center th-big">${escapeHtml(cfg.nombre)}</div>`;
+  encabezado += `<div class="th-center" style="font-size:9pt;">Cierre de Caja</div>`;
+  if (cfg.direccion) {
+    encabezado += `<div class="th-center" style="font-size:8.5pt;color:#555;">${escapeHtml(cfg.direccion)}</div>`;
+  }
+  const telefonos = [cfg.telefono1, cfg.telefono2].filter(Boolean).join(" · ");
+  if (telefonos) {
+    encabezado += `<div class="th-center" style="font-size:8.5pt;color:#555;margin-bottom:2mm;">Tel: ${escapeHtml(telefonos)}</div>`;
+  } else {
+    encabezado += `<div style="margin-bottom:2mm;"></div>`;
+  }
+
   return `
     <div class="thermal-receipt">
-      <div class="th-center th-big">JIREH</div>
-      <div class="th-center" style="font-size:9pt;margin-bottom:2mm;">Cierre de Caja</div>
+      ${encabezado}
       <hr class="th-sep-solid">
       <div>Fecha: ${escapeHtml(fechaStr)}</div>
       <div>Hora impresión: ${escapeHtml(horaStr)}</div>
@@ -1404,7 +1579,7 @@ function buildThermalCierreHTML(resumen) {
       </table>
       <hr class="th-sep">
       ${resumen.observaciones ? `<div style="font-size:9pt;">Obs: ${escapeHtml(resumen.observaciones)}</div><hr class="th-sep">` : ""}
-      <div class="th-footer">Cierre generado por JIREH POS</div>
+      <div class="th-footer">Cierre generado por ${escapeHtml(cfg.nombre)} POS</div>
       <br><br>
     </div>`;
 }
