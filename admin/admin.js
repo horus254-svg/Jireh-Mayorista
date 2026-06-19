@@ -403,28 +403,182 @@ function renderPedidos(lista) {
 
 async function cargarProductos() {
   try {
-    const response = await fetch(API_URL + "?action=productos");
+    const response = await fetch(API_URL + "?action=productosAdmin");
     const data = await response.json();
     let html = "";
     if (!data.productos) return;
+
+    productosAdminGlobal = data.productos;
+
     if (data.productos.length === 0) {
-      html = `<tr><td colspan="4" class="text-center text-muted py-4">No hay productos</td></tr>`;
+      html = `<tr><td colspan="6" class="text-center text-muted py-4">No hay productos todavía</td></tr>`;
     }
     data.productos.forEach(p => {
+      const publicado = String(p.PUBLICADO || "").toUpperCase() === "SI";
+      const stock = Number(p.STOCK || 0);
+      const stockBadge = stock === 0
+        ? `<span class="tile-stock out">Sin stock</span>`
+        : (stock <= 5 ? `<span class="tile-stock low">${stock}</span>` : stock);
+
       html += `
       <tr>
         <td class="mono">${escapeHtml(p.CODIGO)}</td>
         <td>${escapeHtml(p.PRODUCTO)}</td>
+        <td>${escapeHtml(p.CATEGORIA || "—")}</td>
         <td class="money">$${Number(p.PRECIO || 0).toLocaleString("es-AR")}</td>
+        <td>${stockBadge}</td>
         <td>
-          <button class="btn btn-primary btn-sm" onclick="editarProducto('${p.CODIGO}')">Editar</button>
-          <button class="btn btn-danger btn-sm ms-2" onclick="eliminarProducto('${p.CODIGO}')">Eliminar</button>
+          <span class="badge ${publicado ? "bg-success" : "bg-secondary"}">${publicado ? "Publicado" : "Oculto"}</span>
+        </td>
+        <td>
+          <button class="btn btn-primary btn-sm" onclick="editarProducto('${escapeHtml(p.CODIGO)}')">Editar</button>
+          <button class="btn btn-danger btn-sm ms-2" onclick="eliminarProducto('${escapeHtml(p.CODIGO)}')">Eliminar</button>
         </td>
       </tr>`;
     });
     document.getElementById("tablaProductos").innerHTML = html;
   } catch (error) {
     console.error("Error productos:", error);
+  }
+}
+
+/* ===================== PRODUCTOS — ALTA / EDICIÓN (modal) ===================== */
+
+let productosAdminGlobal = [];
+
+/** Opens the modal in "create" mode */
+function nuevoProducto() {
+  document.getElementById("productModalTitle").textContent = "+ Nuevo Producto";
+  document.getElementById("pmCodigoOriginal").value = "";
+  document.getElementById("pmCodigo").value = "";
+  document.getElementById("pmCodigo").disabled = false;
+  document.getElementById("pmNombre").value = "";
+  document.getElementById("pmCategoria").value = "";
+  document.getElementById("pmPrecio").value = "";
+  document.getElementById("pmStock").value = "";
+  document.getElementById("pmPublicado").checked = true;
+  document.getElementById("pmDestacado").checked = false;
+  document.getElementById("pmOferta").checked = false;
+
+  poblarCategoriasDatalist();
+  document.getElementById("productModalBackdrop").classList.add("show");
+  setTimeout(() => document.getElementById("pmNombre").focus(), 80);
+}
+
+/** Opens the modal in "edit" mode, pre-filled with the product's current data */
+function editarProducto(codigo) {
+  const p = productosAdminGlobal.find(x => String(x.CODIGO) === String(codigo));
+  if (!p) { toast("No se encontró el producto para editar", "error"); return; }
+
+  document.getElementById("productModalTitle").textContent = "✏️ Editar Producto";
+  document.getElementById("pmCodigoOriginal").value = p.CODIGO;
+  document.getElementById("pmCodigo").value = p.CODIGO;
+  document.getElementById("pmNombre").value = p.PRODUCTO || "";
+  document.getElementById("pmCategoria").value = p.CATEGORIA || "";
+  document.getElementById("pmPrecio").value = Number(p.PRECIO || 0);
+  document.getElementById("pmStock").value = Number(p.STOCK || 0);
+  document.getElementById("pmPublicado").checked = String(p.PUBLICADO || "").toUpperCase() === "SI";
+  document.getElementById("pmDestacado").checked = String(p.DESTACADO || "").toUpperCase() === "SI";
+  document.getElementById("pmOferta").checked = String(p.OFERTA || "").toUpperCase() === "SI";
+
+  poblarCategoriasDatalist();
+  document.getElementById("productModalBackdrop").classList.add("show");
+}
+
+function cerrarModalProducto() {
+  document.getElementById("productModalBackdrop").classList.remove("show");
+}
+
+/** Fills the category <datalist> with the distinct categories already in use */
+function poblarCategoriasDatalist() {
+  const datalist = document.getElementById("pmCategoriasList");
+  if (!datalist) return;
+  const categorias = [...new Set(
+    productosAdminGlobal.map(p => String(p.CATEGORIA || "").trim()).filter(Boolean)
+  )].sort();
+  datalist.innerHTML = categorias.map(c => `<option value="${escapeHtml(c)}"></option>`).join("");
+}
+
+/** Saves the product form — creates a new product or updates an existing one */
+async function guardarProductoForm() {
+  const codigoOriginal = document.getElementById("pmCodigoOriginal").value.trim();
+  const codigo   = document.getElementById("pmCodigo").value.trim();
+  const nombre   = document.getElementById("pmNombre").value.trim();
+  const categoria = document.getElementById("pmCategoria").value.trim();
+  const precio   = document.getElementById("pmPrecio").value;
+  const stock    = document.getElementById("pmStock").value;
+  const publicado = document.getElementById("pmPublicado").checked ? "SI" : "NO";
+  const destacado  = document.getElementById("pmDestacado").checked ? "SI" : "NO";
+  const oferta     = document.getElementById("pmOferta").checked ? "SI" : "NO";
+
+  if (!nombre) { toast("El nombre del producto es obligatorio", "error"); return; }
+  if (precio === "" || Number(precio) < 0) { toast("Ingresá un precio válido", "error"); return; }
+
+  const esEdicion = !!codigoOriginal;
+  const btn = document.getElementById("btnGuardarProducto");
+  const textoOriginal = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = "Guardando...";
+
+  try {
+    const params = new URLSearchParams({
+      action: esEdicion ? "actualizarProducto" : "guardarProducto",
+      CODIGO: codigo,
+      PRODUCTO: nombre,
+      CATEGORIA: categoria,
+      PRECIO: precio || 0,
+      STOCK: stock || 0,
+      PUBLICADO: publicado,
+      DESTACADO: destacado,
+      OFERTA: oferta
+    });
+    if (esEdicion) params.set("codigoOriginal", codigoOriginal);
+
+    const response = await fetch(API_URL + "?" + params.toString());
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo guardar el producto", "error");
+      return;
+    }
+
+    toast(esEdicion ? "Producto actualizado" : "Producto creado", "success");
+    cerrarModalProducto();
+    cargarProductos();
+
+    // Refresh in-memory POS catalog too, so the new/edited product shows up right away
+    productosPOS = [];
+
+  } catch (error) {
+    console.error("Error al guardar producto:", error);
+    toast("Error de conexión al guardar el producto", "error");
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = textoOriginal;
+  }
+}
+
+/** Deletes a product after confirmation */
+async function eliminarProducto(codigo) {
+  if (!confirm("¿Eliminar el producto \"" + codigo + "\"? Esta acción no se puede deshacer.")) return;
+
+  try {
+    const params = new URLSearchParams({ action: "eliminarProducto", codigo });
+    const response = await fetch(API_URL + "?" + params.toString());
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo eliminar el producto", "error");
+      return;
+    }
+
+    toast("Producto eliminado", "success");
+    cargarProductos();
+    productosPOS = [];
+
+  } catch (error) {
+    console.error("Error al eliminar producto:", error);
+    toast("Error de conexión al eliminar el producto", "error");
   }
 }
 
