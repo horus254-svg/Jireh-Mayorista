@@ -405,41 +405,94 @@ async function cargarProductos() {
   try {
     const response = await fetch(API_URL + "?action=productosAdmin");
     const data = await response.json();
-    let html = "";
     if (!data.productos) return;
 
     productosAdminGlobal = data.productos;
 
-    if (data.productos.length === 0) {
-      html = `<tr><td colspan="6" class="text-center text-muted py-4">No hay productos todavía</td></tr>`;
-    }
-    data.productos.forEach(p => {
-      const publicado = String(p.PUBLICADO || "").toUpperCase() === "SI";
-      const stock = Number(p.STOCK || 0);
-      const stockBadge = stock === 0
-        ? `<span class="tile-stock out">Sin stock</span>`
-        : (stock <= 5 ? `<span class="tile-stock low">${stock}</span>` : stock);
+    poblarFiltroCategoriasProductos();
+    filtrarProductos();
 
-      html += `
-      <tr>
-        <td class="mono">${escapeHtml(p.CODIGO)}</td>
-        <td>${escapeHtml(p.PRODUCTO)}</td>
-        <td>${escapeHtml(p.CATEGORIA || "—")}</td>
-        <td class="money">$${Number(p.PRECIO || 0).toLocaleString("es-AR")}</td>
-        <td>${stockBadge}</td>
-        <td>
-          <span class="badge ${publicado ? "bg-success" : "bg-secondary"}">${publicado ? "Publicado" : "Oculto"}</span>
-        </td>
-        <td>
-          <button class="btn btn-primary btn-sm" onclick="editarProducto('${escapeHtml(p.CODIGO)}')">Editar</button>
-          <button class="btn btn-danger btn-sm ms-2" onclick="eliminarProducto('${escapeHtml(p.CODIGO)}')">Eliminar</button>
-        </td>
-      </tr>`;
-    });
-    document.getElementById("tablaProductos").innerHTML = html;
   } catch (error) {
     console.error("Error productos:", error);
   }
+}
+
+function renderTablaProductos(lista) {
+  const tbody = document.getElementById("tablaProductos");
+  if (!tbody) return;
+
+  if (!lista || lista.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4">No se encontraron productos</td></tr>`;
+    return;
+  }
+
+  let html = "";
+  lista.forEach(p => {
+    const publicado = String(p.PUBLICADO || "").toUpperCase() === "SI";
+    const stock = Number(p.STOCK || 0);
+    const stockBadge = stock === 0
+      ? `<span class="tile-stock out">Sin stock</span>`
+      : (stock <= 5 ? `<span class="tile-stock low">${stock}</span>` : stock);
+
+    html += `
+    <tr>
+      <td class="mono">${escapeHtml(p.CODIGO)}</td>
+      <td>${escapeHtml(p.PRODUCTO)}</td>
+      <td>${escapeHtml(p.CATEGORIA || "—")}</td>
+      <td class="money">$${Number(p.PRECIO || 0).toLocaleString("es-AR")}</td>
+      <td>${stockBadge}</td>
+      <td>
+        <span class="badge ${publicado ? "bg-success" : "bg-secondary"}">${publicado ? "Publicado" : "Oculto"}</span>
+      </td>
+      <td>
+        <button class="btn btn-primary btn-sm" onclick="editarProducto('${escapeHtml(p.CODIGO)}')">Editar</button>
+        <button class="btn btn-danger btn-sm ms-2" onclick="eliminarProducto('${escapeHtml(p.CODIGO)}')">Eliminar</button>
+      </td>
+    </tr>`;
+  });
+  tbody.innerHTML = html;
+}
+
+/** Fills the category <select> filter with the distinct categories currently in use */
+function poblarFiltroCategoriasProductos() {
+  const select = document.getElementById("filtroCategoriaProductos");
+  if (!select) return;
+
+  const valorActual = select.value;
+  const categorias = [...new Set(
+    productosAdminGlobal.map(p => String(p.CATEGORIA || "").trim()).filter(Boolean)
+  )].sort();
+
+  select.innerHTML = `<option value="">Todas las categorías</option>` +
+    categorias.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
+
+  // Preserve the user's selection across refreshes when still valid
+  if (categorias.includes(valorActual)) select.value = valorActual;
+}
+
+/** Client-side filter by name/code (text) and category (select), over the already-loaded product list */
+function filtrarProductos() {
+  const inputBuscar = document.getElementById("buscarProducto");
+  const selectCategoria = document.getElementById("filtroCategoriaProductos");
+
+  const termino = (inputBuscar ? inputBuscar.value : "").toLowerCase().trim();
+  const categoria = selectCategoria ? selectCategoria.value : "";
+
+  let filtrados = productosAdminGlobal;
+
+  if (termino) {
+    filtrados = filtrados.filter(p => {
+      const codigo = String(p.CODIGO || "").toLowerCase();
+      const nombre = String(p.PRODUCTO || "").toLowerCase();
+      return codigo.includes(termino) || nombre.includes(termino);
+    });
+  }
+
+  if (categoria) {
+    filtrados = filtrados.filter(p => String(p.CATEGORIA || "").trim() === categoria);
+  }
+
+  renderTablaProductos(filtrados);
 }
 
 /* ===================== PRODUCTOS — ALTA / EDICIÓN (modal) ===================== */
