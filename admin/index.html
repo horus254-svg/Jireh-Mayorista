@@ -18,6 +18,7 @@
   <nav id="navLinks">
     <a href="#" data-target="dashboard"        onclick="mostrarSeccion('dashboard')"><span class="ic">🏠</span> Dashboard</a>
     <a href="#" data-target="pos"              onclick="mostrarSeccion('pos')"><span class="ic">🏪</span> Punto de Venta</a>
+    <a href="#" data-target="ventasPOS"        onclick="mostrarSeccion('ventasPOS')"><span class="ic">🧾</span> Ventas POS</a>
     <a href="#" data-target="cierreCaja"        onclick="mostrarSeccion('cierreCaja')"><span class="ic">🧮</span> Cierre de Caja</a>
     <a href="#" data-target="pedidos"          onclick="mostrarSeccion('pedidos')"><span class="ic">📦</span> Pedidos</a>
     <a href="#" data-target="productos"        onclick="mostrarSeccion('productos')"><span class="ic">🛒</span> Productos</a>
@@ -132,14 +133,14 @@
         </div>
       </div>
       <div class="col-6 col-md-3">
-        <div class="card p-3 dashboard-card metric-card" onclick="mostrarSeccion('pos')">
+        <div class="card p-3 dashboard-card metric-card" onclick="mostrarSeccion('ventasPOS')">
           <div class="metric-icon bg-tint-green">🏪</div>
           <h6>Ventas POS Hoy</h6>
           <h2 id="ventasPOSHoy">$0</h2>
         </div>
       </div>
       <div class="col-6 col-md-3">
-        <div class="card p-3 dashboard-card metric-card" onclick="mostrarSeccion('pos')">
+        <div class="card p-3 dashboard-card metric-card" onclick="mostrarSeccion('ventasPOS')">
           <div class="metric-icon bg-tint-green">🏪</div>
           <h6>Ventas POS Mes</h6>
           <h2 id="ventasPOSMes">$0</h2>
@@ -164,7 +165,10 @@
     <!-- POS recent sales table -->
     <div class="page-header mt-4 mb-2">
       <div><h1 style="font-size:17px;">Últimas ventas del día (POS)</h1></div>
-      <button class="btn btn-outline-secondary btn-sm" onclick="cargarVentasPOS()">↻ Actualizar</button>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-outline-secondary btn-sm" onclick="cargarVentasPOS()">↻ Actualizar</button>
+        <button class="btn btn-outline-primary btn-sm" onclick="mostrarSeccion('ventasPOS')">Ver historial completo →</button>
+      </div>
     </div>
     <div class="card p-3">
       <div class="table-responsive">
@@ -324,6 +328,43 @@
             <button class="btn-finalize"     id="btnFinalizarVenta" onclick="finalizarVentaPOS()">✅ Finalizar Venta</button>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== VENTAS POS (historial + reimpresión) ===== -->
+  <div id="ventasPOS" class="seccion">
+    <div class="page-header">
+      <div><h1>🧾 Ventas POS</h1><div class="sub">Historial de ventas de mostrador — reimprimí cualquier ticket</div></div>
+      <button class="btn btn-outline-secondary btn-sm" onclick="cargarVentasPOSHistorial()">↻ Actualizar</button>
+    </div>
+
+    <div class="card p-3 mb-3">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+          <div>
+            <label class="form-label" style="font-size:12px; margin-bottom:2px;">Desde</label>
+            <input type="date" id="vpDesde" class="form-control form-control-sm" style="max-width:160px;">
+          </div>
+          <div>
+            <label class="form-label" style="font-size:12px; margin-bottom:2px;">Hasta</label>
+            <input type="date" id="vpHasta" class="form-control form-control-sm" style="max-width:160px;">
+          </div>
+          <button class="btn btn-outline-primary btn-sm" style="margin-top:18px;" onclick="cargarVentasPOSHistorial()">Filtrar</button>
+        </div>
+        <div style="margin-top:18px;">
+          <input type="text" id="vpBuscar" class="form-control form-control-sm" style="max-width:260px"
+            placeholder="Buscar por #venta o forma de pago..." onkeyup="filtrarVentasPOSHistorial()">
+        </div>
+      </div>
+    </div>
+
+    <div class="card p-3">
+      <div class="table-responsive">
+        <table class="table table-striped">
+          <thead><tr><th>#Venta</th><th>Fecha</th><th>Hora</th><th>Items</th><th>Forma de Pago</th><th>Total</th><th>Reimprimir</th></tr></thead>
+          <tbody id="tablaVentasPOSHistorial"></tbody>
+        </table>
       </div>
     </div>
   </div>

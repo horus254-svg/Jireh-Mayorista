@@ -199,6 +199,104 @@ function renderVentasPOSRecientes(lista) {
   tbody.innerHTML = html;
 }
 
+/* ===================== VENTAS POS — HISTORIAL (sección dedicada) ===================== */
+
+let ventasPOSHistorialGlobal = [];
+
+/** Loads POS sales history for the date range selected in the filter inputs (defaults to last 60 days) */
+async function cargarVentasPOSHistorial() {
+  const tbody = document.getElementById("tablaVentasPOSHistorial");
+  if (!tbody) return;
+
+  const desdeInput = document.getElementById("vpDesde");
+  const hastaInput = document.getElementById("vpHasta");
+
+  // Default the date pickers to a sensible range on first load (last 30 days)
+  if (desdeInput && !desdeInput.value) {
+    const hace30 = new Date();
+    hace30.setDate(hace30.getDate() - 30);
+    desdeInput.value = hace30.toISOString().slice(0, 10);
+  }
+  if (hastaInput && !hastaInput.value) {
+    hastaInput.value = new Date().toISOString().slice(0, 10);
+  }
+
+  tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-3">Cargando ventas...</td></tr>`;
+
+  try {
+    const params = new URLSearchParams({ action: "ventasPOSHistorial" });
+    if (desdeInput && desdeInput.value) params.set("desde", desdeInput.value);
+    if (hastaInput && hastaInput.value) params.set("hasta", hastaInput.value);
+
+    const response = await fetch(API_URL + "?" + params.toString());
+    const data = await response.json();
+
+    ventasPOSHistorialGlobal = data.ventas || [];
+    renderVentasPOSHistorial(ventasPOSHistorialGlobal);
+
+  } catch (error) {
+    console.error("Error al cargar historial de ventas POS:", error);
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-3">Error al cargar el historial</td></tr>`;
+  }
+}
+
+function renderVentasPOSHistorial(lista) {
+  const tbody = document.getElementById("tablaVentasPOSHistorial");
+  if (!tbody) return;
+
+  if (!lista || lista.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-3">No hay ventas en el rango seleccionado</td></tr>`;
+    return;
+  }
+
+  let html = "";
+  lista.forEach(v => {
+    const fechaObj = v.FECHA ? new Date(v.FECHA) : null;
+    const fecha = fechaObj ? fechaObj.toLocaleDateString("es-AR") : "—";
+    const hora  = fechaObj ? fechaObj.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }) : "—";
+    const items = v.ITEMS || v.DETALLE || "—";
+    const pago  = v.FORMA_PAGO || v.PAGO || "—";
+    const total = Number(v.TOTAL || 0).toLocaleString("es-AR");
+
+    html += `
+      <tr>
+        <td class="mono">${escapeHtml(String(v.VENTA_ID || v.ID || "—"))}</td>
+        <td>${fecha}</td>
+        <td>${hora}</td>
+        <td>${escapeHtml(String(items))}</td>
+        <td>${escapeHtml(String(pago))}</td>
+        <td class="money">$${total}</td>
+        <td>
+          <button class="btn btn-sm btn-outline-secondary"
+            onclick='imprimirVentaDesdeData(${JSON.stringify(v)})' title="Reimprimir ticket">🖨️ Reimprimir</button>
+        </td>
+      </tr>
+    `;
+  });
+
+  tbody.innerHTML = html;
+}
+
+/** Client-side filter by sale id or payment method, over the already-loaded historial */
+function filtrarVentasPOSHistorial() {
+  const input = document.getElementById("vpBuscar");
+  const termino = (input ? input.value : "").toLowerCase().trim();
+
+  if (!termino) {
+    renderVentasPOSHistorial(ventasPOSHistorialGlobal);
+    return;
+  }
+
+  const filtradas = ventasPOSHistorialGlobal.filter(v => {
+    const id   = String(v.VENTA_ID || v.ID || "").toLowerCase();
+    const pago = String(v.FORMA_PAGO || v.PAGO || "").toLowerCase();
+    const items = String(v.ITEMS || v.DETALLE || "").toLowerCase();
+    return id.includes(termino) || pago.includes(termino) || items.includes(termino);
+  });
+
+  renderVentasPOSHistorial(filtradas);
+}
+
 /* ===================== NAVEGACION ===================== */
 
 function mostrarSeccion(id) {
@@ -219,6 +317,7 @@ function mostrarSeccion(id) {
 
   if (id === "pedidos")   cargarPedidos();
   if (id === "productos") cargarProductos();
+  if (id === "ventasPOS") cargarVentasPOSHistorial();
 
   if (id === "pos") {
     asegurarProductosPOS().then(renderPosGrid);
