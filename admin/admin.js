@@ -764,7 +764,7 @@ function agregarProductoVenta(codigo){
 
   codigo = String(codigo).trim();
 
-  const producto = productos.find(
+  const producto = productosPOS.find(
     p => String(p.CODIGO).trim() === codigo
   );
 
@@ -859,74 +859,258 @@ function buscarProductoPOS(){
 let productosPOS = [];
 let ticketPOS = [];
 
-async function buscarProductoPOS(){
+// ===============================
+// POS - VENTAS DEL LOCAL
+// ===============================
 
-  const input =
-    document.getElementById("posBusqueda");
+async function cargarProductosPOS(){
 
-  if(!input){
-    return;
-  }
-
-  const texto =
-    input.value.toLowerCase().trim();
-
-  if(texto.length < 2){
-
-    document.getElementById(
-      "resultadosPOS"
-    ).innerHTML = "";
-
-    return;
-  }
-
-  if(productosPOS.length === 0){
+  try{
 
     const response =
-      await fetch(
-        API_URL + "?action=productos"
-      );
+      await fetch(API_URL + "?action=productos");
 
     const data =
       await response.json();
 
     productosPOS =
       data.productos || [];
+
+  }
+  catch(error){
+
+    console.error(
+      "Error cargando productos POS:",
+      error
+    );
+
   }
 
-  const resultados =
-    productosPOS.filter(p =>
+}
 
-      String(p.CODIGO)
-        .toLowerCase()
-        .includes(texto)
+function agregarProductoPOS(codigo){
 
-      ||
+  const producto =
+    productosPOS.find(
+      p => String(p.CODIGO) === String(codigo)
+    );
 
-      String(p.PRODUCTO)
-        .toLowerCase()
-        .includes(texto)
+  if(!producto){
+    alert("Producto no encontrado");
+    return;
+  }
 
-    ).slice(0,10);
+  const existente =
+    ticketPOS.find(
+      p => p.CODIGO === producto.CODIGO
+    );
+
+  if(existente){
+
+    existente.CANTIDAD++;
+
+  }else{
+
+    ticketPOS.push({
+
+      CODIGO: producto.CODIGO,
+      PRODUCTO: producto.PRODUCTO,
+      PRECIO: Number(producto.PRECIO || 0),
+      CANTIDAD: 1
+
+    });
+
+  }
+
+  renderTicketPOS();
+
+}
+
+function renderTicketPOS(){
 
   let html = "";
+  let total = 0;
 
-  resultados.forEach(p => {
+  ticketPOS.forEach((item,index)=>{
+
+    const subtotal =
+      item.PRECIO * item.CANTIDAD;
+
+    total += subtotal;
 
     html += `
-      <button
-        class="btn btn-outline-primary m-1"
-        onclick="agregarProductoPOS('${p.CODIGO}')">
+      <tr>
 
-        ${p.CODIGO} - ${p.PRODUCTO}
+        <td>${item.CODIGO}</td>
 
-      </button>
+        <td>${item.PRODUCTO}</td>
+
+        <td>
+
+          <input
+            type="number"
+            min="1"
+            value="${item.CANTIDAD}"
+            class="form-control form-control-sm"
+            onchange="actualizarCantidadPOS(${index},this.value)">
+
+        </td>
+
+        <td>
+
+          $${item.PRECIO.toLocaleString("es-AR")}
+
+        </td>
+
+        <td>
+
+          $${subtotal.toLocaleString("es-AR")}
+
+        </td>
+
+        <td>
+
+          <button
+            class="btn btn-danger btn-sm"
+            onclick="eliminarItemPOS(${index})">
+
+            X
+
+          </button>
+
+        </td>
+
+      </tr>
     `;
 
   });
 
-  document.getElementById(
-    "resultadosPOS"
-  ).innerHTML = html;
+  const tabla =
+    document.getElementById("tablaPOS");
+
+  if(tabla){
+    tabla.innerHTML = html;
+  }
+
+  const totalPOS =
+    document.getElementById("totalPOS");
+
+  if(totalPOS){
+
+    totalPOS.innerText =
+      "$" + total.toLocaleString("es-AR");
+
+  }
+
+}
+
+function actualizarCantidadPOS(
+  index,
+  cantidad
+){
+
+  cantidad = Number(cantidad);
+
+  if(cantidad <= 0){
+
+    ticketPOS.splice(index,1);
+
+  }else{
+
+    ticketPOS[index].CANTIDAD =
+      cantidad;
+
+  }
+
+  renderTicketPOS();
+
+}
+
+function eliminarItemPOS(index){
+
+  ticketPOS.splice(index,1);
+
+  renderTicketPOS();
+
+}
+
+function limpiarPOS(){
+
+  ticketPOS = [];
+
+  renderTicketPOS();
+
+}
+
+async function finalizarVentaPOS(){
+
+  if(ticketPOS.length === 0){
+
+    alert(
+      "No hay productos en el ticket"
+    );
+
+    return;
+
+  }
+
+  try{
+
+    const response =
+      await fetch(API_URL,{
+
+        method:"POST",
+
+        headers:{
+          "Content-Type":
+          "application/json"
+        },
+
+        body:JSON.stringify({
+
+          action:"ventaLocal",
+
+          productos:ticketPOS
+
+        })
+
+      });
+
+    const data =
+      await response.json();
+
+    if(data.success){
+
+      alert(
+        "Venta registrada correctamente"
+      );
+
+      ticketPOS = [];
+
+      renderTicketPOS();
+
+      cargarMetricas();
+
+      cargarProductos();
+
+    }else{
+
+      alert(
+        data.message ||
+        "Error al guardar venta"
+      );
+
+    }
+
+  }
+  catch(error){
+
+    console.error(error);
+
+    alert(
+      "Error de conexión"
+    );
+
+  }
 
 }
