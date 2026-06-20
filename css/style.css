@@ -72,8 +72,10 @@ select:focus-visible{
 ========================================================= */
 
 .navbar{
-    position:relative;
     background:linear-gradient(135deg, var(--navy-950), var(--navy-800));
+    background-image:
+        repeating-linear-gradient(135deg, rgba(255,255,255,.035) 0px, rgba(255,255,255,.035) 1px, transparent 1px, transparent 13px),
+        linear-gradient(135deg, var(--navy-950), var(--navy-800));
     box-shadow:0 4px 20px rgba(11,18,36,.25);
     padding:12px 0 16px;
 }
@@ -169,6 +171,14 @@ select:focus-visible{
     text-align:center;
     padding:50px 20px 64px;
     overflow:hidden;
+}
+
+.hero::before{
+    content:"";
+    position:absolute;
+    inset:0;
+    background-image:repeating-linear-gradient(135deg, rgba(255,255,255,.04) 0px, rgba(255,255,255,.04) 1px, transparent 1px, transparent 13px);
+    pointer-events:none;
 }
 
 .hero::after{
@@ -575,6 +585,7 @@ select:focus-visible{
 
 .modal-header{
     background:var(--navy-950);
+    background-image:repeating-linear-gradient(135deg, rgba(255,255,255,.035) 0px, rgba(255,255,255,.035) 1px, transparent 1px, transparent 13px);
     color:#fff;
 }
 
