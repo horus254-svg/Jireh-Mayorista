@@ -171,14 +171,6 @@ select:focus-visible{
     overflow:hidden;
 }
 
-.hero::before{
-    content:"";
-    position:absolute;
-    inset:0;
-    background-image:repeating-linear-gradient(135deg, rgba(255,255,255,.04) 0px, rgba(255,255,255,.04) 1px, transparent 1px, transparent 13px);
-    pointer-events:none;
-}
-
 .hero::after{
     content:"";
     position:absolute;
@@ -582,9 +574,7 @@ select:focus-visible{
 }
 
 .modal-header{
-    position:relative;
     background:var(--navy-950);
-    background-image:repeating-linear-gradient(135deg, rgba(255,255,255,.035) 0px, rgba(255,255,255,.035) 1px, transparent 1px, transparent 13px);
     color:#fff;
 }
 
