@@ -769,6 +769,13 @@ async function aplicarApariencia(){
         const tema = (cfg.tema || "navy").toLowerCase();
         document.body.setAttribute("data-tema", tema);
 
+        // --- Texto del encabezado (navbar) ---
+        const navbarTextoEl = document.getElementById("navbar-brand-texto");
+
+        if(navbarTextoEl && cfg.navbarTexto){
+            navbarTextoEl.textContent = cfg.navbarTexto;
+        }
+
         // --- Título / subtítulo del banner ---
         const tituloEl = document.getElementById("hero-titulo");
         const subtituloEl = document.getElementById("hero-subtitulo");

@@ -12,8 +12,8 @@
 <!-- =================== SIDEBAR (desktop) =================== -->
 <div class="sidebar">
   <div class="sidebar-brand">
-    <div class="mark">J</div>
-    <div class="label">JIREH<small>PANEL ADMIN</small></div>
+    <div class="mark" id="sidebarMark">J</div>
+    <div class="label"><span id="sidebarLabelTexto">JIREH</span><small id="sidebarLabelSub">PANEL ADMIN</small></div>
   </div>
   <nav id="navLinks">
     <a href="#" data-target="dashboard"        onclick="mostrarSeccion('dashboard')"><span class="ic">🏠</span> Dashboard</a>
@@ -583,7 +583,35 @@
     </div>
 
     <div class="card p-3 mt-3">
+      <h6 style="margin-bottom:14px;">🅰️ Apariencia del panel admin (este sidebar)</h6>
+      <p class="text-muted" style="font-size:12.5px; margin-top:-8px; margin-bottom:14px;">
+        Esto cambia solo lo que se ve aquí, en el menú lateral del panel — no afecta al catálogo web.
+      </p>
+
+      <div class="row g-2 mb-3">
+        <div class="col-3">
+          <label class="form-label">Letra/ícono</label>
+          <input type="text" class="form-control text-center" id="cfgSidebarMark" placeholder="J" maxlength="2">
+        </div>
+        <div class="col-9">
+          <label class="form-label">Nombre <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+          <input type="text" class="form-control" id="cfgSidebarTexto" placeholder="Ej: JIREH">
+        </div>
+      </div>
+
+      <div class="d-flex justify-content-end mt-3">
+        <button class="btn btn-success" id="btnGuardarSidebar" onclick="guardarSidebarForm()">💾 Guardar</button>
+      </div>
+    </div>
+
+    <div class="card p-3 mt-3">
       <h6 style="margin-bottom:14px;">🎨 Apariencia del catálogo web</h6>
+
+      <div class="mb-3">
+        <label class="form-label">Texto del encabezado (navbar) <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+        <input type="text" class="form-control" id="cfgNavbarTexto" placeholder="Ej: Jireh Mayorista">
+        <div class="form-text" style="font-size:11.5px;">Es el texto que aparece arriba de todo, al lado del 🛒, en cualquier pantalla del catálogo.</div>
+      </div>
 
       <div class="mb-3">
         <label class="form-label">Título del banner <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
@@ -602,7 +630,7 @@
       </div>
 
       <div class="mb-3">
-        <label class="form-label">Color del sitio</label>
+        <label class="form-label">Color del sitio <span class="text-muted" style="font-size:11px;">(se aplica acá y en el catálogo)</span></label>
         <select class="form-select" id="cfgTema">
           <option value="navy">Azul oscuro (original)</option>
           <option value="azul">Azul</option>
@@ -619,7 +647,7 @@
     <div class="card p-3 mt-3">
       <div class="config-preview-hint">
         <span class="ic">ℹ️</span>
-        Estos cambios se ven directamente en la página del catálogo (banner y colores) apenas se guardan, sin tocar ningún archivo — quedan también en la hoja "CONFIGURACION" de la planilla.
+        El color que elijas se aplica tanto a este panel admin como a la página del catálogo, apenas guardás — sin tocar ningún archivo. El banner y los textos solo afectan al catálogo.
       </div>
     </div>
 

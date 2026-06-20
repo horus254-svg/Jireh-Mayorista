@@ -52,6 +52,50 @@
   --bottomnav-h: 64px;
 }
 
+/* =========================================================
+   TEMAS DE COLOR (seleccionables desde Configuración → mismo
+   selector que pinta el catálogo web; se guarda una sola vez
+   en Sheets y afecta a los dos sitios).
+   Se activan con data-tema="azul|verde|rojo" en <body>.
+   Sin el atributo (o con data-tema="navy") se usa la paleta
+   original. Solo se reemplazan navy-950..600 y blue-500/50;
+   el resto (slate, green, amber, red de estados) es igual en
+   todos los temas.
+========================================================= */
+
+body[data-tema="azul"]{
+  --navy-950: #0b1f3a;
+  --navy-900: #122a4d;
+  --navy-800: #16335c;
+  --navy-700: #1d4078;
+  --navy-600: #275095;
+
+  --blue-500: #2f7df5;
+  --blue-50:  #eaf2ff;
+}
+
+body[data-tema="verde"]{
+  --navy-950: #0c2417;
+  --navy-900: #103420;
+  --navy-800: #16402a;
+  --navy-700: #1c5536;
+  --navy-600: #226b43;
+
+  --blue-500: #1fa257;
+  --blue-50:  #e9faf0;
+}
+
+body[data-tema="rojo"]{
+  --navy-950: #2a0f12;
+  --navy-900: #3a1417;
+  --navy-800: #481a1f;
+  --navy-700: #5f2228;
+  --navy-600: #782b32;
+
+  --blue-500: #e0413f;
+  --blue-50:  #fdecec;
+}
+
 *{ box-sizing:border-box; }
 
 html,body{
@@ -598,9 +642,20 @@ html,body{
 }
 .qty-btn:hover{ background:var(--slate-100); }
 
-.ticket-row .qty-val{
+.qty-input-pos{
   font-family:var(--font-mono); font-weight:700;
-  font-size:13.5px; min-width:22px; text-align:center;
+  font-size:13.5px; min-width:34px; width:34px; text-align:center;
+  border:1.5px solid var(--slate-200); border-radius:6px;
+  height:28px; padding:0 2px; background:#fff;
+  -moz-appearance:textfield;
+}
+.qty-input-pos::-webkit-outer-spin-button,
+.qty-input-pos::-webkit-inner-spin-button{
+  -webkit-appearance:none; margin:0;
+}
+.qty-input-pos:focus{
+  outline:none; border-color:var(--blue-500);
+  box-shadow:0 0 0 3px var(--blue-50);
 }
 .ticket-row .ti-sub{
   font-family:var(--font-mono); font-weight:700;

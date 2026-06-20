@@ -91,6 +91,8 @@ async function cargarConfigNegocioDesdeBackend() {
     const data = await response.json();
     if (data.success && data.config) {
       configNegocioCache = { ...CONFIG_NEGOCIO_DEFAULT, ...data.config };
+      aplicarSidebarBrand(configNegocioCache);
+      aplicarTemaAdmin(configNegocioCache);
     }
   } catch (error) {
     console.warn("No se pudo cargar la configuración del negocio:", error);
@@ -114,6 +116,7 @@ async function cargarConfigNegocioForm() {
 
   cargarAparienciaForm(cfg);
   cargarBeneficiosForm(cfg);
+  cargarSidebarForm(cfg);
 
   if (form) form.placeholder = "Ej: JIREH";
 }
@@ -200,17 +203,91 @@ function vistaPreviaTicketConfig() {
   setTimeout(() => { window.print(); }, 120);
 }
 
+/* ===================== APARIENCIA DEL PANEL ADMIN (letra + nombre del sidebar) ===================== */
+
+const SIDEBAR_BRAND_DEFAULT = {
+  sidebarMark:  "J",
+  sidebarTexto: "JIREH"
+};
+
+/** Applies the saved letter/name to the sidebar in the DOM — runs on every page load, not just inside Configuración */
+function aplicarSidebarBrand(cfg) {
+  const markEl  = document.getElementById("sidebarMark");
+  const textoEl = document.getElementById("sidebarLabelTexto");
+
+  if (markEl)  markEl.textContent  = (cfg.sidebarMark  || SIDEBAR_BRAND_DEFAULT.sidebarMark).toUpperCase();
+  if (textoEl) textoEl.textContent = (cfg.sidebarTexto || SIDEBAR_BRAND_DEFAULT.sidebarTexto).toUpperCase();
+}
+
+/** Loads the saved letter/name into the "Apariencia del panel admin" form */
+function cargarSidebarForm(cfg) {
+  document.getElementById("cfgSidebarMark").value  = cfg.sidebarMark  ?? SIDEBAR_BRAND_DEFAULT.sidebarMark;
+  document.getElementById("cfgSidebarTexto").value = cfg.sidebarTexto ?? SIDEBAR_BRAND_DEFAULT.sidebarTexto;
+}
+
+/** Reads the form and saves the sidebar letter/name to the backend (hoja CONFIGURACION) */
+async function guardarSidebarForm() {
+  const nombre = document.getElementById("cfgNombreLocal").value.trim();
+
+  if (!nombre) {
+    toast("Completá primero el nombre del local, arriba", "error");
+    return;
+  }
+
+  const cfg = {
+    nombre,
+    sidebarMark:  document.getElementById("cfgSidebarMark").value.trim() || SIDEBAR_BRAND_DEFAULT.sidebarMark,
+    sidebarTexto: document.getElementById("cfgSidebarTexto").value.trim()
+  };
+
+  const btn = document.getElementById("btnGuardarSidebar");
+  const textoOriginal = btn ? btn.innerHTML : "";
+  if (btn) { btn.disabled = true; btn.innerHTML = "Guardando..."; }
+
+  try {
+    const params = new URLSearchParams({ action: "guardarConfiguracionNegocio", ...cfg });
+    const response = await fetch(API_URL + "?" + params.toString());
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo guardar", "error");
+      return;
+    }
+
+    configNegocioCache = { ...configNegocioCache, ...cfg };
+    aplicarSidebarBrand(configNegocioCache);
+    toast("Listo, ya se ve en el sidebar", "success");
+
+  } catch (error) {
+    console.error("Error al guardar el sidebar:", error);
+    toast("Error de conexión al guardar", "error");
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = textoOriginal; }
+  }
+}
+
 /* ===================== APARIENCIA DEL CATÁLOGO WEB (banner + tema) ===================== */
 
 const APARIENCIA_DEFAULT = {
+  navbarTexto:     "Jireh Mayorista",
   bannerTitulo:    "Mayorista Jireh",
   bannerSubtitulo: "Catálogo Mayorista Online",
   bannerImagen:    "",
   tema:            "navy"
 };
 
+/**
+ * Aplica el tema de color al panel admin (este mismo selector pinta
+ * también el catálogo web — es un solo dato compartido en Sheets).
+ */
+function aplicarTemaAdmin(cfg) {
+  const tema = (cfg.tema || APARIENCIA_DEFAULT.tema).toLowerCase();
+  document.body.setAttribute("data-tema", tema);
+}
+
 /** Loads the saved banner/tema config into the "Apariencia" form (called when Configuración opens) */
 function cargarAparienciaForm(cfg) {
+  document.getElementById("cfgNavbarTexto").value     = cfg.navbarTexto     ?? APARIENCIA_DEFAULT.navbarTexto;
   document.getElementById("cfgBannerTitulo").value    = cfg.bannerTitulo    ?? APARIENCIA_DEFAULT.bannerTitulo;
   document.getElementById("cfgBannerSubtitulo").value = cfg.bannerSubtitulo ?? APARIENCIA_DEFAULT.bannerSubtitulo;
   document.getElementById("cfgBannerImagen").value    = cfg.bannerImagen   ?? APARIENCIA_DEFAULT.bannerImagen;
@@ -221,6 +298,7 @@ function cargarAparienciaForm(cfg) {
  * Saves both the ticket-header fields AND the banner/tema fields together,
  * since both live in the same hoja CONFIGURACION and the backend expects
  * the full set of keys in one call to guardarConfiguracionNegocio.
+ * El tema afecta a este mismo panel admin Y al catálogo web a la vez.
  */
 async function guardarAparienciaForm() {
   const nombre = document.getElementById("cfgNombreLocal").value.trim();
@@ -241,7 +319,8 @@ async function guardarAparienciaForm() {
     bannerTitulo:    document.getElementById("cfgBannerTitulo").value.trim(),
     bannerSubtitulo: document.getElementById("cfgBannerSubtitulo").value.trim(),
     bannerImagen:    document.getElementById("cfgBannerImagen").value.trim(),
-    tema:            document.getElementById("cfgTema").value
+    tema:            document.getElementById("cfgTema").value,
+    navbarTexto:     document.getElementById("cfgNavbarTexto").value.trim()
   };
 
   const btn = document.getElementById("btnGuardarApariencia");
@@ -259,7 +338,8 @@ async function guardarAparienciaForm() {
     }
 
     configNegocioCache = { ...configNegocioCache, ...cfg };
-    toast("Apariencia guardada — ya se ve en el catálogo", "success");
+    aplicarTemaAdmin(configNegocioCache);
+    toast("Apariencia guardada — ya se ve en el panel y en el catálogo", "success");
 
   } catch (error) {
     console.error("Error al guardar la apariencia:", error);
@@ -1186,6 +1266,27 @@ function cambiarCantidadPOS(codigo, delta) {
   renderTicketPOS();
 }
 
+/** Lets the cashier type the quantity directly instead of tapping +/- repeatedly */
+function actualizarCantidadManualPOS(codigo, valor) {
+  const item = ticketPOS.find(i => String(i.CODIGO).trim() === String(codigo).trim());
+  if (!item) return;
+
+  let cantidad = parseInt(valor, 10);
+
+  if (isNaN(cantidad) || cantidad <= 0) {
+    quitarProductoPOS(codigo);
+    return;
+  }
+
+  item.cantidad = cantidad;
+  renderTicketPOS();
+}
+
+/** Selects the whole quantity value on focus, so typing a new number replaces it instead of appending */
+function seleccionarCantidadPOS(input) {
+  input.select();
+}
+
 function quitarProductoPOS(codigo) {
   ticketPOS = ticketPOS.filter(i => String(i.CODIGO).trim() !== String(codigo).trim());
   renderTicketPOS();
@@ -1218,7 +1319,15 @@ function renderTicketPOS() {
         </div>
         <div class="ti-qty">
           <button class="qty-btn" onclick="cambiarCantidadPOS('${item.CODIGO}', -1)">−</button>
-          <span class="qty-val">${item.cantidad}</span>
+          <input
+            type="number"
+            class="qty-input-pos"
+            min="1"
+            step="1"
+            inputmode="numeric"
+            value="${item.cantidad}"
+            onfocus="seleccionarCantidadPOS(this)"
+            onchange="actualizarCantidadManualPOS('${item.CODIGO}', this.value)">
           <button class="qty-btn" onclick="cambiarCantidadPOS('${item.CODIGO}', 1)">+</button>
         </div>
         <div class="ti-sub money">$${sub.toLocaleString("es-AR")}</div>
