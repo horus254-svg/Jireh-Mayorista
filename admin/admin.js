@@ -33,15 +33,19 @@ document.addEventListener("DOMContentLoaded", async () => {
     const pedidosVisible   = document.getElementById("pedidos").style.display === "block";
     const clientesVisible  = document.getElementById("clientes").style.display === "block";
 
+    // Antes esto llamaba a cargarMetricas() siempre, aunque el cajero
+    // estuviera en Productos o en el POS vendiendo — son llamadas al
+    // backend (Apps Script + Sheets) que no hacían falta y competían
+    // con lo que el cajero estaba haciendo en ese momento. Ahora solo
+    // se actualiza la pantalla que efectivamente está en uso.
     if (dashboardVisible) { cargarMetricas(); cargarVentasPOS(); }
-    else { cargarMetricas(); } // keep banner numbers fresh even off-screen, it's cheap
-
-    if (pedidosVisible)  cargarPedidos();
-    if (clientesVisible) cargarClientes();
+    if (pedidosVisible)   cargarPedidos();
+    if (clientesVisible)  cargarClientes();
   }, 15000); // 15 s — near real-time without hammering the API
 
   setupScannerListener();
 });
+
 
 /* ===================== UTILS ===================== */
 
@@ -665,6 +669,22 @@ function filtrarVentasPOSHistorial() {
 
 /* ===================== NAVEGACION ===================== */
 
+// Recuerda cuándo se cargó cada sección por última vez, para no volver a
+// pedirle al backend lo mismo si el cajero entra y sale de una sección
+// en pocos segundos (ej: mirar Pedidos, volver al POS, volver a Pedidos).
+// El timer de 15s de arriba sigue refrescando la sección activa con
+// normalidad; esto solo evita pedidos duplicados al navegar.
+const ULTIMA_CARGA_SECCION = {};
+const VENCIMIENTO_CACHE_MS = 10000; // 10 s
+
+function cargarSiVencido(clave, fn) {
+  const ahora = Date.now();
+  const ultima = ULTIMA_CARGA_SECCION[clave] || 0;
+  if (ahora - ultima < VENCIMIENTO_CACHE_MS) return; // todavía fresco, no repetir
+  ULTIMA_CARGA_SECCION[clave] = ahora;
+  fn();
+}
+
 function mostrarSeccion(id) {
   document.querySelectorAll(".seccion").forEach(sec => { sec.style.display = "none"; });
 
@@ -681,9 +701,9 @@ function mostrarSeccion(id) {
     a.classList.toggle("active", a.getAttribute("data-target") === id);
   });
 
-  if (id === "pedidos")   cargarPedidos();
-  if (id === "productos") cargarProductos();
-  if (id === "ventasPOS") cargarVentasPOSHistorial();
+  if (id === "pedidos")   cargarSiVencido("pedidos", cargarPedidos);
+  if (id === "productos") cargarSiVencido("productos", cargarProductos);
+  if (id === "ventasPOS") cargarSiVencido("ventasPOS", cargarVentasPOSHistorial);
   if (id === "configuracion") { cargarConfigNegocioForm(); actualizarEstadoUSBPrint(); }
 
   if (id === "pos") {
@@ -1004,7 +1024,7 @@ async function eliminarProducto(codigo) {
 
 /* ===================== CLIENTES ===================== */
 
-async function cargarClientes() {
+async function cargarClientesDesdeBackend() {
   try {
     const response = await fetch(API_URL + "?action=clientes");
     const data = await response.json();
@@ -1029,6 +1049,15 @@ async function cargarClientes() {
   } catch (error) {
     console.error("Error clientes:", error);
   }
+}
+
+/**
+ * Wrapper público: mantiene el nombre que ya usan el menú y el timer de
+ * fondo, pero evita pedir de nuevo al backend si se llamó hace menos de
+ * VENCIMIENTO_CACHE_MS (ej: el cajero entra y sale de Clientes seguido).
+ */
+function cargarClientes() {
+  cargarSiVencido("clientes", cargarClientesDesdeBackend);
 }
 
 /* ===================== STOCK BAJO / AGOTADOS / MAS VENDIDOS ===================== */
