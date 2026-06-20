@@ -28,6 +28,7 @@
 
   --amber-500: #f59e0b;
   --amber-50:  #fff8e8;
+  --gold-500:  #d99a3d;
 
   --red-500: #dc2626;
   --red-600: #b91c1c;
@@ -122,6 +123,9 @@ html,body{
   width:var(--sidebar-w);
   height:100vh;
   background:linear-gradient(180deg, var(--navy-950) 0%, var(--navy-900) 100%);
+  background-image:
+    repeating-linear-gradient(135deg, rgba(255,255,255,.03) 0px, rgba(255,255,255,.03) 1px, transparent 1px, transparent 13px),
+    linear-gradient(180deg, var(--navy-950) 0%, var(--navy-900) 100%);
   color:#fff;
   padding:22px 16px;
   overflow-y:auto;
@@ -184,6 +188,7 @@ html,body{
   position:fixed; bottom:0; left:0; right:0;
   height:var(--bottomnav-h);
   background:var(--navy-950);
+  background-image:repeating-linear-gradient(135deg, rgba(255,255,255,.03) 0px, rgba(255,255,255,.03) 1px, transparent 1px, transparent 13px);
   border-top:1px solid rgba(255,255,255,.08);
   z-index:100;
   padding:0 4px env(safe-area-inset-bottom,0);
@@ -242,7 +247,18 @@ html,body{
 .dashboard-card{ cursor:pointer; transition:transform .15s, box-shadow .15s; }
 .dashboard-card:hover{ transform:translateY(-3px); box-shadow:var(--shadow-lg); border-color:var(--slate-300); }
 
-.metric-card{ display:flex; flex-direction:column; gap:6px; }
+.metric-card{
+  display:flex; flex-direction:column; gap:6px;
+  position:relative;
+  border-left:4px solid var(--slate-200);
+  border-top-left-radius:6px;
+  border-bottom-left-radius:6px;
+}
+.metric-card:has(.bg-tint-blue) { border-left-color:var(--blue-500); }
+.metric-card:has(.bg-tint-green){ border-left-color:var(--green-500); }
+.metric-card:has(.bg-tint-amber){ border-left-color:var(--gold-500); }
+.metric-card:has(.bg-tint-red)  { border-left-color:var(--red-500); }
+
 .metric-card .metric-icon{
   width:34px; height:34px; border-radius:9px;
   display:flex; align-items:center; justify-content:center;
@@ -259,12 +275,16 @@ html,body{
 
 .bg-tint-blue  { background:var(--blue-50);  color:var(--blue-500);  }
 .bg-tint-green { background:var(--green-50); color:var(--green-600); }
-.bg-tint-amber { background:var(--amber-50); color:var(--amber-500); }
+.bg-tint-amber { background:var(--amber-50); color:var(--gold-500); }
 .bg-tint-red   { background:var(--red-50);   color:var(--red-500);   }
 
 /* Dashboard POS summary card */
 .pos-summary-card{
+  position:relative;
   background:linear-gradient(135deg, var(--navy-900) 0%, var(--navy-700) 100%);
+  background-image:
+    repeating-linear-gradient(135deg, rgba(255,255,255,.03) 0px, rgba(255,255,255,.03) 1px, transparent 1px, transparent 13px),
+    linear-gradient(135deg, var(--navy-900) 0%, var(--navy-700) 100%);
   color:#fff; border-radius:var(--radius-lg);
   padding:20px 22px;
   display:flex; flex-wrap:wrap; gap:18px;
@@ -595,9 +615,23 @@ html,body{
 }
 
 .ticket-header{
-  padding:16px 18px 14px; border-bottom:1px solid var(--slate-100);
+  position:relative;
+  padding:16px 18px 14px; border-bottom:2px dashed var(--slate-200);
   display:flex; align-items:center; justify-content:space-between;
 }
+.ticket-header::before,
+.ticket-header::after{
+  content:"";
+  position:absolute;
+  bottom:-7px;
+  width:14px; height:14px;
+  border-radius:50%;
+  background:#fff;
+  border:1px solid var(--slate-200);
+  z-index:1;
+}
+.ticket-header::before{ left:-7px; }
+.ticket-header::after{ right:-7px; }
 .ticket-header h5{ margin:0; font-size:15.5px; font-weight:700; }
 .ticket-header .count-pill{
   background:var(--navy-900); color:#fff;
