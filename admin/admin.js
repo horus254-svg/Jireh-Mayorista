@@ -715,6 +715,7 @@ function mostrarSeccion(id) {
   }
 
   if (id === "cierreCaja") cargarResumenCierreCaja();
+  if (id === "reportes")   cargarSiVencido("reportes", cargarTodosLosReportes);
 }
 
 /* ===================== PEDIDOS ===================== */
@@ -2631,3 +2632,274 @@ async function cargarHistorialCierres() {
     tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-3">Error al cargar el historial</td></tr>`;
   }
 }
+
+/* ===================== REPORTES ===================== */
+
+/** Lee el filtro de fecha compartido por los 6 reportes. Si está vacío, el backend usa el mes en curso. */
+function obtenerRangoReportes() {
+  const desde = document.getElementById("repDesde").value;
+  const hasta = document.getElementById("repHasta").value;
+  let qs = "";
+  if (desde) qs += "&desde=" + encodeURIComponent(desde);
+  if (hasta) qs += "&hasta=" + encodeURIComponent(hasta);
+  return qs;
+}
+
+/** Dispara los 6 reportes a la vez con el rango de fecha actual. */
+function cargarTodosLosReportes() {
+  cargarReporteVentasPeriodo();
+  cargarReporteProductos();
+  cargarReporteCategorias();
+  cargarReporteFormasPago();
+  cargarReporteCierres();
+  cargarReporteClientes();
+}
+
+/** Sincroniza los inputs de fecha "Desde"/"Hasta" con el rango que devolvió el backend (cuando no se eligió nada, para que el usuario vea qué período se está mostrando). */
+function sincronizarRangoReportes(desde, hasta) {
+  const inputDesde = document.getElementById("repDesde");
+  const inputHasta = document.getElementById("repHasta");
+  if (inputDesde && !inputDesde.value) inputDesde.value = desde;
+  if (inputHasta && !inputHasta.value) inputHasta.value = hasta;
+}
+
+/* ---- Reporte 1: Ventas por período ---- */
+async function cargarReporteVentasPeriodo() {
+  const tbody = document.getElementById("repVentasPeriodoTabla");
+  const resumenWrap = document.getElementById("repVentasPeriodoResumen");
+
+  try {
+    const response = await fetch(API_URL + "?action=reporteVentasPeriodo" + obtenerRangoReportes());
+    const data = await response.json();
+    if (!data.success) return;
+
+    sincronizarRangoReportes(data.desde, data.hasta);
+
+    const r = data.resumen || {};
+    resumenWrap.innerHTML = `
+      <div class="col-6 col-md-3"><div class="card p-2 text-center"><div class="text-muted" style="font-size:11.5px;">Total POS</div><div class="money fw-bold">$${Number(r.totalPOS || 0).toLocaleString("es-AR")}</div></div></div>
+      <div class="col-6 col-md-3"><div class="card p-2 text-center"><div class="text-muted" style="font-size:11.5px;">Total Pedidos</div><div class="money fw-bold">$${Number(r.totalPedidos || 0).toLocaleString("es-AR")}</div></div></div>
+      <div class="col-6 col-md-3"><div class="card p-2 text-center"><div class="text-muted" style="font-size:11.5px;">Total general</div><div class="money fw-bold">$${Number(r.totalGeneral || 0).toLocaleString("es-AR")}</div></div></div>
+      <div class="col-6 col-md-3"><div class="card p-2 text-center"><div class="text-muted" style="font-size:11.5px;">Ticket promedio</div><div class="money fw-bold">$${Number(r.ticketPromedio || 0).toLocaleString("es-AR")}</div></div></div>`;
+
+    if (!data.dias || data.dias.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-3">Sin ventas para el rango elegido</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = data.dias.map(d => `
+      <tr>
+        <td>${escapeHtml(d.fecha)}</td>
+        <td class="money">$${Number(d.pos || 0).toLocaleString("es-AR")}</td>
+        <td class="money">$${Number(d.pedidos || 0).toLocaleString("es-AR")}</td>
+        <td class="money fw-bold">$${Number(d.total || 0).toLocaleString("es-AR")}</td>
+      </tr>`).join("");
+
+  } catch (error) {
+    console.error("Error al cargar reporte de ventas por período:", error);
+    tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-3">Error al cargar el reporte</td></tr>`;
+  }
+}
+
+/* ---- Reporte 2: Productos más vendidos ---- */
+async function cargarReporteProductos() {
+  const tbody = document.getElementById("repProductosTabla");
+
+  try {
+    const response = await fetch(API_URL + "?action=reporteProductosVendidos" + obtenerRangoReportes());
+    const data = await response.json();
+    if (!data.success) return;
+
+    sincronizarRangoReportes(data.desde, data.hasta);
+
+    if (!data.productos || data.productos.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-3">Sin ventas para el rango elegido</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = data.productos.map(p => `
+      <tr>
+        <td class="mono">${escapeHtml(p.CODIGO)}</td>
+        <td>${escapeHtml(p.PRODUCTO)}</td>
+        <td class="money">${Number(p.VENDIDOS || 0).toLocaleString("es-AR")}</td>
+        <td class="money">$${Number(p.INGRESOS || 0).toLocaleString("es-AR")}</td>
+      </tr>`).join("");
+
+  } catch (error) {
+    console.error("Error al cargar reporte de productos vendidos:", error);
+    tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-3">Error al cargar el reporte</td></tr>`;
+  }
+}
+
+/* ---- Reporte 3: Ventas por categoría ---- */
+async function cargarReporteCategorias() {
+  const tbody = document.getElementById("repCategoriasTabla");
+
+  try {
+    const response = await fetch(API_URL + "?action=reporteVentasPorCategoria" + obtenerRangoReportes());
+    const data = await response.json();
+    if (!data.success) return;
+
+    sincronizarRangoReportes(data.desde, data.hasta);
+
+    if (!data.categorias || data.categorias.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="3" class="text-center text-muted py-3">Sin ventas para el rango elegido</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = data.categorias.map(c => `
+      <tr>
+        <td>${escapeHtml(c.categoria)}</td>
+        <td class="money">${Number(c.cantidad || 0).toLocaleString("es-AR")}</td>
+        <td class="money">$${Number(c.ingresos || 0).toLocaleString("es-AR")}</td>
+      </tr>`).join("");
+
+  } catch (error) {
+    console.error("Error al cargar reporte de ventas por categoría:", error);
+    tbody.innerHTML = `<tr><td colspan="3" class="text-center text-muted py-3">Error al cargar el reporte</td></tr>`;
+  }
+}
+
+/* ---- Reporte 4: Formas de pago ---- */
+async function cargarReporteFormasPago() {
+  const tbody = document.getElementById("repFormasPagoTabla");
+
+  try {
+    const response = await fetch(API_URL + "?action=reporteFormasPago" + obtenerRangoReportes());
+    const data = await response.json();
+    if (!data.success) return;
+
+    sincronizarRangoReportes(data.desde, data.hasta);
+
+    if (!data.formas || data.formas.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="3" class="text-center text-muted py-3">Sin ventas para el rango elegido</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = data.formas.map(f => `
+      <tr>
+        <td>${escapeHtml(f.forma)}</td>
+        <td class="money">${Number(f.cantidad || 0).toLocaleString("es-AR")}</td>
+        <td class="money">$${Number(f.total || 0).toLocaleString("es-AR")}</td>
+      </tr>`).join("");
+
+  } catch (error) {
+    console.error("Error al cargar reporte de formas de pago:", error);
+    tbody.innerHTML = `<tr><td colspan="3" class="text-center text-muted py-3">Error al cargar el reporte</td></tr>`;
+  }
+}
+
+/* ---- Reporte 5: Historial de cierres de caja ---- */
+async function cargarReporteCierres() {
+  const tbody = document.getElementById("repCierresTabla");
+
+  try {
+    const response = await fetch(API_URL + "?action=reporteCierresCaja" + obtenerRangoReportes());
+    const data = await response.json();
+    if (!data.success) return;
+
+    sincronizarRangoReportes(data.desde, data.hasta);
+
+    if (!data.cierres || data.cierres.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-3">Sin cierres para el rango elegido</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = data.cierres.map(c => {
+      const fecha = c.FECHA ? new Date(c.FECHA).toLocaleDateString("es-AR") : "—";
+      const totalDif = Number(c.TOTAL_DIFERENCIA || 0);
+      const claseDif = Math.abs(totalDif) < 1 ? "cc-dif-ok" : (totalDif > 0 ? "cc-dif-sobra" : "cc-dif-falta");
+      const signo = totalDif > 0 ? "+" : "";
+      return `
+      <tr>
+        <td>${escapeHtml(fecha)}</td>
+        <td class="money">$${Number(c.TOTAL_ESPERADO || 0).toLocaleString("es-AR")}</td>
+        <td class="money">$${Number(c.TOTAL_CONTADO || 0).toLocaleString("es-AR")}</td>
+        <td class="money ${claseDif}">${signo}$${Math.round(totalDif).toLocaleString("es-AR")}</td>
+        <td>${escapeHtml(c.VENDEDOR || "—")}</td>
+      </tr>`;
+    }).join("");
+
+  } catch (error) {
+    console.error("Error al cargar reporte de cierres de caja:", error);
+    tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-3">Error al cargar el reporte</td></tr>`;
+  }
+}
+
+/* ---- Reporte 6: Clientes que más compran ---- */
+async function cargarReporteClientes() {
+  const tbody = document.getElementById("repClientesTabla");
+
+  try {
+    const response = await fetch(API_URL + "?action=reporteClientes" + obtenerRangoReportes());
+    const data = await response.json();
+    if (!data.success) return;
+
+    sincronizarRangoReportes(data.desde, data.hasta);
+
+    if (!data.clientes || data.clientes.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-3">Sin pedidos para el rango elegido</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = data.clientes.map(c => `
+      <tr>
+        <td>${escapeHtml(c.CLIENTE)}</td>
+        <td>${escapeHtml(c.EMPRESA || "—")}</td>
+        <td class="money">${Number(c.PEDIDOS || 0).toLocaleString("es-AR")}</td>
+        <td class="money">$${Number(c.TOTAL || 0).toLocaleString("es-AR")}</td>
+      </tr>`).join("");
+
+  } catch (error) {
+    console.error("Error al cargar reporte de clientes:", error);
+    tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-3">Error al cargar el reporte</td></tr>`;
+  }
+}
+
+/* ---- Exportar cualquiera de los 6 reportes a PDF ---- */
+/**
+ * Toma la tarjeta del reporte (por su id), lee la tabla que tiene
+ * adentro, y genera un PDF con jsPDF + autoTable. Funciona igual
+ * para los 6 reportes porque todos son <table> dentro de una .card.
+ */
+function exportarReportePDF(cardId, tituloReporte) {
+  try {
+    const card = document.getElementById(cardId);
+    if (!card) return;
+
+    const tabla = card.querySelector("table");
+    if (!tabla) {
+      toast("Este reporte no tiene datos para exportar", "error");
+      return;
+    }
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+
+    const nombreLocal = (obtenerConfigNegocio().nombre || "Reporte").toString();
+    const desde = document.getElementById("repDesde").value || "—";
+    const hasta = document.getElementById("repHasta").value || "—";
+
+    doc.setFontSize(14);
+    doc.text(`${nombreLocal} — ${tituloReporte}`, 30, 30);
+    doc.setFontSize(10);
+    doc.setTextColor(110, 110, 110);
+    doc.text(`Período: ${desde} a ${hasta}  ·  Generado: ${new Date().toLocaleString("es-AR")}`, 30, 46);
+
+    doc.autoTable({
+      html: tabla,
+      startY: 58,
+      theme: "grid",
+      styles: { fontSize: 9, cellPadding: 5 },
+      headStyles: { fillColor: [18, 32, 71], textColor: [255, 255, 255] }
+    });
+
+    const nombreArchivo = `${tituloReporte.replace(/\s+/g, "_")}_${desde}_a_${hasta}.pdf`;
+    doc.save(nombreArchivo);
+
+  } catch (error) {
+    console.error("Error al exportar el reporte a PDF:", error);
+    toast("No se pudo generar el PDF", "error");
+  }
+}
+
