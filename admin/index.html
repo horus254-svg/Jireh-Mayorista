@@ -308,10 +308,7 @@
       <div class="ticket-panel">
         <div class="ticket-header">
           <h5>🧾 Ticket</h5>
-          <div style="display:flex;align-items:center;gap:10px;">
-            <span class="count-pill" id="ticketCount">0</span>
-            <button class="ticket-clear" id="btnVaciarTicket" onclick="vaciarTicketPOS()">Vaciar</button>
-          </div>
+          <span class="count-pill" id="ticketCount">0</span>
         </div>
 
         <div class="ticket-items" id="ticketItemsWrap">
@@ -324,6 +321,8 @@
         </div>
 
         <div class="ticket-footer">
+
+          <!-- Total: lo primero que se ve, es el dato que el cajero necesita decir en voz alta -->
           <div class="ticket-totals">
             <div class="trow"><span>Artículos</span><span class="money" id="ticketItemsCount">0</span></div>
             <div class="trow"><span>Subtotal</span><span class="money">$<span id="subtotalPOS">0</span></span></div>
@@ -334,6 +333,14 @@
             <div class="trow grand"><span>Total</span><span class="money">$<span id="totalPOS">0</span></span></div>
           </div>
 
+          <!-- Forma de pago: sigue naturalmente al total, antes de cualquier ajuste opcional -->
+          <div class="pay-methods" id="payMethods">
+            <button class="pay-method-btn active" data-val="EFECTIVO"      onclick="elegirFormaPago(this,'EFECTIVO')"><span class="ic">💵</span>Efectivo</button>
+            <button class="pay-method-btn"        data-val="TRANSFERENCIA" onclick="elegirFormaPago(this,'TRANSFERENCIA')"><span class="ic">📲</span>Transfer.</button>
+            <button class="pay-method-btn"        data-val="TARJETA"       onclick="elegirFormaPago(this,'TARJETA')"><span class="ic">💳</span>Tarjeta</button>
+          </div>
+
+          <!-- Descuento: acción opcional y menos frecuente, queda colapsada por defecto -->
           <div class="discount-box" id="discountBox">
             <button class="discount-toggle" id="btnToggleDescuento" onclick="toggleDescuentoPOS()">
               <span class="ic">🏷️</span>
@@ -353,16 +360,13 @@
             </div>
           </div>
 
-          <div class="pay-methods" id="payMethods">
-            <button class="pay-method-btn active" data-val="EFECTIVO"      onclick="elegirFormaPago(this,'EFECTIVO')"><span class="ic">💵</span>Efectivo</button>
-            <button class="pay-method-btn"        data-val="TRANSFERENCIA" onclick="elegirFormaPago(this,'TRANSFERENCIA')"><span class="ic">📲</span>Transfer.</button>
-            <button class="pay-method-btn"        data-val="TARJETA"       onclick="elegirFormaPago(this,'TARJETA')"><span class="ic">💳</span>Tarjeta</button>
+          <!-- Acción principal: Finalizar manda, imprimir y vaciar quedan secundarios -->
+          <div class="ticket-action-row">
+            <button class="btn-finalize" id="btnFinalizarVenta" onclick="finalizarVentaPOS()">✅ Finalizar Venta</button>
+            <button class="btn-print-ticket" id="btnImprimirTicket" onclick="imprimirTicketThermal()" title="Imprimir ticket" disabled>🖨️</button>
           </div>
 
-          <div class="ticket-action-row">
-            <button class="btn-print-ticket" id="btnImprimirTicket" onclick="imprimirTicketThermal()" title="Imprimir ticket" disabled>🖨️</button>
-            <button class="btn-finalize"     id="btnFinalizarVenta" onclick="finalizarVentaPOS()">✅ Finalizar Venta</button>
-          </div>
+          <button class="ticket-clear" id="btnVaciarTicket" onclick="vaciarTicketPOS()">Vaciar ticket</button>
         </div>
       </div>
     </div>
