@@ -712,6 +712,33 @@
     </div>
 
     <div class="card p-3 mt-3">
+      <h6 style="margin-bottom:14px;">🔑 Acceso al panel</h6>
+      <p class="text-muted" style="font-size:12.5px; margin-top:-8px; margin-bottom:14px;">
+        Usuario y contraseña para entrar al panel admin. Por seguridad, necesitás escribir la contraseña actual para poder cambiarlos.
+      </p>
+
+      <div class="mb-3">
+        <label class="form-label">Contraseña actual *</label>
+        <input type="password" class="form-control" id="credPasswordActual" placeholder="Tu contraseña actual" autocomplete="current-password">
+      </div>
+
+      <div class="row g-2 mb-3">
+        <div class="col-6">
+          <label class="form-label">Nuevo usuario</label>
+          <input type="text" class="form-control" id="credNuevoUsuario" placeholder="Ej: admin" autocomplete="username">
+        </div>
+        <div class="col-6">
+          <label class="form-label">Nueva contraseña</label>
+          <input type="password" class="form-control" id="credNuevaPassword" placeholder="Mínimo 4 caracteres" autocomplete="new-password">
+        </div>
+      </div>
+
+      <div class="d-flex justify-content-end mt-3">
+        <button class="btn btn-success" id="btnGuardarCredenciales" onclick="guardarCredencialesForm()">💾 Cambiar acceso</button>
+      </div>
+    </div>
+
+    <div class="card p-3 mt-3">
       <h6 style="margin-bottom:14px;">🎨 Apariencia del catálogo web</h6>
 
       <div class="mb-3">

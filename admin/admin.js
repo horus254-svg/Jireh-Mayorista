@@ -270,6 +270,64 @@ async function guardarSidebarForm() {
   }
 }
 
+/**
+ * Cambia el usuario/contraseña de acceso al panel. Requiere la
+ * contraseña actual — el backend la valida antes de aplicar el cambio.
+ * Por seguridad, este formulario nunca precarga el usuario/contraseña
+ * vigentes (a diferencia de los demás formularios de Configuración).
+ */
+async function guardarCredencialesForm() {
+  const passwordActual = document.getElementById("credPasswordActual").value;
+  const nuevoUsuario = document.getElementById("credNuevoUsuario").value.trim();
+  const nuevaPassword = document.getElementById("credNuevaPassword").value;
+
+  if (!passwordActual) {
+    toast("Ingresá tu contraseña actual para confirmar el cambio", "error");
+    return;
+  }
+
+  if (!nuevoUsuario || !nuevaPassword) {
+    toast("Completá el nuevo usuario y la nueva contraseña", "error");
+    return;
+  }
+
+  if (nuevaPassword.length < 4) {
+    toast("La nueva contraseña debe tener al menos 4 caracteres", "error");
+    return;
+  }
+
+  const btn = document.getElementById("btnGuardarCredenciales");
+  const textoOriginal = btn ? btn.innerHTML : "";
+  if (btn) { btn.disabled = true; btn.innerHTML = "Guardando..."; }
+
+  try {
+    const params = new URLSearchParams({
+      action: "guardarCredencialesAdmin",
+      passwordActual,
+      nuevoUsuario,
+      nuevaPassword
+    });
+    const response = await fetch(API_URL + "?" + params.toString());
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo cambiar el acceso", "error");
+      return;
+    }
+
+    document.getElementById("credPasswordActual").value = "";
+    document.getElementById("credNuevoUsuario").value = "";
+    document.getElementById("credNuevaPassword").value = "";
+    toast("Usuario y contraseña actualizados", "success");
+
+  } catch (error) {
+    console.error("Error al cambiar las credenciales:", error);
+    toast("Error de conexión al guardar", "error");
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = textoOriginal; }
+  }
+}
+
 /* ===================== APARIENCIA DEL CATÁLOGO WEB (banner + tema) ===================== */
 
 const APARIENCIA_DEFAULT = {
