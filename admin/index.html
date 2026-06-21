@@ -822,6 +822,27 @@
     </div>
 
     <div class="card p-3 mt-3">
+      <h6 style="margin-bottom:14px;">📄 PDF de pedidos</h6>
+      <p class="text-muted" style="font-size:12.5px; margin-top:-8px; margin-bottom:14px;">
+        Cada pedido genera un PDF con el detalle del cliente y los productos, que se guarda en esta carpeta de tu Google Drive. Pegá el link de la carpeta (o solo el ID) — tiene que ser una carpeta de la misma cuenta de Google donde está la planilla.
+      </p>
+
+      <div class="mb-3">
+        <label class="form-label">Link o ID de la carpeta de Drive</label>
+        <input type="text" class="form-control" id="cfgDriveCarpetaPedidos" placeholder="https://drive.google.com/drive/folders/...">
+      </div>
+
+      <div class="config-preview-hint">
+        <span class="ic">ℹ️</span>
+        En Drive: abrí la carpeta → botón "Compartir" → "Cualquier persona con el enlace" puede ver → copiá el link y pegalo aquí.
+      </div>
+
+      <div class="d-flex justify-content-end mt-3">
+        <button class="btn btn-success" id="btnGuardarDrivePedidos" onclick="guardarDrivePedidosForm()">💾 Guardar</button>
+      </div>
+    </div>
+
+    <div class="card p-3 mt-3">
       <h6 style="margin-bottom:14px;">🔑 Acceso al panel</h6>
       <p class="text-muted" style="font-size:12.5px; margin-top:-8px; margin-bottom:14px;">
         Usuario y contraseña para entrar al panel admin. Por seguridad, necesitás escribir la contraseña actual para poder cambiarlos.

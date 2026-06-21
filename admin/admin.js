@@ -122,6 +122,7 @@ async function cargarConfigNegocioForm() {
   cargarBeneficiosForm(cfg);
   cargarSidebarForm(cfg);
   cargarDriveProductosForm(cfg);
+  cargarDrivePedidosForm(cfg);
 
   if (form) form.placeholder = "Ej: JIREH";
 }
@@ -292,6 +293,51 @@ async function guardarDriveProductosForm() {
   };
 
   const btn = document.getElementById("btnGuardarDriveProductos");
+  const textoOriginal = btn ? btn.innerHTML : "";
+  if (btn) { btn.disabled = true; btn.innerHTML = "Guardando..."; }
+
+  try {
+    const params = new URLSearchParams({ action: "guardarConfiguracionNegocio", ...cfg });
+    const response = await fetch(API_URL + "?" + params.toString());
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo guardar", "error");
+      return;
+    }
+
+    configNegocioCache = { ...configNegocioCache, ...cfg };
+    toast("Carpeta de Drive guardada", "success");
+
+  } catch (error) {
+    console.error("Error al guardar la carpeta de Drive:", error);
+    toast("Error de conexión al guardar", "error");
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = textoOriginal; }
+  }
+}
+
+/** Loads the configured Drive folder (for order PDF storage) into the Configuración form */
+function cargarDrivePedidosForm(cfg) {
+  const input = document.getElementById("cfgDriveCarpetaPedidos");
+  if (input) input.value = cfg.driveCarpetaPedidosId || "";
+}
+
+/** Saves the Drive folder link/ID used to store generated order PDFs */
+async function guardarDrivePedidosForm() {
+  const nombre = document.getElementById("cfgNombreLocal").value.trim();
+
+  if (!nombre) {
+    toast("Completá primero el nombre del local, arriba", "error");
+    return;
+  }
+
+  const cfg = {
+    nombre,
+    driveCarpetaPedidosId: document.getElementById("cfgDriveCarpetaPedidos").value.trim()
+  };
+
+  const btn = document.getElementById("btnGuardarDrivePedidos");
   const textoOriginal = btn ? btn.innerHTML : "";
   if (btn) { btn.disabled = true; btn.innerHTML = "Guardando..."; }
 
