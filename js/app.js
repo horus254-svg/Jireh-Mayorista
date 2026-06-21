@@ -951,19 +951,45 @@ function aplicarBeneficios(cfg){
    en una grilla de 2x2 con foto, nombre, categoría y precio.
 ========================================================= */
 
-/** Loads an image URL into an HTMLImageElement, resolving even on failure (never rejects) */
-function cargarImagenParaPDF(url){
-    return new Promise(resolve => {
-        if(!url){ resolve(null); return; }
+/**
+ * Loads an image URL and returns it as a base64 data URL ready for
+ * jsPDF.addImage(), or null if it couldn't be loaded — never rejects.
+ *
+ * Importante: pasa por el backend (?action=imagenProxy), no se pide
+ * la imagen directo al navegador. Esto es a propósito: Drive no
+ * siempre responde con los headers de CORS necesarios para que el
+ * navegador pueda leer los píxeles de una imagen externa, y además
+ * el navegador puede haber cacheado esa misma imagen antes (mostrada
+ * en una tarjeta del catálogo) sin esos headers, lo que hace fallar
+ * cualquier intento posterior de leerla para el PDF. Apps Script, al
+ * descargarla del lado del servidor, no tiene esa restricción.
+ */
+async function cargarImagenParaPDF(url){
+    if(!url) return null;
 
-        const img = new Image();
-        img.crossOrigin = "anonymous";
+    try{
+        const response = await fetch(API_URL + "?action=imagenProxy&url=" + encodeURIComponent(url));
+        const data = await response.json();
 
-        img.onload = () => resolve(img);
-        img.onerror = () => resolve(null); // sin imagen disponible: la tarjeta se dibuja sin foto, no se interrumpe el PDF
+        if(!data.success || !data.dataUrl) return null;
 
-        img.src = url;
-    });
+        return data.dataUrl;
+
+    }catch(error){
+        // Falla de red, backend caído, URL inválida, etc. — la
+        // tarjeta se dibuja sin foto, no se interrumpe el PDF entero.
+        return null;
+    }
+}
+
+/** Reads the real image format from a data URL's MIME type, for jsPDF.addImage()'s format argument */
+function detectarFormatoImagenPDF(dataUrl){
+    const match = /^data:image\/(\w+);/.exec(dataUrl);
+    const tipo = match ? match[1].toLowerCase() : "jpeg";
+
+    if(tipo === "png") return "PNG";
+    if(tipo === "webp") return "WEBP";
+    return "JPEG"; // jpeg, jpg, y cualquier otro caso por defecto
 }
 
 /** Draws a single product card inside the given box (x, y, width, height) */
@@ -984,12 +1010,10 @@ function dibujarTarjetaProductoPDF(doc, producto, imagenCargada, x, y, w, h){
 
     if(imagenCargada){
         try{
-            doc.addImage(imagenCargada, "JPEG", imgX, imgY, anchoImagen, altoImagen, undefined, "FAST");
+            const formato = detectarFormatoImagenPDF(imagenCargada);
+            doc.addImage(imagenCargada, formato, imgX, imgY, anchoImagen, altoImagen, undefined, "FAST");
         }catch(e){
-            // Algunos formatos (PNG con transparencia, WEBP) pueden fallar al insertarse como JPEG;
-            // se reintenta como PNG antes de resignarse al placeholder.
-            try{ doc.addImage(imagenCargada, "PNG", imgX, imgY, anchoImagen, altoImagen, undefined, "FAST"); }
-            catch(e2){ dibujarPlaceholderImagenPDF(doc, imgX, imgY, anchoImagen, altoImagen); }
+            dibujarPlaceholderImagenPDF(doc, imgX, imgY, anchoImagen, altoImagen);
         }
     } else {
         dibujarPlaceholderImagenPDF(doc, imgX, imgY, anchoImagen, altoImagen);
@@ -1051,6 +1075,52 @@ function dibujarEncabezadoPaginaPDF(doc, anchoPagina, margen){
     doc.line(margen, margen + 12, anchoPagina - margen, margen + 12);
 }
 
+/** Shows (or updates, if already shown) a single persistent progress toast — used for the PDF generation progress */
+function mostrarProgresoToast(mensaje){
+    let el = document.getElementById("pdf-progreso-toast");
+
+    if(!el){
+        el = document.createElement("div");
+        el.id = "pdf-progreso-toast";
+        el.className = "app-toast info";
+        document.getElementById("toast-container").appendChild(el);
+        requestAnimationFrame(()=> el.classList.add("show"));
+    }
+
+    el.textContent = mensaje;
+}
+
+/** Removes the persistent progress toast, if present */
+function ocultarProgresoToast(){
+    const el = document.getElementById("pdf-progreso-toast");
+    if(!el) return;
+    el.classList.remove("show");
+    setTimeout(()=> el.remove(), 300);
+}
+
+/**
+ * Carga las imágenes de a lotes (no todas en paralelo de una sola vez).
+ * Necesario porque cada imagen pasa por el backend (?action=imagenProxy,
+ * ver cargarImagenParaPDF), y Apps Script tiene un límite de cuántas
+ * ejecuciones puede atender en simultáneo por usuario — con catálogos
+ * grandes (100+ productos), lanzar todo de una vez puede saturar esa
+ * cuota y hacer que varias fallen. `onProgreso` se llama después de
+ * cada lote, para poder mostrar un mensaje de avance al usuario.
+ */
+async function cargarImagenesEnLotes(urls, tamanoLote, onProgreso){
+    const resultados = [];
+
+    for(let i = 0; i < urls.length; i += tamanoLote){
+        const lote = urls.slice(i, i + tamanoLote);
+        const cargadas = await Promise.all(lote.map(url => cargarImagenParaPDF(url)));
+        resultados.push(...cargadas);
+
+        if(onProgreso) onProgreso(resultados.length, urls.length);
+    }
+
+    return resultados;
+}
+
 /** Main entry point: builds and downloads the PDF for the products currently visible on screen */
 async function descargarCatalogoPDF(){
 
@@ -1082,13 +1152,17 @@ async function descargarCatalogoPDF(){
         const anchoTarjeta = (anchoDisponible - gap) / 2;
         const altoTarjeta = (altoDisponible - gap) / 2;
 
-        // Pre-carga todas las imágenes en paralelo antes de dibujar — más
-        // rápido que cargarlas una por una, y evita que el PDF quede a
-        // medio armar si una tarda mucho.
-        mostrarToast(`Preparando PDF de ${lista.length} producto(s)...`, "info");
-        const imagenesCargadas = await Promise.all(
-            lista.map(p => cargarImagenParaPDF(p.IMAGEN))
+        // Pre-carga todas las imágenes antes de dibujar — en lotes, no
+        // todas en paralelo de una sola vez (ver cargarImagenesEnLotes),
+        // mostrando el avance real si hay muchos productos.
+        const TAMANO_LOTE = 8;
+        mostrarProgresoToast(`Preparando PDF... (0/${lista.length} fotos)`);
+        const imagenesCargadas = await cargarImagenesEnLotes(
+            lista.map(p => p.IMAGEN),
+            TAMANO_LOTE,
+            (cargadas, total) => mostrarProgresoToast(`Preparando PDF... (${cargadas}/${total} fotos)`)
         );
+        ocultarProgresoToast();
 
         lista.forEach((producto, idx) => {
 
@@ -1115,6 +1189,7 @@ async function descargarCatalogoPDF(){
 
     }catch(error){
         console.error("Error al generar el PDF del catálogo:", error);
+        ocultarProgresoToast();
         mostrarToast("No se pudo generar el PDF. Intentá de nuevo.", "error");
     }finally{
         if(btn){ btn.disabled = false; btn.innerHTML = textoOriginal; }
