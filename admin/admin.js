@@ -944,7 +944,8 @@ function renderTablaProductos(lista) {
         <span class="badge ${publicado ? "bg-success" : "bg-secondary"}">${publicado ? "Publicado" : "Oculto"}</span>
       </td>
       <td>
-        <button class="btn btn-primary btn-sm" onclick="editarProducto('${escapeHtml(p.CODIGO)}')">Editar</button>
+        <button class="btn btn-outline-success btn-sm" onclick="abrirModalStock('${escapeHtml(p.CODIGO)}')" title="Sumar stock">📦 Stock</button>
+        <button class="btn btn-primary btn-sm ms-2" onclick="editarProducto('${escapeHtml(p.CODIGO)}')">Editar</button>
         <button class="btn btn-danger btn-sm ms-2" onclick="eliminarProducto('${escapeHtml(p.CODIGO)}')">Eliminar</button>
       </td>
     </tr>`;
@@ -1049,6 +1050,99 @@ function editarProducto(codigo) {
 
 function cerrarModalProducto() {
   document.getElementById("productModalBackdrop").classList.remove("show");
+}
+
+/* ===================== AGREGAR STOCK (entrada de mercadería) ===================== */
+
+/** Opens the "Agregar Stock" modal pre-filled with the product's current data */
+function abrirModalStock(codigo) {
+  const p = productosAdminGlobal.find(x => String(x.CODIGO) === String(codigo));
+  if (!p) { toast("No se encontró el producto", "error"); return; }
+
+  document.getElementById("smCodigo").value = p.CODIGO;
+  document.getElementById("smNombre").textContent = p.PRODUCTO || "—";
+  document.getElementById("smCodigoLabel").textContent = p.CODIGO;
+  const stockActual = Number(p.STOCK || 0);
+  document.getElementById("smStockActual").textContent = stockActual.toLocaleString("es-AR");
+  document.getElementById("smStockActual").dataset.valor = stockActual;
+  document.getElementById("smCantidad").value = "";
+
+  const imagenUrl = p.IMAGEN ? String(p.IMAGEN).trim() : "";
+  document.getElementById("smFoto").innerHTML = imagenUrl
+    ? `<img src="${escapeHtml(imagenUrl)}" alt="" onerror="this.parentElement.innerHTML='🛒';">`
+    : "🛒";
+
+  const resultadoEl = document.getElementById("smResultado");
+  resultadoEl.classList.remove("show");
+
+  document.getElementById("stockModalBackdrop").classList.add("show");
+  setTimeout(() => document.getElementById("smCantidad").focus(), 80);
+}
+
+function cerrarModalStock() {
+  document.getElementById("stockModalBackdrop").classList.remove("show");
+}
+
+/** Live preview: shows "stock actual + cantidad = stock nuevo" as the user types */
+function actualizarPreviewStock() {
+  const actual = Number(document.getElementById("smStockActual").dataset.valor || 0);
+  const cantidad = Number(document.getElementById("smCantidad").value || 0);
+  const resultadoEl = document.getElementById("smResultado");
+
+  if (!cantidad || cantidad <= 0) {
+    resultadoEl.classList.remove("show");
+    return;
+  }
+
+  const nuevo = actual + cantidad;
+  resultadoEl.innerHTML = `<span>Nuevo stock</span><strong>${actual.toLocaleString("es-AR")} + ${cantidad.toLocaleString("es-AR")} = ${nuevo.toLocaleString("es-AR")}</strong>`;
+  resultadoEl.classList.add("show");
+}
+
+/** Sends the stock addition to the backend (sumarStockProducto) */
+async function confirmarAgregarStock() {
+  const codigo = document.getElementById("smCodigo").value.trim();
+  const cantidad = document.getElementById("smCantidad").value;
+
+  if (!cantidad || Number(cantidad) <= 0) {
+    toast("Ingresá una cantidad válida, mayor a 0", "error");
+    return;
+  }
+
+  const btn = document.getElementById("btnConfirmarStock");
+  const textoOriginal = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = "Guardando...";
+
+  try {
+    const params = new URLSearchParams({
+      action: "sumarStockProducto",
+      codigo: codigo,
+      cantidad: cantidad
+    });
+
+    const response = await fetch(API_URL + "?" + params.toString());
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo sumar el stock", "error");
+      return;
+    }
+
+    toast(`Stock actualizado: ${data.stockAnterior.toLocaleString("es-AR")} → ${data.stockNuevo.toLocaleString("es-AR")}`, "success");
+    cerrarModalStock();
+    cargarProductos();
+
+    // Refresh in-memory POS catalog too, so the new stock shows up right away
+    productosPOS = [];
+
+  } catch (error) {
+    console.error("Error al sumar stock:", error);
+    toast("Error de conexión al sumar el stock", "error");
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = textoOriginal;
+  }
 }
 
 /** Live preview of the image URL pasted into the product modal */

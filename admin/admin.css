@@ -1141,6 +1141,44 @@ html,body{
   .product-modal-actions .btn{ width:100%; }
 }
 
+/* ===================== AGREGAR STOCK (entrada de mercadería) ===================== */
+
+.stock-modal{ width:min(400px, 94vw); }
+
+.stock-modal-producto{
+  display:flex; align-items:center; gap:12px;
+  padding-bottom:14px; margin-bottom:14px;
+  border-bottom:1px dashed var(--slate-200);
+}
+.stock-modal-producto .tabla-producto-thumb{ width:48px; height:48px; font-size:20px; }
+.stock-modal-producto-info{ min-width:0; flex:1; }
+.stock-modal-producto-nombre{
+  font-size:14.5px; font-weight:700; color:var(--navy-900);
+  line-height:1.3;
+}
+.stock-modal-producto-codigo{ font-size:11.5px; color:var(--slate-400); margin-top:2px; }
+
+.stock-modal-actual{
+  display:flex; align-items:center; justify-content:space-between;
+  background:var(--slate-50); border-radius:10px;
+  padding:10px 14px; font-size:13.5px; color:var(--slate-600);
+}
+.stock-modal-actual strong{
+  font-family:var(--font-mono); font-size:17px; color:var(--navy-900);
+}
+
+.stock-modal-resultado{
+  margin-top:14px; padding:12px 14px; border-radius:10px;
+  background:var(--green-50); border:1.5px solid var(--green-500);
+  display:none;
+  align-items:center; justify-content:space-between;
+  font-size:13.5px; color:var(--green-600); font-weight:600;
+}
+.stock-modal-resultado.show{ display:flex; }
+.stock-modal-resultado strong{
+  font-family:var(--font-mono); font-size:18px;
+}
+
 /* ===================== CONFIGURACIÓN (datos del local) ===================== */
 
 .config-preview-hint{
