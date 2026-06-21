@@ -971,17 +971,11 @@ async function cargarImagenParaPDF(url){
         const response = await fetch(API_URL + "?action=imagenProxy&url=" + encodeURIComponent(url));
         const data = await response.json();
 
-        // TEMPORAL — diagnóstico del problema "sale sin imagen". Quitar
-        // esta línea una vez confirmado y solucionado.
-        console.log("imagenProxy para", url, "→ success:", data.success, "message:", data.message, "dataUrl largo:", data.dataUrl ? data.dataUrl.length : 0);
-
         if(!data.success || !data.dataUrl) return null;
 
         return data.dataUrl;
 
     }catch(error){
-        // TEMPORAL — diagnóstico.
-        console.log("imagenProxy ERROR para", url, "→", error);
         // Falla de red, backend caído, URL inválida, etc. — la
         // tarjeta se dibuja sin foto, no se interrumpe el PDF entero.
         return null;
@@ -1017,12 +1011,8 @@ function dibujarTarjetaProductoPDF(doc, producto, imagenCargada, x, y, w, h){
     if(imagenCargada){
         try{
             const formato = detectarFormatoImagenPDF(imagenCargada);
-            // TEMPORAL — diagnóstico.
-            console.log("Dibujando imagen, formato:", formato, "producto:", producto.PRODUCTO);
             doc.addImage(imagenCargada, formato, imgX, imgY, anchoImagen, altoImagen, undefined, "FAST");
         }catch(e){
-            // TEMPORAL — diagnóstico.
-            console.log("addImage FALLÓ para", producto.PRODUCTO, "→", e);
             dibujarPlaceholderImagenPDF(doc, imgX, imgY, anchoImagen, altoImagen);
         }
     } else {
