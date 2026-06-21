@@ -673,11 +673,14 @@ async function checkoutWhatsapp(){
     const nombre = document.getElementById("clienteNombre").value.trim();
     const empresa = document.getElementById("clienteEmpresa").value.trim();
     const direccion = document.getElementById("clienteDireccion").value.trim();
+    const localidad = document.getElementById("clienteLocalidad").value.trim();
+    const provincia = document.getElementById("clienteProvincia").value.trim();
+    const codigoPostal = document.getElementById("clienteCodigoPostal").value.trim();
     const telefono = document.getElementById("clienteTelefono").value.trim();
     const dni = document.getElementById("clienteDni").value.trim();
 
-    if(nombre === "" || direccion === "" || telefono === "" || dni === ""){
-        mostrarToast("Completá Nombre, Dirección, Teléfono y DNI o CUIT.", "error");
+    if(nombre === "" || direccion === "" || localidad === "" || provincia === "" || telefono === "" || dni === ""){
+        mostrarToast("Completá Nombre, Dirección, Localidad, Provincia, Teléfono y DNI o CUIT.", "error");
         desactivarCargaCheckout();
         return;
     }
@@ -697,6 +700,9 @@ async function checkoutWhatsapp(){
         "&nombre=" + encodeURIComponent(nombre) +
         "&empresa=" + encodeURIComponent(empresa) +
         "&direccion=" + encodeURIComponent(direccion) +
+        "&localidad=" + encodeURIComponent(localidad) +
+        "&provincia=" + encodeURIComponent(provincia) +
+        "&codigoPostal=" + encodeURIComponent(codigoPostal) +
         "&telefono=" + encodeURIComponent(telefono) +
         "&dni=" + encodeURIComponent(dni) +
         "&total=" + total +
@@ -720,6 +726,7 @@ async function checkoutWhatsapp(){
 👤 Cliente: ${nombre}
 🏢 Empresa: ${empresa}
 🏠 Dirección: ${direccion}
+📍 Localidad: ${localidad} (${provincia})${codigoPostal ? " - CP: " + codigoPostal : ""}
 📱 Teléfono: ${telefono}
 🆔 DNI/CUIT: ${dni}
 

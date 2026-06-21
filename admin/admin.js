@@ -1802,6 +1802,9 @@ function renderTicketPOS() {
   const finalizeBtn = document.getElementById("btnFinalizarVenta");
   if (finalizeBtn) finalizeBtn.disabled = ticketPOS.length === 0;
 
+  const generarPedidoBtn = document.getElementById("btnGenerarPedido");
+  if (generarPedidoBtn) generarPedidoBtn.disabled = ticketPOS.length === 0;
+
   const printBtn = document.getElementById("btnImprimirTicket");
   if (printBtn) printBtn.disabled = ticketPOS.length === 0;
 
@@ -1972,6 +1975,96 @@ async function finalizarVentaPOS() {
     toast("Error de conexión al registrar la venta", "error");
   } finally {
     if (btn) { btn.disabled = ticketPOS.length === 0; btn.innerHTML = textoOriginal; }
+  }
+}
+
+/* ---- generar pedido desde el POS (no es una venta, no descuenta stock) ---- */
+
+/** Opens the "Generar Pedido" modal, pre-filling the current ticket total */
+function abrirModalPedidoAdmin() {
+  if (ticketPOS.length === 0) { toast("El ticket está vacío, agregá productos primero", "error"); return; }
+
+  const subtotal = ticketPOS.reduce((acc, item) => acc + (item.PRECIO * item.cantidad), 0);
+  const { total } = calcularDescuentoPOS(subtotal);
+
+  document.getElementById("paNombre").value = "";
+  document.getElementById("paEmpresa").value = "";
+  document.getElementById("paDireccion").value = "";
+  document.getElementById("paLocalidad").value = "";
+  document.getElementById("paProvincia").value = "";
+  document.getElementById("paCodigoPostal").value = "";
+  document.getElementById("paTelefono").value = "";
+  document.getElementById("paDni").value = "";
+  document.getElementById("paTotal").textContent = "$" + total.toLocaleString("es-AR");
+
+  document.getElementById("pedidoAdminModalBackdrop").classList.add("show");
+  setTimeout(() => document.getElementById("paNombre").focus(), 80);
+}
+
+function cerrarModalPedidoAdmin() {
+  document.getElementById("pedidoAdminModalBackdrop").classList.remove("show");
+}
+
+/** Sends the current POS ticket as a pedido (PEDIDOS/DETALLE_PEDIDOS) — never touches stock */
+async function confirmarPedidoAdmin() {
+  if (ticketPOS.length === 0) { toast("El ticket está vacío", "error"); cerrarModalPedidoAdmin(); return; }
+
+  const nombre = document.getElementById("paNombre").value.trim();
+  const empresa = document.getElementById("paEmpresa").value.trim();
+  const direccion = document.getElementById("paDireccion").value.trim();
+  const localidad = document.getElementById("paLocalidad").value.trim();
+  const provincia = document.getElementById("paProvincia").value.trim();
+  const codigoPostal = document.getElementById("paCodigoPostal").value.trim();
+  const telefono = document.getElementById("paTelefono").value.trim();
+  const dni = document.getElementById("paDni").value.trim();
+
+  if (!nombre || !direccion || !localidad || !provincia || !telefono || !dni) {
+    toast("Completá Nombre, Dirección, Localidad, Provincia, Teléfono y DNI/CUIT", "error");
+    return;
+  }
+
+  const subtotal = ticketPOS.reduce((acc, item) => acc + (item.PRECIO * item.cantidad), 0);
+  const { total } = calcularDescuentoPOS(subtotal);
+
+  const btn = document.getElementById("btnConfirmarPedidoAdmin");
+  const textoOriginal = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = "Creando pedido...";
+
+  try {
+    const params = new URLSearchParams({
+      action: "guardarPedidoAdmin",
+      nombre, empresa, direccion, localidad, provincia, codigoPostal, telefono, dni,
+      total: total,
+      carrito: JSON.stringify(ticketPOS)
+    });
+
+    const response = await fetch(API_URL + "?" + params.toString());
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo crear el pedido", "error");
+      return;
+    }
+
+    toast(`Pedido ${data.pedidoId} creado`, "success");
+    cerrarModalPedidoAdmin();
+
+    // El pedido no es una venta: el ticket se vacía igual, para que el
+    // cajero pueda empezar de cero, pero sin tocar stock ni métricas
+    // de ventas (a diferencia de finalizarVentaPOS).
+    ticketPOS = [];
+    resetearDescuentoPOS();
+    renderTicketPOS();
+    ultimoCodigoAgregadoPOS = null;
+    posTileFocusIdx = -1;
+
+  } catch (error) {
+    console.error("Error al crear el pedido:", error);
+    toast("Error de conexión al crear el pedido", "error");
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = textoOriginal;
   }
 }
 

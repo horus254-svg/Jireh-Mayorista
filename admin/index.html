@@ -381,6 +381,8 @@
             <button class="btn-print-ticket" id="btnImprimirTicket" onclick="imprimirTicketThermal()" title="Imprimir ticket" disabled>🖨️</button>
           </div>
 
+          <button class="btn-generar-pedido" id="btnGenerarPedido" onclick="abrirModalPedidoAdmin()">📦 Generar Pedido (no es venta)</button>
+
           <button class="ticket-clear" id="btnVaciarTicket" onclick="vaciarTicketPOS()">Vaciar ticket</button>
         </div>
       </div>
@@ -1129,6 +1131,77 @@
     <div class="product-modal-actions">
       <button class="btn btn-outline-secondary" onclick="cerrarModalStock()">Cancelar</button>
       <button class="btn btn-success" id="btnConfirmarStock" onclick="confirmarAgregarStock()">📦 Sumar al stock</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== GENERAR PEDIDO (desde el POS, no es una venta) ===== -->
+<div class="product-modal-backdrop" id="pedidoAdminModalBackdrop">
+  <div class="product-modal pedido-admin-modal">
+    <div class="product-modal-header">
+      <h6>📦 Generar Pedido</h6>
+      <button onclick="cerrarModalPedidoAdmin()">✕</button>
+    </div>
+
+    <div class="product-modal-body">
+
+      <div class="config-preview-hint mb-3">
+        <span class="ic">ℹ️</span>
+        Esto crea un pedido (queda en la sección Pedidos) — no es una venta y no descuenta stock. El ticket actual del POS se usa como detalle del pedido.
+      </div>
+
+      <div class="mb-2">
+        <label class="form-label">Nombre y Apellido *</label>
+        <input type="text" class="form-control" id="paNombre" placeholder="Nombre del cliente" autofocus>
+      </div>
+
+      <div class="mb-2">
+        <label class="form-label">Empresa <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+        <input type="text" class="form-control" id="paEmpresa" placeholder="Ej: Almacén Don José">
+      </div>
+
+      <div class="mb-2">
+        <label class="form-label">Dirección *</label>
+        <input type="text" class="form-control" id="paDireccion" placeholder="Calle y número">
+      </div>
+
+      <div class="row g-2 mb-2">
+        <div class="col-6">
+          <label class="form-label">Localidad *</label>
+          <input type="text" class="form-control" id="paLocalidad" placeholder="Ej: San Justo">
+        </div>
+        <div class="col-6">
+          <label class="form-label">Provincia *</label>
+          <input type="text" class="form-control" id="paProvincia" placeholder="Ej: Buenos Aires">
+        </div>
+      </div>
+
+      <div class="row g-2 mb-2">
+        <div class="col-6">
+          <label class="form-label">Código Postal <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+          <input type="text" class="form-control" id="paCodigoPostal" placeholder="Ej: 1754">
+        </div>
+        <div class="col-6">
+          <label class="form-label">Teléfono *</label>
+          <input type="tel" class="form-control" id="paTelefono" placeholder="Ej: 11-2345-6789">
+        </div>
+      </div>
+
+      <div class="mb-2">
+        <label class="form-label">DNI o CUIT *</label>
+        <input type="text" class="form-control" id="paDni" placeholder="Sin puntos ni guiones">
+      </div>
+
+      <div class="pedido-admin-resumen">
+        <span>Total del pedido</span>
+        <strong id="paTotal">$0</strong>
+      </div>
+
+    </div>
+
+    <div class="product-modal-actions">
+      <button class="btn btn-outline-secondary" onclick="cerrarModalPedidoAdmin()">Cancelar</button>
+      <button class="btn btn-success" id="btnConfirmarPedidoAdmin" onclick="confirmarPedidoAdmin()">📦 Crear Pedido</button>
     </div>
   </div>
 </div>
