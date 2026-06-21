@@ -23,6 +23,12 @@ const estado = {
 // es solo el valor por defecto mientras carga o si falla la conexión.
 let whatsappNumero = "5491140975795";
 
+// Promesa de la carga de configuración (se asigna más abajo, al llamar
+// aplicarApariencia()). checkoutWhatsapp() la espera antes de armar el
+// link de WhatsApp, para nunca mandar el pedido al número de respaldo
+// por una carrera entre el clic del cliente y la respuesta del backend.
+let apariencaCargadaPromise = null;
+
 let qvProductoActual = null;
 let debounceTimer = null;
 
@@ -619,6 +625,14 @@ document.getElementById("cart-items").addEventListener("change", function(e){
 
 async function checkoutWhatsapp(){
 
+    // Espera a que termine de cargar la configuración del negocio (de donde
+    // sale whatsappNumero), por si el cliente hizo clic muy rápido y esa
+    // carga todavía estaba en curso. Si ya terminó, esto no demora nada.
+    // Si falla, igual sigue: whatsappNumero ya tiene el valor de respaldo.
+    if(apariencaCargadaPromise){
+        try{ await apariencaCargadaPromise; }catch(e){ /* whatsappNumero ya tiene el valor de respaldo */ }
+    }
+
     const nombre = document.getElementById("clienteNombre").value.trim();
     const empresa = document.getElementById("clienteEmpresa").value.trim();
     const direccion = document.getElementById("clienteDireccion").value.trim();
@@ -901,6 +915,6 @@ function aplicarBeneficios(cfg){
    INICIO
 ========================================================= */
 
-aplicarApariencia();
+apariencaCargadaPromise = aplicarApariencia();
 actualizarContador();
 cargarProductos();
