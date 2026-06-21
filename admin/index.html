@@ -474,7 +474,13 @@
           <span class="cc-ic">💵</span>
           <h6>Efectivo</h6>
         </div>
-        <div class="cc-row"><span>Esperado (según ventas)</span><strong id="ccEfectivoEsperado">$0</strong></div>
+        <div class="cc-row"><span>Esperado (ventas + movimientos)</span><strong id="ccEfectivoEsperado">$0</strong></div>
+        <div class="cc-movimientos-detalle" id="ccMovimientosDetalle" style="display:none;">
+          <div class="cc-mov-line"><span>Ventas en efectivo</span><span id="ccVentasEfectivo">$0</span></div>
+          <div class="cc-mov-line cc-mov-ingreso"><span>+ Ingresos de caja</span><span id="ccMovIngresos">$0</span></div>
+          <div class="cc-mov-line cc-mov-egreso"><span>− Egresos de caja</span><span id="ccMovEgresos">$0</span></div>
+          <a href="#" class="cc-mov-link" onclick="mostrarSeccion('movimientosCaja'); return false;">Ver detalle de movimientos →</a>
+        </div>
         <div class="cc-row">
           <span>Contado físicamente</span>
           <input type="number" class="form-control form-control-sm cc-input" id="ccEfectivoContado" placeholder="0" min="0" step="1" oninput="calcularDiferenciasCierreCaja()">

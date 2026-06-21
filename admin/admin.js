@@ -2869,6 +2869,20 @@ async function cargarResumenCierreCaja(fecha) {
     actualizarElemento("ccTarjetaEsperado",       "$" + Number(data.esperado.TARJETA).toLocaleString("es-AR"));
     actualizarElemento("ccTotalEsperado",         "$" + Number(data.esperado.TOTAL).toLocaleString("es-AR"));
 
+    // Desglose de efectivo: solo se muestra si hubo ingresos/egresos manuales
+    // ese día — si no hubo, "esperado" es directamente igual a las ventas
+    // y no tiene sentido mostrar un desglose vacío.
+    const movDetalleEl = document.getElementById("ccMovimientosDetalle");
+    const mov = data.movimientosCaja;
+    if (movDetalleEl && mov && (mov.ingresos > 0 || mov.egresos > 0)) {
+      actualizarElemento("ccVentasEfectivo", "$" + Number(data.ventasEfectivo || 0).toLocaleString("es-AR"));
+      actualizarElemento("ccMovIngresos", "+$" + Number(mov.ingresos).toLocaleString("es-AR"));
+      actualizarElemento("ccMovEgresos", "-$" + Number(mov.egresos).toLocaleString("es-AR"));
+      movDetalleEl.style.display = "flex";
+    } else if (movDetalleEl) {
+      movDetalleEl.style.display = "none";
+    }
+
     // If a closing already exists for this date, pre-fill counted amounts so the user can review/edit
     const inputEfectivo      = document.getElementById("ccEfectivoContado");
     const inputTransferencia = document.getElementById("ccTransferenciaContado");
