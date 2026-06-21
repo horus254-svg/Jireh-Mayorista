@@ -58,6 +58,15 @@
                     </button>
                 </div>
 
+                <button
+                    id="btn-descargar-pdf"
+                    class="btn btn-pdf-top"
+                    type="button"
+                    onclick="descargarCatalogoPDF()"
+                    title="Descargar en PDF los productos que se están mostrando">
+                    📄 PDF
+                </button>
+
             </div>
 
         </div>
@@ -233,7 +242,8 @@
                         id="btn-checkout"
                         class="btn btn-success"
                         onclick="checkoutWhatsapp()">
-                        Enviar pedido por WhatsApp
+                        <span class="btn-checkout-spinner"></span>
+                        <span id="btn-checkout-texto">Enviar pedido por WhatsApp</span>
                     </button>
 
                 </div>
@@ -308,6 +318,8 @@
     <!-- SCRIPTS -->
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
     <script src="js/app.js"></script>
 

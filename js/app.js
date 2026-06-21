@@ -13,6 +13,7 @@ const PLACEHOLDER_IMG = "data:image/svg+xml;base64," + btoa(
 
 const estado = {
     productos: [],
+    productosVisibles: [],
     carrito: JSON.parse(localStorage.getItem("carrito")) || [],
     busqueda: "",
     categoria: ""
@@ -28,6 +29,10 @@ let whatsappNumero = "5491140975795";
 // link de WhatsApp, para nunca mandar el pedido al número de respaldo
 // por una carrera entre el clic del cliente y la respuesta del backend.
 let apariencaCargadaPromise = null;
+
+// Nombre del negocio, para el encabezado del PDF del catálogo. Se
+// sobreescribe con el valor de Sheets en aplicarApariencia().
+let nombreNegocio = "Catálogo";
 
 let qvProductoActual = null;
 let debounceTimer = null;
@@ -196,6 +201,10 @@ function aplicarFiltros(){
             String(p.PRODUCTO || "").toLowerCase().includes(estado.busqueda)
         );
     }
+
+    // Se guarda la lista visible actual, para que el botón de descarga
+    // de PDF siempre tome exactamente lo que se está mostrando en pantalla.
+    estado.productosVisibles = lista;
 
     mostrarProductos(lista);
 }
@@ -623,7 +632,35 @@ document.getElementById("cart-items").addEventListener("change", function(e){
    CHECKOUT (WHATSAPP)
 ========================================================= */
 
+// Bandera explícita además de btn.disabled — evita que dos clics
+// disparados casi en simultáneo (doble clic muy rápido) entren ambos
+// a la función antes de que el atributo "disabled" surta efecto.
+let enviandoPedido = false;
+
+/** Puts the checkout button into its "sending" state: spinner, disabled, locked */
+function activarCargaCheckout(){
+    enviandoPedido = true;
+    const btn = document.getElementById("btn-checkout");
+    const texto = document.getElementById("btn-checkout-texto");
+    if(btn){ btn.disabled = true; btn.classList.add("loading"); }
+    if(texto) texto.textContent = "Enviando pedido...";
+}
+
+/** Restores the checkout button to its normal, clickable state */
+function desactivarCargaCheckout(){
+    enviandoPedido = false;
+    const btn = document.getElementById("btn-checkout");
+    const texto = document.getElementById("btn-checkout-texto");
+    if(btn){ btn.disabled = false; btn.classList.remove("loading"); }
+    if(texto) texto.textContent = "Enviar pedido por WhatsApp";
+}
+
 async function checkoutWhatsapp(){
+
+    // Primera línea de defensa contra doble envío: si ya hay un pedido
+    // en curso, no hace nada más — ni siquiera vuelve a validar.
+    if(enviandoPedido) return;
+    activarCargaCheckout();
 
     // Espera a que termine de cargar la configuración del negocio (de donde
     // sale whatsappNumero), por si el cliente hizo clic muy rápido y esa
@@ -641,20 +678,18 @@ async function checkoutWhatsapp(){
 
     if(nombre === "" || direccion === "" || telefono === "" || dni === ""){
         mostrarToast("Completá Nombre, Dirección, Teléfono y DNI o CUIT.", "error");
+        desactivarCargaCheckout();
         return;
     }
 
     if(estado.carrito.length === 0){
         mostrarToast("Tu carrito está vacío.", "error");
+        desactivarCargaCheckout();
         return;
     }
 
     let total = 0;
     estado.carrito.forEach(item => { total += item.PRECIO * item.cantidad; });
-
-    const btnCheckout = document.getElementById("btn-checkout");
-    btnCheckout.disabled = true;
-    btnCheckout.textContent = "Enviando...";
 
     const url =
         API_URL +
@@ -674,8 +709,7 @@ async function checkoutWhatsapp(){
 
         if(!resultado.success){
             mostrarToast("No se pudo guardar el pedido. Intentá de nuevo.", "error");
-            btnCheckout.disabled = false;
-            btnCheckout.textContent = "Enviar pedido por WhatsApp";
+            desactivarCargaCheckout();
             return;
         }
 
@@ -718,8 +752,7 @@ Subtotal: $${formatearPrecio(subtotal)}
         const modal = bootstrap.Modal.getInstance(modalElement);
         if(modal) modal.hide();
 
-        btnCheckout.disabled = false;
-        btnCheckout.textContent = "Enviar pedido por WhatsApp";
+        desactivarCargaCheckout();
 
         setTimeout(()=>{
             window.location.href = `https://api.whatsapp.com/send?phone=${whatsappNumero}&text=${encodeURIComponent(mensaje)}`;
@@ -731,8 +764,7 @@ Subtotal: $${formatearPrecio(subtotal)}
 
         mostrarToast("Error al registrar el pedido.", "error");
 
-        btnCheckout.disabled = false;
-        btnCheckout.textContent = "Enviar pedido por WhatsApp";
+        desactivarCargaCheckout();
     }
 }
 
@@ -813,6 +845,7 @@ async function aplicarApariencia(){
         // --- Título de la pestaña del navegador ---
         if(cfg.nombre){
             document.title = cfg.nombre;
+            nombreNegocio = cfg.nombre;
         }
 
         // --- Sección "Beneficios" (chips bajo el banner) ---
@@ -909,6 +942,183 @@ function aplicarBeneficios(cfg){
     const texto2El = document.getElementById("beneficio-texto2");
     if(texto2El) texto2El.textContent = texto2;
     configurarChipBeneficio("beneficio-texto2-wrap", !!texto2);
+}
+
+/* =========================================================
+   DESCARGA DE CATÁLOGO EN PDF
+   Genera un PDF con los productos que se están mostrando AHORA
+   (respeta búsqueda y filtro de categoría activos), 4 por hoja,
+   en una grilla de 2x2 con foto, nombre, categoría y precio.
+========================================================= */
+
+/** Loads an image URL into an HTMLImageElement, resolving even on failure (never rejects) */
+function cargarImagenParaPDF(url){
+    return new Promise(resolve => {
+        if(!url){ resolve(null); return; }
+
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+
+        img.onload = () => resolve(img);
+        img.onerror = () => resolve(null); // sin imagen disponible: la tarjeta se dibuja sin foto, no se interrumpe el PDF
+
+        img.src = url;
+    });
+}
+
+/** Draws a single product card inside the given box (x, y, width, height) */
+function dibujarTarjetaProductoPDF(doc, producto, imagenCargada, x, y, w, h){
+
+    const margenInterno = 10;
+    const anchoImagen = w - margenInterno * 2;
+    const altoImagen = anchoImagen; // tarjeta de imagen cuadrada
+
+    // --- Marco de la tarjeta ---
+    doc.setDrawColor(225, 228, 235);
+    doc.setLineWidth(0.6);
+    doc.roundedRect(x, y, w, h, 4, 4, "S");
+
+    // --- Imagen (o placeholder si no cargó) ---
+    const imgX = x + margenInterno;
+    const imgY = y + margenInterno;
+
+    if(imagenCargada){
+        try{
+            doc.addImage(imagenCargada, "JPEG", imgX, imgY, anchoImagen, altoImagen, undefined, "FAST");
+        }catch(e){
+            // Algunos formatos (PNG con transparencia, WEBP) pueden fallar al insertarse como JPEG;
+            // se reintenta como PNG antes de resignarse al placeholder.
+            try{ doc.addImage(imagenCargada, "PNG", imgX, imgY, anchoImagen, altoImagen, undefined, "FAST"); }
+            catch(e2){ dibujarPlaceholderImagenPDF(doc, imgX, imgY, anchoImagen, altoImagen); }
+        }
+    } else {
+        dibujarPlaceholderImagenPDF(doc, imgX, imgY, anchoImagen, altoImagen);
+    }
+
+    // --- Textos, debajo de la imagen ---
+    let cursorY = imgY + altoImagen + 14;
+    const textoX = x + margenInterno;
+    const anchoTexto = w - margenInterno * 2;
+
+    const categoria = String(producto.CATEGORIA || "").trim();
+    if(categoria){
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8.5);
+        doc.setTextColor(140, 145, 160);
+        doc.text(categoria.toUpperCase(), textoX, cursorY);
+        cursorY += 13;
+    }
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(30, 35, 50);
+    const nombreLineas = doc.splitTextToSize(String(producto.PRODUCTO || ""), anchoTexto);
+    doc.text(nombreLineas.slice(0, 2), textoX, cursorY); // máximo 2 líneas, para no desbordar la tarjeta
+    cursorY += nombreLineas.slice(0, 2).length * 13 + 6;
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.setTextColor(20, 130, 90);
+    doc.text("$" + formatearPrecio(producto.PRECIO), textoX, cursorY);
+}
+
+/** Simple gray placeholder box, used when a product has no image or it failed to load */
+function dibujarPlaceholderImagenPDF(doc, x, y, w, h){
+    doc.setFillColor(238, 241, 246);
+    doc.rect(x, y, w, h, "F");
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(170, 175, 190);
+    doc.text("Sin imagen", x + w / 2, y + h / 2, { align: "center" });
+}
+
+/** Draws the small header repeated at the top of every page */
+function dibujarEncabezadoPaginaPDF(doc, anchoPagina, margen){
+    const fecha = new Date().toLocaleDateString("es-AR");
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(13);
+    doc.setTextColor(20, 25, 40);
+    doc.text(nombreNegocio, margen, margen + 4);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(140, 145, 160);
+    doc.text(fecha, anchoPagina - margen, margen + 4, { align: "right" });
+
+    doc.setDrawColor(225, 228, 235);
+    doc.setLineWidth(0.8);
+    doc.line(margen, margen + 12, anchoPagina - margen, margen + 12);
+}
+
+/** Main entry point: builds and downloads the PDF for the products currently visible on screen */
+async function descargarCatalogoPDF(){
+
+    const lista = estado.productosVisibles || [];
+
+    if(lista.length === 0){
+        mostrarToast("No hay productos para descargar con el filtro actual.", "error");
+        return;
+    }
+
+    const btn = document.getElementById("btn-descargar-pdf");
+    const textoOriginal = btn ? btn.innerHTML : "";
+    if(btn){ btn.disabled = true; btn.innerHTML = "⏳ Generando..."; }
+
+    try{
+
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
+
+        const anchoPagina = doc.internal.pageSize.getWidth();
+        const altoPagina = doc.internal.pageSize.getHeight();
+        const margen = 36;
+        const espacioEncabezado = 50;
+
+        const anchoDisponible = anchoPagina - margen * 2;
+        const altoDisponible = altoPagina - margen * 2 - espacioEncabezado;
+
+        const gap = 14;
+        const anchoTarjeta = (anchoDisponible - gap) / 2;
+        const altoTarjeta = (altoDisponible - gap) / 2;
+
+        // Pre-carga todas las imágenes en paralelo antes de dibujar — más
+        // rápido que cargarlas una por una, y evita que el PDF quede a
+        // medio armar si una tarda mucho.
+        mostrarToast(`Preparando PDF de ${lista.length} producto(s)...`, "info");
+        const imagenesCargadas = await Promise.all(
+            lista.map(p => cargarImagenParaPDF(p.IMAGEN))
+        );
+
+        lista.forEach((producto, idx) => {
+
+            const posicionEnPagina = idx % 4;
+
+            if(posicionEnPagina === 0){
+                if(idx > 0) doc.addPage();
+                dibujarEncabezadoPaginaPDF(doc, anchoPagina, margen);
+            }
+
+            const col = posicionEnPagina % 2;
+            const fila = Math.floor(posicionEnPagina / 2);
+
+            const x = margen + col * (anchoTarjeta + gap);
+            const y = margen + espacioEncabezado + fila * (altoTarjeta + gap);
+
+            dibujarTarjetaProductoPDF(doc, producto, imagenesCargadas[idx], x, y, anchoTarjeta, altoTarjeta);
+        });
+
+        const fechaArchivo = new Date().toISOString().slice(0, 10);
+        doc.save(`catalogo_${fechaArchivo}.pdf`);
+
+        mostrarToast("PDF descargado correctamente.", "success");
+
+    }catch(error){
+        console.error("Error al generar el PDF del catálogo:", error);
+        mostrarToast("No se pudo generar el PDF. Intentá de nuevo.", "error");
+    }finally{
+        if(btn){ btn.disabled = false; btn.innerHTML = textoOriginal; }
+    }
 }
 
 /* =========================================================
