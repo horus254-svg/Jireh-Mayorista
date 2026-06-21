@@ -824,7 +824,23 @@
     <div class="card p-3 mt-3">
       <h6 style="margin-bottom:14px;">📄 PDF de pedidos</h6>
       <p class="text-muted" style="font-size:12.5px; margin-top:-8px; margin-bottom:14px;">
-        Cada pedido genera un PDF con el detalle del cliente y los productos, que se guarda en esta carpeta de tu Google Drive. Pegá el link de la carpeta (o solo el ID) — tiene que ser una carpeta de la misma cuenta de Google donde está la planilla.
+        Cada pedido genera un PDF con el detalle del cliente y los productos. El título y el WhatsApp del encabezado usan el <strong>nombre del local</strong> y el <strong>WhatsApp</strong> que configuraste arriba — los textos de abajo son específicos de este PDF.
+      </p>
+
+      <div class="mb-3">
+        <label class="form-label">Subtítulo del encabezado</label>
+        <input type="text" class="form-control" id="cfgPedidoPdfSubtitulo" placeholder="Ej: Distribuidora Mayorista">
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Texto del pie de página</label>
+        <input type="text" class="form-control" id="cfgPedidoPdfPie" placeholder="Ej: Gracias por su compra.">
+      </div>
+
+      <hr class="my-3">
+
+      <p class="text-muted" style="font-size:12.5px; margin-bottom:14px;">
+        Carpeta de Google Drive donde se guarda cada PDF generado. Pegá el link de la carpeta (o solo el ID) — tiene que ser una carpeta de la misma cuenta de Google donde está la planilla.
       </p>
 
       <div class="mb-3">

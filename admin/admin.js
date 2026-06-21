@@ -319,11 +319,17 @@ async function guardarDriveProductosForm() {
 
 /** Loads the configured Drive folder (for order PDF storage) into the Configuración form */
 function cargarDrivePedidosForm(cfg) {
-  const input = document.getElementById("cfgDriveCarpetaPedidos");
-  if (input) input.value = cfg.driveCarpetaPedidosId || "";
+  const carpetaInput = document.getElementById("cfgDriveCarpetaPedidos");
+  if (carpetaInput) carpetaInput.value = cfg.driveCarpetaPedidosId || "";
+
+  const subtituloInput = document.getElementById("cfgPedidoPdfSubtitulo");
+  if (subtituloInput) subtituloInput.value = cfg.pedidoPdfSubtitulo || "";
+
+  const pieInput = document.getElementById("cfgPedidoPdfPie");
+  if (pieInput) pieInput.value = cfg.pedidoPdfPie || "";
 }
 
-/** Saves the Drive folder link/ID used to store generated order PDFs */
+/** Saves both the Drive folder and the editable texts used by the order PDF */
 async function guardarDrivePedidosForm() {
   const nombre = document.getElementById("cfgNombreLocal").value.trim();
 
@@ -334,7 +340,9 @@ async function guardarDrivePedidosForm() {
 
   const cfg = {
     nombre,
-    driveCarpetaPedidosId: document.getElementById("cfgDriveCarpetaPedidos").value.trim()
+    driveCarpetaPedidosId: document.getElementById("cfgDriveCarpetaPedidos").value.trim(),
+    pedidoPdfSubtitulo:    document.getElementById("cfgPedidoPdfSubtitulo").value.trim(),
+    pedidoPdfPie:          document.getElementById("cfgPedidoPdfPie").value.trim()
   };
 
   const btn = document.getElementById("btnGuardarDrivePedidos");
@@ -352,7 +360,7 @@ async function guardarDrivePedidosForm() {
     }
 
     configNegocioCache = { ...configNegocioCache, ...cfg };
-    toast("Carpeta de Drive guardada", "success");
+    toast("Configuración del PDF de pedidos guardada", "success");
 
   } catch (error) {
     console.error("Error al guardar la carpeta de Drive:", error);
