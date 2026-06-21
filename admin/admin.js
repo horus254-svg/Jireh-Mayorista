@@ -915,7 +915,7 @@ function renderTablaProductos(lista) {
   if (!tbody) return;
 
   if (!lista || lista.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4">No se encontraron productos</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted py-4">No se encontraron productos</td></tr>`;
     return;
   }
 
@@ -927,8 +927,14 @@ function renderTablaProductos(lista) {
       ? `<span class="tile-stock out">Sin stock</span>`
       : (stock <= 5 ? `<span class="tile-stock low">${stock}</span>` : stock);
 
+    const imagenUrl = p.IMAGEN ? String(p.IMAGEN).trim() : "";
+    const fotoHtml = imagenUrl
+      ? `<img src="${escapeHtml(imagenUrl)}" alt="" loading="lazy" onerror="this.parentElement.innerHTML='🛒';">`
+      : "🛒";
+
     html += `
     <tr>
+      <td><div class="tabla-producto-thumb">${fotoHtml}</div></td>
       <td class="mono">${escapeHtml(p.CODIGO)}</td>
       <td>${escapeHtml(p.PRODUCTO)}</td>
       <td>${escapeHtml(p.CATEGORIA || "—")}</td>
