@@ -20,6 +20,7 @@
     <a href="#" data-target="pos"              onclick="mostrarSeccion('pos')"><span class="ic">🏪</span> Punto de Venta</a>
     <a href="#" data-target="ventasPOS"        onclick="mostrarSeccion('ventasPOS')"><span class="ic">🧾</span> Ventas POS</a>
     <a href="#" data-target="cierreCaja"        onclick="mostrarSeccion('cierreCaja')"><span class="ic">🧮</span> Cierre de Caja</a>
+    <a href="#" data-target="movimientosCaja"   onclick="mostrarSeccion('movimientosCaja')"><span class="ic">💸</span> Movimientos de Caja</a>
     <a href="#" data-target="pedidos"          onclick="mostrarSeccion('pedidos')"><span class="ic">📦</span> Pedidos</a>
     <a href="#" data-target="productos"        onclick="mostrarSeccion('productos')"><span class="ic">🛒</span> Productos</a>
     <a href="#" data-target="clientes"         onclick="mostrarSeccion('clientes'); cargarClientes();"><span class="ic">👥</span> Clientes</a>
@@ -281,6 +282,7 @@
   <div id="pos" class="seccion">
     <div class="page-header">
       <div><h1>Punto de Venta</h1><div class="sub">Escaneá, buscá o tocá un producto para agregarlo al ticket</div></div>
+      <button class="btn-shortcuts-help" id="btnShortcutsHelp" onclick="toggleShortcutsHelp()" title="Atajos de teclado">⌨️ Atajos</button>
     </div>
 
     <div class="pos-wrap">
@@ -291,10 +293,23 @@
           <input
             type="text" id="posBusqueda" autocomplete="off"
             inputmode="text"
-            placeholder="Escaneá o escribí para buscar..."
+            placeholder="Escaneá o escribí para buscar... (Ctrl+K)"
             onkeyup="onPosInputKeyup(event)">
           <span id="scannerStatus" class="scanner-status idle"><span class="dot"></span> Listo</span>
           <button class="btn-camera-scan" id="btnCameraScan" onclick="abrirCamaraScan()" title="Escanear con cámara">📷</button>
+        </div>
+
+        <!-- Panel de producto recién escaneado, con su imagen cargada -->
+        <div class="scan-result-panel" id="scanResultPanel">
+          <div class="scan-result-label"><span class="dot"></span> Último escaneado</div>
+          <div class="scan-result-body">
+            <div class="scan-result-thumb" id="scanResultThumb">🛒</div>
+            <div class="scan-result-info">
+              <div class="scan-result-name" id="scanResultName">Escaneá un producto para verlo aquí</div>
+              <div class="scan-result-code mono" id="scanResultCode">—</div>
+            </div>
+            <div class="scan-result-price" id="scanResultPrice">—</div>
+          </div>
         </div>
 
         <div class="pos-categories" id="posCategorias"></div>
@@ -335,9 +350,9 @@
 
           <!-- Forma de pago: sigue naturalmente al total, antes de cualquier ajuste opcional -->
           <div class="pay-methods" id="payMethods">
-            <button class="pay-method-btn active" data-val="EFECTIVO"      onclick="elegirFormaPago(this,'EFECTIVO')"><span class="ic">💵</span>Efectivo</button>
-            <button class="pay-method-btn"        data-val="TRANSFERENCIA" onclick="elegirFormaPago(this,'TRANSFERENCIA')"><span class="ic">📲</span>Transfer.</button>
-            <button class="pay-method-btn"        data-val="TARJETA"       onclick="elegirFormaPago(this,'TARJETA')"><span class="ic">💳</span>Tarjeta</button>
+            <button class="pay-method-btn active" data-val="EFECTIVO"      onclick="elegirFormaPago(this,'EFECTIVO')"><span class="ic">💵</span>Efectivo <kbd>1</kbd></button>
+            <button class="pay-method-btn"        data-val="TRANSFERENCIA" onclick="elegirFormaPago(this,'TRANSFERENCIA')"><span class="ic">📲</span>Transfer. <kbd>2</kbd></button>
+            <button class="pay-method-btn"        data-val="TARJETA"       onclick="elegirFormaPago(this,'TARJETA')"><span class="ic">💳</span>Tarjeta <kbd>3</kbd></button>
           </div>
 
           <!-- Descuento: acción opcional y menos frecuente, queda colapsada por defecto -->
@@ -362,11 +377,30 @@
 
           <!-- Acción principal: Finalizar manda, imprimir y vaciar quedan secundarios -->
           <div class="ticket-action-row">
-            <button class="btn-finalize" id="btnFinalizarVenta" onclick="finalizarVentaPOS()">✅ Finalizar Venta</button>
+            <button class="btn-finalize" id="btnFinalizarVenta" onclick="finalizarVentaPOS()">✅ Finalizar Venta <kbd>F2</kbd></button>
             <button class="btn-print-ticket" id="btnImprimirTicket" onclick="imprimirTicketThermal()" title="Imprimir ticket" disabled>🖨️</button>
           </div>
 
           <button class="ticket-clear" id="btnVaciarTicket" onclick="vaciarTicketPOS()">Vaciar ticket</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== AYUDA DE ATAJOS DE TECLADO ===== -->
+    <div class="shortcuts-help-backdrop" id="shortcutsHelpBackdrop" onclick="cerrarShortcutsHelp(event)">
+      <div class="shortcuts-help-modal">
+        <div class="shortcuts-help-header">
+          <h6>⌨️ Atajos de teclado</h6>
+          <button onclick="toggleShortcutsHelp()">✕</button>
+        </div>
+        <div class="shortcuts-help-body">
+          <div class="sh-row"><kbd>Ctrl</kbd> + <kbd>K</kbd><span>Ir al buscador / escaneo</span></div>
+          <div class="sh-row"><kbd>↑</kbd> <kbd>↓</kbd> <kbd>←</kbd> <kbd>→</kbd><span>Navegar entre productos del catálogo</span></div>
+          <div class="sh-row"><kbd>Enter</kbd><span>Agregar producto seleccionado al ticket</span></div>
+          <div class="sh-row"><kbd>+</kbd> / <kbd>-</kbd><span>Sumar / restar cantidad del último producto agregado</span></div>
+          <div class="sh-row"><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd><span>Elegir forma de pago (Efectivo / Transfer. / Tarjeta)</span></div>
+          <div class="sh-row"><kbd>F2</kbd><span>Finalizar venta</span></div>
+          <div class="sh-row"><kbd>Esc</kbd><span>Vaciar ticket actual</span></div>
         </div>
       </div>
     </div>
@@ -513,6 +547,53 @@
         <table class="table table-striped">
           <thead><tr><th>Fecha</th><th>Esperado</th><th>Contado</th><th>Diferencia</th><th>Vendedor</th><th>Observaciones</th></tr></thead>
           <tbody id="tablaCierresCaja"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== MOVIMIENTOS DE CAJA (ingresos / egresos manuales) ===== -->
+  <div id="movimientosCaja" class="seccion">
+    <div class="page-header">
+      <div><h1>💸 Movimientos de Caja</h1><div class="sub">Ingresos y egresos manuales de hoy — retiros, gastos chicos, aportes</div></div>
+      <button class="btn btn-outline-secondary btn-sm" onclick="cargarMovimientosCajaHoy()">↻ Actualizar</button>
+    </div>
+
+    <!-- Resumen del día -->
+    <div class="mc-summary-row">
+      <div class="card p-3 mc-summary-card">
+        <div class="ps-label">Ingresos de hoy</div>
+        <div class="mc-summary-value mc-ingreso" id="mcTotalIngresos">$0</div>
+      </div>
+      <div class="card p-3 mc-summary-card">
+        <div class="ps-label">Egresos de hoy</div>
+        <div class="mc-summary-value mc-egreso" id="mcTotalEgresos">$0</div>
+      </div>
+      <div class="card p-3 mc-summary-card">
+        <div class="ps-label">Saldo neto</div>
+        <div class="mc-summary-value" id="mcSaldoNeto">$0</div>
+      </div>
+    </div>
+
+    <!-- Alta rápida -->
+    <div class="card p-3 mb-3">
+      <div class="mc-form-row">
+        <div class="mc-tipo-toggle" id="mcTipoToggle">
+          <button type="button" class="mc-tipo-btn active" data-tipo="INGRESO" onclick="elegirTipoMovimientoCaja(this,'INGRESO')">⬆️ Ingreso</button>
+          <button type="button" class="mc-tipo-btn" data-tipo="EGRESO" onclick="elegirTipoMovimientoCaja(this,'EGRESO')">⬇️ Egreso</button>
+        </div>
+        <input type="number" class="form-control" id="mcMonto" placeholder="Monto" min="0" step="1" style="max-width:160px;">
+        <input type="text" class="form-control" id="mcMotivo" placeholder="Motivo (ej: Retiro para el banco, Compra de bolsas...)">
+        <button class="btn btn-success" id="btnGuardarMovimientoCaja" onclick="guardarMovimientoCajaForm()">+ Registrar</button>
+      </div>
+    </div>
+
+    <!-- Listado del día -->
+    <div class="card p-3">
+      <div class="table-responsive">
+        <table class="table table-striped">
+          <thead><tr><th>Hora</th><th>Tipo</th><th>Motivo</th><th>Monto</th><th>Vendedor</th><th></th></tr></thead>
+          <tbody id="tablaMovimientosCaja"></tbody>
         </table>
       </div>
     </div>
@@ -708,6 +789,27 @@
 
       <div class="d-flex justify-content-end mt-3">
         <button class="btn btn-success" id="btnGuardarSidebar" onclick="guardarSidebarForm()">💾 Guardar</button>
+      </div>
+    </div>
+
+    <div class="card p-3 mt-3">
+      <h6 style="margin-bottom:14px;">🖼️ Imágenes de productos</h6>
+      <p class="text-muted" style="font-size:12.5px; margin-top:-8px; margin-bottom:14px;">
+        Las fotos que subís desde "Nuevo Producto" se guardan en esta carpeta de tu Google Drive. Pegá el link de la carpeta (o solo el ID) — tiene que ser una carpeta de la misma cuenta de Google donde está la planilla.
+      </p>
+
+      <div class="mb-3">
+        <label class="form-label">Link o ID de la carpeta de Drive</label>
+        <input type="text" class="form-control" id="cfgDriveCarpetaProductos" placeholder="https://drive.google.com/drive/folders/...">
+      </div>
+
+      <div class="config-preview-hint">
+        <span class="ic">ℹ️</span>
+        En Drive: abrí la carpeta → botón "Compartir" → "Cualquier persona con el enlace" puede ver → copiá el link y pegalo aquí.
+      </div>
+
+      <div class="d-flex justify-content-end mt-3">
+        <button class="btn btn-success" id="btnGuardarDriveProductos" onclick="guardarDriveProductosForm()">💾 Guardar</button>
       </div>
     </div>
 
@@ -938,6 +1040,18 @@
       <div class="mt-2">
         <label class="form-label">Nombre del producto *</label>
         <input type="text" class="form-control" id="pmNombre" placeholder="Ej: Coca Cola 500ml" required>
+      </div>
+
+      <div class="mt-2">
+        <label class="form-label">Foto del producto <span class="text-muted" style="font-size:11px;">(opcional, se muestra en el POS y al escanear)</span></label>
+        <div class="pm-image-row">
+          <div class="pm-image-preview" id="pmImagenPreview">🖼️</div>
+          <div style="flex:1; min-width:0;">
+            <input type="file" class="form-control form-control-sm mb-1" id="pmImagenArchivo" accept="image/*" onchange="onSeleccionarArchivoImagenProducto(event)">
+            <input type="text" class="form-control form-control-sm" id="pmImagen" placeholder="o pegá una URL de imagen" oninput="actualizarPreviewImagenProducto()">
+          </div>
+        </div>
+        <div class="pm-image-status" id="pmImagenStatus"></div>
       </div>
 
       <div class="row g-2 mt-2">

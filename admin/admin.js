@@ -121,6 +121,7 @@ async function cargarConfigNegocioForm() {
   cargarAparienciaForm(cfg);
   cargarBeneficiosForm(cfg);
   cargarSidebarForm(cfg);
+  cargarDriveProductosForm(cfg);
 
   if (form) form.placeholder = "Ej: JIREH";
 }
@@ -264,6 +265,51 @@ async function guardarSidebarForm() {
 
   } catch (error) {
     console.error("Error al guardar el sidebar:", error);
+    toast("Error de conexión al guardar", "error");
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = textoOriginal; }
+  }
+}
+
+/** Loads the configured Drive folder (for product photo uploads) into the Configuración form */
+function cargarDriveProductosForm(cfg) {
+  const input = document.getElementById("cfgDriveCarpetaProductos");
+  if (input) input.value = cfg.driveCarpetaProductosId || "";
+}
+
+/** Saves the Drive folder link/ID used for product photo uploads */
+async function guardarDriveProductosForm() {
+  const nombre = document.getElementById("cfgNombreLocal").value.trim();
+
+  if (!nombre) {
+    toast("Completá primero el nombre del local, arriba", "error");
+    return;
+  }
+
+  const cfg = {
+    nombre,
+    driveCarpetaProductosId: document.getElementById("cfgDriveCarpetaProductos").value.trim()
+  };
+
+  const btn = document.getElementById("btnGuardarDriveProductos");
+  const textoOriginal = btn ? btn.innerHTML : "";
+  if (btn) { btn.disabled = true; btn.innerHTML = "Guardando..."; }
+
+  try {
+    const params = new URLSearchParams({ action: "guardarConfiguracionNegocio", ...cfg });
+    const response = await fetch(API_URL + "?" + params.toString());
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo guardar", "error");
+      return;
+    }
+
+    configNegocioCache = { ...configNegocioCache, ...cfg };
+    toast("Carpeta de Drive guardada", "success");
+
+  } catch (error) {
+    console.error("Error al guardar la carpeta de Drive:", error);
     toast("Error de conexión al guardar", "error");
   } finally {
     if (btn) { btn.disabled = false; btn.innerHTML = textoOriginal; }
@@ -773,6 +819,7 @@ function mostrarSeccion(id) {
   }
 
   if (id === "cierreCaja") cargarResumenCierreCaja();
+  if (id === "movimientosCaja") cargarMovimientosCajaHoy();
   if (id === "reportes")   cargarSiVencido("reportes", cargarTodosLosReportes);
 }
 
@@ -955,6 +1002,11 @@ function nuevoProducto() {
   document.getElementById("pmCategoria").value = "";
   document.getElementById("pmPrecio").value = "";
   document.getElementById("pmStock").value = "";
+  document.getElementById("pmImagen").value = "";
+  document.getElementById("pmImagenArchivo").value = "";
+  document.getElementById("pmImagenPreview").innerHTML = "🖼️";
+  document.getElementById("pmImagenStatus").textContent = "";
+  document.getElementById("pmImagenStatus").className = "pm-image-status";
   document.getElementById("pmPublicado").checked = true;
   document.getElementById("pmDestacado").checked = false;
   document.getElementById("pmOferta").checked = false;
@@ -976,16 +1028,167 @@ function editarProducto(codigo) {
   document.getElementById("pmCategoria").value = p.CATEGORIA || "";
   document.getElementById("pmPrecio").value = Number(p.PRECIO || 0);
   document.getElementById("pmStock").value = Number(p.STOCK || 0);
+  document.getElementById("pmImagen").value = p.IMAGEN || "";
+  document.getElementById("pmImagenArchivo").value = "";
+  document.getElementById("pmImagenStatus").textContent = "";
+  document.getElementById("pmImagenStatus").className = "pm-image-status";
   document.getElementById("pmPublicado").checked = String(p.PUBLICADO || "").toUpperCase() === "SI";
   document.getElementById("pmDestacado").checked = String(p.DESTACADO || "").toUpperCase() === "SI";
   document.getElementById("pmOferta").checked = String(p.OFERTA || "").toUpperCase() === "SI";
 
+  actualizarPreviewImagenProducto();
   poblarCategoriasDatalist();
   document.getElementById("productModalBackdrop").classList.add("show");
 }
 
 function cerrarModalProducto() {
   document.getElementById("productModalBackdrop").classList.remove("show");
+}
+
+/** Live preview of the image URL pasted into the product modal */
+function actualizarPreviewImagenProducto() {
+  const url = document.getElementById("pmImagen").value.trim();
+  const preview = document.getElementById("pmImagenPreview");
+  if (!preview) return;
+  if (!url) { preview.innerHTML = "🖼️"; return; }
+  preview.innerHTML = `<img src="${escapeHtml(url)}" alt="" onerror="this.parentElement.innerHTML='⚠️';">`;
+}
+
+/**
+ * Redimensiona y comprime una imagen en el navegador antes de subirla,
+ * para que una foto de celular de varios MB no tarde una eternidad en
+ * subir ni ocupe espacio de más en Drive. Devuelve siempre JPEG
+ * (excepto si el original es más chico que el límite, en cuyo caso ni
+ * vale la pena recomprimir).
+ *
+ * Estrategia: redimensiona al lado mayor = LADO_MAXIMO_PX, y si con
+ * calidad inicial sigue pesando más que PESO_OBJETIVO_KB, vuelve a
+ * comprimir con menos calidad (hasta MAX_INTENTOS veces). Nunca rechaza
+ * la imagen — en el peor caso, sube la versión más liviana que logró.
+ */
+async function comprimirImagenProducto(file) {
+
+  const LADO_MAXIMO_PX   = 900;
+  const PESO_OBJETIVO_KB = 700;
+  const CALIDADES        = [0.82, 0.7, 0.55, 0.4]; // intentos sucesivos, de mejor a peor calidad
+
+  const imagen = await new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload  = () => resolve(img);
+    img.onerror = () => reject(new Error("No se pudo leer la imagen seleccionada"));
+    img.src = URL.createObjectURL(file);
+  });
+
+  let { width, height } = imagen;
+  if (width > LADO_MAXIMO_PX || height > LADO_MAXIMO_PX) {
+    if (width >= height) {
+      height = Math.round(height * (LADO_MAXIMO_PX / width));
+      width  = LADO_MAXIMO_PX;
+    } else {
+      width  = Math.round(width * (LADO_MAXIMO_PX / height));
+      height = LADO_MAXIMO_PX;
+    }
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#ffffff"; // si el original tenía transparencia (ej. PNG), JPEG no la soporta
+  ctx.fillRect(0, 0, width, height);
+  ctx.drawImage(imagen, 0, 0, width, height);
+  URL.revokeObjectURL(imagen.src);
+
+  let ultimoBase64 = null;
+
+  for (const calidad of CALIDADES) {
+    const base64 = await new Promise(resolve => {
+      canvas.toBlob(blob => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.readAsDataURL(blob);
+      }, "image/jpeg", calidad);
+    });
+
+    ultimoBase64 = base64;
+    const pesoKB = Math.round((base64.length * 0.75) / 1024);
+    if (pesoKB <= PESO_OBJETIVO_KB) break; // ya entra cómodo, no hace falta seguir bajando calidad
+  }
+
+  return { base64: ultimoBase64, tipoMime: "image/jpeg" };
+}
+
+/** Handles the file picker: compresses the chosen image, then uploads it to Drive */
+async function onSeleccionarArchivoImagenProducto(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+
+  const statusEl = document.getElementById("pmImagenStatus");
+
+  if (!file.type.startsWith("image/")) {
+    if (statusEl) { statusEl.className = "pm-image-status error"; statusEl.textContent = "Elegí un archivo de imagen (jpg, png, webp)."; }
+    event.target.value = "";
+    return;
+  }
+
+  // Tope de seguridad sobre el archivo original: una foto de celular normal
+  // pesa 2-8MB. Más que esto probablemente sea un error de selección
+  // (video, RAW, etc.) — se rechaza antes de gastar tiempo procesándolo.
+  const TAMANO_ORIGINAL_MAXIMO_MB = 20;
+  if (file.size > TAMANO_ORIGINAL_MAXIMO_MB * 1024 * 1024) {
+    if (statusEl) { statusEl.className = "pm-image-status error"; statusEl.textContent = `⚠️ El archivo pesa demasiado (máx. ${TAMANO_ORIGINAL_MAXIMO_MB}MB). Elegí una foto más liviana.`; }
+    event.target.value = "";
+    return;
+  }
+
+  // Local preview inmediata, mientras se comprime y sube en segundo plano
+  const localUrl = URL.createObjectURL(file);
+  const preview = document.getElementById("pmImagenPreview");
+  if (preview) preview.innerHTML = `<img src="${localUrl}" alt="">`;
+
+  if (statusEl) { statusEl.className = "pm-image-status uploading"; statusEl.textContent = "⏳ Optimizando imagen..."; }
+
+  try {
+    const pesoOriginalKB = Math.round(file.size / 1024);
+    const { base64, tipoMime } = await comprimirImagenProducto(file);
+    const pesoFinalKB = Math.round((base64.length * 0.75) / 1024); // estimación: base64 pesa ~33% más que los bytes reales
+
+    if (statusEl) {
+      statusEl.className = "pm-image-status uploading";
+      statusEl.textContent = pesoFinalKB < pesoOriginalKB
+        ? `⏳ Subiendo a Drive... (${pesoOriginalKB}KB → ${pesoFinalKB}KB)`
+        : "⏳ Subiendo a Drive...";
+    }
+
+    const codigoProducto = document.getElementById("pmCodigo").value.trim() || document.getElementById("pmCodigoOriginal").value.trim();
+
+    const response = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" }, // evita preflight CORS contra Apps Script
+      body: JSON.stringify({
+        action: "subirImagenProducto",
+        imagenBase64: base64,
+        tipoMime: tipoMime,
+        codigoProducto: codigoProducto
+      })
+    });
+
+    const data = await response.json();
+
+    if (!data.success) {
+      if (statusEl) { statusEl.className = "pm-image-status error"; statusEl.textContent = "⚠️ " + (data.message || "No se pudo subir la imagen."); }
+      return;
+    }
+
+    document.getElementById("pmImagen").value = data.url;
+    if (statusEl) { statusEl.className = "pm-image-status success"; statusEl.textContent = `✓ Imagen subida (${pesoFinalKB}KB)`; }
+
+  } catch (error) {
+    console.error("Error al subir imagen de producto:", error);
+    if (statusEl) { statusEl.className = "pm-image-status error"; statusEl.textContent = "⚠️ Error de conexión al subir la imagen."; }
+  } finally {
+    URL.revokeObjectURL(localUrl);
+  }
 }
 
 /** Fills the category <datalist> with the distinct categories already in use */
@@ -1006,6 +1209,7 @@ async function guardarProductoForm() {
   const categoria = document.getElementById("pmCategoria").value.trim();
   const precio   = document.getElementById("pmPrecio").value;
   const stock    = document.getElementById("pmStock").value;
+  const imagen   = document.getElementById("pmImagen").value.trim();
   const publicado = document.getElementById("pmPublicado").checked ? "SI" : "NO";
   const destacado  = document.getElementById("pmDestacado").checked ? "SI" : "NO";
   const oferta     = document.getElementById("pmOferta").checked ? "SI" : "NO";
@@ -1027,6 +1231,7 @@ async function guardarProductoForm() {
       CATEGORIA: categoria,
       PRECIO: precio || 0,
       STOCK: stock || 0,
+      IMAGEN: imagen,
       PUBLICADO: publicado,
       DESTACADO: destacado,
       OFERTA: oferta
@@ -1181,6 +1386,8 @@ let productosPOS    = [];
 let ticketPOS        = [];
 let categoriaActivaPOS = "TODAS";
 let formaPagoPOS    = "EFECTIVO";
+let ultimoCodigoAgregadoPOS = null; // usado por el atajo +/- de cantidad
+let posTileFocusIdx  = -1;          // índice de la tarjeta con foco de teclado en el grid
 
 // Descuento aplicado al ticket actual
 let descuentoTipoPOS   = "PORCENTAJE"; // "PORCENTAJE" | "MONTO"
@@ -1211,6 +1418,7 @@ function construirCategoriasPOS() {
 
 function filtrarCategoriaPOS(cat, el) {
   categoriaActivaPOS = cat;
+  posTileFocusIdx = -1;
   document.querySelectorAll(".cat-chip").forEach(c => c.classList.remove("active"));
   if (el) el.classList.add("active");
   renderPosGrid();
@@ -1258,12 +1466,18 @@ function renderPosGrid(filtroTexto) {
     else if (stock !== null) stockBadge = `<span class="tile-stock ok">Stock: ${stock}</span>`;
 
     const cat = p.CATEGORIA ? escapeHtml(String(p.CATEGORIA).trim()) : "";
+    const imagenUrl = p.IMAGEN ? String(p.IMAGEN).trim() : "";
 
     html += `
       <button type="button"
         class="product-tile ${agotado ? "disabled" : ""}"
         data-idx="${idx}"
         ${agotado ? "disabled" : ""}>
+        <div class="tile-photo">
+          ${imagenUrl
+            ? `<img src="${escapeHtml(imagenUrl)}" alt="" loading="lazy" onerror="this.parentElement.innerHTML='🛒';">`
+            : "🛒"}
+        </div>
         <div class="tile-info">
           <span class="tile-code">${escapeHtml(p.CODIGO)}</span>
           <span class="tile-name">${escapeHtml(p.PRODUCTO)}</span>
@@ -1300,6 +1514,7 @@ function onPosInputKeyup(e) {
     }
     return;
   }
+  posTileFocusIdx = -1;
   renderPosGrid(input.value.trim());
 }
 
@@ -1329,9 +1544,32 @@ function agregarProductoPOS(codigo) {
   }
   renderTicketPOS();
   flashTile(codigo);
+  mostrarUltimoEscaneado(producto);
+  ultimoCodigoAgregadoPOS = codigo;
 
   const input = document.getElementById("posBusqueda");
   if (input) { input.value = ""; input.focus(); }
+}
+
+/** Updates the "last scanned product" panel with its photo, name, code and price */
+function mostrarUltimoEscaneado(producto) {
+  const panel = document.getElementById("scanResultPanel");
+  if (!panel) return;
+
+  const thumb = document.getElementById("scanResultThumb");
+  const imagenUrl = producto.IMAGEN ? String(producto.IMAGEN).trim() : "";
+
+  if (thumb) {
+    thumb.innerHTML = imagenUrl
+      ? `<img src="${escapeHtml(imagenUrl)}" alt="" onerror="this.parentElement.innerHTML='🛒';">`
+      : "🛒";
+  }
+
+  actualizarElemento("scanResultName", producto.PRODUCTO);
+  actualizarElemento("scanResultCode", producto.CODIGO);
+  actualizarElemento("scanResultPrice", "$" + Number(producto.PRECIO || 0).toLocaleString("es-AR"));
+
+  panel.classList.add("has-product");
 }
 
 function flashTile(codigo) {
@@ -1614,6 +1852,8 @@ async function finalizarVentaPOS() {
     resetearDescuentoPOS();
     renderTicketPOS();
 
+    ultimoCodigoAgregadoPOS = null;
+    posTileFocusIdx = -1;
     productosPOS = [];
     await asegurarProductosPOS();
     renderPosGrid();
@@ -1735,14 +1975,14 @@ function buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, cf
   // Encabezado: nombre + subtítulo + dirección + teléfono(s), todos configurables
   let encabezado = `<div class="th-center th-big">${escapeHtml(cfg.nombre)}</div>`;
   if (cfg.subtitulo) {
-    encabezado += `<div class="th-center" style="font-size:9.5pt;">${escapeHtml(cfg.subtitulo)}</div>`;
+    encabezado += `<div class="th-center" style="font-size:11pt;font-weight:bold;">${escapeHtml(cfg.subtitulo)}</div>`;
   }
   if (cfg.direccion) {
-    encabezado += `<div class="th-center" style="font-size:9pt;">${escapeHtml(cfg.direccion)}</div>`;
+    encabezado += `<div class="th-center" style="font-size:10.5pt;font-weight:bold;color:#555;">${escapeHtml(cfg.direccion)}</div>`;
   }
   const telefonos = [cfg.telefono1, cfg.telefono2].filter(Boolean).join(" · ");
   if (telefonos) {
-    encabezado += `<div class="th-center" style="font-size:9pt;margin-bottom:2mm;">Tel: ${escapeHtml(telefonos)}</div>`;
+    encabezado += `<div class="th-center" style="font-size:10.5pt;font-weight:bold;color:#555;margin-bottom:2mm;">Tel: ${escapeHtml(telefonos)}</div>`;
   } else {
     encabezado += `<div style="margin-bottom:2mm;"></div>`;
   }
@@ -2253,13 +2493,13 @@ function buildThermalCierreHTML(resumen) {
 
   // Encabezado: nombre del local + dirección + teléfono(s) (sin subtítulo, este ticket no es de venta)
   let encabezado = `<div class="th-center th-big">${escapeHtml(cfg.nombre)}</div>`;
-  encabezado += `<div class="th-center" style="font-size:9.5pt;">Cierre de Caja</div>`;
+  encabezado += `<div class="th-center" style="font-size:13pt;font-weight:bold;">Cierre de Caja</div>`;
   if (cfg.direccion) {
-    encabezado += `<div class="th-center" style="font-size:9pt;">${escapeHtml(cfg.direccion)}</div>`;
+    encabezado += `<div class="th-center" style="font-size:13pt;font-weight:bold;">${escapeHtml(cfg.direccion)}</div>`;
   }
   const telefonos = [cfg.telefono1, cfg.telefono2].filter(Boolean).join(" · ");
   if (telefonos) {
-    encabezado += `<div class="th-center" style="font-size:9pt;margin-bottom:2mm;">Tel: ${escapeHtml(telefonos)}</div>`;
+    encabezado += `<div class="th-center" style="font-size:13pt;font-weight:bold;margin-bottom:2mm;">Tel: ${escapeHtml(telefonos)}</div>`;
   } else {
     encabezado += `<div style="margin-bottom:2mm;"></div>`;
   }
@@ -2293,7 +2533,7 @@ function buildThermalCierreHTML(resumen) {
         </tr>
       </table>
       <hr class="th-sep">
-      ${resumen.observaciones ? `<div style="font-size:9.5pt;">Obs: ${escapeHtml(resumen.observaciones)}</div><hr class="th-sep">` : ""}
+      ${resumen.observaciones ? `<div style="font-size:13pt;font-weight:bold;">Obs: ${escapeHtml(resumen.observaciones)}</div><hr class="th-sep">` : ""}
       <div class="th-footer">Cierre generado por ${escapeHtml(cfg.nombre)} POS</div>
       <br><br>
     </div>`;
@@ -2366,7 +2606,7 @@ function imprimirCierreCaja() {
 }
 
 /* ===================================================================
-   BARCODE SCANNER SUPPORT
+   BARCODE SCANNER SUPPORT + ATAJOS DE TECLADO DEL POS
 =================================================================== */
 
 let scanBuffer    = "";
@@ -2379,9 +2619,58 @@ function setupScannerListener() {
     const posVisible = posSection && posSection.style.display === "block";
     if (!posVisible) return;
 
+    // Ctrl+K / Cmd+K: foco directo al buscador, funciona incluso si el foco está en otro lado
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+      e.preventDefault();
+      const input = document.getElementById("posBusqueda");
+      if (input) input.focus();
+      return;
+    }
+
     const activeTag  = document.activeElement ? document.activeElement.tagName : "";
     const isOurInput = document.activeElement && document.activeElement.id === "posBusqueda";
+
+    // F2 finaliza la venta desde cualquier lado dentro del POS (incluso con el buscador enfocado)
+    if (e.key === "F2") {
+      e.preventDefault();
+      finalizarVentaPOS();
+      return;
+    }
+
     if (!isOurInput && (activeTag === "INPUT" || activeTag === "SELECT" || activeTag === "TEXTAREA")) return;
+
+    // ---- Atajos que solo aplican cuando NO se está escribiendo en el buscador ----
+    if (!isOurInput) {
+      if (e.key === "ArrowRight" || e.key === "ArrowLeft" || e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        moverFocoPosGrid(e.key);
+        return;
+      }
+      if (e.key === "Enter" && posTileFocusIdx >= 0) {
+        e.preventDefault();
+        agregarProductoEnFoco();
+        return;
+      }
+      if (e.key === "+" || e.key === "=") {
+        if (ultimoCodigoAgregadoPOS) { e.preventDefault(); cambiarCantidadPOS(ultimoCodigoAgregadoPOS, 1); }
+        return;
+      }
+      if (e.key === "-") {
+        if (ultimoCodigoAgregadoPOS) { e.preventDefault(); cambiarCantidadPOS(ultimoCodigoAgregadoPOS, -1); }
+        return;
+      }
+      if (e.key === "1" || e.key === "2" || e.key === "3") {
+        const mapa = { "1": "EFECTIVO", "2": "TRANSFERENCIA", "3": "TARJETA" };
+        const btn = document.querySelector(`.pay-method-btn[data-val="${mapa[e.key]}"]`);
+        if (btn) { e.preventDefault(); elegirFormaPago(btn, mapa[e.key]); }
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        vaciarTicketPOS();
+        return;
+      }
+    }
 
     const now     = Date.now();
     const elapsed = now - lastKeyTime;
@@ -2405,6 +2694,48 @@ function setupScannerListener() {
   }, 500);
 }
 
+/** Moves the keyboard focus highlight across the visible product tiles in the grid */
+function moverFocoPosGrid(tecla) {
+  const tiles = Array.from(document.querySelectorAll("#posProductGrid .product-tile:not(.disabled)"));
+  if (tiles.length === 0) return;
+
+  // Estimate columns from actual layout so left/right and up/down both feel natural
+  const primerTop = tiles[0].getBoundingClientRect().top;
+  let columnas = 1;
+  for (let i = 1; i < tiles.length; i++) {
+    if (Math.abs(tiles[i].getBoundingClientRect().top - primerTop) > 2) { columnas = i; break; }
+  }
+
+  let nuevoIdx = posTileFocusIdx;
+  if (nuevoIdx < 0) {
+    nuevoIdx = 0;
+  } else if (tecla === "ArrowRight") {
+    nuevoIdx = Math.min(tiles.length - 1, nuevoIdx + 1);
+  } else if (tecla === "ArrowLeft") {
+    nuevoIdx = Math.max(0, nuevoIdx - 1);
+  } else if (tecla === "ArrowDown") {
+    nuevoIdx = Math.min(tiles.length - 1, nuevoIdx + columnas);
+  } else if (tecla === "ArrowUp") {
+    nuevoIdx = Math.max(0, nuevoIdx - columnas);
+  }
+
+  tiles.forEach(t => t.classList.remove("kbd-focus"));
+  posTileFocusIdx = nuevoIdx;
+  const tileActivo = tiles[posTileFocusIdx];
+  if (tileActivo) {
+    tileActivo.classList.add("kbd-focus");
+    tileActivo.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
+}
+
+/** Adds to the ticket whichever tile currently has keyboard focus */
+function agregarProductoEnFoco() {
+  const tiles = Array.from(document.querySelectorAll("#posProductGrid .product-tile:not(.disabled)"));
+  const tile = tiles[posTileFocusIdx];
+  if (!tile || !tile.dataset.codigo) return;
+  agregarProductoPOS(tile.dataset.codigo);
+}
+
 function setScannerStatus(estado) {
   const el = document.getElementById("scannerStatus");
   if (!el) return;
@@ -2418,6 +2749,15 @@ function setScannerStatus(estado) {
     el.className = "scanner-status idle";
     el.innerHTML = `<span class="dot"></span> Listo`;
   }
+}
+
+/* ---- shortcuts help modal ---- */
+
+function toggleShortcutsHelp() {
+  document.getElementById("shortcutsHelpBackdrop").classList.toggle("show");
+}
+function cerrarShortcutsHelp(e) {
+  if (e.target.id === "shortcutsHelpBackdrop") e.target.classList.remove("show");
 }
 
 /* ---- camera-based scanning ---- */
@@ -2961,3 +3301,138 @@ function exportarReportePDF(cardId, tituloReporte) {
   }
 }
 
+
+/* ===================================================================
+   MOVIMIENTOS DE CAJA — ingresos y egresos manuales (no son ventas)
+=================================================================== */
+
+let tipoMovimientoCajaActivo = "INGRESO";
+
+function elegirTipoMovimientoCaja(el, tipo) {
+  tipoMovimientoCajaActivo = tipo;
+  document.querySelectorAll(".mc-tipo-btn").forEach(b => b.classList.remove("active"));
+  el.classList.add("active");
+}
+
+/** Loads today's manual cash movements and the running totals */
+async function cargarMovimientosCajaHoy() {
+  try {
+    const response = await fetch(API_URL + "?action=movimientosCajaHoy");
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo cargar movimientos de caja", "error");
+      return;
+    }
+
+    actualizarElemento("mcTotalIngresos", "$" + Number(data.totalIngresos).toLocaleString("es-AR"));
+    actualizarElemento("mcTotalEgresos",  "$" + Number(data.totalEgresos).toLocaleString("es-AR"));
+
+    const netoEl = document.getElementById("mcSaldoNeto");
+    if (netoEl) {
+      netoEl.textContent = (data.neto >= 0 ? "$" : "-$") + Math.abs(data.neto).toLocaleString("es-AR");
+      netoEl.style.color = data.neto >= 0 ? "var(--green-600)" : "var(--red-500)";
+    }
+
+    renderTablaMovimientosCaja(data.movimientos || []);
+
+  } catch (error) {
+    console.error("Error al cargar movimientos de caja:", error);
+    toast("Error de conexión al cargar movimientos de caja", "error");
+  }
+}
+
+function renderTablaMovimientosCaja(lista) {
+  const tbody = document.getElementById("tablaMovimientosCaja");
+  if (!tbody) return;
+
+  if (lista.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-3">Todavía no hay movimientos registrados hoy</td></tr>`;
+    return;
+  }
+
+  let html = "";
+  lista.forEach(m => {
+    const esIngreso = String(m.TIPO).toUpperCase() === "INGRESO";
+    const hora = m.FECHA_REGISTRO ? new Date(m.FECHA_REGISTRO).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }) : "—";
+
+    html += `
+    <tr>
+      <td>${hora}</td>
+      <td><span class="mc-tag ${esIngreso ? "mc-ingreso" : "mc-egreso"}">${esIngreso ? "⬆️ Ingreso" : "⬇️ Egreso"}</span></td>
+      <td>${escapeHtml(m.MOTIVO || "—")}</td>
+      <td class="money" style="color:${esIngreso ? "var(--green-600)" : "var(--red-500)"};">
+        ${esIngreso ? "+" : "-"}$${Number(m.MONTO || 0).toLocaleString("es-AR")}
+      </td>
+      <td>${escapeHtml(m.VENDEDOR || "—")}</td>
+      <td><button class="btn btn-outline-danger btn-sm" onclick="eliminarMovimientoCajaForm('${escapeHtml(m.MOVIMIENTO_ID)}')">Eliminar</button></td>
+    </tr>`;
+  });
+
+  tbody.innerHTML = html;
+}
+
+/** Saves a new manual income/expense movement */
+async function guardarMovimientoCajaForm() {
+  const monto = document.getElementById("mcMonto").value;
+  const motivo = document.getElementById("mcMotivo").value.trim();
+
+  if (!monto || Number(monto) <= 0) { toast("Ingresá un monto válido", "error"); return; }
+  if (!motivo) { toast("Ingresá un motivo para el movimiento", "error"); return; }
+
+  const btn = document.getElementById("btnGuardarMovimientoCaja");
+  const textoOriginal = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = "Guardando...";
+
+  try {
+    const params = new URLSearchParams({
+      action: "guardarMovimientoCaja",
+      tipo: tipoMovimientoCajaActivo,
+      monto: monto,
+      motivo: motivo
+    });
+
+    const response = await fetch(API_URL + "?" + params.toString());
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo registrar el movimiento", "error");
+      return;
+    }
+
+    toast(tipoMovimientoCajaActivo === "INGRESO" ? "Ingreso registrado" : "Egreso registrado", "success");
+    document.getElementById("mcMonto").value = "";
+    document.getElementById("mcMotivo").value = "";
+    cargarMovimientosCajaHoy();
+
+  } catch (error) {
+    console.error("Error al guardar movimiento de caja:", error);
+    toast("Error de conexión al registrar el movimiento", "error");
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = textoOriginal;
+  }
+}
+
+/** Deletes a movement after confirmation */
+async function eliminarMovimientoCajaForm(movimientoId) {
+  if (!confirm("¿Eliminar este movimiento de caja? Esta acción no se puede deshacer.")) return;
+
+  try {
+    const response = await fetch(API_URL + "?action=eliminarMovimientoCaja&movimientoId=" + encodeURIComponent(movimientoId));
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo eliminar el movimiento", "error");
+      return;
+    }
+
+    toast("Movimiento eliminado", "success");
+    cargarMovimientosCajaHoy();
+
+  } catch (error) {
+    console.error("Error al eliminar movimiento de caja:", error);
+    toast("Error de conexión al eliminar el movimiento", "error");
+  }
+}
