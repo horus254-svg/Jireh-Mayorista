@@ -1546,9 +1546,16 @@ function agregarProductoPOS(codigo) {
   flashTile(codigo);
   mostrarUltimoEscaneado(producto);
   ultimoCodigoAgregadoPOS = codigo;
+  scrollTicketAlProducto(codigo);
 
   const input = document.getElementById("posBusqueda");
   if (input) { input.value = ""; input.focus(); }
+}
+
+/** Scrolls the ticket list so the row for this product is visible (used when adding/incrementing it) */
+function scrollTicketAlProducto(codigo) {
+  const fila = document.querySelector(`.ticket-row[data-codigo="${cssEscape(codigo)}"]`);
+  if (fila) fila.scrollIntoView({ block: "end", behavior: "smooth" });
 }
 
 /** Updates the "last scanned product" panel with its photo, name, code and price */
@@ -1638,7 +1645,7 @@ function renderTicketPOS() {
     subtotal += sub;
     totalItems += item.cantidad;
     html += `
-      <div class="ticket-row">
+      <div class="ticket-row" data-codigo="${escapeHtml(item.CODIGO)}">
         <div class="ti-info">
           <div class="ti-name">${escapeHtml(item.PRODUCTO)}</div>
           <div class="ti-price">$${item.PRECIO.toLocaleString("es-AR")} c/u</div>
