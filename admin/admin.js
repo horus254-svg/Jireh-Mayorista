@@ -2232,11 +2232,11 @@ function buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, cf
     encabezado += `<div class="th-center" style="font-size:11pt;font-weight:bold;">${escapeHtml(cfg.subtitulo)}</div>`;
   }
   if (cfg.direccion) {
-    encabezado += `<div class="th-center" style="font-size:10.5pt;font-weight:bold;color:#555;">${escapeHtml(cfg.direccion)}</div>`;
+    encabezado += `<div class="th-center" style="font-size:10.5pt;font-weight:bold;">${escapeHtml(cfg.direccion)}</div>`;
   }
   const telefonos = [cfg.telefono1, cfg.telefono2].filter(Boolean).join(" · ");
   if (telefonos) {
-    encabezado += `<div class="th-center" style="font-size:10.5pt;font-weight:bold;color:#555;margin-bottom:2mm;">Tel: ${escapeHtml(telefonos)}</div>`;
+    encabezado += `<div class="th-center" style="font-size:10.5pt;font-weight:bold;margin-bottom:2mm;">Tel: ${escapeHtml(telefonos)}</div>`;
   } else {
     encabezado += `<div style="margin-bottom:2mm;"></div>`;
   }
