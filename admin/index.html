@@ -231,8 +231,8 @@
     <div class="page-header"><div><h1>Pedidos</h1><div class="sub">Seguimiento y estado de pedidos</div></div></div>
     <div class="card p-3">
       <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-        <span class="text-muted" style="font-size:13px;">Buscá por pedido, cliente o DNI</span>
         <input type="text" id="buscarPedido" class="form-control" style="max-width:300px" placeholder="Buscar pedido, cliente o DNI..." onkeyup="filtrarPedidos()">
+        <span class="text-muted" style="font-size:13px;">Buscá por pedido, cliente o DNI</span>
       </div>
       <div class="table-responsive">
         <table class="table table-striped">
@@ -409,6 +409,10 @@
 
     <div class="card p-3 mb-3">
       <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div style="margin-top:18px;">
+          <input type="text" id="vpBuscar" class="form-control form-control-sm" style="max-width:260px"
+            placeholder="Buscar por #venta o forma de pago..." onkeyup="filtrarVentasPOSHistorial()">
+        </div>
         <div class="d-flex flex-wrap gap-2 align-items-center">
           <div>
             <label class="form-label" style="font-size:12px; margin-bottom:2px;">Desde</label>
@@ -419,10 +423,6 @@
             <input type="date" id="vpHasta" class="form-control form-control-sm" style="max-width:160px;">
           </div>
           <button class="btn btn-outline-primary btn-sm" style="margin-top:18px;" onclick="cargarVentasPOSHistorial()">Filtrar</button>
-        </div>
-        <div style="margin-top:18px;">
-          <input type="text" id="vpBuscar" class="form-control form-control-sm" style="max-width:260px"
-            placeholder="Buscar por #venta o forma de pago..." onkeyup="filtrarVentasPOSHistorial()">
         </div>
       </div>
     </div>
