@@ -75,6 +75,27 @@ body{
     color:var(--ink-600);
 }
 
+.precio-imagen-wrap{
+    width:140px;
+    height:140px;
+    margin:0 auto 18px;
+    border-radius:16px;
+    background:var(--paper);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    overflow:hidden;
+    font-size:48px;
+    color:var(--ink-600);
+}
+
+.precio-imagen{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    display:block;
+}
+
 .precio-categoria{
     font-size:12.5px;
     font-weight:600;
@@ -208,8 +229,14 @@ async function cargarPrecio(){
 
         const p = data.producto;
         const stock = obtenerEstadoStock(p.STOCK);
+        const imagenUrl = p.IMAGEN ? String(p.IMAGEN).trim() : "";
 
         document.getElementById("precioCard").innerHTML = `
+            <div class="precio-imagen-wrap">
+                ${imagenUrl
+                    ? `<img class="precio-imagen" src="${escapeHtml(imagenUrl)}" alt="" onerror="this.parentElement.innerHTML='🛒';">`
+                    : "🛒"}
+            </div>
             ${p.CATEGORIA ? `<div class="precio-categoria">${escapeHtml(p.CATEGORIA)}</div>` : ""}
             <div class="precio-nombre">${escapeHtml(p.PRODUCTO)}</div>
             <div class="precio-monto">$${formatearPrecio(p.PRECIO)}</div>
