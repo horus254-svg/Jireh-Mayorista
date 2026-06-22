@@ -3800,12 +3800,13 @@ async function eliminarMovimientoCajaForm(movimientoId) {
    ETIQUETAS DE CÓDIGO DE BARRAS (para estantería/góndola)
 =================================================================== */
 
-/** Updates the selection counter and enables/disables both the "Generar Etiquetas" and "Generar QR" buttons */
+/** Updates the selection counter and enables/disables the three label/QR generation buttons */
 function actualizarSeleccionEtiquetas() {
   const checks = document.querySelectorAll(".check-producto-etiqueta:checked");
   const info = document.getElementById("etiquetasSeleccionInfo");
   const btnEtiquetas = document.getElementById("btnGenerarEtiquetas");
   const btnQR = document.getElementById("btnGenerarQR");
+  const btnQROffline = document.getElementById("btnGenerarQROffline");
 
   const cantidad = checks.length;
 
@@ -3819,6 +3820,7 @@ function actualizarSeleccionEtiquetas() {
 
   if (btnEtiquetas) btnEtiquetas.disabled = cantidad === 0;
   if (btnQR) btnQR.disabled = cantidad === 0;
+  if (btnQROffline) btnQROffline.disabled = cantidad === 0;
 }
 
 /** Toggles every visible product checkbox via the header checkbox */
@@ -4055,6 +4057,107 @@ function imprimirQR() {
   });
 
   cerrarModalQR();
+
+  setTimeout(() => {
+    window.print();
+  }, 200);
+}
+
+/* ===================================================================
+   QR DE IDENTIFICACIÓN (offline, solo nombre del producto)
+   A diferencia del QR de Precio, NO apunta a ninguna URL — codifica
+   directamente el texto del nombre. Por eso cualquier lector de QR lo
+   muestra al instante, sin necesidad de internet ni de que el backend
+   esté disponible. Pensado para identificar cajas en el depósito.
+=================================================================== */
+
+function abrirModalQROffline() {
+  const codigos = obtenerCodigosSeleccionados();
+  if (codigos.length === 0) { toast("Seleccioná al menos un producto", "error"); return; }
+
+  actualizarPreviewQROffline();
+  document.getElementById("qrOfflineModalBackdrop").classList.add("show");
+}
+
+function cerrarModalQROffline() {
+  document.getElementById("qrOfflineModalBackdrop").classList.remove("show");
+}
+
+function actualizarPreviewQROffline() {
+  const codigos = obtenerCodigosSeleccionados();
+  const copias = Math.max(1, Number(document.getElementById("qrOfflineCantidadCopias").value || 1));
+  const totalQR = codigos.length * copias;
+
+  const info = document.getElementById("qrOfflinePreviewInfo");
+  if (info) {
+    info.textContent = `Se van a imprimir ${totalQR} código${totalQR === 1 ? "" : "s"} QR en total (${codigos.length} producto${codigos.length === 1 ? "" : "s"} × ${copias} copia${copias === 1 ? "" : "s"}).`;
+  }
+}
+
+/**
+ * Builds the printable QR grid where each QR encodes just the plain
+ * product name as text (not a URL) — works with any QR reader with
+ * zero network involved, on either end.
+ */
+function imprimirQROffline() {
+  const codigos = obtenerCodigosSeleccionados();
+  if (codigos.length === 0) { toast("Seleccioná al menos un producto", "error"); return; }
+
+  const copias = Math.max(1, Number(document.getElementById("qrOfflineCantidadCopias").value || 1));
+  const columnas = document.getElementById("qrOfflineColumnas").value;
+
+  const productos = codigos
+    .map(codigo => productosAdminGlobal.find(p => String(p.CODIGO) === String(codigo)))
+    .filter(Boolean);
+
+  if (productos.length === 0) {
+    toast("No se encontraron los productos seleccionados", "error");
+    return;
+  }
+
+  const printArea = document.getElementById("etiquetasPrintArea");
+
+  const thermalFrame = document.getElementById("thermalPrintFrame");
+  if (thermalFrame) thermalFrame.innerHTML = "";
+
+  let html = `<div class="etiquetas-grid cols-${columnas}">`;
+
+  let idx = 0;
+  productos.forEach(p => {
+    for (let copia = 0; copia < copias; copia++) {
+      html += `
+        <div class="qr-item">
+          <div class="qr-nombre">${escapeHtml(p.PRODUCTO)}</div>
+          <div id="qrOfflineCanvas${idx}"></div>
+          <div class="qr-leyenda">Funciona sin internet</div>
+        </div>`;
+      idx++;
+    }
+  });
+
+  html += `</div>`;
+  printArea.innerHTML = html;
+
+  idx = 0;
+  productos.forEach(p => {
+    for (let copia = 0; copia < copias; copia++) {
+      try {
+        new QRCode(document.getElementById(`qrOfflineCanvas${idx}`), {
+          text: String(p.PRODUCTO || ""),
+          width: 120,
+          height: 120,
+          colorDark: "#000000",
+          colorLight: "#ffffff",
+          correctLevel: QRCode.CorrectLevel.M
+        });
+      } catch (error) {
+        console.error("No se pudo generar el QR de identificación para", p.CODIGO, error);
+      }
+      idx++;
+    }
+  });
+
+  cerrarModalQROffline();
 
   setTimeout(() => {
     window.print();
