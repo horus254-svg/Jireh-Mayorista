@@ -2780,6 +2780,14 @@ function _imprimirConDialogo(html) {
   const frame = document.getElementById("thermalPrintFrame");
   if (!frame) { toast("Error: frame de impresión no encontrado", "error"); return; }
 
+  // Si antes se generaron etiquetas de código de barras o QR, ese
+  // contenedor pudo haber quedado con contenido — y como el CSS de
+  // impresión decide qué mostrar según cuál de los dos NO esté vacío,
+  // hay que vaciarlo siempre antes de imprimir un ticket, o la
+  // impresión podría mostrar las etiquetas viejas en vez del ticket.
+  const etiquetasArea = document.getElementById("etiquetasPrintArea");
+  if (etiquetasArea) etiquetasArea.innerHTML = "";
+
   frame.innerHTML = html;
 
   // Small delay to let the DOM paint before triggering print dialog
