@@ -967,7 +967,7 @@ function renderTablaProductos(lista) {
   if (!tbody) return;
 
   if (!lista || lista.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted py-4">No se encontraron productos</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-4">No se encontraron productos</td></tr>`;
     return;
   }
 
@@ -986,6 +986,7 @@ function renderTablaProductos(lista) {
 
     html += `
     <tr>
+      <td><input type="checkbox" class="check-producto-etiqueta" value="${escapeHtml(p.CODIGO)}" onchange="actualizarSeleccionEtiquetas()"></td>
       <td><div class="tabla-producto-thumb">${fotoHtml}</div></td>
       <td class="mono">${escapeHtml(p.CODIGO)}</td>
       <td>${escapeHtml(p.PRODUCTO)}</td>
@@ -1003,6 +1004,13 @@ function renderTablaProductos(lista) {
     </tr>`;
   });
   tbody.innerHTML = html;
+
+  // El checkbox "seleccionar todos" no sobrevive a un re-render de la
+  // tabla (filtro, búsqueda, etc.) — se resetea para evitar que quede
+  // marcado mientras la tabla ya no refleja esa selección completa.
+  const checkTodos = document.getElementById("checkTodosProductos");
+  if (checkTodos) checkTodos.checked = false;
+  actualizarSeleccionEtiquetas();
 }
 
 /** Fills the category <select> filter with the distinct categories currently in use */
@@ -3733,3 +3741,146 @@ async function eliminarMovimientoCajaForm(movimientoId) {
     toast("Error de conexión al eliminar el movimiento", "error");
   }
 }
+
+/* ===================================================================
+   ETIQUETAS DE CÓDIGO DE BARRAS (para estantería/góndola)
+=================================================================== */
+
+/** Updates the selection counter and enables/disables the "Generar Etiquetas" button */
+function actualizarSeleccionEtiquetas() {
+  const checks = document.querySelectorAll(".check-producto-etiqueta:checked");
+  const info = document.getElementById("etiquetasSeleccionInfo");
+  const btn = document.getElementById("btnGenerarEtiquetas");
+
+  const cantidad = checks.length;
+
+  if (info) {
+    info.textContent = cantidad === 0
+      ? "Ningún producto seleccionado"
+      : cantidad === 1
+        ? "1 producto seleccionado"
+        : `${cantidad} productos seleccionados`;
+  }
+
+  if (btn) btn.disabled = cantidad === 0;
+}
+
+/** Toggles every visible product checkbox via the header checkbox */
+function toggleTodosProductos(checkboxHeader) {
+  document.querySelectorAll(".check-producto-etiqueta").forEach(c => {
+    c.checked = checkboxHeader.checked;
+  });
+  actualizarSeleccionEtiquetas();
+}
+
+/** Returns the list of currently-checked product codes */
+function obtenerCodigosSeleccionados() {
+  return Array.from(document.querySelectorAll(".check-producto-etiqueta:checked")).map(c => c.value);
+}
+
+function abrirModalEtiquetas() {
+  const codigos = obtenerCodigosSeleccionados();
+  if (codigos.length === 0) { toast("Seleccioná al menos un producto", "error"); return; }
+
+  actualizarPreviewEtiquetas();
+  document.getElementById("etiquetasModalBackdrop").classList.add("show");
+}
+
+function cerrarModalEtiquetas() {
+  document.getElementById("etiquetasModalBackdrop").classList.remove("show");
+}
+
+/** Shows a quick text summary (no barcodes yet — those render only at print time) */
+function actualizarPreviewEtiquetas() {
+  const codigos = obtenerCodigosSeleccionados();
+  const copias = Math.max(1, Number(document.getElementById("etqCantidadCopias").value || 1));
+  const totalEtiquetas = codigos.length * copias;
+
+  const info = document.getElementById("etiquetasPreviewInfo");
+  if (info) {
+    info.textContent = `Se van a imprimir ${totalEtiquetas} etiqueta${totalEtiquetas === 1 ? "" : "s"} en total (${codigos.length} producto${codigos.length === 1 ? "" : "s"} × ${copias} copia${copias === 1 ? "" : "s"}).`;
+  }
+}
+
+/**
+ * Builds the printable label grid (one <div> per label, with an <svg>
+ * placeholder per barcode) and renders the actual barcodes into those
+ * placeholders with JsBarcode — then triggers the browser's print
+ * dialog. Runs entirely client-side, same approach as the PDF catalog
+ * download: no server round-trip per label.
+ */
+function imprimirEtiquetas() {
+  const codigos = obtenerCodigosSeleccionados();
+  if (codigos.length === 0) { toast("Seleccioná al menos un producto", "error"); return; }
+
+  const copias = Math.max(1, Number(document.getElementById("etqCantidadCopias").value || 1));
+  const columnas = document.getElementById("etqColumnas").value;
+
+  const productos = codigos
+    .map(codigo => productosAdminGlobal.find(p => String(p.CODIGO) === String(codigo)))
+    .filter(Boolean);
+
+  if (productos.length === 0) {
+    toast("No se encontraron los productos seleccionados", "error");
+    return;
+  }
+
+  const printArea = document.getElementById("etiquetasPrintArea");
+
+  // Por si quedó contenido de una impresión de ticket térmico anterior
+  // a medio camino, se limpia el otro contenedor de impresión para que
+  // el CSS de :empty/:not(:empty) elija el correcto sin ambigüedad.
+  const thermalFrame = document.getElementById("thermalPrintFrame");
+  if (thermalFrame) thermalFrame.innerHTML = "";
+
+  let html = `<div class="etiquetas-grid cols-${columnas}">`;
+
+  let idx = 0;
+  productos.forEach(p => {
+    for (let copia = 0; copia < copias; copia++) {
+      const svgId = `etqSvg${idx}`;
+      html += `
+        <div class="etiqueta-item">
+          <div class="etiqueta-nombre">${escapeHtml(p.PRODUCTO)}</div>
+          <svg class="etiqueta-barcode-svg" id="${svgId}"></svg>
+          <div class="etiqueta-codigo-texto">${escapeHtml(p.CODIGO)}</div>
+          <div class="etiqueta-precio">$${Number(p.PRECIO || 0).toLocaleString("es-AR")}</div>
+        </div>`;
+      idx++;
+    }
+  });
+
+  html += `</div>`;
+  printArea.innerHTML = html;
+
+  // JsBarcode necesita que el <svg> ya esté en el DOM antes de dibujar
+  // adentro — por eso se llena el HTML primero y se recorre después.
+  idx = 0;
+  productos.forEach(p => {
+    for (let copia = 0; copia < copias; copia++) {
+      try {
+        JsBarcode(`#etqSvg${idx}`, String(p.CODIGO), {
+          format: "CODE128",
+          displayValue: false, // el código ya se muestra como texto aparte, en una fuente más legible
+          width: 1.6,
+          height: 38,
+          margin: 4
+        });
+      } catch (error) {
+        // Un código vacío o con caracteres no soportados no debe
+        // frenar la impresión del resto de las etiquetas.
+        console.error("No se pudo generar el código de barras para", p.CODIGO, error);
+      }
+      idx++;
+    }
+  });
+
+  cerrarModalEtiquetas();
+
+  // Pequeño delay para asegurar que los SVG ya se pintaron en el DOM
+  // antes de que el navegador capture el contenido para imprimir.
+  setTimeout(() => {
+    window.print();
+  }, 200);
+}
+
