@@ -608,7 +608,6 @@ async function cargarMetricas() {
 
     // Pedidos
     actualizarElemento("pedidosNuevos",   data.pedidosNuevos  || 0);
-    actualizarElemento("TotalPedidos",    data.totalPedidos   || 0);
     actualizarElemento("totalPedidos",    data.totalPedidos   || 0);
 
     // Productos / stock
@@ -632,7 +631,6 @@ async function cargarMetricas() {
     actualizarElemento("ventasTotales", "$" + ventasMesTotal.toLocaleString("es-AR"));
 
     const tp = "$" + Math.round(data.ticketPromedio || 0).toLocaleString("es-AR");
-    actualizarElemento("TicketPromedio", tp);
     actualizarElemento("ticketPromedio", tp);
 
     // Ventas — POS (mostrador) hoy/mes
@@ -1442,31 +1440,62 @@ async function eliminarProducto(codigo) {
 
 /* ===================== CLIENTES ===================== */
 
+let clientesGlobal = [];
+
 async function cargarClientesDesdeBackend() {
   try {
     const response = await fetch(API_URL + "?action=clientes");
     const data = await response.json();
-    let html = "";
     if (!data.clientes) return;
-    if (data.clientes.length === 0) {
-      html = `<tr><td colspan="7" class="text-center text-muted py-4">No hay clientes</td></tr>`;
-    }
-    data.clientes.forEach(c => {
-      html += `
-      <tr>
-        <td>${escapeHtml(c.CLIENTE)}</td>
-        <td>${escapeHtml(c.EMPRESA)}</td>
-        <td>${escapeHtml(c.DIRECCION)}</td>
-        <td>${escapeHtml(c.TELEFONO)}</td>
-        <td>${escapeHtml(c.DNI)}</td>
-        <td>${c.PEDIDOS}</td>
-        <td class="money">$${Number(c.TOTAL || 0).toLocaleString("es-AR")}</td>
-      </tr>`;
-    });
-    document.getElementById("tablaClientes").innerHTML = html;
+    clientesGlobal = data.clientes;
+    filtrarClientes();
   } catch (error) {
     console.error("Error clientes:", error);
   }
+}
+
+function renderTablaClientes(lista) {
+  const tbody = document.getElementById("tablaClientes");
+  if (!tbody) return;
+
+  if (!lista || lista.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4">No se encontraron clientes</td></tr>`;
+    return;
+  }
+
+  let html = "";
+  lista.forEach(c => {
+    html += `
+    <tr>
+      <td>${escapeHtml(c.CLIENTE)}</td>
+      <td>${escapeHtml(c.EMPRESA)}</td>
+      <td>${escapeHtml(c.DIRECCION)}</td>
+      <td>${escapeHtml(c.TELEFONO)}</td>
+      <td>${escapeHtml(c.DNI)}</td>
+      <td>${c.PEDIDOS}</td>
+      <td class="money">$${Number(c.TOTAL || 0).toLocaleString("es-AR")}</td>
+    </tr>`;
+  });
+  tbody.innerHTML = html;
+}
+
+/** Filters the already-loaded client list by name, empresa, or DNI — no new backend call */
+function filtrarClientes() {
+  const input = document.getElementById("buscarCliente");
+  const termino = (input ? input.value : "").toLowerCase().trim();
+
+  let filtrados = clientesGlobal;
+
+  if (termino) {
+    filtrados = filtrados.filter(c => {
+      const nombre = String(c.CLIENTE || "").toLowerCase();
+      const empresa = String(c.EMPRESA || "").toLowerCase();
+      const dni = String(c.DNI || "").toLowerCase();
+      return nombre.includes(termino) || empresa.includes(termino) || dni.includes(termino);
+    });
+  }
+
+  renderTablaClientes(filtrados);
 }
 
 /**

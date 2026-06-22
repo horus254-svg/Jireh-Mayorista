@@ -121,20 +121,6 @@
         </div>
       </div>
       <div class="col-6 col-md-3">
-        <div class="card p-3 dashboard-card metric-card" onclick="mostrarSeccion('pedidos')">
-          <div class="metric-icon bg-tint-blue">📦</div>
-          <h6>Total Pedidos</h6>
-          <h2 id="TotalPedidos">0</h2>
-        </div>
-      </div>
-      <div class="col-6 col-md-3">
-        <div class="card p-3 metric-card">
-          <div class="metric-icon bg-tint-green">💵</div>
-          <h6>Ticket Promedio</h6>
-          <h2 id="TicketPromedio">$0</h2>
-        </div>
-      </div>
-      <div class="col-6 col-md-3">
         <div class="card p-3 dashboard-card metric-card" onclick="mostrarSeccion('ventasPOS')">
           <div class="metric-icon bg-tint-green">🏪</div>
           <h6>Ventas POS Hoy</h6>
@@ -185,6 +171,12 @@
   <!-- ===== CLIENTES ===== -->
   <div id="clientes" class="seccion">
     <div class="page-header"><div><h1>Clientes</h1><div class="sub">Historial de compra por cliente</div></div></div>
+
+    <div class="card p-3 mb-3">
+      <input type="text" id="buscarCliente" class="form-control" style="max-width:300px"
+        placeholder="Buscar por nombre, empresa o DNI..." onkeyup="filtrarClientes()">
+    </div>
+
     <div class="card p-3">
       <div class="table-responsive">
         <table class="table table-striped">
