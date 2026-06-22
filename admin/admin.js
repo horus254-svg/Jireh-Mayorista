@@ -123,6 +123,7 @@ async function cargarConfigNegocioForm() {
   cargarSidebarForm(cfg);
   cargarDriveProductosForm(cfg);
   cargarDrivePedidosForm(cfg);
+  cargarUrlCatalogoForm(cfg);
 
   if (form) form.placeholder = "Ej: JIREH";
 }
@@ -327,6 +328,51 @@ function cargarDrivePedidosForm(cfg) {
 
   const pieInput = document.getElementById("cfgPedidoPdfPie");
   if (pieInput) pieInput.value = cfg.pedidoPdfPie || "";
+}
+
+/** Loads the catalog public URL into the Configuración form, used to build price-QR links */
+function cargarUrlCatalogoForm(cfg) {
+  const input = document.getElementById("cfgUrlCatalogo");
+  if (input) input.value = cfg.urlCatalogo || "";
+}
+
+/** Saves the catalog public URL */
+async function guardarUrlCatalogoForm() {
+  const nombre = document.getElementById("cfgNombreLocal").value.trim();
+
+  if (!nombre) {
+    toast("Completá primero el nombre del local, arriba", "error");
+    return;
+  }
+
+  const cfg = {
+    nombre,
+    urlCatalogo: document.getElementById("cfgUrlCatalogo").value.trim().replace(/\/+$/, "") // sin / al final, evita //precio.html
+  };
+
+  const btn = document.getElementById("btnGuardarUrlCatalogo");
+  const textoOriginal = btn ? btn.innerHTML : "";
+  if (btn) { btn.disabled = true; btn.innerHTML = "Guardando..."; }
+
+  try {
+    const params = new URLSearchParams({ action: "guardarConfiguracionNegocio", ...cfg });
+    const response = await fetch(API_URL + "?" + params.toString());
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo guardar", "error");
+      return;
+    }
+
+    configNegocioCache = { ...configNegocioCache, ...cfg };
+    toast("URL del catálogo guardada", "success");
+
+  } catch (error) {
+    console.error("Error al guardar la URL del catálogo:", error);
+    toast("Error de conexión al guardar", "error");
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = textoOriginal; }
+  }
 }
 
 /** Saves both the Drive folder and the editable texts used by the order PDF */
@@ -3746,11 +3792,12 @@ async function eliminarMovimientoCajaForm(movimientoId) {
    ETIQUETAS DE CÓDIGO DE BARRAS (para estantería/góndola)
 =================================================================== */
 
-/** Updates the selection counter and enables/disables the "Generar Etiquetas" button */
+/** Updates the selection counter and enables/disables both the "Generar Etiquetas" and "Generar QR" buttons */
 function actualizarSeleccionEtiquetas() {
   const checks = document.querySelectorAll(".check-producto-etiqueta:checked");
   const info = document.getElementById("etiquetasSeleccionInfo");
-  const btn = document.getElementById("btnGenerarEtiquetas");
+  const btnEtiquetas = document.getElementById("btnGenerarEtiquetas");
+  const btnQR = document.getElementById("btnGenerarQR");
 
   const cantidad = checks.length;
 
@@ -3762,7 +3809,8 @@ function actualizarSeleccionEtiquetas() {
         : `${cantidad} productos seleccionados`;
   }
 
-  if (btn) btn.disabled = cantidad === 0;
+  if (btnEtiquetas) btnEtiquetas.disabled = cantidad === 0;
+  if (btnQR) btnQR.disabled = cantidad === 0;
 }
 
 /** Toggles every visible product checkbox via the header checkbox */
@@ -3879,6 +3927,127 @@ function imprimirEtiquetas() {
 
   // Pequeño delay para asegurar que los SVG ya se pintaron en el DOM
   // antes de que el navegador capture el contenido para imprimir.
+  setTimeout(() => {
+    window.print();
+  }, 200);
+}
+
+/* ===================================================================
+   QR DE PRECIO (consulta pública del precio actualizado, sin login)
+=================================================================== */
+
+function abrirModalQR() {
+  const codigos = obtenerCodigosSeleccionados();
+  if (codigos.length === 0) { toast("Seleccioná al menos un producto", "error"); return; }
+
+  if (!configNegocioCache.urlCatalogo) {
+    toast("Configurá primero la URL del catálogo en Configuración → Catálogo online", "error");
+    return;
+  }
+
+  actualizarPreviewQR();
+  document.getElementById("qrModalBackdrop").classList.add("show");
+}
+
+function cerrarModalQR() {
+  document.getElementById("qrModalBackdrop").classList.remove("show");
+}
+
+function actualizarPreviewQR() {
+  const codigos = obtenerCodigosSeleccionados();
+  const copias = Math.max(1, Number(document.getElementById("qrCantidadCopias").value || 1));
+  const totalQR = codigos.length * copias;
+
+  const info = document.getElementById("qrPreviewInfo");
+  if (info) {
+    info.textContent = `Se van a imprimir ${totalQR} código${totalQR === 1 ? "" : "s"} QR en total (${codigos.length} producto${codigos.length === 1 ? "" : "s"} × ${copias} copia${copias === 1 ? "" : "s"}).`;
+  }
+}
+
+/** Builds the public "consultar precio" URL for a given product code */
+function construirUrlPrecio(codigo) {
+  const base = (configNegocioCache.urlCatalogo || "").replace(/\/+$/, "");
+  return `${base}/precio.html?codigo=${encodeURIComponent(codigo)}`;
+}
+
+/**
+ * Builds the printable QR grid and renders each QR with QRCode.js into
+ * its placeholder <div> — then triggers the print dialog. Same
+ * client-side approach as the barcode labels: no server round-trip.
+ */
+function imprimirQR() {
+  const codigos = obtenerCodigosSeleccionados();
+  if (codigos.length === 0) { toast("Seleccioná al menos un producto", "error"); return; }
+
+  if (!configNegocioCache.urlCatalogo) {
+    toast("Configurá primero la URL del catálogo en Configuración → Catálogo online", "error");
+    return;
+  }
+
+  const copias = Math.max(1, Number(document.getElementById("qrCantidadCopias").value || 1));
+  const columnas = document.getElementById("qrColumnas").value;
+
+  const productos = codigos
+    .map(codigo => productosAdminGlobal.find(p => String(p.CODIGO) === String(codigo)))
+    .filter(Boolean);
+
+  if (productos.length === 0) {
+    toast("No se encontraron los productos seleccionados", "error");
+    return;
+  }
+
+  const printArea = document.getElementById("etiquetasPrintArea");
+
+  // Mismo cuidado que en las etiquetas de código de barras: se limpia
+  // el otro contenedor de impresión para que el CSS :empty/:not(:empty)
+  // elija el correcto sin ambigüedad.
+  const thermalFrame = document.getElementById("thermalPrintFrame");
+  if (thermalFrame) thermalFrame.innerHTML = "";
+
+  let html = `<div class="etiquetas-grid cols-${columnas}">`;
+
+  let idx = 0;
+  productos.forEach(p => {
+    for (let copia = 0; copia < copias; copia++) {
+      html += `
+        <div class="qr-item">
+          <div class="qr-nombre">${escapeHtml(p.PRODUCTO)}</div>
+          <div id="qrCanvas${idx}"></div>
+          <div class="qr-leyenda">Escaneá para ver el precio</div>
+        </div>`;
+      idx++;
+    }
+  });
+
+  html += `</div>`;
+  printArea.innerHTML = html;
+
+  // QRCode.js necesita que el contenedor ya esté en el DOM antes de
+  // dibujar adentro — por eso se llena el HTML primero y se recorre después.
+  idx = 0;
+  productos.forEach(p => {
+    const url = construirUrlPrecio(p.CODIGO);
+    for (let copia = 0; copia < copias; copia++) {
+      try {
+        new QRCode(document.getElementById(`qrCanvas${idx}`), {
+          text: url,
+          width: 120,
+          height: 120,
+          colorDark: "#000000",
+          colorLight: "#ffffff",
+          correctLevel: QRCode.CorrectLevel.M
+        });
+      } catch (error) {
+        // Un error puntual generando un QR no debe frenar la
+        // impresión del resto.
+        console.error("No se pudo generar el QR para", p.CODIGO, error);
+      }
+      idx++;
+    }
+  });
+
+  cerrarModalQR();
+
   setTimeout(() => {
     window.print();
   }, 200);
