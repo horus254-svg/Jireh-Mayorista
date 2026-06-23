@@ -1043,9 +1043,9 @@ function renderTablaProductos(lista) {
         <span class="badge ${publicado ? "bg-success" : "bg-secondary"}">${publicado ? "Publicado" : "Oculto"}</span>
       </td>
       <td>
-        <button class="btn btn-outline-success btn-sm" onclick="abrirModalStock('${escapeHtml(p.CODIGO)}')" title="Sumar stock">📦 Stock</button>
-        <button class="btn btn-primary btn-sm ms-2" onclick="editarProducto('${escapeHtml(p.CODIGO)}')">Editar</button>
-        <button class="btn btn-danger btn-sm ms-2" onclick="eliminarProducto('${escapeHtml(p.CODIGO)}')">Eliminar</button>
+        <button class="btn btn-outline-success btn-sm btn-accion-producto" onclick="abrirModalStock('${escapeHtml(p.CODIGO)}')" title="Sumar stock">📦 Stock</button>
+        <button class="btn btn-primary btn-sm btn-accion-producto ms-2" onclick="editarProducto('${escapeHtml(p.CODIGO)}')">Editar</button>
+        <button class="btn btn-danger btn-sm btn-accion-producto ms-2" onclick="eliminarProducto('${escapeHtml(p.CODIGO)}')">Eliminar</button>
       </td>
     </tr>`;
   });

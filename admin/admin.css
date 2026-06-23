@@ -440,6 +440,15 @@ html,body{
 .btn-outline-dark{ color:var(--navy-900); border:1.5px solid var(--navy-900); background:#fff; }
 .btn-outline-dark:hover{ background:var(--navy-900); border-color:var(--navy-900); color:#fff; }
 
+/* Stock / Editar / Eliminar en la tabla de Productos: mismo ancho
+   visual sin truncar texto — min-width (no width fijo) para que
+   "Eliminar", la palabra más larga, sea la que define el tamaño y el
+   resto se centre cómodo dentro de ese mismo espacio. */
+.btn-accion-producto{
+  min-width:92px;
+  text-align:center;
+}
+
 /* ===================== POS SCREEN ===================== */
 
 .pos-wrap{
