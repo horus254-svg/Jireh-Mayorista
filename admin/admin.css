@@ -435,6 +435,10 @@ html,body{
 .btn-outline-primary{ color:var(--navy-900); border:1.5px solid var(--slate-300); background:#fff; }
 .btn-outline-primary:hover{ background:var(--navy-900); border-color:var(--navy-900); color:#fff; }
 .btn-outline-secondary{ border:1.5px solid var(--slate-300); color:var(--slate-600); background:#fff; }
+.btn-outline-success{ color:var(--green-600); border:1.5px solid var(--green-500); background:#fff; }
+.btn-outline-success:hover{ background:var(--green-500); border-color:var(--green-500); color:#fff; }
+.btn-outline-dark{ color:var(--navy-900); border:1.5px solid var(--navy-900); background:#fff; }
+.btn-outline-dark:hover{ background:var(--navy-900); border-color:var(--navy-900); color:#fff; }
 
 /* ===================== POS SCREEN ===================== */
 
