@@ -6,9 +6,12 @@
 <title>Lector de Códigos</title>
 
 <!-- Permite "Agregar a pantalla de inicio" y que abra sin barra de navegador -->
+<link rel="manifest" href="manifest.json">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Lector QR">
+<link rel="apple-touch-icon" href="icon-512.png">
 <meta name="theme-color" content="#0f1830">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -344,6 +347,17 @@ document.getElementById("btnEscanearOtro").addEventListener("click", iniciarEsca
 document.addEventListener("visibilitychange", () => {
     if(document.hidden) detenerCamara();
 });
+
+// Necesario para que Chrome en Android permita instalar esta página
+// como app real (pantalla completa, sin barra de navegador) en vez de
+// un simple acceso directo — ver service-worker.js para más detalle.
+if("serviceWorker" in navigator){
+    navigator.serviceWorker.register("service-worker.js").catch((error) => {
+        console.error("No se pudo registrar el service worker:", error);
+        // Si falla, la página sigue funcionando igual para escanear —
+        // solo no se va a poder instalar como app de pantalla completa.
+    });
+}
 
 </script>
 
