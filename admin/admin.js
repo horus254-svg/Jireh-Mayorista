@@ -3036,6 +3036,15 @@ function setupScannerListener() {
     lastKeyTime   = now;
 
     if (e.key === "Enter") {
+      // Si el foco está en el buscador del POS, onPosInputKeyup (el
+      // oninput="" de ese mismo <input>) ya se encarga de procesar
+      // este Enter — dejarlo pasar también acá disparaba
+      // agregarProductoPorCodigo() DOS VECES para el mismo escaneo
+      // (una desde cada listener), una condición de carrera que podía
+      // hacer fallar una de las dos búsquedas y mostrar "Producto no
+      // encontrado" aunque el producto sí se agregara por la otra vía.
+      if (isOurInput) { scanBuffer = ""; return; }
+
       if (scanBuffer.length >= 3) { agregarProductoPorCodigo(scanBuffer); setScannerStatus("listening"); }
       scanBuffer = "";
       return;
