@@ -1,0 +1,1017 @@
+/* =========================================================
+   DESIGN TOKENS
+   Palette: deep navy surface + indigo action color +
+   amber/coral tag accents on a warm paper background.
+   Signature: a "price-tag" motif — zigzag torn edge under
+   the hero, and a perforated ticket-stub line on cards.
+========================================================= */
+
+:root{
+    --navy-950:#0a1020;
+    --navy-900:#0f1830;
+    --navy-800:#141d36;
+    --indigo-600:#3d5afe;
+    --indigo-700:#2c41d6;
+    --gold-500:#d99a3d;
+    --amber-500:#f5a623;
+    --coral-600:#ff5d5d;
+    --paper:#f6f3ec;
+    --paper-line:#e7e2d2;
+    --ink-900:#171a23;
+    --ink-600:#5b6072;
+
+    --bg-card:#ffffff;
+
+    --green-ok-bg:#dff5e3;
+    --green-ok-text:#1c7a3c;
+    --amber-low-bg:#fdecc8;
+    --amber-low-text:#9a5b06;
+
+    --radius-lg:18px;
+    --radius-md:12px;
+    --radius-sm:9px;
+    --radius-pill:50px;
+
+    --shadow-card:0 8px 22px rgba(11,18,36,.07), 0 2px 6px rgba(11,18,36,.05);
+    --shadow-card-hover:0 16px 34px rgba(11,18,36,.14), 0 4px 10px rgba(11,18,36,.08);
+    --shadow-float:0 10px 28px rgba(11,18,36,.28);
+
+    --font-display:'Space Grotesk', system-ui, sans-serif;
+    --font-body:'Inter', system-ui, -apple-system, sans-serif;
+    --font-price:'JetBrains Mono', ui-monospace, monospace;
+
+    --navbar-h:128px;
+    --mobile-cart-bar-h:60px;
+}
+
+*{
+    box-sizing:border-box;
+}
+
+body{
+    background:var(--paper);
+    padding-top:var(--navbar-h);
+    font-family:var(--font-body);
+    color:var(--ink-900);
+}
+
+h1,h2,h3,h4,h5,.navbar-brand{
+    font-family:var(--font-display);
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible{
+    outline:3px solid #9fb0ff;
+    outline-offset:2px;
+}
+
+/* =========================================================
+   NAVBAR
+========================================================= */
+
+.navbar{
+    background:linear-gradient(135deg, var(--navy-950), var(--navy-800));
+    background-image:
+        repeating-linear-gradient(135deg, rgba(255,255,255,.035) 0px, rgba(255,255,255,.035) 1px, transparent 1px, transparent 13px),
+        linear-gradient(135deg, var(--navy-950), var(--navy-800));
+    box-shadow:0 4px 20px rgba(11,18,36,.25);
+    padding:12px 0 16px;
+}
+
+.navbar-top{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    width:100%;
+}
+
+.navbar-brand{
+    font-weight:700;
+    font-size:1.2rem;
+    color:#fff;
+    letter-spacing:-.01em;
+}
+
+.btn-cart-top{
+    background:rgba(255,255,255,.1);
+    color:#fff;
+    border:1px solid rgba(255,255,255,.22);
+    border-radius:var(--radius-pill);
+    font-weight:700;
+    padding:7px 16px;
+    font-size:.92rem;
+}
+
+.btn-cart-top:hover{
+    background:var(--indigo-600);
+    border-color:var(--indigo-600);
+    color:#fff;
+}
+
+.navbar-search-row{
+    width:100%;
+    margin-top:10px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+}
+
+.search-wrap{
+    position:relative;
+    display:flex;
+    align-items:center;
+    flex:1;
+    min-width:0;
+}
+
+.search-icon{
+    position:absolute;
+    left:16px;
+    pointer-events:none;
+    opacity:.55;
+}
+
+#search{
+    border-radius:var(--radius-pill);
+    padding:11px 38px 11px 40px;
+    border:1px solid transparent;
+    background:rgba(255,255,255,.94);
+    width:100%;
+    font-family:var(--font-body);
+}
+
+#search:focus{
+    background:#fff;
+    box-shadow:0 0 0 3px rgba(61,90,254,.35);
+}
+
+.search-clear{
+    position:absolute;
+    right:10px;
+    border:none;
+    background:transparent;
+    color:var(--ink-600);
+    font-size:.85rem;
+    padding:6px;
+    border-radius:50%;
+    display:none;
+    cursor:pointer;
+}
+
+.search-clear.visible{
+    display:block;
+}
+
+.btn-pdf-top{
+    flex-shrink:0;
+    background:rgba(255,255,255,.94);
+    color:var(--ink-900);
+    border:1px solid transparent;
+    border-radius:var(--radius-pill);
+    font-weight:700;
+    padding:11px 16px;
+    font-size:.88rem;
+    white-space:nowrap;
+}
+
+.btn-pdf-top:hover{
+    background:#fff;
+    box-shadow:0 0 0 3px rgba(61,90,254,.25);
+}
+
+.btn-pdf-top:disabled{
+    opacity:.6;
+    cursor:not-allowed;
+}
+
+/* =========================================================
+   HERO
+   Signature: zigzag "torn price-tag" edge at the bottom.
+========================================================= */
+
+.hero{
+    position:relative;
+    background:radial-gradient(120% 140% at 15% 0%, #1c2a52 0%, var(--navy-950) 55%, var(--navy-950) 100%);
+    color:#fff;
+    text-align:center;
+    padding:50px 20px 64px;
+    overflow:hidden;
+}
+
+.hero::before{
+    content:"";
+    position:absolute;
+    inset:0;
+    background-image:repeating-linear-gradient(135deg, rgba(255,255,255,.04) 0px, rgba(255,255,255,.04) 1px, transparent 1px, transparent 13px);
+    pointer-events:none;
+}
+
+.hero::after{
+    content:"";
+    position:absolute;
+    left:0;
+    right:0;
+    bottom:-1px;
+    height:26px;
+    background-color:var(--paper);
+    clip-path:polygon(0.000% 55%, 4.167% 0%, 8.333% 55%, 8.333% 55%, 12.500% 0%, 16.667% 55%, 16.667% 55%, 20.833% 0%, 25.000% 55%, 25.000% 55%, 29.167% 0%, 33.333% 55%, 33.333% 55%, 37.500% 0%, 41.667% 55%, 41.667% 55%, 45.833% 0%, 50.000% 55%, 50.000% 55%, 54.167% 0%, 58.333% 55%, 58.333% 55%, 62.500% 0%, 66.667% 55%, 66.667% 55%, 70.833% 0%, 75.000% 55%, 75.000% 55%, 79.167% 0%, 83.333% 55%, 83.333% 55%, 87.500% 0%, 91.667% 55%, 91.667% 55%, 95.833% 0%, 100.000% 55%, 100% 100%, 0% 100%);
+}
+
+.hero h1{
+    font-weight:700;
+    letter-spacing:-.02em;
+}
+
+.hero p{
+    margin-bottom:0;
+    opacity:.82;
+    font-weight:500;
+}
+
+/* =========================================================
+   BENEFICIOS
+========================================================= */
+
+.beneficios{
+    background:transparent;
+    padding:18px 0 6px;
+    margin-bottom:6px;
+}
+
+.beneficio-item{
+    font-weight:600;
+    color:var(--ink-600);
+    font-size:.82rem;
+}
+
+.beneficio-link{
+    text-decoration:none;
+    cursor:pointer;
+}
+
+.beneficio-link:hover{
+    color:var(--indigo-600);
+}
+
+/* =========================================================
+   CATEGORÍAS (CHIPS — tag motif with a punched hole)
+========================================================= */
+
+.categorias-section{
+    margin-bottom:6px;
+}
+
+.chip-scroll{
+    display:flex;
+    gap:10px;
+    overflow-x:auto;
+    padding:4px 2px 14px;
+    scrollbar-width:thin;
+    -webkit-overflow-scrolling:touch;
+}
+
+.chip-scroll::-webkit-scrollbar{
+    height:5px;
+}
+
+.chip-scroll::-webkit-scrollbar-thumb{
+    background:#dcd7c8;
+    border-radius:10px;
+}
+
+.chip{
+    position:relative;
+    flex:0 0 auto;
+    border:1px solid #e4e0d3;
+    background:#fff;
+    color:var(--ink-900);
+    border-radius:var(--radius-pill);
+    padding:9px 18px 9px 24px;
+    font-size:.84rem;
+    font-weight:600;
+    white-space:nowrap;
+    cursor:pointer;
+    transition:.2s;
+}
+
+.chip::before{
+    content:"";
+    position:absolute;
+    left:10px;
+    top:50%;
+    transform:translateY(-50%);
+    width:6px;
+    height:6px;
+    border-radius:50%;
+    background:var(--paper);
+    border:1px solid #e4e0d3;
+}
+
+.chip:hover{
+    border-color:var(--indigo-600);
+}
+
+.chip.active{
+    background:var(--indigo-600);
+    border-color:var(--indigo-600);
+    color:#fff;
+}
+
+.chip.active::before{
+    background:var(--indigo-600);
+    border-color:rgba(255,255,255,.6);
+}
+
+/* =========================================================
+   RESULTADOS / EMPTY STATE
+========================================================= */
+
+.resultados-info{
+    font-size:.85rem;
+    color:var(--ink-600);
+    margin:4px 2px 14px;
+    font-weight:600;
+}
+
+.sin-resultados{
+    text-align:center;
+    padding:60px 20px;
+    color:var(--ink-600);
+}
+
+.sin-resultados-icon{
+    font-size:2.5rem;
+    margin-bottom:10px;
+}
+
+.sin-resultados h5{
+    color:var(--ink-900);
+    font-weight:700;
+}
+
+/* =========================================================
+   SKELETON LOADER
+========================================================= */
+
+.skeleton-card{
+    background:#fff;
+    border-radius:var(--radius-lg);
+    box-shadow:var(--shadow-card);
+    overflow:hidden;
+    height:100%;
+}
+
+.skeleton-img{
+    width:100%;
+    aspect-ratio:1/1;
+    background:linear-gradient(90deg,#eee9da 25%,#e3ddc9 37%,#eee9da 63%);
+    background-size:400% 100%;
+    animation:skeleton-shimmer 1.4s ease infinite;
+}
+
+.skeleton-line{
+    height:12px;
+    margin:14px 15px 0;
+    border-radius:6px;
+    background:linear-gradient(90deg,#eee9da 25%,#e3ddc9 37%,#eee9da 63%);
+    background-size:400% 100%;
+    animation:skeleton-shimmer 1.4s ease infinite;
+}
+
+.skeleton-line.w-60{ width:60%; }
+.skeleton-line.w-80{ width:80%; margin-bottom:15px; }
+
+@keyframes skeleton-shimmer{
+    0%{ background-position:100% 50%; }
+    100%{ background-position:0 50%; }
+}
+
+@media (prefers-reduced-motion:reduce){
+    .skeleton-img,.skeleton-line{
+        animation:none;
+    }
+}
+
+/* =========================================================
+   PRODUCTOS
+========================================================= */
+
+.card-product{
+    position:relative;
+    background:var(--bg-card);
+    border:1px solid var(--paper-line);
+    border-radius:var(--radius-lg);
+    overflow:hidden;
+    transition:.25s ease;
+    box-shadow:var(--shadow-card);
+    cursor:pointer;
+}
+
+.card-product:hover{
+    transform:translateY(-4px);
+    border-color:transparent;
+    box-shadow:var(--shadow-card-hover);
+}
+
+.card-product .card-img-wrap{
+    position:relative;
+    background:#fff;
+}
+
+.card-product img{
+    width:100%;
+    aspect-ratio:1/1;
+    object-fit:contain;
+    object-position:center;
+    background:#fff;
+    padding:18px;
+    transition:transform .3s ease;
+}
+
+.card-product:hover img{
+    transform:scale(1.05);
+}
+
+/* Ticket-stub perforation between the image and product info */
+.ticket-perf{
+    position:relative;
+    height:1px;
+    margin:0 16px;
+    border-top:2px dashed #e7e2d2;
+}
+
+.ticket-perf::before,
+.ticket-perf::after{
+    content:"";
+    position:absolute;
+    top:-6px;
+    width:12px;
+    height:12px;
+    border-radius:50%;
+    background:var(--paper);
+}
+
+.ticket-perf::before{ left:-6px; }
+.ticket-perf::after{ right:-6px; }
+
+.card-product .card-body-custom{
+    padding:14px 16px 18px;
+}
+
+.card-product small{
+    display:block;
+    color:var(--ink-600);
+    margin-bottom:6px;
+    text-transform:uppercase;
+    font-size:11px;
+    letter-spacing:.6px;
+    font-weight:700;
+}
+
+.card-product h5{
+    font-size:15px;
+    line-height:1.4;
+    min-height:42px;
+    font-weight:600;
+    color:var(--ink-900);
+    margin:0;
+    font-family:var(--font-body);
+}
+
+.price{
+    font-family:var(--font-price);
+    font-size:1.4rem;
+    font-weight:700;
+    color:var(--navy-950);
+    margin-top:10px;
+    letter-spacing:-.02em;
+}
+
+.stock-badge{
+    display:inline-block;
+    font-size:.72rem;
+    font-weight:700;
+    padding:3px 11px;
+    border-radius:var(--radius-pill);
+    margin-top:8px;
+}
+
+.stock-badge.stock-ok{
+    background:var(--green-ok-bg);
+    color:var(--green-ok-text);
+}
+
+.stock-badge.stock-bajo{
+    background:var(--amber-low-bg);
+    color:var(--amber-low-text);
+}
+
+.qty-stepper{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-top:12px;
+}
+
+.qty-btn{
+    width:34px;
+    height:34px;
+    border-radius:var(--radius-sm);
+    border:1px solid #e4e0d3;
+    background:#fff;
+    font-size:1.1rem;
+    font-weight:700;
+    color:var(--indigo-600);
+    line-height:1;
+}
+
+.qty-btn:active{
+    background:#eef0ff;
+}
+
+.qty-input{
+    width:100%;
+    max-width:64px;
+    text-align:center;
+    border:1px solid #e4e0d3;
+    border-radius:var(--radius-sm);
+    height:34px;
+    font-weight:600;
+    font-family:var(--font-price);
+}
+
+.card-product .btn-primary{
+    background:var(--indigo-600);
+    border:none;
+    font-weight:600;
+    border-radius:var(--radius-md);
+    margin-top:14px;
+    width:100%;
+    padding:10px;
+}
+
+.card-product .btn-primary:hover{
+    background:var(--indigo-700);
+}
+
+/* =========================================================
+   RIBBONS
+========================================================= */
+
+.ribbon-destacado{
+    position:absolute;
+    top:12px;
+    left:12px;
+    background:var(--gold-500);
+    color:#231505;
+    font-weight:700;
+    font-family:var(--font-display);
+    font-size:11px;
+    padding:6px 11px;
+    border-radius:20px;
+    z-index:5;
+    box-shadow:0 3px 8px rgba(217,154,61,.35);
+}
+
+.ribbon-oferta{
+    position:absolute;
+    top:12px;
+    right:12px;
+    background:var(--coral-600);
+    color:#fff;
+    font-weight:700;
+    font-family:var(--font-display);
+    font-size:11px;
+    padding:6px 11px;
+    border-radius:20px;
+    z-index:5;
+}
+
+/* =========================================================
+   VISTA RÁPIDA
+========================================================= */
+
+.qv-img{
+    width:100%;
+    max-height:320px;
+    object-fit:contain;
+    background:#fff;
+}
+
+/* =========================================================
+   MODAL CARRITO
+========================================================= */
+
+.modal-content{
+    border:none;
+    border-radius:22px;
+    overflow:hidden;
+}
+
+.modal-header{
+    background:var(--navy-950);
+    background-image:repeating-linear-gradient(135deg, rgba(255,255,255,.035) 0px, rgba(255,255,255,.035) 1px, transparent 1px, transparent 13px);
+    color:#fff;
+}
+
+.modal-header .btn-close{
+    filter:brightness(0) invert(1);
+}
+
+.modal-title{
+    font-weight:700;
+    font-family:var(--font-display);
+}
+
+.form-section-label{
+    font-weight:700;
+    font-size:.85rem;
+    color:var(--ink-600);
+    text-transform:uppercase;
+    letter-spacing:.4px;
+    margin-bottom:8px;
+}
+
+.cart-total-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+}
+
+.cart-total-row h5{
+    font-family:var(--font-price);
+}
+
+.cart-empty{
+    text-align:center;
+    padding:30px 10px;
+    color:var(--ink-600);
+}
+
+.cart-empty-icon{
+    font-size:2.2rem;
+    margin-bottom:6px;
+}
+
+.cart-item-row{
+    border-bottom:1px solid #eee9da;
+    padding:14px 0;
+}
+
+.cart-item-name{
+    font-weight:700;
+    font-size:.95rem;
+}
+
+.cart-item-subtotal{
+    margin-top:8px;
+    font-weight:700;
+    font-family:var(--font-price);
+    color:var(--indigo-600);
+}
+
+/* =========================================================
+   BOTONES GENERALES
+========================================================= */
+
+.btn{
+    border-radius:var(--radius-md);
+}
+
+.btn-success,
+.btn-primary{
+    font-weight:600;
+}
+
+#btn-checkout{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+}
+
+.btn-checkout-spinner{
+    width:15px;
+    height:15px;
+    border:2px solid rgba(255,255,255,.4);
+    border-top-color:#fff;
+    border-radius:50%;
+    display:none;
+    flex-shrink:0;
+    animation:btn-checkout-spin .6s linear infinite;
+}
+
+#btn-checkout.loading .btn-checkout-spinner{
+    display:inline-block;
+}
+
+@keyframes btn-checkout-spin{
+    to{ transform:rotate(360deg); }
+}
+
+@media (prefers-reduced-motion:reduce){
+    .btn-checkout-spinner{ animation:none; }
+}
+
+.btn-primary{
+    background:var(--indigo-600);
+    border-color:var(--indigo-600);
+}
+
+.btn-primary:hover{
+    background:var(--indigo-700);
+    border-color:var(--indigo-700);
+}
+
+.btn-outline-primary{
+    color:var(--indigo-600);
+    border-color:var(--indigo-600);
+}
+
+.btn-outline-primary:hover{
+    background:var(--indigo-600);
+    border-color:var(--indigo-600);
+}
+
+/* =========================================================
+   TOASTS
+========================================================= */
+
+.toast-container{
+    position:fixed;
+    top:calc(var(--navbar-h) + 10px);
+    right:16px;
+    left:16px;
+    display:flex;
+    flex-direction:column;
+    align-items:flex-end;
+    gap:8px;
+    z-index:12000;
+    pointer-events:none;
+}
+
+.app-toast{
+    background:var(--navy-950);
+    color:#fff;
+    padding:12px 18px;
+    border-radius:var(--radius-md);
+    font-size:.9rem;
+    font-weight:600;
+    box-shadow:0 10px 25px rgba(0,0,0,.25);
+    opacity:0;
+    transform:translateY(-10px);
+    transition:.25s ease;
+    max-width:340px;
+}
+
+.app-toast.show{
+    opacity:1;
+    transform:translateY(0);
+}
+
+.app-toast.success{
+    background:#15803d;
+}
+
+.app-toast.error{
+    background:#b91c1c;
+}
+
+/* =========================================================
+   WHATSAPP FLOTANTE
+========================================================= */
+
+.whatsapp-float-text{
+    position:fixed;
+    bottom:25px;
+    left:25px;
+    background:#25D366;
+    color:#fff;
+    text-decoration:none;
+    padding:12px 18px;
+    border-radius:var(--radius-pill);
+    display:flex;
+    align-items:center;
+    gap:10px;
+    font-weight:600;
+    box-shadow:var(--shadow-float);
+    z-index:9999;
+    transition:.25s;
+}
+
+.whatsapp-float-text:hover{
+    transform:scale(1.05);
+    color:#fff;
+    text-decoration:none;
+}
+
+/* =========================================================
+   VOLVER ARRIBA
+========================================================= */
+
+.scroll-top-btn{
+    position:fixed;
+    right:20px;
+    bottom:95px;
+    width:44px;
+    height:44px;
+    border-radius:50%;
+    border:none;
+    background:var(--navy-950);
+    color:#fff;
+    font-size:1.2rem;
+    font-weight:700;
+    box-shadow:var(--shadow-float);
+    z-index:9998;
+    transition:.2s;
+}
+
+.scroll-top-btn:hover{
+    background:var(--indigo-600);
+}
+
+/* =========================================================
+   BARRA CARRITO MOBILE
+========================================================= */
+
+.mobile-cart-bar{
+    position:fixed;
+    left:0;
+    right:0;
+    bottom:0;
+    height:var(--mobile-cart-bar-h);
+    background:var(--indigo-600);
+    color:#fff;
+    border:none;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:0 18px;
+    font-weight:700;
+    font-size:.9rem;
+    z-index:9990;
+    padding-bottom:env(safe-area-inset-bottom);
+    box-shadow:0 -6px 20px rgba(0,0,0,.2);
+}
+
+.mcb-right{
+    font-family:var(--font-price);
+}
+
+/* =========================================================
+   RESPONSIVE — TABLET / DESKTOP (≥769px)
+========================================================= */
+
+@media (min-width:769px){
+
+    :root{
+        --navbar-h:80px;
+    }
+
+    .navbar-top{
+        width:auto;
+        flex:0 0 auto;
+        gap:20px;
+    }
+
+    .navbar-search-row{
+        flex:1;
+        margin:0 24px;
+        max-width:760px;
+    }
+
+    .navbar .container{
+        display:flex;
+        align-items:center;
+        flex-wrap:nowrap;
+    }
+
+    #search{
+        height:50px;
+        font-size:1.05rem;
+        padding:13px 44px;
+    }
+
+    .search-icon{
+        font-size:1.1rem;
+    }
+
+    .btn-cart-top{
+        font-size:1rem;
+        padding:8px 18px;
+    }
+
+    .mobile-cart-bar{
+        display:none !important;
+    }
+}
+
+/* =========================================================
+   RESPONSIVE — CELULARES (≤768px)
+========================================================= */
+
+@media (max-width:768px){
+
+    :root{
+        --navbar-h:128px;
+    }
+
+    body{
+        padding-bottom:calc(var(--mobile-cart-bar-h) + 10px);
+    }
+
+    .navbar-brand{
+        font-size:1.05rem;
+    }
+
+    .hero{
+        padding:38px 16px 50px;
+    }
+
+    .hero h1{
+        font-size:1.7rem;
+    }
+
+    .hero p{
+        font-size:.95rem;
+    }
+
+    .beneficio-item{
+        font-size:.78rem;
+    }
+
+    .whatsapp-float-text span{
+        display:none;
+    }
+
+    .whatsapp-float-text{
+        bottom:calc(var(--mobile-cart-bar-h) + 18px);
+        padding:13px;
+    }
+
+    .scroll-top-btn{
+        bottom:calc(var(--mobile-cart-bar-h) + 18px);
+    }
+
+    .modal{
+        z-index:11000 !important;
+    }
+
+    .modal-backdrop{
+        z-index:10990 !important;
+    }
+}
+
+/* =========================================================
+   TEMAS DE COLOR (seleccionables desde el panel admin / Sheets)
+   Se activan poniendo data-tema="azul|verde|rojo" en <body>.
+   Sin el atributo (o con data-tema="navy") se usa la paleta
+   original. Solo se reemplazan navy/indigo: el resto de la
+   paleta (paper, ink, ámbar/coral de etiquetas, estados de
+   stock) se mantiene igual en todos los temas.
+========================================================= */
+
+body[data-tema="azul"]{
+    --navy-950:#0b1f3a;
+    --navy-800:#16335c;
+    --indigo-600:#2f7df5;
+    --indigo-700:#1f63d1;
+}
+
+body[data-tema="verde"]{
+    --navy-950:#0c2417;
+    --navy-800:#16402a;
+    --indigo-600:#1fa257;
+    --indigo-700:#168447;
+}
+
+body[data-tema="rojo"]{
+    --navy-950:#2a0f12;
+    --navy-800:#481a1f;
+    --indigo-600:#e0413f;
+    --indigo-700:#bf2e2e;
+}
+
+/* =========================================================
+   BANNER PERSONALIZADO (imagen de fondo opcional en el Hero)
+   Se activa agregando la clase .hero--imagen vía JS cuando
+   hay una URL de imagen configurada en Sheets.
+========================================================= */
+
+.hero.hero--imagen{
+    background-image:
+        linear-gradient(180deg, rgba(11,18,36,.62), rgba(11,18,36,.78)),
+        var(--hero-bg-img);
+    background-size:cover;
+    background-position:center;
+}
+
+/* Cuando el banner ya tiene su propio texto/diseño incorporado (no se
+   usa el título de texto del sistema), se quita el oscurecido — la
+   imagen del banner queda nítida, al frente, sin ningún velo encima. */
+.hero.hero--imagen.hero--sin-degradado{
+    background-image: var(--hero-bg-img);
+}
+
