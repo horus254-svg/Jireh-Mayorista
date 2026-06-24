@@ -1643,6 +1643,20 @@ async function asegurarProductosPOS() {
 function construirCategoriasPOS() {
   const cont = document.getElementById("posCategorias");
   if (!cont) return;
+
+  // Permite desplazar las categorías con la rueda normal del mouse
+  // (vertical), sin necesidad de Shift+rueda ni de arrastrar — se
+  // agrega una sola vez, porque este <div> no se recrea entre
+  // llamadas (solo cambia su innerHTML más abajo).
+  if (!cont.dataset.wheelListo) {
+    cont.addEventListener("wheel", (e) => {
+      if (e.deltaY === 0) return; // ya es un scroll horizontal nativo (trackpad), no interferir
+      e.preventDefault();
+      cont.scrollLeft += e.deltaY;
+    });
+    cont.dataset.wheelListo = "1";
+  }
+
   const categorias = new Set();
   productosPOS.forEach(p => { if (p.CATEGORIA) categorias.add(String(p.CATEGORIA).trim()); });
   if (categorias.size === 0) { cont.innerHTML = ""; return; }
