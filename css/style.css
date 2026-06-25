@@ -1008,15 +1008,19 @@ body[data-tema="rojo"]{
     background-position:center;
     background-repeat:no-repeat;
 
-    /* Con contain, si el hero queda muy bajo (por ejemplo sin título
-       de texto encima), la imagen se ve chica en medio de mucho
-       espacio vacío. Este alto mínimo, que escala según el ancho de
-       pantalla, le da lugar suficiente a un banner ancho y bajo (como
-       una imagen tipo "cartel", proporción 3.35:1 aprox.) para
-       mostrarse a buen tamaño sin ocupar toda la pantalla en celular.
-       Si en algún momento se cambia la imagen del banner por una de
-       proporción distinta, este valor hay que recalcularlo. */
-    min-height:clamp(100px, 30vw, 550px);
+    /* Alto fijo, no calculado según el ancho de pantalla — así el
+       banner siempre ocupa el mismo espacio, sin sentirse "invasivo"
+       en ningún tamaño. En celular se reduce con la media query de
+       abajo. La imagen recomendada (ver guía de tamaños) está
+       diseñada para encajar bien en este alto sin recortarse ni
+       dejar franjas vacías notorias. */
+    height:220px;
+}
+
+@media (max-width:600px){
+    .hero.hero--imagen{
+        height:150px;
+    }
 }
 
 /* Cuando el banner ya tiene su propio texto/diseño incorporado (no se
