@@ -126,10 +126,15 @@ async function cargarProductos(){
         .filter(p => Number(String(p.STOCK).trim()) > 0)
         .sort((a,b)=>{
 
-            const da = String(a.DESTACADO).trim().toUpperCase();
-            const db = String(b.DESTACADO).trim().toUpperCase();
+            // Antes esto comparaba el texto alfabéticamente, lo cual hacía
+            // que cualquier valor no vacío en DESTACADO (no solo "SI")
+            // pudiera ordenarse antes que uno verdaderamente destacado.
+            // Ahora es una comparación real de "es destacado sí o no".
+            const esDestacadaA = String(a.DESTACADO || "").trim().toUpperCase() === "SI";
+            const esDestacadaB = String(b.DESTACADO || "").trim().toUpperCase() === "SI";
 
-            return db.localeCompare(da);
+            if(esDestacadaA === esDestacadaB) return 0;
+            return esDestacadaA ? -1 : 1; // los destacados reales van primero
         });
 
         renderChips();
@@ -278,9 +283,9 @@ function mostrarProductos(lista){
 
             <div class="card-product h-100" data-code="${codigo}" data-action="quickview">
 
-                ${String(p.DESTACADO || "").trim().length > 0 ? `<div class="ribbon-destacado">⭐ DESTACADO</div>` : ""}
+                ${String(p.DESTACADO || "").trim().toUpperCase() === "SI" ? `<div class="ribbon-destacado">⭐ DESTACADO</div>` : ""}
 
-                ${String(p.OFERTA || "").trim().length > 0 ? `<div class="ribbon-oferta">🔥 OFERTA</div>` : ""}
+                ${String(p.OFERTA || "").trim().toUpperCase() === "SI" ? `<div class="ribbon-oferta">🔥 OFERTA</div>` : ""}
 
                 <div class="card-img-wrap">
                     <img
@@ -830,15 +835,31 @@ async function aplicarApariencia(){
         }
 
         // --- Título / subtítulo del banner ---
+        // Si vienen vacíos desde Configuración, se ocultan del todo (en vez
+        // de dejar el texto de respaldo del HTML para siempre) — pensado
+        // para cuando el banner ya es una imagen con su propio diseño y
+        // texto incorporado, que no necesita nada del sistema superpuesto.
         const tituloEl = document.getElementById("hero-titulo");
         const subtituloEl = document.getElementById("hero-subtitulo");
 
-        if(tituloEl && cfg.bannerTitulo){
-            tituloEl.textContent = cfg.bannerTitulo;
+        const tituloVacio = !cfg.bannerTitulo || !cfg.bannerTitulo.trim();
+
+        if(tituloEl){
+            if(tituloVacio){
+                tituloEl.style.display = "none";
+            }else{
+                tituloEl.textContent = cfg.bannerTitulo;
+                tituloEl.style.display = "";
+            }
         }
 
-        if(subtituloEl && cfg.bannerSubtitulo){
-            subtituloEl.textContent = cfg.bannerSubtitulo;
+        if(subtituloEl){
+            if(!cfg.bannerSubtitulo || !cfg.bannerSubtitulo.trim()){
+                subtituloEl.style.display = "none";
+            }else{
+                subtituloEl.textContent = cfg.bannerSubtitulo;
+                subtituloEl.style.display = "";
+            }
         }
 
         // --- Imagen de fondo del banner (opcional) ---
@@ -847,6 +868,12 @@ async function aplicarApariencia(){
         if(heroEl && cfg.bannerImagen){
             heroEl.style.setProperty("--hero-bg-img", `url("${cfg.bannerImagen}")`);
             heroEl.classList.add("hero--imagen");
+
+            // Si no hay título de texto del sistema, tampoco hace falta el
+            // oscurecido que existe solo para que ese texto se lea bien
+            // sobre la foto — así la imagen del banner se ve nítida, sin
+            // ningún velo encima.
+            heroEl.classList.toggle("hero--sin-degradado", tituloVacio);
         }
 
         // --- Título de la pestaña del navegador ---
