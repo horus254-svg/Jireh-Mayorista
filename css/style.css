@@ -1012,9 +1012,11 @@ body[data-tema="rojo"]{
        de texto encima), la imagen se ve chica en medio de mucho
        espacio vacío. Este alto mínimo, que escala según el ancho de
        pantalla, le da lugar suficiente a un banner ancho y bajo (como
-       una imagen tipo "cartel", proporción 2.5:1 aprox.) para
-       mostrarse a buen tamaño sin ocupar toda la pantalla en celular. */
-    min-height:clamp(150px, 40vw, 500px);
+       una imagen tipo "cartel", proporción 3.35:1 aprox.) para
+       mostrarse a buen tamaño sin ocupar toda la pantalla en celular.
+       Si en algún momento se cambia la imagen del banner por una de
+       proporción distinta, este valor hay que recalcularlo. */
+    min-height:clamp(100px, 30vw, 550px);
 }
 
 /* Cuando el banner ya tiene su propio texto/diseño incorporado (no se
