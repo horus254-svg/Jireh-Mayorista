@@ -1004,8 +1004,17 @@ body[data-tema="rojo"]{
     background-image:
         linear-gradient(180deg, rgba(11,18,36,.62), rgba(11,18,36,.78)),
         var(--hero-bg-img);
-    background-size:cover;
+    background-size:contain;
     background-position:center;
+    background-repeat:no-repeat;
+
+    /* Con contain, si el hero queda muy bajo (por ejemplo sin título
+       de texto encima), la imagen se ve chica en medio de mucho
+       espacio vacío. Este alto mínimo, que escala según el ancho de
+       pantalla, le da lugar suficiente a un banner ancho y bajo (como
+       una imagen tipo "cartel", proporción 2.5:1 aprox.) para
+       mostrarse a buen tamaño sin ocupar toda la pantalla en celular. */
+    min-height:clamp(150px, 40vw, 500px);
 }
 
 /* Cuando el banner ya tiene su propio texto/diseño incorporado (no se
