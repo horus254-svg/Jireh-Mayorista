@@ -1008,3 +1008,10 @@ body[data-tema="rojo"]{
     background-position:center;
 }
 
+/* Cuando el banner ya tiene su propio texto/diseño incorporado (no se
+   usa el título de texto del sistema), se quita el oscurecido — la
+   imagen del banner queda nítida, al frente, sin ningún velo encima. */
+.hero.hero--imagen.hero--sin-degradado{
+    background-image: var(--hero-bg-img);
+}
+
