@@ -966,16 +966,81 @@ function aplicarBeneficios(cfg){
     }
     configurarChipBeneficio("beneficio-direccion-wrap", !!direccion);
 
-    // --- Textos libres ---
+    // --- Textos libres (si el contenido es un link, se muestra como
+    // botón clickable con el nombre de la red social detectada en vez
+    // del texto plano original) ---
     const texto1 = (cfg.beneficioTextoLibre1 || "").trim();
-    const texto1El = document.getElementById("beneficio-texto1");
-    if(texto1El) texto1El.textContent = texto1;
+    renderBeneficioTextoLibre("beneficio-texto1-wrap", texto1);
     configurarChipBeneficio("beneficio-texto1-wrap", !!texto1);
 
     const texto2 = (cfg.beneficioTextoLibre2 || "").trim();
-    const texto2El = document.getElementById("beneficio-texto2");
-    if(texto2El) texto2El.textContent = texto2;
+    renderBeneficioTextoLibre("beneficio-texto2-wrap", texto2);
     configurarChipBeneficio("beneficio-texto2-wrap", !!texto2);
+}
+
+/**
+ * Lista de redes sociales/plataformas que se reconocen por su dominio,
+ * con el nombre y el emoji que se muestran en el chip cuando el texto
+ * libre es un link a ese sitio. Si el link no coincide con ninguna,
+ * se usa el genérico "Visitar enlace" (ver más abajo).
+ */
+const REDES_SOCIALES_CONOCIDAS = [
+    { dominio: "tiktok.com",     nombre: "TikTok",    icono: "🎵" },
+    { dominio: "instagram.com",  nombre: "Instagram", icono: "📷" },
+    { dominio: "facebook.com",   nombre: "Facebook",  icono: "📘" },
+    { dominio: "fb.com",         nombre: "Facebook",  icono: "📘" },
+    { dominio: "wa.me",          nombre: "WhatsApp",  icono: "💬" },
+    { dominio: "whatsapp.com",   nombre: "WhatsApp",  icono: "💬" },
+    { dominio: "youtube.com",    nombre: "YouTube",   icono: "▶️" },
+    { dominio: "youtu.be",       nombre: "YouTube",   icono: "▶️" },
+    { dominio: "twitter.com",    nombre: "Twitter",   icono: "🐦" },
+    { dominio: "x.com",          nombre: "X",         icono: "✕" },
+    { dominio: "linkedin.com",   nombre: "LinkedIn",  icono: "💼" },
+    { dominio: "t.me",           nombre: "Telegram",  icono: "✈️" }
+];
+
+/** Returns {nombre, icono} for a known social network, by matching its domain against the URL */
+function detectarRedSocial(url){
+    const urlMin = url.toLowerCase();
+    const encontrada = REDES_SOCIALES_CONOCIDAS.find(r => urlMin.includes(r.dominio));
+    return encontrada || { nombre: "Visitar enlace", icono: "🔗" };
+}
+
+/** Returns true if the text looks like a URL (with or without an explicit http(s):// scheme) */
+function esLinkValido(texto){
+    if(/^https?:\/\//i.test(texto)) return true;
+    // También se acepta sin "https://" adelante (ej. "tiktok.com/@negocio"),
+    // siempre que tenga la forma de un dominio con algo después.
+    return /^[a-z0-9.-]+\.[a-z]{2,}\/?\S*$/i.test(texto);
+}
+
+/**
+ * Pinta el contenido de un chip de "texto libre": si el texto es un
+ * link, lo muestra como botón clickable (mismo estilo que el chip de
+ * Instagram) con el nombre de la red social detectada; si no, lo
+ * muestra como antes, como texto plano sin link.
+ */
+function renderBeneficioTextoLibre(idWrap, texto){
+    const wrap = document.getElementById(idWrap);
+    if(!wrap) return;
+
+    if(!texto){
+        wrap.innerHTML = `<span class="beneficio-item"></span>`;
+        return;
+    }
+
+    if(esLinkValido(texto)){
+        const href = /^https?:\/\//i.test(texto) ? texto : ("https://" + texto);
+        const { nombre, icono } = detectarRedSocial(texto);
+
+        wrap.innerHTML = `
+            <a href="${escapeHtml(href)}" class="beneficio-item beneficio-link" target="_blank" rel="noopener">
+                ${icono} <span>${escapeHtml(nombre)}</span>
+            </a>
+        `;
+    } else {
+        wrap.innerHTML = `<span class="beneficio-item">${escapeHtml(texto)}</span>`;
+    }
 }
 
 /* =========================================================
