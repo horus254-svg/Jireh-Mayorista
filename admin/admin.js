@@ -841,12 +841,46 @@ function renderVentasPOSHistorial(lista) {
         <td>
           <button class="btn btn-sm btn-outline-secondary"
             onclick='imprimirVentaDesdeData(${JSON.stringify(v)})' title="Reimprimir ticket">🖨️ Reimprimir</button>
+          <button class="btn btn-sm btn-outline-danger ms-1"
+            onclick='eliminarVentaPOS(${JSON.stringify(v)})' title="Eliminar venta y devolver stock">🗑️ Eliminar</button>
         </td>
       </tr>
     `;
   });
 
   tbody.innerHTML = html;
+}
+
+/**
+ * Deletes a sale (and returns its stock) after confirmation. Receives
+ * the full sale object (as rendered in the table) so the backend gets
+ * the cart directly, without needing to re-read DETALLE_VENTAS.
+ */
+async function eliminarVentaPOS(venta) {
+  if (!confirm(`¿Eliminar la venta ${venta.VENTA_ID || venta.ID}? Esta acción no se puede deshacer y va a devolver el stock de los productos vendidos.`)) return;
+
+  try {
+    const params = new URLSearchParams({
+      action: "eliminarVenta",
+      ventaId: venta.VENTA_ID || venta.ID,
+      carrito: venta.CARRITO || "[]"
+    });
+    const response = await fetch(API_URL + "?" + params.toString());
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo eliminar la venta", "error");
+      return;
+    }
+
+    toast("Venta eliminada y stock devuelto", "success");
+    cargarVentasPOSHistorial();
+    productosPOS = []; // fuerza a recargar el catálogo la próxima vez que se entre al POS, con el stock ya actualizado
+
+  } catch (error) {
+    console.error("Error al eliminar venta:", error);
+    toast("Error de conexión al eliminar la venta", "error");
+  }
 }
 
 /** Client-side filter by sale id or payment method, over the already-loaded historial */
