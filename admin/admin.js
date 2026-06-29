@@ -1642,9 +1642,9 @@ function renderTablaClientes(lista) {
       <td>
         <div class="d-flex flex-wrap gap-1">
           ${c.CLIENTE_ID
-            ? `<button class="btn btn-outline-secondary btn-sm" onclick="abrirModalDetalleCliente('${escapeHtml(c.CLIENTE_ID)}')">Ver cuenta</button>
-               <button class="btn btn-outline-secondary btn-sm" onclick="abrirModalEditarCliente('${escapeHtml(c.CLIENTE_ID)}')" title="Editar">✏️</button>
-               <button class="btn btn-outline-danger btn-sm" onclick="eliminarClienteForm('${escapeHtml(c.CLIENTE_ID)}', '${escapeHtml(c.NOMBRE)}')" title="Eliminar">🗑️</button>`
+            ? `<button class="btn btn-outline-secondary btn-sm btn-accion-producto" onclick="abrirModalDetalleCliente('${escapeHtml(c.CLIENTE_ID)}')" ${(saldoArs <= 0 && saldoUsd <= 0) ? 'disabled title="Sin deuda pendiente"' : ''}>Ver cuenta</button>
+               <button class="btn btn-primary btn-sm btn-accion-producto ms-1" onclick="abrirModalEditarCliente('${escapeHtml(c.CLIENTE_ID)}')">Editar</button>
+               <button class="btn btn-danger btn-sm btn-accion-producto ms-1" onclick="eliminarClienteForm('${escapeHtml(c.CLIENTE_ID)}', '${escapeHtml(c.NOMBRE)}')">Eliminar</button>`
             : `<button class="btn btn-outline-success btn-sm" onclick="marcarClienteDesdeHistorialACredito('${escapeHtml(c.DNI)}')">Marcar a crédito</button>`}
         </div>
       </td>
