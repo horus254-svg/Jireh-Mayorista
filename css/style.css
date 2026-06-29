@@ -245,6 +245,11 @@ select:focus-visible{
     font-size:.82rem;
 }
 
+.beneficio-item .bi{
+    font-size:.95rem;
+    vertical-align:-1px;
+}
+
 .beneficio-link{
     text-decoration:none;
     cursor:pointer;

@@ -699,23 +699,30 @@ async function checkoutWhatsapp(){
     let total = 0;
     estado.carrito.forEach(item => { total += item.PRECIO * item.cantidad; });
 
-    const url =
-        API_URL +
-        "?action=guardarPedido" +
-        "&nombre=" + encodeURIComponent(nombre) +
-        "&empresa=" + encodeURIComponent(empresa) +
-        "&direccion=" + encodeURIComponent(direccion) +
-        "&localidad=" + encodeURIComponent(localidad) +
-        "&provincia=" + encodeURIComponent(provincia) +
-        "&codigoPostal=" + encodeURIComponent(codigoPostal) +
-        "&telefono=" + encodeURIComponent(telefono) +
-        "&dni=" + encodeURIComponent(dni) +
-        "&total=" + total +
-        "&carrito=" + encodeURIComponent(JSON.stringify(estado.carrito));
-
     try{
 
-        const response = await fetch(url);
+        // POST en vez de GET: con varios productos en el carrito, armar
+        // todo en la URL (como antes) podía superar el límite de longitud
+        // de URL de Safari/iOS y el pedido fallaba sin guardarse. Con el
+        // carrito en el body, no hay ese límite. El backend (doPost) ya
+        // espera exactamente este formato para action: "guardarPedido".
+        const response = await fetch(API_URL, {
+            method: "POST",
+            headers: { "Content-Type": "text/plain;charset=utf-8" }, // evita que el navegador dispare un preflight CORS contra Apps Script
+            body: JSON.stringify({
+                action: "guardarPedido",
+                nombre,
+                empresa,
+                direccion,
+                localidad,
+                provincia,
+                codigoPostal,
+                telefono,
+                dni,
+                total,
+                carrito: estado.carrito
+            })
+        });
         const resultado = await response.json();
 
         if(!resultado.success){
@@ -980,30 +987,31 @@ function aplicarBeneficios(cfg){
 
 /**
  * Lista de redes sociales/plataformas que se reconocen por su dominio,
- * con el nombre y el emoji que se muestran en el chip cuando el texto
- * libre es un link a ese sitio. Si el link no coincide con ninguna,
- * se usa el genérico "Visitar enlace" (ver más abajo).
+ * con el nombre y la clase de ícono (Bootstrap Icons) que se muestran
+ * en el chip cuando el texto libre es un link a ese sitio. Si el link
+ * no coincide con ninguna, se usa el genérico "Visitar enlace" (ver
+ * más abajo).
  */
 const REDES_SOCIALES_CONOCIDAS = [
-    { dominio: "tiktok.com",     nombre: "TikTok",    icono: "🎵" },
-    { dominio: "instagram.com",  nombre: "Instagram", icono: "📷" },
-    { dominio: "facebook.com",   nombre: "Facebook",  icono: "📘" },
-    { dominio: "fb.com",         nombre: "Facebook",  icono: "📘" },
-    { dominio: "wa.me",          nombre: "WhatsApp",  icono: "💬" },
-    { dominio: "whatsapp.com",   nombre: "WhatsApp",  icono: "💬" },
-    { dominio: "youtube.com",    nombre: "YouTube",   icono: "▶️" },
-    { dominio: "youtu.be",       nombre: "YouTube",   icono: "▶️" },
-    { dominio: "twitter.com",    nombre: "Twitter",   icono: "🐦" },
-    { dominio: "x.com",          nombre: "X",         icono: "✕" },
-    { dominio: "linkedin.com",   nombre: "LinkedIn",  icono: "💼" },
-    { dominio: "t.me",           nombre: "Telegram",  icono: "✈️" }
+    { dominio: "tiktok.com",     nombre: "TikTok",    iconoClase: "bi-tiktok" },
+    { dominio: "instagram.com",  nombre: "Instagram", iconoClase: "bi-instagram" },
+    { dominio: "facebook.com",   nombre: "Facebook",  iconoClase: "bi-facebook" },
+    { dominio: "fb.com",         nombre: "Facebook",  iconoClase: "bi-facebook" },
+    { dominio: "wa.me",          nombre: "WhatsApp",  iconoClase: "bi-whatsapp" },
+    { dominio: "whatsapp.com",   nombre: "WhatsApp",  iconoClase: "bi-whatsapp" },
+    { dominio: "youtube.com",    nombre: "YouTube",   iconoClase: "bi-youtube" },
+    { dominio: "youtu.be",       nombre: "YouTube",   iconoClase: "bi-youtube" },
+    { dominio: "twitter.com",    nombre: "Twitter",   iconoClase: "bi-twitter-x" },
+    { dominio: "x.com",          nombre: "X",         iconoClase: "bi-twitter-x" },
+    { dominio: "linkedin.com",   nombre: "LinkedIn",  iconoClase: "bi-linkedin" },
+    { dominio: "t.me",           nombre: "Telegram",  iconoClase: "bi-telegram" }
 ];
 
-/** Returns {nombre, icono} for a known social network, by matching its domain against the URL */
+/** Returns {nombre, iconoClase} for a known social network, by matching its domain against the URL */
 function detectarRedSocial(url){
     const urlMin = url.toLowerCase();
     const encontrada = REDES_SOCIALES_CONOCIDAS.find(r => urlMin.includes(r.dominio));
-    return encontrada || { nombre: "Visitar enlace", icono: "🔗" };
+    return encontrada || { nombre: "Visitar enlace", iconoClase: "bi-link-45deg" };
 }
 
 /** Returns true if the text looks like a URL (with or without an explicit http(s):// scheme) */
@@ -1031,11 +1039,11 @@ function renderBeneficioTextoLibre(idWrap, texto){
 
     if(esLinkValido(texto)){
         const href = /^https?:\/\//i.test(texto) ? texto : ("https://" + texto);
-        const { nombre, icono } = detectarRedSocial(texto);
+        const { nombre, iconoClase } = detectarRedSocial(texto);
 
         wrap.innerHTML = `
             <a href="${escapeHtml(href)}" class="beneficio-item beneficio-link" target="_blank" rel="noopener">
-                ${icono} <span>${escapeHtml(nombre)}</span>
+                <i class="bi ${escapeHtml(iconoClase)}"></i> <span>${escapeHtml(nombre)}</span>
             </a>
         `;
     } else {
