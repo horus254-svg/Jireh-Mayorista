@@ -1279,7 +1279,24 @@
 
       <div class="mb-2">
         <label class="form-label">DNI o CUIT *</label>
-        <input type="text" class="form-control" id="paDni" placeholder="Sin puntos ni guiones">
+        <input type="text" class="form-control" id="paDni" placeholder="Sin puntos ni guiones" onblur="chequearClienteCreditoPedidoAdmin()">
+      </div>
+
+      <div class="mb-2" id="paMonedaWrap" style="display:none;">
+        <div class="config-preview-hint mb-2" style="background:var(--green-50); color:var(--green-600); border-color:var(--green-600);">
+          <span class="ic">💳</span>
+          Este cliente es a crédito — elegí en qué moneda queda este pedido.
+        </div>
+        <label class="form-label">Moneda del pedido</label>
+        <select class="form-select" id="paMoneda" onchange="actualizarVisibilidadTipoCambioPedidoAdmin()">
+          <option value="ARS">Pesos (ARS)</option>
+          <option value="USD">Dólares (USD)</option>
+        </select>
+      </div>
+
+      <div class="mb-2" id="paTipoCambioWrap" style="display:none;">
+        <label class="form-label">Tipo de cambio <span class="text-muted" style="font-size:11px;">(para registrar el valor del día)</span></label>
+        <input type="number" class="form-control" id="paTipoCambio" placeholder="Ej: 1200">
       </div>
 
       <div class="pedido-admin-resumen">
@@ -1423,10 +1440,11 @@
 <div class="product-modal-backdrop" id="clienteModalBackdrop">
   <div class="product-modal" style="max-width:460px;">
     <div class="product-modal-header">
-      <h6>+ Nuevo Cliente</h6>
+      <h6 id="clienteModalTitulo">+ Nuevo Cliente</h6>
       <button onclick="cerrarModalNuevoCliente()">✕</button>
     </div>
     <div class="product-modal-body">
+      <input type="hidden" id="clClienteIdEditando">
       <div class="mb-2">
         <label class="form-label">Nombre <span class="text-danger">*</span></label>
         <input type="text" class="form-control" id="clNombre" placeholder="Nombre y apellido, o razón social">
@@ -1453,7 +1471,7 @@
         <label class="form-label">Dirección <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
         <input type="text" class="form-control" id="clDireccion" placeholder="">
       </div>
-      <div class="form-check mt-3">
+      <div class="form-check mt-3" id="clACreditoWrap">
         <input class="form-check-input" type="checkbox" id="clACredito">
         <label class="form-check-label" for="clACredito">Marcar como cliente a crédito</label>
       </div>
@@ -1467,41 +1485,81 @@
 
 <!-- ===== MODAL: DETALLE DE CLIENTE A CRÉDITO / REGISTRAR PAGO ===== -->
 <div class="product-modal-backdrop" id="detalleClienteModalBackdrop">
-  <div class="product-modal" style="max-width:560px;">
+  <div class="product-modal" style="max-width:780px; width:94vw;">
     <div class="product-modal-header">
       <h6 id="detalleClienteNombre">Cliente</h6>
       <button onclick="cerrarModalDetalleCliente()">✕</button>
     </div>
-    <div class="product-modal-body">
+    <div class="product-modal-body" style="max-height:80vh; overflow-y:auto;">
 
-      <div class="row g-2 mb-3 text-center">
-        <div class="col-4">
-          <div class="config-preview-hint" style="display:block;">
-            <div class="text-muted" style="font-size:11px;">Comprado</div>
-            <div style="font-size:16px; font-weight:700;" id="detalleClienteTotalComprado">$0</div>
+      <div class="row g-2 mb-2">
+        <div class="col-6">
+          <div class="card p-2" style="background:var(--slate-50);">
+            <div class="text-muted text-center" style="font-size:11px; font-weight:700;">PESOS (ARS)</div>
+            <div class="row g-1 text-center mt-1">
+              <div class="col-4">
+                <div class="text-muted" style="font-size:10.5px;">Comprado</div>
+                <div style="font-size:14px; font-weight:700;" id="detalleClienteTotalCompradoArs">$0</div>
+              </div>
+              <div class="col-4">
+                <div class="text-muted" style="font-size:10.5px;">Pagado</div>
+                <div style="font-size:14px; font-weight:700; color:var(--green-600);" id="detalleClienteTotalPagadoArs">$0</div>
+              </div>
+              <div class="col-4">
+                <div class="text-muted" style="font-size:10.5px;">Saldo</div>
+                <div style="font-size:14px; font-weight:700; color:var(--red-500);" id="detalleClienteSaldoArs">$0</div>
+              </div>
+            </div>
           </div>
         </div>
-        <div class="col-4">
-          <div class="config-preview-hint" style="display:block;">
-            <div class="text-muted" style="font-size:11px;">Pagado</div>
-            <div style="font-size:16px; font-weight:700; color:var(--green-600);" id="detalleClienteTotalPagado">$0</div>
-          </div>
-        </div>
-        <div class="col-4">
-          <div class="config-preview-hint" style="display:block; background:var(--red-50); border-color:var(--red-500);">
-            <div class="text-muted" style="font-size:11px;">Saldo pendiente</div>
-            <div style="font-size:16px; font-weight:700; color:var(--red-500);" id="detalleClienteSaldo">$0</div>
+        <div class="col-6">
+          <div class="card p-2" style="background:var(--slate-50);">
+            <div class="text-muted text-center" style="font-size:11px; font-weight:700;">DÓLARES (USD)</div>
+            <div class="row g-1 text-center mt-1">
+              <div class="col-4">
+                <div class="text-muted" style="font-size:10.5px;">Comprado</div>
+                <div style="font-size:14px; font-weight:700;" id="detalleClienteTotalCompradoUsd">US$0</div>
+              </div>
+              <div class="col-4">
+                <div class="text-muted" style="font-size:10.5px;">Pagado</div>
+                <div style="font-size:14px; font-weight:700; color:var(--green-600);" id="detalleClienteTotalPagadoUsd">US$0</div>
+              </div>
+              <div class="col-4">
+                <div class="text-muted" style="font-size:10.5px;">Saldo</div>
+                <div style="font-size:14px; font-weight:700; color:var(--red-500);" id="detalleClienteSaldoUsd">US$0</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      <div class="card p-2 mb-3" style="background:var(--slate-50);">
-        <div class="row g-2 align-items-end">
-          <div class="col-4">
+      <div class="card p-3 mb-3" style="background:var(--slate-50);">
+        <div class="row g-2">
+          <div class="col-md-3">
             <label class="form-label" style="font-size:12px;">Monto a registrar</label>
             <input type="number" class="form-control form-control-sm" id="pagoMonto" placeholder="0">
           </div>
-          <div class="col-3">
+          <div class="col-md-3">
+            <label class="form-label" style="font-size:12px;">Moneda del pago</label>
+            <select class="form-select form-select-sm" id="pagoMonedaPago" onchange="actualizarVisibilidadTipoCambioPago()">
+              <option value="ARS">Pesos (ARS)</option>
+              <option value="USD">Dólares (USD)</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label" style="font-size:12px;">Aplicar primero a</label>
+            <select class="form-select form-select-sm" id="pagoPrioridad" onchange="actualizarVisibilidadTipoCambioPago()">
+              <option value="ARS">Deuda en pesos</option>
+              <option value="USD">Deuda en dólares</option>
+            </select>
+          </div>
+          <div class="col-md-3" id="pagoTipoCambioWrap" style="display:none;">
+            <label class="form-label" style="font-size:12px;">Tipo de cambio</label>
+            <input type="number" class="form-control form-control-sm" id="pagoTipoCambio" placeholder="Ej: 1200">
+          </div>
+        </div>
+        <div class="row g-2 mt-2">
+          <div class="col-md-4">
             <label class="form-label" style="font-size:12px;">Forma de pago</label>
             <select class="form-select form-select-sm" id="pagoFormaPago">
               <option value="EFECTIVO">Efectivo</option>
@@ -1509,34 +1567,35 @@
               <option value="TARJETA">Tarjeta</option>
             </select>
           </div>
-          <div class="col-3">
+          <div class="col-md-5">
             <label class="form-label" style="font-size:12px;">Observaciones</label>
             <input type="text" class="form-control form-control-sm" id="pagoObservaciones" placeholder="opcional">
           </div>
-          <div class="col-2">
-            <button class="btn btn-success btn-sm w-100" onclick="registrarPagoCreditoForm()">💾 Pagar</button>
+          <div class="col-md-3 d-flex align-items-end">
+            <button class="btn btn-success btn-sm w-100" onclick="registrarPagoCreditoForm()">💾 Registrar pago</button>
           </div>
         </div>
       </div>
 
       <h6 style="font-size:13px; margin-bottom:8px;">Pedidos de este cliente</h6>
-      <div class="table-responsive mb-3" style="max-height:180px; overflow-y:auto;">
+      <div class="table-responsive mb-3" style="max-height:200px; overflow-y:auto;">
         <table class="table table-sm table-striped">
-          <thead><tr><th>Fecha</th><th>Total</th><th>Estado</th></tr></thead>
+          <thead><tr><th>Fecha</th><th>Total</th><th>Moneda</th><th>Estado</th></tr></thead>
           <tbody id="detalleClientePedidosTabla"></tbody>
         </table>
       </div>
 
       <h6 style="font-size:13px; margin-bottom:8px;">Pagos registrados</h6>
-      <div class="table-responsive" style="max-height:140px; overflow-y:auto;">
+      <div class="table-responsive" style="max-height:160px; overflow-y:auto;">
         <table class="table table-sm table-striped">
-          <thead><tr><th>Fecha</th><th>Monto</th><th>Forma</th><th>Obs.</th></tr></thead>
+          <thead><tr><th>Fecha</th><th>Pago</th><th>Aplicado ARS</th><th>Aplicado USD</th><th>Forma</th><th>Obs.</th></tr></thead>
           <tbody id="detalleClientePagosTabla"></tbody>
         </table>
       </div>
 
     </div>
     <div class="product-modal-actions">
+      <button class="btn btn-outline-secondary" onclick="imprimirInformeCliente()">🖨️ Imprimir informe</button>
       <button class="btn btn-outline-secondary" onclick="cerrarModalDetalleCliente()">Cerrar</button>
     </div>
   </div>

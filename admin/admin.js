@@ -1613,7 +1613,16 @@ function renderTablaClientes(lista) {
   let html = "";
   lista.forEach(c => {
     const esCredito = String(c.A_CREDITO || "").toUpperCase() === "SI";
-    const saldo = Number(c.SALDO_PENDIENTE || 0);
+    const saldoArs = Number(c.SALDO_PENDIENTE_ARS || 0);
+    const saldoUsd = Number(c.SALDO_PENDIENTE_USD || 0);
+
+    let celdaSaldo = "—";
+    if (esCredito) {
+      const partes = [];
+      if (saldoArs > 0) partes.push(`<span style="color:var(--red-500); font-weight:700;">$${saldoArs.toLocaleString("es-AR")}</span>`);
+      if (saldoUsd > 0) partes.push(`<span style="color:var(--red-500); font-weight:700;">US$${saldoUsd.toLocaleString("es-AR")}</span>`);
+      celdaSaldo = partes.length > 0 ? partes.join("<br>") : `<span class="text-muted">Sin deuda</span>`;
+    }
 
     html += `
     <tr>
@@ -1629,11 +1638,15 @@ function renderTablaClientes(lista) {
           ? `<span class="badge" style="background:var(--green-50); color:var(--green-600);">A crédito</span>`
           : `<span class="text-muted" style="font-size:12px;">—</span>`}
       </td>
-      <td class="money" style="${saldo > 0 ? "color:var(--red-500); font-weight:700;" : ""}">${esCredito ? "$" + saldo.toLocaleString("es-AR") : "—"}</td>
+      <td class="money">${celdaSaldo}</td>
       <td>
-        ${c.CLIENTE_ID
-          ? `<button class="btn btn-outline-secondary btn-sm" onclick="abrirModalDetalleCliente('${escapeHtml(c.CLIENTE_ID)}')">Ver cuenta</button>`
-          : `<button class="btn btn-outline-success btn-sm" onclick="marcarClienteDesdeHistorialACredito('${escapeHtml(c.DNI)}')">Marcar a crédito</button>`}
+        <div class="d-flex flex-wrap gap-1">
+          ${c.CLIENTE_ID
+            ? `<button class="btn btn-outline-secondary btn-sm" onclick="abrirModalDetalleCliente('${escapeHtml(c.CLIENTE_ID)}')">Ver cuenta</button>
+               <button class="btn btn-outline-secondary btn-sm" onclick="abrirModalEditarCliente('${escapeHtml(c.CLIENTE_ID)}')" title="Editar">✏️</button>
+               <button class="btn btn-outline-danger btn-sm" onclick="eliminarClienteForm('${escapeHtml(c.CLIENTE_ID)}', '${escapeHtml(c.NOMBRE)}')" title="Eliminar">🗑️</button>`
+            : `<button class="btn btn-outline-success btn-sm" onclick="marcarClienteDesdeHistorialACredito('${escapeHtml(c.DNI)}')">Marcar a crédito</button>`}
+        </div>
       </td>
     </tr>`;
   });
@@ -1677,6 +1690,9 @@ function cargarClientes() {
 /* ===================== CLIENTES — ALTA Y CRÉDITO ===================== */
 
 function abrirModalNuevoCliente() {
+  document.getElementById("clClienteIdEditando").value = "";
+  document.getElementById("clienteModalTitulo").textContent = "+ Nuevo Cliente";
+  document.getElementById("clACreditoWrap").style.display = "block";
   document.getElementById("clNombre").value = "";
   document.getElementById("clAlias").value = "";
   document.getElementById("clDni").value = "";
@@ -1684,6 +1700,23 @@ function abrirModalNuevoCliente() {
   document.getElementById("clEmpresa").value = "";
   document.getElementById("clDireccion").value = "";
   document.getElementById("clACredito").checked = false;
+  document.getElementById("clienteModalBackdrop").classList.add("show");
+}
+
+/** Opens the same client modal, but pre-filled for editing — the "a crédito" checkbox is hidden, that's managed by its own dedicated button in the table */
+function abrirModalEditarCliente(clienteId) {
+  const cliente = clientesGlobal.find(c => String(c.CLIENTE_ID) === String(clienteId));
+  if (!cliente) { toast("No se encontró el cliente", "error"); return; }
+
+  document.getElementById("clClienteIdEditando").value = clienteId;
+  document.getElementById("clienteModalTitulo").textContent = "✏️ Editar Cliente";
+  document.getElementById("clACreditoWrap").style.display = "none";
+  document.getElementById("clNombre").value = cliente.NOMBRE || "";
+  document.getElementById("clAlias").value = cliente.ALIAS || "";
+  document.getElementById("clDni").value = cliente.DNI || "";
+  document.getElementById("clTelefono").value = cliente.TELEFONO || "";
+  document.getElementById("clEmpresa").value = cliente.EMPRESA || "";
+  document.getElementById("clDireccion").value = cliente.DIRECCION || "";
   document.getElementById("clienteModalBackdrop").classList.add("show");
 }
 
@@ -1695,34 +1728,50 @@ async function guardarNuevoCliente() {
   const nombre = document.getElementById("clNombre").value.trim();
   if (!nombre) { toast("Ingresá el nombre del cliente", "error"); return; }
 
+  const clienteIdEditando = document.getElementById("clClienteIdEditando").value.trim();
+  const editando = !!clienteIdEditando;
+
   const btn = document.getElementById("btnGuardarNuevoCliente");
   const textoOriginal = btn.innerHTML;
   btn.disabled = true;
   btn.innerHTML = "Guardando...";
 
   try {
+    const cuerpo = editando
+      ? {
+          action: "editarCliente",
+          clienteId: clienteIdEditando,
+          nombre,
+          alias: document.getElementById("clAlias").value.trim(),
+          dni: document.getElementById("clDni").value.trim(),
+          telefono: document.getElementById("clTelefono").value.trim(),
+          empresa: document.getElementById("clEmpresa").value.trim(),
+          direccion: document.getElementById("clDireccion").value.trim()
+        }
+      : {
+          action: "crearCliente",
+          nombre,
+          alias: document.getElementById("clAlias").value.trim(),
+          dni: document.getElementById("clDni").value.trim(),
+          telefono: document.getElementById("clTelefono").value.trim(),
+          empresa: document.getElementById("clEmpresa").value.trim(),
+          direccion: document.getElementById("clDireccion").value.trim(),
+          aCredito: document.getElementById("clACredito").checked ? "SI" : "NO"
+        };
+
     const response = await fetch(API_URL, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({
-        action: "crearCliente",
-        nombre,
-        alias: document.getElementById("clAlias").value.trim(),
-        dni: document.getElementById("clDni").value.trim(),
-        telefono: document.getElementById("clTelefono").value.trim(),
-        empresa: document.getElementById("clEmpresa").value.trim(),
-        direccion: document.getElementById("clDireccion").value.trim(),
-        aCredito: document.getElementById("clACredito").checked ? "SI" : "NO"
-      })
+      body: JSON.stringify(cuerpo)
     });
     const data = await response.json();
 
     if (!data.success) {
-      toast(data.message || "No se pudo crear el cliente", "error");
+      toast(data.message || (editando ? "No se pudo editar el cliente" : "No se pudo crear el cliente"), "error");
       return;
     }
 
-    toast("Cliente creado", "success");
+    toast(editando ? "Cliente actualizado" : "Cliente creado", "success");
     cerrarModalNuevoCliente();
     cargarClientesDesdeBackend();
 
@@ -1761,11 +1810,50 @@ async function marcarClienteDesdeHistorialACredito(dni) {
   }
 }
 
+/** Deletes a client — only removes the CLIENTES row, never touches their past PEDIDOS or PAGOS_CREDITO history */
+async function eliminarClienteForm(clienteId, nombre) {
+  const cliente = clientesGlobal.find(c => String(c.CLIENTE_ID) === String(clienteId));
+  const tieneSaldo = cliente && (Number(cliente.SALDO_PENDIENTE_ARS || 0) > 0 || Number(cliente.SALDO_PENDIENTE_USD || 0) > 0);
+
+  const mensaje = tieneSaldo
+    ? `⚠️ "${nombre}" todavía tiene saldo pendiente. ¿Eliminar igual su ficha de cliente? (sus pedidos y pagos pasados NO se borran, solo deja de aparecer en esta lista como cliente)`
+    : `¿Eliminar al cliente "${nombre}"? Sus pedidos y pagos pasados no se borran, solo su ficha de cliente.`;
+
+  if (!confirm(mensaje)) return;
+
+  try {
+    const response = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action: "eliminarCliente", clienteId })
+    });
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo eliminar el cliente", "error");
+      return;
+    }
+
+    toast("Cliente eliminado", "success");
+    cargarClientesDesdeBackend();
+
+  } catch (error) {
+    console.error("Error al eliminar cliente:", error);
+    toast("Error de conexión al eliminar el cliente", "error");
+  }
+}
+
+let detalleClienteDatosActuales = null;
+
 async function abrirModalDetalleCliente(clienteId) {
   document.getElementById("detalleClienteModalBackdrop").classList.add("show");
   document.getElementById("detalleClienteNombre").textContent = "Cargando...";
   document.getElementById("pagoMonto").value = "";
   document.getElementById("pagoObservaciones").value = "";
+  document.getElementById("pagoMonedaPago").value = "ARS";
+  document.getElementById("pagoPrioridad").value = "ARS";
+  document.getElementById("pagoTipoCambio").value = "";
+  document.getElementById("pagoTipoCambioWrap").style.display = "none";
   detalleClienteIdActual = clienteId;
 
   try {
@@ -1778,30 +1866,43 @@ async function abrirModalDetalleCliente(clienteId) {
       return;
     }
 
+    detalleClienteDatosActuales = data;
+
     document.getElementById("detalleClienteNombre").textContent =
       data.cliente.ALIAS ? `${data.cliente.NOMBRE} (${data.cliente.ALIAS})` : data.cliente.NOMBRE;
 
-    document.getElementById("detalleClienteTotalComprado").textContent = "$" + Number(data.totalComprado).toLocaleString("es-AR");
-    document.getElementById("detalleClienteTotalPagado").textContent = "$" + Number(data.totalPagado).toLocaleString("es-AR");
-    document.getElementById("detalleClienteSaldo").textContent = "$" + Number(data.saldoPendiente).toLocaleString("es-AR");
+    document.getElementById("detalleClienteTotalCompradoArs").textContent = "$" + Number(data.totalCompradoArs).toLocaleString("es-AR");
+    document.getElementById("detalleClienteTotalPagadoArs").textContent = "$" + Number(data.totalPagadoArs).toLocaleString("es-AR");
+    document.getElementById("detalleClienteSaldoArs").textContent = "$" + Number(data.saldoPendienteArs).toLocaleString("es-AR");
+
+    document.getElementById("detalleClienteTotalCompradoUsd").textContent = "US$" + Number(data.totalCompradoUsd).toLocaleString("es-AR");
+    document.getElementById("detalleClienteTotalPagadoUsd").textContent = "US$" + Number(data.totalPagadoUsd).toLocaleString("es-AR");
+    document.getElementById("detalleClienteSaldoUsd").textContent = "US$" + Number(data.saldoPendienteUsd).toLocaleString("es-AR");
 
     const pedidosTbody = document.getElementById("detalleClientePedidosTabla");
     pedidosTbody.innerHTML = data.pedidos.length === 0
-      ? `<tr><td colspan="3" class="text-center text-muted">Sin pedidos</td></tr>`
-      : data.pedidos.map(p => `
+      ? `<tr><td colspan="4" class="text-center text-muted">Sin pedidos</td></tr>`
+      : data.pedidos.map(p => {
+          const moneda = String(p.MONEDA || "ARS").toUpperCase();
+          const simbolo = moneda === "USD" ? "US$" : "$";
+          return `
           <tr>
             <td>${p.FECHA ? new Date(p.FECHA).toLocaleDateString("es-AR") : "—"}</td>
-            <td class="money">$${Number(p.TOTAL || 0).toLocaleString("es-AR")}</td>
+            <td class="money">${simbolo}${Number(p.TOTAL || 0).toLocaleString("es-AR")}</td>
+            <td>${moneda}${moneda === "USD" && p.TIPO_CAMBIO ? ` (TC ${p.TIPO_CAMBIO})` : ""}</td>
             <td>${escapeHtml(p.ESTADO || "")}</td>
-          </tr>`).join("");
+          </tr>`;
+        }).join("");
 
     const pagosTbody = document.getElementById("detalleClientePagosTabla");
     pagosTbody.innerHTML = data.pagos.length === 0
-      ? `<tr><td colspan="4" class="text-center text-muted">Sin pagos registrados todavía</td></tr>`
+      ? `<tr><td colspan="6" class="text-center text-muted">Sin pagos registrados todavía</td></tr>`
       : data.pagos.map(pago => `
           <tr>
             <td>${pago.FECHA ? new Date(pago.FECHA).toLocaleDateString("es-AR") : "—"}</td>
-            <td class="money">$${Number(pago.MONTO || 0).toLocaleString("es-AR")}</td>
+            <td class="money">${String(pago.MONEDA_PAGO || "ARS").toUpperCase() === "USD" ? "US$" : "$"}${Number(pago.MONTO_PAGO || 0).toLocaleString("es-AR")}</td>
+            <td class="money">${Number(pago.MONTO_APLICADO_ARS || 0) > 0 ? "$" + Number(pago.MONTO_APLICADO_ARS).toLocaleString("es-AR") : "—"}</td>
+            <td class="money">${Number(pago.MONTO_APLICADO_USD || 0) > 0 ? "US$" + Number(pago.MONTO_APLICADO_USD).toLocaleString("es-AR") : "—"}</td>
             <td>${escapeHtml(pago.FORMA_PAGO || "")}</td>
             <td>${escapeHtml(pago.OBSERVACIONES || "")}</td>
           </tr>`).join("");
@@ -1815,6 +1916,14 @@ async function abrirModalDetalleCliente(clienteId) {
 function cerrarModalDetalleCliente() {
   document.getElementById("detalleClienteModalBackdrop").classList.remove("show");
   detalleClienteIdActual = null;
+  detalleClienteDatosActuales = null;
+}
+
+/** Shows the exchange-rate field only when the payment currency and the priority currency differ — that's the only case where a conversion is actually needed */
+function actualizarVisibilidadTipoCambioPago() {
+  const monedaPago = document.getElementById("pagoMonedaPago").value;
+  const prioridad = document.getElementById("pagoPrioridad").value;
+  document.getElementById("pagoTipoCambioWrap").style.display = monedaPago !== prioridad ? "block" : "none";
 }
 
 async function registrarPagoCreditoForm() {
@@ -1822,6 +1931,15 @@ async function registrarPagoCreditoForm() {
 
   const monto = Number(document.getElementById("pagoMonto").value);
   if (!monto || monto <= 0) { toast("Ingresá un monto válido", "error"); return; }
+
+  const monedaPago = document.getElementById("pagoMonedaPago").value;
+  const prioridad = document.getElementById("pagoPrioridad").value;
+  const tipoCambio = document.getElementById("pagoTipoCambio").value.trim();
+
+  if (monedaPago !== prioridad && (!tipoCambio || Number(tipoCambio) <= 0)) {
+    toast("Ingresá el tipo de cambio para convertir entre pesos y dólares", "error");
+    return;
+  }
 
   try {
     const response = await fetch(API_URL, {
@@ -1831,6 +1949,9 @@ async function registrarPagoCreditoForm() {
         action: "registrarPagoCredito",
         clienteId: detalleClienteIdActual,
         monto,
+        monedaPago,
+        prioridad,
+        tipoCambio: tipoCambio || "",
         formaPago: document.getElementById("pagoFormaPago").value,
         observaciones: document.getElementById("pagoObservaciones").value.trim()
       })
@@ -1853,6 +1974,109 @@ async function registrarPagoCreditoForm() {
 }
 
 let detalleClienteIdActual = null;
+
+/**
+ * Genera un informe A4 (no térmico) con el resumen de cuenta del
+ * cliente que está abierto en el modal de detalle — saldos por
+ * moneda, detalle de pedidos, y detalle de pagos. Reutiliza
+ * #etiquetasPrintArea, el mismo contenedor que ya usa el sistema
+ * para imprimir en A4 (las etiquetas de producto usan el mismo
+ * mecanismo, ver imprimirEtiquetas).
+ */
+function imprimirInformeCliente() {
+  if (!detalleClienteDatosActuales) { toast("Esperá a que termine de cargar el cliente", "error"); return; }
+
+  const data = detalleClienteDatosActuales;
+  const cliente = data.cliente;
+  const fechaHoy = new Date().toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" });
+
+  const filasPedidos = data.pedidos.length === 0
+    ? `<tr><td colspan="4" style="text-align:center; color:#888;">Sin pedidos</td></tr>`
+    : data.pedidos.map(p => {
+        const moneda = String(p.MONEDA || "ARS").toUpperCase();
+        const simbolo = moneda === "USD" ? "US$" : "$";
+        return `<tr>
+          <td>${p.FECHA ? new Date(p.FECHA).toLocaleDateString("es-AR") : "—"}</td>
+          <td style="text-align:right;">${simbolo}${Number(p.TOTAL || 0).toLocaleString("es-AR")}</td>
+          <td>${moneda}</td>
+          <td>${escapeHtml(p.ESTADO || "")}</td>
+        </tr>`;
+      }).join("");
+
+  const filasPagos = data.pagos.length === 0
+    ? `<tr><td colspan="5" style="text-align:center; color:#888;">Sin pagos registrados</td></tr>`
+    : data.pagos.map(pago => `<tr>
+        <td>${pago.FECHA ? new Date(pago.FECHA).toLocaleDateString("es-AR") : "—"}</td>
+        <td style="text-align:right;">${String(pago.MONEDA_PAGO || "ARS").toUpperCase() === "USD" ? "US$" : "$"}${Number(pago.MONTO_PAGO || 0).toLocaleString("es-AR")}</td>
+        <td style="text-align:right;">${Number(pago.MONTO_APLICADO_ARS || 0) > 0 ? "$" + Number(pago.MONTO_APLICADO_ARS).toLocaleString("es-AR") : "—"}</td>
+        <td style="text-align:right;">${Number(pago.MONTO_APLICADO_USD || 0) > 0 ? "US$" + Number(pago.MONTO_APLICADO_USD).toLocaleString("es-AR") : "—"}</td>
+        <td>${escapeHtml(pago.FORMA_PAGO || "")}</td>
+      </tr>`).join("");
+
+  const html = `
+    <div style="font-family:Arial, sans-serif; color:#1a1a1a; padding:10mm;">
+      <h2 style="margin:0 0 4px;">${escapeHtml((configNegocioCache && configNegocioCache.nombre) || "Informe de cuenta")}</h2>
+      <div style="color:#666; font-size:12px; margin-bottom:18px;">Informe de cuenta corriente — generado el ${fechaHoy}</div>
+
+      <div style="border:1px solid #ddd; border-radius:8px; padding:12px 16px; margin-bottom:18px;">
+        <strong>${escapeHtml(cliente.NOMBRE)}</strong>${cliente.ALIAS ? ` (${escapeHtml(cliente.ALIAS)})` : ""}<br>
+        ${cliente.DNI ? `DNI/CUIT: ${escapeHtml(cliente.DNI)}<br>` : ""}
+        ${cliente.TELEFONO ? `Tel: ${escapeHtml(cliente.TELEFONO)}<br>` : ""}
+        ${cliente.DIRECCION ? `Dirección: ${escapeHtml(cliente.DIRECCION)}` : ""}
+      </div>
+
+      <table style="width:100%; border-collapse:collapse; margin-bottom:18px;">
+        <tr style="background:#f4f4f4;">
+          <th style="padding:8px; text-align:left; border:1px solid #ddd;"></th>
+          <th style="padding:8px; text-align:right; border:1px solid #ddd;">Comprado</th>
+          <th style="padding:8px; text-align:right; border:1px solid #ddd;">Pagado</th>
+          <th style="padding:8px; text-align:right; border:1px solid #ddd;">Saldo</th>
+        </tr>
+        <tr>
+          <td style="padding:8px; border:1px solid #ddd;"><strong>Pesos (ARS)</strong></td>
+          <td style="padding:8px; text-align:right; border:1px solid #ddd;">$${Number(data.totalCompradoArs).toLocaleString("es-AR")}</td>
+          <td style="padding:8px; text-align:right; border:1px solid #ddd;">$${Number(data.totalPagadoArs).toLocaleString("es-AR")}</td>
+          <td style="padding:8px; text-align:right; border:1px solid #ddd; font-weight:bold;">$${Number(data.saldoPendienteArs).toLocaleString("es-AR")}</td>
+        </tr>
+        <tr>
+          <td style="padding:8px; border:1px solid #ddd;"><strong>Dólares (USD)</strong></td>
+          <td style="padding:8px; text-align:right; border:1px solid #ddd;">US$${Number(data.totalCompradoUsd).toLocaleString("es-AR")}</td>
+          <td style="padding:8px; text-align:right; border:1px solid #ddd;">US$${Number(data.totalPagadoUsd).toLocaleString("es-AR")}</td>
+          <td style="padding:8px; text-align:right; border:1px solid #ddd; font-weight:bold;">US$${Number(data.saldoPendienteUsd).toLocaleString("es-AR")}</td>
+        </tr>
+      </table>
+
+      <h4 style="margin:0 0 8px;">Pedidos</h4>
+      <table style="width:100%; border-collapse:collapse; margin-bottom:18px; font-size:13px;">
+        <tr style="background:#f4f4f4;">
+          <th style="padding:6px; text-align:left; border:1px solid #ddd;">Fecha</th>
+          <th style="padding:6px; text-align:right; border:1px solid #ddd;">Total</th>
+          <th style="padding:6px; text-align:left; border:1px solid #ddd;">Moneda</th>
+          <th style="padding:6px; text-align:left; border:1px solid #ddd;">Estado</th>
+        </tr>
+        ${filasPedidos}
+      </table>
+
+      <h4 style="margin:0 0 8px;">Pagos</h4>
+      <table style="width:100%; border-collapse:collapse; font-size:13px;">
+        <tr style="background:#f4f4f4;">
+          <th style="padding:6px; text-align:left; border:1px solid #ddd;">Fecha</th>
+          <th style="padding:6px; text-align:right; border:1px solid #ddd;">Pago</th>
+          <th style="padding:6px; text-align:right; border:1px solid #ddd;">Aplicado ARS</th>
+          <th style="padding:6px; text-align:right; border:1px solid #ddd;">Aplicado USD</th>
+          <th style="padding:6px; text-align:left; border:1px solid #ddd;">Forma</th>
+        </tr>
+        ${filasPagos}
+      </table>
+    </div>
+  `;
+
+  document.getElementById("etiquetasPrintArea").innerHTML = html;
+
+  setTimeout(() => {
+    window.print();
+  }, 100);
+}
 
 /* ===================== STOCK BAJO / AGOTADOS / MAS VENDIDOS ===================== */
 
@@ -2447,6 +2671,10 @@ function abrirModalPedidoAdmin() {
   document.getElementById("paTelefono").value = "";
   document.getElementById("paDni").value = "";
   document.getElementById("paTotal").textContent = "$" + total.toLocaleString("es-AR");
+  document.getElementById("paMonedaWrap").style.display = "none";
+  document.getElementById("paTipoCambioWrap").style.display = "none";
+  document.getElementById("paMoneda").value = "ARS";
+  document.getElementById("paTipoCambio").value = "";
 
   document.getElementById("pedidoAdminModalBackdrop").classList.add("show");
   setTimeout(() => document.getElementById("paNombre").focus(), 80);
@@ -2456,7 +2684,39 @@ function cerrarModalPedidoAdmin() {
   document.getElementById("pedidoAdminModalBackdrop").classList.remove("show");
 }
 
-/** Sends the current POS ticket as a pedido (PEDIDOS/DETALLE_PEDIDOS) — never touches stock */
+/** Checks if the typed DNI belongs to a client already marked as "a crédito" — if so, shows the currency selector */
+async function chequearClienteCreditoPedidoAdmin() {
+  const dni = document.getElementById("paDni").value.trim();
+  const wrap = document.getElementById("paMonedaWrap");
+
+  if (!dni) {
+    wrap.style.display = "none";
+    document.getElementById("paTipoCambioWrap").style.display = "none";
+    return;
+  }
+
+  try {
+    const response = await fetch(API_URL + "?action=consultarClienteCreditoPorDni&dni=" + encodeURIComponent(dni));
+    const data = await response.json();
+
+    wrap.style.display = data.esCredito ? "block" : "none";
+    if (!data.esCredito) {
+      document.getElementById("paTipoCambioWrap").style.display = "none";
+    } else {
+      actualizarVisibilidadTipoCambioPedidoAdmin();
+    }
+  } catch (error) {
+    console.error("Error al consultar cliente a crédito:", error);
+    // Un error puntual de red no debe bloquear el pedido — simplemente
+    // no se muestra el selector de moneda, y el pedido sigue en ARS.
+  }
+}
+
+function actualizarVisibilidadTipoCambioPedidoAdmin() {
+  const moneda = document.getElementById("paMoneda").value;
+  document.getElementById("paTipoCambioWrap").style.display = moneda === "USD" ? "block" : "none";
+}
+
 async function confirmarPedidoAdmin() {
   if (ticketPOS.length === 0) { toast("El ticket está vacío", "error"); cerrarModalPedidoAdmin(); return; }
 
@@ -2474,6 +2734,18 @@ async function confirmarPedidoAdmin() {
     return;
   }
 
+  // Moneda y tipo de cambio solo importan si el selector está visible
+  // (cliente a crédito) — para cualquier otro pedido, queda en ARS sin
+  // tipo de cambio, igual que siempre.
+  const monedaWrapVisible = document.getElementById("paMonedaWrap").style.display !== "none";
+  const moneda = monedaWrapVisible ? document.getElementById("paMoneda").value : "ARS";
+  const tipoCambio = document.getElementById("paTipoCambio").value.trim();
+
+  if (moneda === "USD" && (!tipoCambio || Number(tipoCambio) <= 0)) {
+    toast("Ingresá el tipo de cambio para un pedido en dólares", "error");
+    return;
+  }
+
   const subtotal = ticketPOS.reduce((acc, item) => acc + (item.PRECIO * item.cantidad), 0);
   const { total } = calcularDescuentoPOS(subtotal);
 
@@ -2487,6 +2759,8 @@ async function confirmarPedidoAdmin() {
       action: "guardarPedidoAdmin",
       nombre, empresa, direccion, localidad, provincia, codigoPostal, telefono, dni,
       total: total,
+      moneda: moneda,
+      tipoCambio: moneda === "USD" ? tipoCambio : "",
       carrito: JSON.stringify(ticketPOS)
     });
 
