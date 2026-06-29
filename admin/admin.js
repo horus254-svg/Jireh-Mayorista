@@ -1854,6 +1854,12 @@ async function abrirModalDetalleCliente(clienteId) {
   document.getElementById("pagoPrioridad").value = "ARS";
   document.getElementById("pagoTipoCambio").value = "";
   document.getElementById("pagoTipoCambioWrap").style.display = "none";
+  // Reset deuda extra form
+  document.getElementById("deudaExtraMonto").value = "";
+  document.getElementById("deudaExtraConcepto").value = "";
+  document.getElementById("deudaExtraMoneda").value = "ARS";
+  document.getElementById("deudaExtraForm").style.display = "none";
+  document.getElementById("deudaExtraToggleIcon").textContent = "▼ Expandir";
   detalleClienteIdActual = clienteId;
 
   try {
@@ -1907,6 +1913,25 @@ async function abrirModalDetalleCliente(clienteId) {
             <td>${escapeHtml(pago.OBSERVACIONES || "")}</td>
           </tr>`).join("");
 
+    // Deudas extra
+    const deudasExtra = data.deudasExtra || [];
+    const deudasWrap = document.getElementById("deudaExtraTablaWrap");
+    const deudasTbody = document.getElementById("detalleClienteDeudasExtraTabla");
+    if (deudasExtra.length > 0) {
+      deudasWrap.style.display = "block";
+      deudasTbody.innerHTML = deudasExtra.map(d => {
+        const simbolo = String(d.MONEDA || "ARS").toUpperCase() === "USD" ? "US$" : "$";
+        return `<tr>
+          <td>${d.FECHA ? new Date(d.FECHA).toLocaleDateString("es-AR") : "—"}</td>
+          <td>${escapeHtml(String(d.MONEDA || "ARS").toUpperCase())}</td>
+          <td class="money">${simbolo}${Number(d.MONTO || 0).toLocaleString("es-AR")}</td>
+          <td>${escapeHtml(d.CONCEPTO || "")}</td>
+        </tr>`;
+      }).join("");
+    } else {
+      deudasWrap.style.display = "none";
+    }
+
   } catch (error) {
     console.error("Error al cargar el detalle del cliente:", error);
     toast("Error de conexión al cargar el cliente", "error");
@@ -1917,6 +1942,47 @@ function cerrarModalDetalleCliente() {
   document.getElementById("detalleClienteModalBackdrop").classList.remove("show");
   detalleClienteIdActual = null;
   detalleClienteDatosActuales = null;
+}
+
+function toggleFormDeudaExtra() {
+  const form = document.getElementById("deudaExtraForm");
+  const icon = document.getElementById("deudaExtraToggleIcon");
+  const visible = form.style.display !== "none";
+  form.style.display = visible ? "none" : "block";
+  icon.textContent = visible ? "▼ Expandir" : "▲ Cerrar";
+}
+
+async function registrarDeudaExtraForm() {
+  if (!detalleClienteIdActual) return;
+
+  const monto = Number(document.getElementById("deudaExtraMonto").value);
+  if (!monto || monto <= 0) { toast("Ingresá un monto válido", "error"); return; }
+
+  const moneda = document.getElementById("deudaExtraMoneda").value;
+  const concepto = document.getElementById("deudaExtraConcepto").value.trim();
+  if (!concepto) { toast("El concepto es obligatorio", "error"); return; }
+
+  try {
+    const response = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({
+        action: "crearDeudaExtra",
+        clienteId: detalleClienteIdActual,
+        monto,
+        moneda,
+        concepto
+      })
+    });
+    const data = await response.json();
+    if (!data.success) { toast(data.message || "No se pudo registrar la deuda", "error"); return; }
+    toast("Deuda registrada correctamente", "success");
+    abrirModalDetalleCliente(detalleClienteIdActual); // refresca saldos y tabla
+    cargarClientesDesdeBackend();
+  } catch (error) {
+    console.error("Error al registrar deuda extra:", error);
+    toast("Error de conexión al registrar la deuda", "error");
+  }
 }
 
 /** Shows the exchange-rate field only when the payment currency and the priority currency differ — that's the only case where a conversion is actually needed */
