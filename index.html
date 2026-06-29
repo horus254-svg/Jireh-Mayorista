@@ -17,6 +17,11 @@
 
 <body>
 
+    <!-- FRANJA SUPERIOR: mensajes rotativos, configurables desde Configuración -->
+    <div id="top-banner" class="top-banner d-none">
+        <div class="top-banner-track" id="top-banner-track"></div>
+    </div>
+
     <!-- NAVBAR -->
 
     <nav class="navbar navbar-dark fixed-top">
@@ -282,37 +287,43 @@
 
     <div class="modal fade" id="quickViewModal" tabindex="-1">
 
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
 
             <div class="modal-content">
 
                 <div class="modal-header">
-                    <h5 class="modal-title" id="qv-titulo"></h5>
                     <button class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
                 </div>
 
                 <div class="modal-body">
+                    <div class="qv-layout">
 
-                    <img id="qv-imagen" src="" alt="" class="qv-img">
+                        <div class="qv-col-imagen">
+                            <img id="qv-imagen" src="" alt="" class="qv-img">
+                        </div>
 
-                    <small id="qv-categoria" class="text-muted d-block mt-2"></small>
+                        <div class="qv-col-info">
+                            <small id="qv-categoria" class="text-muted d-block"></small>
+                            <h5 class="qv-titulo" id="qv-titulo"></h5>
 
-                    <div class="price mt-1" id="qv-precio"></div>
+                            <div class="price qv-precio-grande" id="qv-precio"></div>
 
-                    <div id="qv-stock" class="stock-badge d-none"></div>
+                            <div id="qv-stock" class="stock-badge d-none mb-2"></div>
 
-                    <div class="qty-stepper mt-3">
-                        <button class="qty-btn" onclick="cambiarQtyInput('qv-cantidad',-1)" aria-label="Restar">−</button>
-                        <input type="number" id="qv-cantidad" class="qty-input" value="1" min="1">
-                        <button class="qty-btn" onclick="cambiarQtyInput('qv-cantidad',1)" aria-label="Sumar">+</button>
+                            <p class="qv-descripcion" id="qv-descripcion"></p>
+
+                            <div class="qty-stepper mt-2">
+                                <button class="qty-btn" onclick="cambiarQtyInput('qv-cantidad',-1)" aria-label="Restar">−</button>
+                                <input type="number" id="qv-cantidad" class="qty-input" value="1" min="1">
+                                <button class="qty-btn" onclick="cambiarQtyInput('qv-cantidad',1)" aria-label="Sumar">+</button>
+                            </div>
+
+                            <button class="btn btn-primary w-100 mt-3" id="qv-agregar">
+                                🛒 Agregar al carrito
+                            </button>
+                        </div>
+
                     </div>
-
-                </div>
-
-                <div class="modal-footer">
-                    <button class="btn btn-primary w-100" id="qv-agregar">
-                        🛒 Agregar al carrito
-                    </button>
                 </div>
 
             </div>

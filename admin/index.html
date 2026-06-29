@@ -1019,6 +1019,22 @@
     </div>
 
     <div class="card p-3 mt-3">
+      <h6 style="margin-bottom:6px;">📢 Banner superior (mensajes rotativos)</h6>
+      <p class="text-muted" style="font-size:12.5px; margin-top:-4px; margin-bottom:14px;">
+        Una franja verde arriba de todo el catálogo, que va rotando solo entre los mensajes que escribas acá. Escribí un mensaje por línea — si dejás solo uno, queda fijo sin rotar.
+      </p>
+
+      <div class="mb-3">
+        <textarea class="form-control" id="cfgBannerTopMensajes" rows="4" placeholder="🚚 Envíos a todo el país&#10;✅ Stock actualizado&#10;💳 Aceptamos todos los medios de pago"></textarea>
+        <div class="form-text" style="font-size:11.5px;">Un mensaje por renglón. Vaciá el campo entero para ocultar la franja por completo.</div>
+      </div>
+
+      <div class="d-flex justify-content-end mt-3">
+        <button class="btn btn-success" id="btnGuardarBannerTop" onclick="guardarBannerTopForm()">💾 Guardar</button>
+      </div>
+    </div>
+
+    <div class="card p-3 mt-3">
       <div class="config-preview-hint">
         <span class="ic">ℹ️</span>
         El número de WhatsApp que pongas aquí es el que usa el botón flotante de ayuda y al que llegan los pedidos del catálogo.

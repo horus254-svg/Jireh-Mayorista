@@ -404,6 +404,11 @@ function abrirQuickView(producto){
     document.getElementById("qv-categoria").textContent = producto.CATEGORIA || "";
     document.getElementById("qv-precio").textContent = "$" + formatearPrecio(producto.PRECIO);
 
+    const descripcionEl = document.getElementById("qv-descripcion");
+    const descripcion = String(producto.DESCRIPCION || "").trim();
+    descripcionEl.textContent = descripcion;
+    descripcionEl.classList.toggle("d-none", !descripcion);
+
     const stockEl = document.getElementById("qv-stock");
     const stock = obtenerEstadoStock(producto.STOCK);
 
@@ -983,6 +988,65 @@ function aplicarBeneficios(cfg){
     const texto2 = (cfg.beneficioTextoLibre2 || "").trim();
     renderBeneficioTextoLibre("beneficio-texto2-wrap", texto2);
     configurarChipBeneficio("beneficio-texto2-wrap", !!texto2);
+
+    aplicarBannerTop(cfg.bannerTopMensajes);
+}
+
+/**
+ * Muestra la franja superior con los mensajes configurados desde
+ * Configuración → "Banner superior" (uno por línea). Si no hay
+ * ningún mensaje, la franja queda oculta y el navbar/contenido vuelven
+ * a su posición normal (--top-banner-h en 0). Con más de un mensaje,
+ * rota entre ellos cada pocos segundos con un fade simple.
+ */
+let bannerTopIntervalId = null;
+
+function aplicarBannerTop(mensajesTexto){
+    const banner = document.getElementById("top-banner");
+    const track = document.getElementById("top-banner-track");
+    if(!banner || !track) return;
+
+    if(bannerTopIntervalId){
+        clearInterval(bannerTopIntervalId);
+        bannerTopIntervalId = null;
+    }
+
+    const mensajes = String(mensajesTexto || "")
+        .split("\n")
+        .map(m => m.trim())
+        .filter(m => m.length > 0);
+
+    if(mensajes.length === 0){
+        banner.classList.add("d-none");
+        document.documentElement.style.setProperty("--top-banner-h", "0px");
+        return;
+    }
+
+    track.innerHTML = mensajes
+        .map((m, i) => `<span class="msg${i === 0 ? " activo" : ""}">${escapeHtml(m)}</span>`)
+        .join("");
+
+    banner.classList.remove("d-none");
+
+    // La altura real (34px definidos en CSS para .top-banner-track,
+    // pero se mide en vivo por si el texto necesita más de una línea
+    // en pantallas angostas) se aplica recién después de que el
+    // navegador ya puso la franja en el DOM, para que la medición sea
+    // exacta — sin esto, podría medir 0 y dejar el navbar mal ubicado.
+    requestAnimationFrame(() => {
+        const alturaReal = banner.offsetHeight;
+        document.documentElement.style.setProperty("--top-banner-h", alturaReal + "px");
+    });
+
+    if(mensajes.length > 1){
+        let indiceActual = 0;
+        bannerTopIntervalId = setInterval(() => {
+            const spans = track.querySelectorAll(".msg");
+            spans[indiceActual].classList.remove("activo");
+            indiceActual = (indiceActual + 1) % spans.length;
+            spans[indiceActual].classList.add("activo");
+        }, 4000);
+    }
 }
 
 /**

@@ -140,6 +140,7 @@ async function cargarConfigNegocioForm() {
 
   cargarAparienciaForm(cfg);
   cargarBeneficiosForm(cfg);
+  document.getElementById("cfgBannerTopMensajes").value = cfg.bannerTopMensajes ?? "";
   cargarSidebarForm(cfg);
   cargarDriveProductosForm(cfg);
   cargarDrivePedidosForm(cfg);
@@ -643,6 +644,35 @@ async function guardarBeneficiosForm() {
   } catch (error) {
     console.error("Error al guardar los beneficios:", error);
     toast("Error de conexión al guardar los beneficios", "error");
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = textoOriginal; }
+  }
+}
+
+/** Saves the rotating top-banner messages — one per line in the textarea, joined with newlines for the backend */
+async function guardarBannerTopForm() {
+  const bannerTopMensajes = document.getElementById("cfgBannerTopMensajes").value.trim();
+
+  const btn = document.getElementById("btnGuardarBannerTop");
+  const textoOriginal = btn ? btn.innerHTML : "";
+  if (btn) { btn.disabled = true; btn.innerHTML = "Guardando..."; }
+
+  try {
+    const params = new URLSearchParams({ action: "guardarConfiguracionNegocio", nombre: configNegocioCache.nombre, bannerTopMensajes });
+    const response = await fetch(API_URL + "?" + params.toString());
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo guardar el banner", "error");
+      return;
+    }
+
+    configNegocioCache.bannerTopMensajes = bannerTopMensajes;
+    toast("Banner superior guardado — ya se ve en el catálogo", "success");
+
+  } catch (error) {
+    console.error("Error al guardar el banner superior:", error);
+    toast("Error de conexión al guardar el banner", "error");
   } finally {
     if (btn) { btn.disabled = false; btn.innerHTML = textoOriginal; }
   }
