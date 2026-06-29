@@ -55,6 +55,26 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
+/**
+ * Devuelve una versión "demorada" de una función: si se la llama
+ * varias veces seguidas (por ejemplo, una vez por cada tecla mientras
+ * alguien escribe rápido en un buscador), solo se ejecuta la ÚLTIMA
+ * llamada, esperando `demoraMs` desde que paró de llamarse — evita
+ * redibujar una tabla o grilla completa en cada tecla, cuando en la
+ * práctica el usuario ya tipeó la letra siguiente antes de llegar a
+ * ver el resultado intermedio.
+ *
+ * Uso: const buscarConDemora = debounce(buscarFunction, 150);
+ *      buscarConDemora(); // se llama igual que la función original
+ */
+function debounce(fn, demoraMs) {
+  let temporizador = null;
+  return function (...args) {
+    clearTimeout(temporizador);
+    temporizador = setTimeout(() => fn.apply(this, args), demoraMs);
+  };
+}
+
 function actualizarElemento(id, valor) {
   const el = document.getElementById(id);
   if (el) el.textContent = valor;
@@ -1135,6 +1155,15 @@ function filtrarProductos() {
   renderTablaProductos(filtrados);
 }
 
+/**
+ * Versión con demora de filtrarProductos, usada SOLO por el tecleo en
+ * el buscador (onkeyup) — el cambio de categoría (onchange del
+ * <select>) y la carga inicial siguen llamando a filtrarProductos()
+ * directo, sin demora, porque ahí no hay riesgo de redibujar la
+ * tabla completa en cada tecla.
+ */
+const filtrarProductosConDemora = debounce(filtrarProductos, 150);
+
 /* ===================== PRODUCTOS — ALTA / EDICIÓN (modal) ===================== */
 
 let productosAdminGlobal = [];
@@ -1532,7 +1561,7 @@ let clientesGlobal = [];
 
 async function cargarClientesDesdeBackend() {
   try {
-    const response = await fetch(API_URL + "?action=clientes");
+    const response = await fetch(API_URL + "?action=clientesConCredito");
     const data = await response.json();
     if (!data.clientes) return;
     clientesGlobal = data.clientes;
@@ -1547,40 +1576,60 @@ function renderTablaClientes(lista) {
   if (!tbody) return;
 
   if (!lista || lista.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4">No se encontraron clientes</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" class="text-center text-muted py-4">No se encontraron clientes</td></tr>`;
     return;
   }
 
   let html = "";
   lista.forEach(c => {
+    const esCredito = String(c.A_CREDITO || "").toUpperCase() === "SI";
+    const saldo = Number(c.SALDO_PENDIENTE || 0);
+
     html += `
     <tr>
-      <td>${escapeHtml(c.CLIENTE)}</td>
+      <td>${escapeHtml(c.NOMBRE || c.CLIENTE)}</td>
+      <td>${escapeHtml(c.ALIAS || "")}</td>
       <td>${escapeHtml(c.EMPRESA)}</td>
-      <td>${escapeHtml(c.DIRECCION)}</td>
       <td>${escapeHtml(c.TELEFONO)}</td>
       <td>${escapeHtml(c.DNI)}</td>
       <td>${c.PEDIDOS}</td>
-      <td class="money">$${Number(c.TOTAL || 0).toLocaleString("es-AR")}</td>
+      <td class="money">$${Number(c.TOTAL_COMPRADO || c.TOTAL || 0).toLocaleString("es-AR")}</td>
+      <td>
+        ${esCredito
+          ? `<span class="badge" style="background:var(--green-50); color:var(--green-600);">A crédito</span>`
+          : `<span class="text-muted" style="font-size:12px;">—</span>`}
+      </td>
+      <td class="money" style="${saldo > 0 ? "color:var(--red-500); font-weight:700;" : ""}">${esCredito ? "$" + saldo.toLocaleString("es-AR") : "—"}</td>
+      <td>
+        ${c.CLIENTE_ID
+          ? `<button class="btn btn-outline-secondary btn-sm" onclick="abrirModalDetalleCliente('${escapeHtml(c.CLIENTE_ID)}')">Ver cuenta</button>`
+          : `<button class="btn btn-outline-success btn-sm" onclick="marcarClienteDesdeHistorialACredito('${escapeHtml(c.DNI)}')">Marcar a crédito</button>`}
+      </td>
     </tr>`;
   });
   tbody.innerHTML = html;
 }
 
-/** Filters the already-loaded client list by name, empresa, or DNI — no new backend call */
+/** Filters the already-loaded client list by name, alias, empresa, or DNI — no new backend call. Also applies the "solo crédito" checkbox. */
 function filtrarClientes() {
   const input = document.getElementById("buscarCliente");
+  const soloCredito = document.getElementById("filtroSoloCredito");
   const termino = (input ? input.value : "").toLowerCase().trim();
 
   let filtrados = clientesGlobal;
 
   if (termino) {
     filtrados = filtrados.filter(c => {
-      const nombre = String(c.CLIENTE || "").toLowerCase();
+      const nombre = String(c.NOMBRE || c.CLIENTE || "").toLowerCase();
+      const alias = String(c.ALIAS || "").toLowerCase();
       const empresa = String(c.EMPRESA || "").toLowerCase();
       const dni = String(c.DNI || "").toLowerCase();
-      return nombre.includes(termino) || empresa.includes(termino) || dni.includes(termino);
+      return nombre.includes(termino) || alias.includes(termino) || empresa.includes(termino) || dni.includes(termino);
     });
+  }
+
+  if (soloCredito && soloCredito.checked) {
+    filtrados = filtrados.filter(c => String(c.A_CREDITO || "").toUpperCase() === "SI");
   }
 
   renderTablaClientes(filtrados);
@@ -1594,6 +1643,186 @@ function filtrarClientes() {
 function cargarClientes() {
   cargarSiVencido("clientes", cargarClientesDesdeBackend);
 }
+
+/* ===================== CLIENTES — ALTA Y CRÉDITO ===================== */
+
+function abrirModalNuevoCliente() {
+  document.getElementById("clNombre").value = "";
+  document.getElementById("clAlias").value = "";
+  document.getElementById("clDni").value = "";
+  document.getElementById("clTelefono").value = "";
+  document.getElementById("clEmpresa").value = "";
+  document.getElementById("clDireccion").value = "";
+  document.getElementById("clACredito").checked = false;
+  document.getElementById("clienteModalBackdrop").classList.add("show");
+}
+
+function cerrarModalNuevoCliente() {
+  document.getElementById("clienteModalBackdrop").classList.remove("show");
+}
+
+async function guardarNuevoCliente() {
+  const nombre = document.getElementById("clNombre").value.trim();
+  if (!nombre) { toast("Ingresá el nombre del cliente", "error"); return; }
+
+  const btn = document.getElementById("btnGuardarNuevoCliente");
+  const textoOriginal = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = "Guardando...";
+
+  try {
+    const response = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({
+        action: "crearCliente",
+        nombre,
+        alias: document.getElementById("clAlias").value.trim(),
+        dni: document.getElementById("clDni").value.trim(),
+        telefono: document.getElementById("clTelefono").value.trim(),
+        empresa: document.getElementById("clEmpresa").value.trim(),
+        direccion: document.getElementById("clDireccion").value.trim(),
+        aCredito: document.getElementById("clACredito").checked ? "SI" : "NO"
+      })
+    });
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo crear el cliente", "error");
+      return;
+    }
+
+    toast("Cliente creado", "success");
+    cerrarModalNuevoCliente();
+    cargarClientesDesdeBackend();
+
+  } catch (error) {
+    console.error("Error al crear cliente:", error);
+    toast("Error de conexión al crear el cliente", "error");
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = textoOriginal;
+  }
+}
+
+/** Used from the "Marcar a crédito" button on a client that only exists in the PEDIDOS-derived ranking (not yet in CLIENTES) */
+async function marcarClienteDesdeHistorialACredito(dni) {
+  if (!confirm(`¿Crear un registro de cliente para "${dni}" y marcarlo a crédito?`)) return;
+
+  try {
+    const response = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action: "crearClienteDesdeHistorialYMarcarCredito", dni })
+    });
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo marcar a crédito", "error");
+      return;
+    }
+
+    toast("Cliente marcado a crédito", "success");
+    cargarClientesDesdeBackend();
+
+  } catch (error) {
+    console.error("Error al marcar cliente a crédito:", error);
+    toast("Error de conexión", "error");
+  }
+}
+
+async function abrirModalDetalleCliente(clienteId) {
+  document.getElementById("detalleClienteModalBackdrop").classList.add("show");
+  document.getElementById("detalleClienteNombre").textContent = "Cargando...";
+  document.getElementById("pagoMonto").value = "";
+  document.getElementById("pagoObservaciones").value = "";
+  detalleClienteIdActual = clienteId;
+
+  try {
+    const response = await fetch(API_URL + "?action=detalleClienteCredito&clienteId=" + encodeURIComponent(clienteId));
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo cargar el cliente", "error");
+      cerrarModalDetalleCliente();
+      return;
+    }
+
+    document.getElementById("detalleClienteNombre").textContent =
+      data.cliente.ALIAS ? `${data.cliente.NOMBRE} (${data.cliente.ALIAS})` : data.cliente.NOMBRE;
+
+    document.getElementById("detalleClienteTotalComprado").textContent = "$" + Number(data.totalComprado).toLocaleString("es-AR");
+    document.getElementById("detalleClienteTotalPagado").textContent = "$" + Number(data.totalPagado).toLocaleString("es-AR");
+    document.getElementById("detalleClienteSaldo").textContent = "$" + Number(data.saldoPendiente).toLocaleString("es-AR");
+
+    const pedidosTbody = document.getElementById("detalleClientePedidosTabla");
+    pedidosTbody.innerHTML = data.pedidos.length === 0
+      ? `<tr><td colspan="3" class="text-center text-muted">Sin pedidos</td></tr>`
+      : data.pedidos.map(p => `
+          <tr>
+            <td>${p.FECHA ? new Date(p.FECHA).toLocaleDateString("es-AR") : "—"}</td>
+            <td class="money">$${Number(p.TOTAL || 0).toLocaleString("es-AR")}</td>
+            <td>${escapeHtml(p.ESTADO || "")}</td>
+          </tr>`).join("");
+
+    const pagosTbody = document.getElementById("detalleClientePagosTabla");
+    pagosTbody.innerHTML = data.pagos.length === 0
+      ? `<tr><td colspan="4" class="text-center text-muted">Sin pagos registrados todavía</td></tr>`
+      : data.pagos.map(pago => `
+          <tr>
+            <td>${pago.FECHA ? new Date(pago.FECHA).toLocaleDateString("es-AR") : "—"}</td>
+            <td class="money">$${Number(pago.MONTO || 0).toLocaleString("es-AR")}</td>
+            <td>${escapeHtml(pago.FORMA_PAGO || "")}</td>
+            <td>${escapeHtml(pago.OBSERVACIONES || "")}</td>
+          </tr>`).join("");
+
+  } catch (error) {
+    console.error("Error al cargar el detalle del cliente:", error);
+    toast("Error de conexión al cargar el cliente", "error");
+  }
+}
+
+function cerrarModalDetalleCliente() {
+  document.getElementById("detalleClienteModalBackdrop").classList.remove("show");
+  detalleClienteIdActual = null;
+}
+
+async function registrarPagoCreditoForm() {
+  if (!detalleClienteIdActual) return;
+
+  const monto = Number(document.getElementById("pagoMonto").value);
+  if (!monto || monto <= 0) { toast("Ingresá un monto válido", "error"); return; }
+
+  try {
+    const response = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({
+        action: "registrarPagoCredito",
+        clienteId: detalleClienteIdActual,
+        monto,
+        formaPago: document.getElementById("pagoFormaPago").value,
+        observaciones: document.getElementById("pagoObservaciones").value.trim()
+      })
+    });
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo registrar el pago", "error");
+      return;
+    }
+
+    toast("Pago registrado", "success");
+    abrirModalDetalleCliente(detalleClienteIdActual); // refresca el detalle con el saldo actualizado
+    cargarClientesDesdeBackend(); // refresca también la tabla de fondo
+
+  } catch (error) {
+    console.error("Error al registrar el pago:", error);
+    toast("Error de conexión al registrar el pago", "error");
+  }
+}
+
+let detalleClienteIdActual = null;
 
 /* ===================== STOCK BAJO / AGOTADOS / MAS VENDIDOS ===================== */
 
@@ -1800,8 +2029,15 @@ function onPosInputKeyup(e) {
     return;
   }
   posTileFocusIdx = -1;
-  renderPosGrid(input.value.trim());
+  // El redibujado de la grilla (hasta 60 tarjetas, cada una con su
+  // imagen y badges) se demora un poco para no reconstruirla en cada
+  // tecla mientras se escribe rápido — el Enter de arriba, en cambio,
+  // sigue siendo instantáneo, porque ahí la respuesta inmediata
+  // importa de verdad (escaneo de código de barras).
+  renderPosGridConDemora(input.value.trim());
 }
+
+const renderPosGridConDemora = debounce(renderPosGrid, 150);
 
 /* ---- adding items ---- */
 
