@@ -1810,20 +1810,21 @@ function abrirModalNuevoCliente() {
   document.getElementById("clienteModalBackdrop").classList.add("show");
 }
 
-/** Opens the same client modal, but pre-filled for editing — the "a crédito" checkbox is hidden, that's managed by its own dedicated button in the table */
+/** Opens the same client modal, pre-filled for editing — now also shows the "a crédito" checkbox, pre-checked with the client's current value, so it can be toggled directly from here */
 function abrirModalEditarCliente(clienteId) {
   const cliente = clientesGlobal.find(c => String(c.CLIENTE_ID) === String(clienteId));
   if (!cliente) { toast("No se encontró el cliente", "error"); return; }
 
   document.getElementById("clClienteIdEditando").value = clienteId;
   document.getElementById("clienteModalTitulo").textContent = "✏️ Editar Cliente";
-  document.getElementById("clACreditoWrap").style.display = "none";
+  document.getElementById("clACreditoWrap").style.display = "block";
   document.getElementById("clNombre").value = cliente.NOMBRE || "";
   document.getElementById("clAlias").value = cliente.ALIAS || "";
   document.getElementById("clDni").value = cliente.DNI || "";
   document.getElementById("clTelefono").value = cliente.TELEFONO || "";
   document.getElementById("clEmpresa").value = cliente.EMPRESA || "";
   document.getElementById("clDireccion").value = cliente.DIRECCION || "";
+  document.getElementById("clACredito").checked = String(cliente.A_CREDITO || "").toUpperCase() === "SI";
   document.getElementById("clienteModalBackdrop").classList.add("show");
 }
 
@@ -1862,7 +1863,8 @@ async function guardarNuevoCliente() {
           dni: document.getElementById("clDni").value.trim(),
           telefono: document.getElementById("clTelefono").value.trim(),
           empresa: document.getElementById("clEmpresa").value.trim(),
-          direccion: document.getElementById("clDireccion").value.trim()
+          direccion: document.getElementById("clDireccion").value.trim(),
+          aCredito: document.getElementById("clACredito").checked ? "SI" : "NO"
         }
       : {
           action: "crearCliente",
