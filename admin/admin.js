@@ -1036,6 +1036,71 @@ async function cambiarEstado(pedidoId, estado) {
   }
 }
 
+/**
+ * Maneja el checkbox "Cobrado" de un pedido. Solo dispara la llamada
+ * al backend cuando YA hay una forma de pago elegida — si todavía no
+ * se eligió, simplemente habilita el desplegable y espera a que el
+ * usuario la complete (eso lo dispara cambiarFormaPagoPedido). Esto
+ * evita mandar "cobrado=SI" sin forma de pago, que el backend
+ * rechazaría de todas formas.
+ */
+async function cambiarCobradoPedido(pedidoId, marcado) {
+  const selectFormaPago = document.getElementById(`formaPago-${pedidoId}`);
+
+  if (!marcado) {
+    selectFormaPago.disabled = true;
+    selectFormaPago.value = "";
+    await aplicarCobroPedido(pedidoId, false, "");
+    return;
+  }
+
+  selectFormaPago.disabled = false;
+
+  const formaPagoElegida = selectFormaPago.value;
+  if (!formaPagoElegida) {
+    toast("Elegí la forma de pago para terminar de marcarlo como cobrado", "error");
+    return; // se queda tildado y con el desplegable habilitado, esperando la forma de pago
+  }
+
+  await aplicarCobroPedido(pedidoId, true, formaPagoElegida);
+}
+
+/** Maneja el desplegable de forma de pago — si el checkbox ya está tildado, aplica el cambio al elegir */
+async function cambiarFormaPagoPedido(pedidoId, formaPago) {
+  const checkbox = document.getElementById(`cobrado-${pedidoId}`);
+  if (!checkbox.checked) return; // todavía no se tildó "Cobrado", no hace nada hasta que se tilde
+  if (!formaPago) return;
+  await aplicarCobroPedido(pedidoId, true, formaPago);
+}
+
+/** Llama al backend para marcar/desmarcar el pedido como cobrado en caja, y refresca la lista */
+async function aplicarCobroPedido(pedidoId, cobrado, formaPago) {
+  try {
+    const response = await fetch(
+      API_URL +
+      "?action=marcarPedidoCobrado" +
+      "&pedidoId=" + encodeURIComponent(pedidoId) +
+      "&cobrado=" + (cobrado ? "SI" : "NO") +
+      "&formaPago=" + encodeURIComponent(formaPago || "")
+    );
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo actualizar el cobro del pedido", "error");
+      cargarPedidos(); // revierte cualquier cambio visual a lo que diga el backend
+      return;
+    }
+
+    toast(cobrado ? "Pedido marcado como cobrado — ya suma al cierre de caja de hoy" : "Pedido desmarcado — ya no suma al cierre de caja", "success");
+    cargarPedidos();
+
+  } catch (error) {
+    console.error("Error al marcar el pedido como cobrado:", error);
+    toast("Error de conexión al actualizar el cobro", "error");
+    cargarPedidos();
+  }
+}
+
 function filtrarPedidos() {
   const texto = document.getElementById("buscarPedido").value.toLowerCase();
   const filtrados = pedidosGlobal.filter(p =>
@@ -1049,10 +1114,13 @@ function filtrarPedidos() {
 function renderPedidos(lista) {
   let html = "";
   if (lista.length === 0) {
-    html = `<tr><td colspan="6" class="text-center text-muted py-4">No se encontraron pedidos</td></tr>`;
+    html = `<tr><td colspan="7" class="text-center text-muted py-4">No se encontraron pedidos</td></tr>`;
   }
   lista.forEach(p => {
     const estadoColor = p.ESTADO === "NUEVO" ? "table-warning" : "";
+    const estaCobrado = String(p.COBRADO || "").toUpperCase() === "SI";
+    const formaPagoActual = String(p.FORMA_PAGO_COBRO || "");
+
     html += `
     <tr class="${estadoColor}">
       <td class="mono">${escapeHtml(p.PEDIDO_ID)}</td>
@@ -1067,6 +1135,25 @@ function renderPedidos(lista) {
           <option value="ENTREGADO"  ${p.ESTADO==="ENTREGADO"?"selected":""}>ENTREGADO</option>
           <option value="CANCELADO"  ${p.ESTADO==="CANCELADO"?"selected":""}>CANCELADO</option>
         </select>
+      </td>
+      <td>
+        <div class="d-flex align-items-center gap-2 flex-wrap" style="min-width:230px;">
+          <div class="form-check mb-0">
+            <input class="form-check-input" type="checkbox" id="cobrado-${p.PEDIDO_ID}"
+              ${estaCobrado ? "checked" : ""}
+              onchange="cambiarCobradoPedido('${p.PEDIDO_ID}', this.checked)">
+            <label class="form-check-label" for="cobrado-${p.PEDIDO_ID}" style="font-size:12.5px;">Cobrado</label>
+          </div>
+          <select class="form-select form-select-sm" style="max-width:150px;"
+            id="formaPago-${p.PEDIDO_ID}"
+            ${estaCobrado ? "" : "disabled"}
+            onchange="cambiarFormaPagoPedido('${p.PEDIDO_ID}', this.value)">
+            <option value="">Forma de pago...</option>
+            <option value="EFECTIVO"      ${formaPagoActual==="EFECTIVO"?"selected":""}>Efectivo</option>
+            <option value="TRANSFERENCIA" ${formaPagoActual==="TRANSFERENCIA"?"selected":""}>Transferencia</option>
+            <option value="TARJETA"       ${formaPagoActual==="TARJETA"?"selected":""}>Tarjeta</option>
+          </select>
+        </div>
       </td>
       <td>${p.PDF_URL ? `<a href="${p.PDF_URL}" target="_blank" class="btn btn-primary btn-sm">PDF</a>` : "-"}</td>
     </tr>`;
