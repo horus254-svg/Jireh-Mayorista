@@ -568,33 +568,48 @@ function abrirCarrito(){
             html += `
             <div class="cart-item-row" data-code="${escapeHtml(item.CODIGO)}">
 
-                <div class="d-flex justify-content-between align-items-center">
+                <div class="cart-item-main">
 
-                    <span class="cart-item-name">${escapeHtml(item.PRODUCTO)}</span>
+                    <img
+                        class="cart-item-thumb"
+                        src="${item.IMAGEN || ""}"
+                        alt="${escapeHtml(item.PRODUCTO)}"
+                        loading="lazy"
+                        onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'">
 
-                    <button type="button" class="btn btn-sm btn-danger" data-action="eliminar" aria-label="Quitar producto">
-                        🗑
-                    </button>
+                    <div class="cart-item-info">
+
+                        <div class="d-flex justify-content-between align-items-center">
+
+                            <span class="cart-item-name">${escapeHtml(item.PRODUCTO)}</span>
+
+                            <button type="button" class="btn btn-sm btn-danger" data-action="eliminar" aria-label="Quitar producto">
+                                🗑
+                            </button>
+
+                        </div>
+
+                        <div class="qty-stepper">
+
+                            <button type="button" class="qty-btn" data-action="menos" aria-label="Restar">−</button>
+
+                            <input
+                                type="number"
+                                min="1"
+                                value="${item.cantidad}"
+                                class="qty-input"
+                                data-action-input="cantidad"
+                                inputmode="numeric">
+
+                            <button type="button" class="qty-btn" data-action="mas" aria-label="Sumar">+</button>
+
+                        </div>
+
+                        <div class="cart-item-subtotal">$${formatearPrecio(subtotal)}</div>
+
+                    </div>
 
                 </div>
-
-                <div class="qty-stepper">
-
-                    <button type="button" class="qty-btn" data-action="menos" aria-label="Restar">−</button>
-
-                    <input
-                        type="number"
-                        min="1"
-                        value="${item.cantidad}"
-                        class="qty-input"
-                        data-action-input="cantidad"
-                        inputmode="numeric">
-
-                    <button type="button" class="qty-btn" data-action="mas" aria-label="Sumar">+</button>
-
-                </div>
-
-                <div class="cart-item-subtotal">$${formatearPrecio(subtotal)}</div>
 
             </div>`;
         });
