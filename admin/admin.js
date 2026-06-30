@@ -1855,6 +1855,8 @@ async function abrirModalDetalleCliente(clienteId) {
   document.getElementById("pagoPrioridad").value = "ARS";
   document.getElementById("pagoTipoCambio").value = "";
   document.getElementById("pagoTipoCambioWrap").style.display = "none";
+  const btnPago = document.getElementById("btnRegistrarPago");
+  if (btnPago) { btnPago.disabled = false; btnPago.textContent = "💾 Registrar pago"; }
   detalleClienteIdActual = clienteId;
 
   try {
@@ -2029,6 +2031,9 @@ async function registrarPagoCreditoForm() {
     return;
   }
 
+  const btn = document.getElementById("btnRegistrarPago");
+  if (btn) { btn.disabled = true; btn.textContent = "Registrando..."; }
+
   try {
     const response = await fetch(API_URL, {
       method: "POST",
@@ -2048,16 +2053,18 @@ async function registrarPagoCreditoForm() {
 
     if (!data.success) {
       toast(data.message || "No se pudo registrar el pago", "error");
+      if (btn) { btn.disabled = false; btn.textContent = "💾 Registrar pago"; }
       return;
     }
 
     toast("Pago registrado", "success");
-    abrirModalDetalleCliente(detalleClienteIdActual); // refresca el detalle con el saldo actualizado
-    cargarClientesDesdeBackend(); // refresca también la tabla de fondo
+    abrirModalDetalleCliente(detalleClienteIdActual);
+    cargarClientesDesdeBackend();
 
   } catch (error) {
     console.error("Error al registrar el pago:", error);
     toast("Error de conexión al registrar el pago", "error");
+    if (btn) { btn.disabled = false; btn.textContent = "💾 Registrar pago"; }
   }
 }
 
