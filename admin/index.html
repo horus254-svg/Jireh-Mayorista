@@ -172,7 +172,10 @@
   <div id="clientes" class="seccion">
     <div class="page-header">
       <div><h1>Clientes</h1><div class="sub">Historial de compra y cuentas a crédito</div></div>
-      <button class="btn btn-success" onclick="abrirModalNuevoCliente()">+ Nuevo Cliente</button>
+      <div class="d-flex gap-2">
+        <button class="btn btn-outline-secondary" id="btnActualizarClientes" onclick="actualizarClientesForm()">🔄 Actualizar</button>
+        <button class="btn btn-success" onclick="abrirModalNuevoCliente()">+ Nuevo Cliente</button>
+      </div>
     </div>
 
     <div class="card p-3 mb-3">

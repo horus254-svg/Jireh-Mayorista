@@ -1589,6 +1589,25 @@ async function eliminarProducto(codigo) {
 
 let clientesGlobal = [];
 
+/** Refresca manualmente la tabla de clientes desde el backend, con feedback visual en el botón */
+async function actualizarClientesForm() {
+  const btn = document.getElementById("btnActualizarClientes");
+  const textoOriginal = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = "Actualizando...";
+
+  try {
+    await cargarClientesDesdeBackend();
+    toast("Clientes actualizados", "success");
+  } catch (error) {
+    console.error("Error al actualizar clientes:", error);
+    toast("Error de conexión al actualizar", "error");
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = textoOriginal;
+  }
+}
+
 async function cargarClientesDesdeBackend() {
   try {
     const response = await fetch(API_URL + "?action=clientesConCredito");
@@ -1642,7 +1661,7 @@ function renderTablaClientes(lista) {
       <td>
         <div class="d-flex flex-wrap gap-1">
           ${c.CLIENTE_ID
-            ? `<button class="btn btn-outline-secondary btn-sm btn-accion-producto" onclick="abrirModalDetalleCliente('${escapeHtml(c.CLIENTE_ID)}')" ${(saldoArs <= 0 && saldoUsd <= 0) ? 'disabled title="Sin deuda pendiente"' : ''}>Ver cuenta</button>
+            ? `<button class="btn btn-outline-secondary btn-sm btn-accion-producto" onclick="abrirModalDetalleCliente('${escapeHtml(c.CLIENTE_ID)}')">Ver cuenta</button>
                <button class="btn btn-warning btn-sm btn-accion-producto ms-1" onclick="abrirModalDeudaExtraDirecto('${escapeHtml(c.CLIENTE_ID)}', '${escapeHtml(c.NOMBRE || c.CLIENTE)}')">+ Deuda</button>
                <button class="btn btn-primary btn-sm btn-accion-producto ms-1" onclick="abrirModalEditarCliente('${escapeHtml(c.CLIENTE_ID)}')">Editar</button>
                <button class="btn btn-danger btn-sm btn-accion-producto ms-1" onclick="eliminarClienteForm('${escapeHtml(c.CLIENTE_ID)}', '${escapeHtml(c.NOMBRE)}')">Eliminar</button>`
@@ -1725,9 +1744,18 @@ function cerrarModalNuevoCliente() {
   document.getElementById("clienteModalBackdrop").classList.remove("show");
 }
 
+let guardandoCliente = false;
+
 async function guardarNuevoCliente() {
+  if (guardandoCliente) return; // evita doble click mientras la petición anterior sigue en vuelo
+  guardandoCliente = true;
+
   const nombre = document.getElementById("clNombre").value.trim();
-  if (!nombre) { toast("Ingresá el nombre del cliente", "error"); return; }
+  if (!nombre) {
+    toast("Ingresá el nombre del cliente", "error");
+    guardandoCliente = false;
+    return;
+  }
 
   const clienteIdEditando = document.getElementById("clClienteIdEditando").value.trim();
   const editando = !!clienteIdEditando;
@@ -1774,7 +1802,7 @@ async function guardarNuevoCliente() {
 
     toast(editando ? "Cliente actualizado" : "Cliente creado", "success");
     cerrarModalNuevoCliente();
-    cargarClientesDesdeBackend();
+    await cargarClientesDesdeBackend();
 
   } catch (error) {
     console.error("Error al crear cliente:", error);
@@ -1782,6 +1810,7 @@ async function guardarNuevoCliente() {
   } finally {
     btn.disabled = false;
     btn.innerHTML = textoOriginal;
+    guardandoCliente = false;
   }
 }
 
