@@ -1643,6 +1643,7 @@ function renderTablaClientes(lista) {
         <div class="d-flex flex-wrap gap-1">
           ${c.CLIENTE_ID
             ? `<button class="btn btn-outline-secondary btn-sm btn-accion-producto" onclick="abrirModalDetalleCliente('${escapeHtml(c.CLIENTE_ID)}')" ${(saldoArs <= 0 && saldoUsd <= 0) ? 'disabled title="Sin deuda pendiente"' : ''}>Ver cuenta</button>
+               <button class="btn btn-warning btn-sm btn-accion-producto ms-1" onclick="abrirModalDeudaExtraDirecto('${escapeHtml(c.CLIENTE_ID)}', '${escapeHtml(c.NOMBRE || c.CLIENTE)}')">+ Deuda</button>
                <button class="btn btn-primary btn-sm btn-accion-producto ms-1" onclick="abrirModalEditarCliente('${escapeHtml(c.CLIENTE_ID)}')">Editar</button>
                <button class="btn btn-danger btn-sm btn-accion-producto ms-1" onclick="eliminarClienteForm('${escapeHtml(c.CLIENTE_ID)}', '${escapeHtml(c.NOMBRE)}')">Eliminar</button>`
             : `<button class="btn btn-outline-success btn-sm" onclick="marcarClienteDesdeHistorialACredito('${escapeHtml(c.DNI)}')">Marcar a crédito</button>`}
@@ -1942,6 +1943,15 @@ function cerrarModalDetalleCliente() {
   document.getElementById("detalleClienteModalBackdrop").classList.remove("show");
   detalleClienteIdActual = null;
   detalleClienteDatosActuales = null;
+}
+
+function abrirModalDeudaExtraDirecto(clienteId, nombre) {
+  abrirModalDetalleCliente(clienteId).then(() => {
+    // Expandir el formulario de deuda automáticamente
+    document.getElementById("deudaExtraForm").style.display = "block";
+    document.getElementById("deudaExtraToggleIcon").textContent = "▲ Cerrar";
+    document.getElementById("deudaExtraMonto").focus();
+  });
 }
 
 function toggleFormDeudaExtra() {
