@@ -1111,6 +1111,61 @@ function filtrarPedidos() {
   renderPedidos(filtrados);
 }
 
+/**
+ * Normaliza un número de teléfono argentino al formato internacional
+ * que requiere wa.me (sin +, sin espacios, con código de país).
+ * Maneja: 011XXXXXXXX, 15XXXXXXXX, 9XXXXXXXX, 54911XXXXXXXX, etc.
+ */
+function normalizarTelefonoWA(tel) {
+  if (!tel) return null;
+
+  // Quita todo lo que no sea dígito
+  let num = String(tel).replace(/\D/g, "");
+
+  // Si ya empieza con 54 y tiene 13 dígitos → ya está listo
+  if (num.startsWith("54") && num.length === 13) return num;
+
+  // Si empieza con 54 pero le falta el 9 de celular (5411XXXXXXXX → 54911XXXXXXXX)
+  if (num.startsWith("54") && num.length === 12) return "549" + num.slice(2);
+
+  // Quita el 0 inicial de área si lo tiene (0351... → 351...)
+  if (num.startsWith("0")) num = num.slice(1);
+
+  // Quita el 15 de celular si lo tiene después del área (351158... → 35158...)
+  // Área argentina: 2-4 dígitos, luego el número. El 15 aparece en posición variable.
+  // Estrategia: si el número tiene exactamente 10 dígitos (área 2-4 + número 6-8)
+  // lo armamos directo. Si tiene 11, probablemente tenga el 15 incluido.
+  if (num.length === 11 && num.charAt(2) === "1" && num.charAt(3) === "5") {
+    num = num.slice(0, 2) + num.slice(4); // quita el 15 tras el área de 2 dígitos
+  } else if (num.length === 11 && num.charAt(3) === "1" && num.charAt(4) === "5") {
+    num = num.slice(0, 3) + num.slice(5); // quita el 15 tras el área de 3 dígitos
+  } else if (num.length === 11 && num.charAt(4) === "1" && num.charAt(5) === "5") {
+    num = num.slice(0, 4) + num.slice(6); // quita el 15 tras el área de 4 dígitos
+  }
+
+  // Agrega código de país Argentina + 9 de celular
+  // (WA Argentina requiere 549 + área + número = 13 dígitos total)
+  if (num.length === 10) return "549" + num;
+  if (num.length === 8)  return "5491" + num; // número corto sin área, asume GBA
+
+  return null; // no se pudo normalizar — el botón no se muestra
+}
+
+/** Genera el mensaje de WhatsApp según el estado del pedido */
+function mensajeWhatsAppPorEstado(estado, pedidoId, cliente, total) {
+  const totalStr = "$" + Number(total || 0).toLocaleString("es-AR");
+  switch(estado) {
+    case "PREPARANDO":
+      return `Hola ${cliente}! 👋 Tu pedido *${pedidoId}* por ${totalStr} ya está siendo preparado. En cuanto esté listo te avisamos. ¡Gracias por tu compra!`;
+    case "ENVIADO":
+      return `Hola ${cliente}! 📦 Tu pedido *${pedidoId}* por ${totalStr} ya fue enviado y está en camino. ¡Pronto lo tenés en tus manos!`;
+    case "ENTREGADO":
+      return `Hola ${cliente}! ✅ Tu pedido *${pedidoId}* por ${totalStr} fue entregado. Esperamos que todo haya llegado perfecto. ¡Gracias por elegirnos!`;
+    default:
+      return null;
+  }
+}
+
 function renderPedidos(lista) {
   let html = "";
   if (lista.length === 0) {
@@ -1121,6 +1176,17 @@ function renderPedidos(lista) {
     const estaCobrado = String(p.COBRADO || "").toUpperCase() === "SI";
     const formaPagoActual = String(p.FORMA_PAGO_COBRO || "");
 
+    // Botón WhatsApp: solo en PREPARANDO, ENVIADO y ENTREGADO, y solo si hay teléfono
+    const estadosConWA = ["PREPARANDO", "ENVIADO", "ENTREGADO"];
+    const telefono = String(p.TELEFONO || "").trim();
+    const numeroWA = normalizarTelefonoWA(telefono);
+    const mensajeWA = mensajeWhatsAppPorEstado(p.ESTADO, p.PEDIDO_ID, p.CLIENTE, p.TOTAL);
+    const btnWA = (estadosConWA.includes(p.ESTADO) && numeroWA && mensajeWA)
+      ? `<a href="https://wa.me/${numeroWA}?text=${encodeURIComponent(mensajeWA)}" target="_blank" class="btn btn-success btn-sm ms-1" title="Notificar por WhatsApp">📲 WA</a>`
+      : (estadosConWA.includes(p.ESTADO) && !numeroWA
+          ? `<span class="text-muted ms-1" style="font-size:11px;" title="Sin teléfono válido">Sin tel.</span>`
+          : "");
+
     html += `
     <tr class="${estadoColor}">
       <td class="mono">${escapeHtml(p.PEDIDO_ID)}</td>
@@ -1128,13 +1194,16 @@ function renderPedidos(lista) {
       <td>${escapeHtml(p.CLIENTE)}</td>
       <td class="money">$${Number(p.TOTAL || 0).toLocaleString("es-AR")}</td>
       <td>
-        <select class="form-select form-select-sm" onchange="cambiarEstado('${p.PEDIDO_ID}',this.value)">
-          <option value="NUEVO"      ${p.ESTADO==="NUEVO"?"selected":""}>NUEVO</option>
-          <option value="PREPARANDO" ${p.ESTADO==="PREPARANDO"?"selected":""}>PREPARANDO</option>
-          <option value="ENVIADO"    ${p.ESTADO==="ENVIADO"?"selected":""}>ENVIADO</option>
-          <option value="ENTREGADO"  ${p.ESTADO==="ENTREGADO"?"selected":""}>ENTREGADO</option>
-          <option value="CANCELADO"  ${p.ESTADO==="CANCELADO"?"selected":""}>CANCELADO</option>
-        </select>
+        <div class="d-flex align-items-center gap-1">
+          <select class="form-select form-select-sm" onchange="cambiarEstado('${p.PEDIDO_ID}',this.value)">
+            <option value="NUEVO"      ${p.ESTADO==="NUEVO"?"selected":""}>NUEVO</option>
+            <option value="PREPARANDO" ${p.ESTADO==="PREPARANDO"?"selected":""}>PREPARANDO</option>
+            <option value="ENVIADO"    ${p.ESTADO==="ENVIADO"?"selected":""}>ENVIADO</option>
+            <option value="ENTREGADO"  ${p.ESTADO==="ENTREGADO"?"selected":""}>ENTREGADO</option>
+            <option value="CANCELADO"  ${p.ESTADO==="CANCELADO"?"selected":""}>CANCELADO</option>
+          </select>
+          ${btnWA}
+        </div>
       </td>
       <td>
         <div class="d-flex align-items-center gap-2 flex-wrap" style="min-width:230px;">

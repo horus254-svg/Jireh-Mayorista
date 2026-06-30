@@ -345,7 +345,9 @@ document.getElementById("productos").addEventListener("click", function(e){
     switch(actionEl.dataset.action){
 
         case "qty-plus":
-            qtyInput.value = Math.max(1, (parseInt(qtyInput.value) || 1) + 1);
+            const stockMax = Number(String(producto.STOCK ?? "").trim()) || 0;
+            const qtyActual = parseInt(qtyInput.value) || 1;
+            qtyInput.value = stockMax > 0 ? Math.min(stockMax, qtyActual + 1) : qtyActual + 1;
             break;
 
         case "qty-minus":
@@ -384,8 +386,11 @@ document.getElementById("categoria-chips").addEventListener("click", function(e)
 function cambiarQtyInput(id, delta){
 
     const el = document.getElementById(id);
-
-    el.value = Math.max(1, (parseInt(el.value) || 1) + delta);
+    const stockDisponible = qvProductoActual
+        ? Number(String(qvProductoActual.STOCK ?? "").trim()) || 0
+        : 0;
+    const nuevo = (parseInt(el.value) || 1) + delta;
+    el.value = Math.max(1, stockDisponible > 0 ? Math.min(stockDisponible, nuevo) : nuevo);
 }
 
 function abrirQuickView(producto){
@@ -446,7 +451,22 @@ function agregarAlCarrito(producto, cantidad){
 
     cantidad = Math.max(1, cantidad || 1);
 
+    const stockDisponible = Number(String(producto.STOCK ?? "").trim()) || 0;
+
     const existente = estado.carrito.find(p => String(p.CODIGO) === String(producto.CODIGO));
+    const yaEnCarrito = existente ? existente.cantidad : 0;
+    const totalSolicitado = yaEnCarrito + cantidad;
+
+    if(stockDisponible > 0 && totalSolicitado > stockDisponible){
+        const podemos = stockDisponible - yaEnCarrito;
+        if(podemos <= 0){
+            mostrarToast(`⚠️ Ya tenés el máximo disponible de "${producto.PRODUCTO}" en el carrito (${stockDisponible} ud${stockDisponible !== 1 ? "s" : ""})`, "error");
+            return;
+        }
+        // Agrega solo lo que queda disponible
+        cantidad = podemos;
+        mostrarToast(`⚠️ Solo se agregaron ${cantidad} ud${cantidad !== 1 ? "s" : ""} de "${producto.PRODUCTO}" (stock disponible: ${stockDisponible})`, "error");
+    }
 
     if(existente){
         existente.cantidad += cantidad;
@@ -456,7 +476,9 @@ function agregarAlCarrito(producto, cantidad){
 
     guardarCarrito();
 
-    mostrarToast(`✓ ${producto.PRODUCTO} agregado (${cantidad})`, "success");
+    if(stockDisponible <= 0 || totalSolicitado <= stockDisponible){
+        mostrarToast(`✓ ${producto.PRODUCTO} agregado (${cantidad})`, "success");
+    }
 }
 
 function guardarCarrito(){
@@ -493,11 +515,23 @@ function cambiarCantidad(codigo, cambio){
     const item = estado.carrito.find(p => String(p.CODIGO) === String(codigo));
     if(!item) return;
 
-    item.cantidad += cambio;
+    const nuevaCantidad = item.cantidad + cambio;
 
-    if(item.cantidad <= 0){
+    if(nuevaCantidad <= 0){
         estado.carrito = estado.carrito.filter(p => String(p.CODIGO) !== String(codigo));
+        guardarCarrito();
+        abrirCarrito();
+        return;
     }
+
+    // Respeta el stock — el objeto item tiene STOCK porque viene del producto original
+    const stockDisponible = Number(String(item.STOCK ?? "").trim()) || 0;
+    if(stockDisponible > 0 && nuevaCantidad > stockDisponible){
+        mostrarToast(`⚠️ Stock máximo disponible: ${stockDisponible} ud${stockDisponible !== 1 ? "s" : ""}`, "error");
+        return;
+    }
+
+    item.cantidad = nuevaCantidad;
 
     guardarCarrito();
     abrirCarrito();
@@ -512,6 +546,13 @@ function actualizarCantidadManual(codigo, cantidad){
 
     if(isNaN(cantidad) || cantidad < 1){
         cantidad = 1;
+    }
+
+    // Respeta el stock — el objeto item tiene STOCK porque viene del producto original
+    const stockDisponible = Number(String(item.STOCK ?? "").trim()) || 0;
+    if(stockDisponible > 0 && cantidad > stockDisponible){
+        cantidad = stockDisponible;
+        mostrarToast(`⚠️ Stock máximo disponible: ${stockDisponible} ud${stockDisponible !== 1 ? "s" : ""}`, "error");
     }
 
     item.cantidad = cantidad;
