@@ -1990,13 +1990,39 @@ async function abrirModalDetalleCliente(clienteId) {
     document.getElementById("detalleClienteNombre").textContent =
       data.cliente.ALIAS ? `${data.cliente.NOMBRE} (${data.cliente.ALIAS})` : data.cliente.NOMBRE;
 
-    document.getElementById("detalleClienteTotalCompradoArs").textContent = "$" + Number(data.totalCompradoArs).toLocaleString("es-AR");
-    document.getElementById("detalleClienteTotalPagadoArs").textContent = "$" + Number(data.totalPagadoArs).toLocaleString("es-AR");
-    document.getElementById("detalleClienteSaldoArs").textContent = "$" + Number(data.saldoPendienteArs).toLocaleString("es-AR");
+    const esCredito = String(data.cliente.A_CREDITO || "").toUpperCase() === "SI";
 
-    document.getElementById("detalleClienteTotalCompradoUsd").textContent = "US$" + Number(data.totalCompradoUsd).toLocaleString("es-AR");
-    document.getElementById("detalleClienteTotalPagadoUsd").textContent = "US$" + Number(data.totalPagadoUsd).toLocaleString("es-AR");
-    document.getElementById("detalleClienteSaldoUsd").textContent = "US$" + Number(data.saldoPendienteUsd).toLocaleString("es-AR");
+    document.getElementById("cardAvisoNoCredito").style.display = esCredito ? "none" : "block";
+    document.getElementById("cardFormularioPago").style.display = esCredito ? "block" : "none";
+
+    if (esCredito) {
+      // Cliente a crédito: los números son una deuda real, vienen
+      // calculados del backend (ya restan los pagos registrados).
+      document.getElementById("detalleClienteTotalCompradoArs").textContent = "$" + Number(data.totalCompradoArs).toLocaleString("es-AR");
+      document.getElementById("detalleClienteTotalPagadoArs").textContent = "$" + Number(data.totalPagadoArs).toLocaleString("es-AR");
+      document.getElementById("detalleClienteSaldoArs").textContent = "$" + Number(data.saldoPendienteArs).toLocaleString("es-AR");
+
+      document.getElementById("detalleClienteTotalCompradoUsd").textContent = "US$" + Number(data.totalCompradoUsd).toLocaleString("es-AR");
+      document.getElementById("detalleClienteTotalPagadoUsd").textContent = "US$" + Number(data.totalPagadoUsd).toLocaleString("es-AR");
+      document.getElementById("detalleClienteSaldoUsd").textContent = "US$" + Number(data.saldoPendienteUsd).toLocaleString("es-AR");
+    } else {
+      // Cliente NO a crédito: sus pedidos fueron compras al contado.
+      // El total comprado es solo informativo (no es deuda), y el
+      // saldo pendiente siempre es $0 — nunca debe nada.
+      let totalArsInformativo = 0, totalUsdInformativo = 0;
+      (data.pedidos || []).forEach(p => {
+        if (String(p.MONEDA || "ARS").toUpperCase() === "USD") totalUsdInformativo += Number(p.TOTAL || 0);
+        else totalArsInformativo += Number(p.TOTAL || 0);
+      });
+
+      document.getElementById("detalleClienteTotalCompradoArs").textContent = "$" + totalArsInformativo.toLocaleString("es-AR");
+      document.getElementById("detalleClienteTotalPagadoArs").textContent = "$" + totalArsInformativo.toLocaleString("es-AR");
+      document.getElementById("detalleClienteSaldoArs").textContent = "$0";
+
+      document.getElementById("detalleClienteTotalCompradoUsd").textContent = "US$" + totalUsdInformativo.toLocaleString("es-AR");
+      document.getElementById("detalleClienteTotalPagadoUsd").textContent = "US$" + totalUsdInformativo.toLocaleString("es-AR");
+      document.getElementById("detalleClienteSaldoUsd").textContent = "US$0";
+    }
 
     const pedidosTbody = document.getElementById("detalleClientePedidosTabla");
     pedidosTbody.innerHTML = data.pedidos.length === 0
