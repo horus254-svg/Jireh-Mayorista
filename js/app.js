@@ -604,6 +604,12 @@ function abrirCarrito(){
 
     document.getElementById("cart-total").innerText = formatearPrecio(total);
 
+    const avisoMinimo = document.getElementById("cart-minimo-aviso");
+    if(avisoMinimo){
+        if(total > 0 && total < 100000) avisoMinimo.classList.remove("d-none");
+        else avisoMinimo.classList.add("d-none");
+    }
+
     const btnCheckout = document.getElementById("btn-checkout");
     btnCheckout.disabled = estado.carrito.length === 0;
 
@@ -703,6 +709,12 @@ async function checkoutWhatsapp(){
 
     let total = 0;
     estado.carrito.forEach(item => { total += item.PRECIO * item.cantidad; });
+
+    if(total < 100000){
+        mostrarToast("El pedido mínimo es $100.000. Agregá más productos para continuar.", "error");
+        desactivarCargaCheckout();
+        return;
+    }
 
     try{
 

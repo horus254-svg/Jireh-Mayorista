@@ -166,7 +166,7 @@
 
     <div class="modal fade" id="cartModal" tabindex="-1">
 
-        <div class="modal-dialog modal-dialog-scrollable">
+        <div class="modal-dialog modal-dialog-scrollable modal-cart-desktop">
 
             <div class="modal-content">
 
@@ -184,78 +184,90 @@
 
                 </div>
 
-                <div class="modal-body">
+                <div class="modal-body modal-body-cart-cols">
 
-                    <div id="cart-items"></div>
+                    <!-- Columna izquierda: productos -->
+                    <div class="cart-col-productos">
 
-                    <div id="cart-empty" class="cart-empty d-none">
-                        <div class="cart-empty-icon">🛒</div>
-                        <p>Tu carrito está vacío.</p>
-                    </div>
+                        <div id="cart-items"></div>
 
-                    <hr>
-
-                    <div class="cart-total-row">
-                        <span>Total</span>
-                        <h5 class="mb-0">$<span id="cart-total">0</span></h5>
-                    </div>
-
-                    <hr>
-
-                    <p class="form-section-label">Datos para el pedido</p>
-
-                    <input
-                        type="text"
-                        id="clienteNombre"
-                        class="form-control mb-2"
-                        placeholder="Nombre y Apellido *">
-
-                    <input
-                        type="text"
-                        id="clienteEmpresa"
-                        class="form-control mb-2"
-                        placeholder="Empresa (opcional)">
-
-                    <input
-                        type="text"
-                        id="clienteDireccion"
-                        class="form-control mb-2"
-                        placeholder="Dirección *">
-
-                    <div class="row g-2 mb-2">
-                        <div class="col-6">
-                            <input
-                                type="text"
-                                id="clienteLocalidad"
-                                class="form-control"
-                                placeholder="Localidad *">
+                        <div id="cart-empty" class="cart-empty d-none">
+                            <div class="cart-empty-icon">🛒</div>
+                            <p>Tu carrito está vacío.</p>
                         </div>
-                        <div class="col-6">
-                            <input
-                                type="text"
-                                id="clienteProvincia"
-                                class="form-control"
-                                placeholder="Provincia *">
+
+                        <hr>
+
+                        <div class="cart-total-row">
+                            <span>Total</span>
+                            <h5 class="mb-0">$<span id="cart-total">0</span></h5>
                         </div>
+
+                        <div id="cart-minimo-aviso" class="cart-minimo-aviso d-none">
+                            ⚠️ El pedido mínimo es $100.000
+                        </div>
+
                     </div>
 
-                    <input
-                        type="text"
-                        id="clienteCodigoPostal"
-                        class="form-control mb-2"
-                        placeholder="Código Postal (opcional)">
+                    <!-- Columna derecha: datos del cliente -->
+                    <div class="cart-col-datos">
 
-                    <input
-                        type="tel"
-                        id="clienteTelefono"
-                        class="form-control mb-2"
-                        placeholder="Teléfono *">
+                        <p class="form-section-label">Datos para el pedido</p>
 
-                    <input
-                        type="text"
-                        id="clienteDni"
-                        class="form-control mb-2"
-                        placeholder="DNI o CUIT *">
+                        <input
+                            type="text"
+                            id="clienteNombre"
+                            class="form-control mb-2"
+                            placeholder="Nombre y Apellido *">
+
+                        <input
+                            type="text"
+                            id="clienteEmpresa"
+                            class="form-control mb-2"
+                            placeholder="Empresa (opcional)">
+
+                        <input
+                            type="text"
+                            id="clienteDireccion"
+                            class="form-control mb-2"
+                            placeholder="Dirección *">
+
+                        <div class="row g-2 mb-2">
+                            <div class="col-6">
+                                <input
+                                    type="text"
+                                    id="clienteLocalidad"
+                                    class="form-control"
+                                    placeholder="Localidad *">
+                            </div>
+                            <div class="col-6">
+                                <input
+                                    type="text"
+                                    id="clienteProvincia"
+                                    class="form-control"
+                                    placeholder="Provincia *">
+                            </div>
+                        </div>
+
+                        <input
+                            type="text"
+                            id="clienteCodigoPostal"
+                            class="form-control mb-2"
+                            placeholder="Código Postal (opcional)">
+
+                        <input
+                            type="tel"
+                            id="clienteTelefono"
+                            class="form-control mb-2"
+                            placeholder="Teléfono *">
+
+                        <input
+                            type="text"
+                            id="clienteDni"
+                            class="form-control mb-2"
+                            placeholder="DNI o CUIT *">
+
+                    </div>
 
                 </div>
 

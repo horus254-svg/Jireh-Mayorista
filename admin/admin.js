@@ -1972,6 +1972,9 @@ async function registrarDeudaExtraForm() {
   const concepto = document.getElementById("deudaExtraModalConcepto").value.trim();
   if (!concepto) { toast("El concepto es obligatorio", "error"); return; }
 
+  const btn = document.querySelector("#deudaExtraModalBackdrop .btn-warning");
+  if (btn) { btn.disabled = true; btn.textContent = "Registrando..."; }
+
   try {
     const response = await fetch(API_URL, {
       method: "POST",
@@ -1985,13 +1988,18 @@ async function registrarDeudaExtraForm() {
       })
     });
     const data = await response.json();
-    if (!data.success) { toast(data.message || "No se pudo registrar la deuda", "error"); return; }
+    if (!data.success) {
+      toast(data.message || "No se pudo registrar la deuda", "error");
+      if (btn) { btn.disabled = false; btn.textContent = "💾 Registrar deuda"; }
+      return;
+    }
     toast("Deuda registrada correctamente", "success");
     cerrarModalDeudaExtra();
     cargarClientesDesdeBackend();
   } catch (error) {
     console.error("Error al registrar deuda extra:", error);
     toast("Error de conexión al registrar la deuda", "error");
+    if (btn) { btn.disabled = false; btn.textContent = "💾 Registrar deuda"; }
   }
 }
 
