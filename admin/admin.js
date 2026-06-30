@@ -1855,12 +1855,6 @@ async function abrirModalDetalleCliente(clienteId) {
   document.getElementById("pagoPrioridad").value = "ARS";
   document.getElementById("pagoTipoCambio").value = "";
   document.getElementById("pagoTipoCambioWrap").style.display = "none";
-  // Reset deuda extra form
-  document.getElementById("deudaExtraMonto").value = "";
-  document.getElementById("deudaExtraConcepto").value = "";
-  document.getElementById("deudaExtraMoneda").value = "ARS";
-  document.getElementById("deudaExtraForm").style.display = "none";
-  document.getElementById("deudaExtraToggleIcon").textContent = "▼ Expandir";
   detalleClienteIdActual = clienteId;
 
   try {
@@ -1953,6 +1947,8 @@ function abrirModalDeudaExtraDirecto(clienteId, nombre) {
   document.getElementById("deudaExtraModalMonto").value = "";
   document.getElementById("deudaExtraModalMoneda").value = "ARS";
   document.getElementById("deudaExtraModalConcepto").value = "";
+  const btnDeuda = document.getElementById("btnRegistrarDeudaExtra");
+  if (btnDeuda) { btnDeuda.disabled = false; btnDeuda.textContent = "💾 Registrar deuda"; }
   document.getElementById("deudaExtraModalBackdrop").classList.add("show");
   setTimeout(() => document.getElementById("deudaExtraModalMonto").focus(), 100);
 }
@@ -1972,7 +1968,7 @@ async function registrarDeudaExtraForm() {
   const concepto = document.getElementById("deudaExtraModalConcepto").value.trim();
   if (!concepto) { toast("El concepto es obligatorio", "error"); return; }
 
-  const btn = document.querySelector("#deudaExtraModalBackdrop .btn-warning");
+  const btn = document.getElementById("btnRegistrarDeudaExtra");
   if (btn) { btn.disabled = true; btn.textContent = "Registrando..."; }
 
   try {
