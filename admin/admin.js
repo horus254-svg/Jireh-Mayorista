@@ -1945,31 +1945,31 @@ function cerrarModalDetalleCliente() {
   detalleClienteDatosActuales = null;
 }
 
+let deudaExtraClienteId = null;
+
 function abrirModalDeudaExtraDirecto(clienteId, nombre) {
-  abrirModalDetalleCliente(clienteId).then(() => {
-    // Expandir el formulario de deuda automáticamente
-    document.getElementById("deudaExtraForm").style.display = "block";
-    document.getElementById("deudaExtraToggleIcon").textContent = "▲ Cerrar";
-    document.getElementById("deudaExtraMonto").focus();
-  });
+  deudaExtraClienteId = clienteId;
+  document.getElementById("deudaExtraModalNombre").textContent = nombre;
+  document.getElementById("deudaExtraModalMonto").value = "";
+  document.getElementById("deudaExtraModalMoneda").value = "ARS";
+  document.getElementById("deudaExtraModalConcepto").value = "";
+  document.getElementById("deudaExtraModalBackdrop").classList.add("show");
+  setTimeout(() => document.getElementById("deudaExtraModalMonto").focus(), 100);
 }
 
-function toggleFormDeudaExtra() {
-  const form = document.getElementById("deudaExtraForm");
-  const icon = document.getElementById("deudaExtraToggleIcon");
-  const visible = form.style.display !== "none";
-  form.style.display = visible ? "none" : "block";
-  icon.textContent = visible ? "▼ Expandir" : "▲ Cerrar";
+function cerrarModalDeudaExtra() {
+  document.getElementById("deudaExtraModalBackdrop").classList.remove("show");
+  deudaExtraClienteId = null;
 }
 
 async function registrarDeudaExtraForm() {
-  if (!detalleClienteIdActual) return;
+  if (!deudaExtraClienteId) return;
 
-  const monto = Number(document.getElementById("deudaExtraMonto").value);
+  const monto = Number(document.getElementById("deudaExtraModalMonto").value);
   if (!monto || monto <= 0) { toast("Ingresá un monto válido", "error"); return; }
 
-  const moneda = document.getElementById("deudaExtraMoneda").value;
-  const concepto = document.getElementById("deudaExtraConcepto").value.trim();
+  const moneda = document.getElementById("deudaExtraModalMoneda").value;
+  const concepto = document.getElementById("deudaExtraModalConcepto").value.trim();
   if (!concepto) { toast("El concepto es obligatorio", "error"); return; }
 
   try {
@@ -1978,7 +1978,7 @@ async function registrarDeudaExtraForm() {
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify({
         action: "crearDeudaExtra",
-        clienteId: detalleClienteIdActual,
+        clienteId: deudaExtraClienteId,
         monto,
         moneda,
         concepto
@@ -1987,12 +1987,20 @@ async function registrarDeudaExtraForm() {
     const data = await response.json();
     if (!data.success) { toast(data.message || "No se pudo registrar la deuda", "error"); return; }
     toast("Deuda registrada correctamente", "success");
-    abrirModalDetalleCliente(detalleClienteIdActual); // refresca saldos y tabla
+    cerrarModalDeudaExtra();
     cargarClientesDesdeBackend();
   } catch (error) {
     console.error("Error al registrar deuda extra:", error);
     toast("Error de conexión al registrar la deuda", "error");
   }
+}
+
+function toggleFormDeudaExtra() {
+  const form = document.getElementById("deudaExtraForm");
+  const icon = document.getElementById("deudaExtraToggleIcon");
+  const visible = form.style.display !== "none";
+  form.style.display = visible ? "none" : "block";
+  icon.textContent = visible ? "▼ Expandir" : "▲ Cerrar";
 }
 
 /** Shows the exchange-rate field only when the payment currency and the priority currency differ — that's the only case where a conversion is actually needed */

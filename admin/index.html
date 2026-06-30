@@ -1577,6 +1577,17 @@
         </div>
       </div>
 
+      <!-- Tabla de deudas extra -->
+      <div id="deudaExtraTablaWrap" style="display:none;">
+        <h6 style="font-size:13px; margin-bottom:8px;">Deudas extra registradas</h6>
+        <div class="table-responsive mb-3" style="max-height:160px; overflow-y:auto;">
+          <table class="table table-sm table-striped">
+            <thead><tr><th>Fecha</th><th>Moneda</th><th>Monto</th><th>Concepto</th></tr></thead>
+            <tbody id="detalleClienteDeudasExtraTabla"></tbody>
+          </table>
+        </div>
+      </div>
+
       <h6 style="font-size:13px; margin-bottom:8px;">Pedidos de este cliente</h6>
       <div class="table-responsive mb-3" style="max-height:200px; overflow-y:auto;">
         <table class="table table-sm table-striped">
@@ -1597,6 +1608,40 @@
     <div class="product-modal-actions">
       <button class="btn btn-outline-secondary" onclick="imprimirInformeCliente()">🖨️ Imprimir informe</button>
       <button class="btn btn-outline-secondary" onclick="cerrarModalDetalleCliente()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ===== MODAL AGREGAR DEUDA EXTRA ===== -->
+<div class="product-modal-backdrop" id="deudaExtraModalBackdrop">
+  <div class="product-modal" style="max-width:460px;">
+    <div class="product-modal-header">
+      <h6>➕ Agregar deuda — <span id="deudaExtraModalNombre"></span></h6>
+      <button onclick="cerrarModalDeudaExtra()">✕</button>
+    </div>
+    <div class="product-modal-body">
+      <div class="row g-3">
+        <div class="col-6">
+          <label class="form-label">Monto</label>
+          <input type="number" class="form-control" id="deudaExtraModalMonto" placeholder="0" min="0">
+        </div>
+        <div class="col-6">
+          <label class="form-label">Moneda</label>
+          <select class="form-select" id="deudaExtraModalMoneda">
+            <option value="ARS">Pesos (ARS)</option>
+            <option value="USD">Dólares (USD)</option>
+          </select>
+        </div>
+        <div class="col-12">
+          <label class="form-label">Concepto <span style="color:var(--red-500);">*</span></label>
+          <input type="text" class="form-control" id="deudaExtraModalConcepto" placeholder="Ej: Flete, servicio, adelanto...">
+        </div>
+      </div>
+    </div>
+    <div class="product-modal-actions">
+      <button class="btn btn-outline-secondary" onclick="cerrarModalDeudaExtra()">Cancelar</button>
+      <button class="btn btn-warning" onclick="registrarDeudaExtraForm()">💾 Registrar deuda</button>
     </div>
   </div>
 </div>
