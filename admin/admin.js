@@ -1152,15 +1152,16 @@ function normalizarTelefonoWA(tel) {
 }
 
 /** Genera el mensaje de WhatsApp según el estado del pedido */
-function mensajeWhatsAppPorEstado(estado, pedidoId, cliente, total) {
+function mensajeWhatsAppPorEstado(estado, pedidoId, cliente, total, pdfUrl) {
   const totalStr = "$" + Number(total || 0).toLocaleString("es-AR");
+  const linkPdf = pdfUrl ? `\n\n📄 Tu comprobante de pedido: ${pdfUrl}` : "";
   switch(estado) {
     case "PREPARANDO":
-      return `Hola ${cliente}! 👋 Tu pedido *${pedidoId}* por ${totalStr} ya está siendo preparado. En cuanto esté listo te avisamos. ¡Gracias por tu compra!`;
+      return `Hola ${cliente}! 👋 Tu pedido *${pedidoId}* por ${totalStr} ya está siendo preparado. En cuanto esté listo te avisamos. ¡Gracias por tu compra!${linkPdf}`;
     case "ENVIADO":
-      return `Hola ${cliente}! 📦 Tu pedido *${pedidoId}* por ${totalStr} ya fue enviado y está en camino. ¡Pronto lo tenés en tus manos!`;
+      return `Hola ${cliente}! 📦 Tu pedido *${pedidoId}* por ${totalStr} ya fue enviado y está en camino. ¡Pronto lo tenés en tus manos!${linkPdf}`;
     case "ENTREGADO":
-      return `Hola ${cliente}! ✅ Tu pedido *${pedidoId}* por ${totalStr} fue entregado. Esperamos que todo haya llegado perfecto. ¡Gracias por elegirnos!`;
+      return `Hola ${cliente}! ✅ Tu pedido *${pedidoId}* por ${totalStr} fue entregado. Esperamos que todo haya llegado perfecto. ¡Gracias por elegirnos!${linkPdf}`;
     default:
       return null;
   }
@@ -1180,7 +1181,7 @@ function renderPedidos(lista) {
     const estadosConWA = ["PREPARANDO", "ENVIADO", "ENTREGADO"];
     const telefono = String(p.TELEFONO || "").trim();
     const numeroWA = normalizarTelefonoWA(telefono);
-    const mensajeWA = mensajeWhatsAppPorEstado(p.ESTADO, p.PEDIDO_ID, p.CLIENTE, p.TOTAL);
+    const mensajeWA = mensajeWhatsAppPorEstado(p.ESTADO, p.PEDIDO_ID, p.CLIENTE, p.TOTAL, p.PDF_URL);
     const btnWA = (estadosConWA.includes(p.ESTADO) && numeroWA && mensajeWA)
       ? `<a href="https://wa.me/${numeroWA}?text=${encodeURIComponent(mensajeWA)}" target="_blank" class="btn btn-success btn-sm ms-1" title="Notificar por WhatsApp">📲 WA</a>`
       : (estadosConWA.includes(p.ESTADO) && !numeroWA
