@@ -1158,12 +1158,14 @@ function normalizarTelefonoWA(tel) {
 /** Genera el mensaje de WhatsApp según el estado del pedido */
 function mensajeWhatsAppPorEstado(estado, pedidoId, cliente, total, pdfUrl) {
   const totalStr = "$" + Number(total || 0).toLocaleString("es-AR");
-  const linkPdf = pdfUrl ? `\n\n📄 Tu comprobante de pedido: ${pdfUrl}` : "";
+  const linkPdf = pdfUrl ? `\n\nComprobante de pedido: ${pdfUrl}` : "";
   switch(estado) {
+    case "NUEVO":
+      return `Hola ${cliente}! Recibimos tu pedido ${pedidoId} por ${totalStr}.\n\nPara confirmar tu pedido, realizá la transferencia a:\nAlias: jireholga\nNombre: Olga Carbajal Alvis\n\nUna vez realizado el pago, envianos el comprobante por este medio para que podamos empezar a preparar tu pedido. Gracias por elegirnos!${linkPdf}`;
     case "PREPARANDO":
-      return `Hola ${cliente}! 👋 Tu pedido *${pedidoId}* por ${totalStr} ya está siendo preparado. En cuanto esté listo te avisamos. ¡Gracias por tu compra!${linkPdf}`;
+      return `Hola ${cliente}! Tu pedido ${pedidoId} por ${totalStr} ya esta siendo preparado. En cuanto este listo te avisamos. Gracias por tu compra!${linkPdf}`;
     case "ENVIADO":
-      return `Hola ${cliente}! 📦 Tu pedido *${pedidoId}* por ${totalStr} ya fue enviado y está en camino. ¡Pronto lo tenés en tus manos!${linkPdf}`;
+      return `Hola ${cliente}! Tu pedido ${pedidoId} por ${totalStr} ya fue enviado y esta en camino. Pronto lo tenes en tus manos!${linkPdf}`;
     default:
       return null;
   }
@@ -1184,8 +1186,8 @@ function renderPedidos(lista) {
     const estaCobrado = String(p.COBRADO || "").toUpperCase() === "SI";
     const formaPagoActual = String(p.FORMA_PAGO_COBRO || "");
 
-    // Botón WhatsApp — solo en PREPARANDO y ENVIADO
-    const estadosConWA = ["PREPARANDO", "ENVIADO"];
+    // Botón WhatsApp — en NUEVO, PREPARANDO y ENVIADO
+    const estadosConWA = ["NUEVO", "PREPARANDO", "ENVIADO"];
     const telefono = String(p.TELEFONO || "").trim();
     const numeroWA = normalizarTelefonoWA(telefono);
     const mensajeWA = mensajeWhatsAppPorEstado(p.ESTADO, p.PEDIDO_ID, p.CLIENTE, p.TOTAL, p.PDF_URL);
@@ -1241,6 +1243,7 @@ function renderPedidos(lista) {
         ${btnWA}
         ${selectCobrado}
         ${p.PDF_URL ? `<a href="${p.PDF_URL}" target="_blank" class="btn btn-outline-secondary btn-sm ms-auto">📄 PDF</a>` : ""}
+        ${p.ESTADO === "PREPARANDO" ? `<button class="btn btn-outline-secondary btn-sm" onclick='imprimirEtiquetaEnvio(${JSON.stringify({pedidoId:p.PEDIDO_ID,cliente:p.CLIENTE,telefono:p.TELEFONO||"",direccion:p.DIRECCION||"",localidad:p.LOCALIDAD||"",provincia:p.PROVINCIA||"",codigoPostal:p.CODIGO_POSTAL||p.CODIGOPOSTAL||"",dni:p.DNI||"",transporte:p.EMPRESA||""})})'>Imprimir etiqueta</button>` : ""}
       </div>
     </div>`;
   }).join("");
@@ -2420,6 +2423,101 @@ function imprimirInformeCliente() {
   setTimeout(() => {
     window.print();
   }, 100);
+}
+
+/**
+ * Imprime una etiqueta de envío A4 para un pedido en estado PREPARANDO.
+ * Usa el mismo #etiquetasPrintArea que el resto de las impresiones A4.
+ * Incluye un código de barras Code128 con el número de pedido, generado
+ * con JsBarcode (ya cargado en el panel).
+ */
+function imprimirEtiquetaEnvio(datos) {
+  const { pedidoId, cliente, telefono, direccion, localidad, provincia, codigoPostal, dni, transporte } = datos;
+
+  const cpStr = codigoPostal ? `  CP:${codigoPostal}` : "";
+  const localidadStr = [localidad, cpStr].filter(Boolean).join("").trim();
+
+  const html = `
+    <div style="
+      font-family: Arial, Helvetica, sans-serif;
+      width: 190mm;
+      min-height: 130mm;
+      margin: 10mm auto;
+      padding: 8mm;
+      box-sizing: border-box;
+      border: 2px solid #000;
+      border-radius: 4mm;
+      page-break-inside: avoid;
+    ">
+
+      <!-- Franja frágil / cabecera -->
+      <div style="background:#d32f2f; color:#fff; text-align:center; padding:6mm 4mm; border-radius:2mm; margin-bottom:6mm;">
+        <div style="font-size:18pt; font-weight:900; letter-spacing:2px; text-transform:uppercase;">POR FAVOR</div>
+        <div style="font-size:11pt; font-weight:700; letter-spacing:4px; text-transform:uppercase;">MANEJESE CON CUIDADO</div>
+        <div style="font-size:26pt; font-weight:900; letter-spacing:6px; margin:4px 0;">FRAGIL</div>
+        <div style="font-size:11pt; font-weight:700; letter-spacing:3px;">== GRACIAS ==</div>
+      </div>
+
+      <!-- Datos del destinatario -->
+      <table style="width:100%; border-collapse:collapse; font-size:13pt;">
+        <tr>
+          <td style="font-size:7pt; font-weight:700; text-transform:uppercase; color:#555; width:28mm; vertical-align:top; padding-top:4px;">Nombre:</td>
+          <td style="font-size:16pt; font-weight:900; text-transform:uppercase; letter-spacing:1px;">${escapeHtml(cliente)}</td>
+        </tr>
+        ${telefono ? `<tr>
+          <td style="font-size:7pt; font-weight:700; text-transform:uppercase; color:#555; padding-top:4px;">Teléfono:</td>
+          <td style="font-size:14pt; font-weight:700;">${escapeHtml(telefono)}</td>
+        </tr>` : ""}
+        ${direccion ? `<tr>
+          <td style="font-size:7pt; font-weight:700; text-transform:uppercase; color:#555; padding-top:4px;">Dirección:</td>
+          <td style="font-size:14pt; font-weight:700; text-transform:uppercase;">${escapeHtml(direccion)}</td>
+        </tr>` : ""}
+        ${localidadStr ? `<tr>
+          <td style="font-size:7pt; font-weight:700; text-transform:uppercase; color:#555; padding-top:4px;">Localidad:</td>
+          <td style="font-size:14pt; font-weight:700; text-transform:uppercase;">${escapeHtml(localidadStr)}</td>
+        </tr>` : ""}
+        ${provincia ? `<tr>
+          <td style="font-size:7pt; font-weight:700; text-transform:uppercase; color:#555; padding-top:4px;">Provincia:</td>
+          <td style="font-size:14pt; font-weight:700; text-transform:uppercase;">${escapeHtml(provincia)}</td>
+        </tr>` : ""}
+        ${dni ? `<tr>
+          <td style="font-size:7pt; font-weight:700; text-transform:uppercase; color:#555; padding-top:4px;">DNI:</td>
+          <td style="font-size:14pt; font-weight:700;">${escapeHtml(dni)}</td>
+        </tr>` : ""}
+        ${transporte ? `<tr>
+          <td style="font-size:7pt; font-weight:700; text-transform:uppercase; color:#555; padding-top:4px;">Transporte:</td>
+          <td style="font-size:14pt; font-weight:700; text-transform:uppercase;">${escapeHtml(transporte)}</td>
+        </tr>` : ""}
+      </table>
+
+      <!-- Código de barras con número de pedido -->
+      <div style="margin-top:6mm; text-align:center; border-top:1px solid #ddd; padding-top:4mm;">
+        <svg id="barcode-etiqueta-${pedidoId.replace(/[^a-zA-Z0-9]/g,'_')}"></svg>
+      </div>
+
+    </div>
+  `;
+
+  const area = document.getElementById("etiquetasPrintArea");
+  area.innerHTML = html;
+
+  // Generar el código de barras después de que el DOM esté listo
+  setTimeout(() => {
+    const svgId = `barcode-etiqueta-${pedidoId.replace(/[^a-zA-Z0-9]/g,'_')}`;
+    const svgEl = document.getElementById(svgId);
+    if (svgEl && typeof JsBarcode !== "undefined") {
+      JsBarcode(svgEl, pedidoId, {
+        format: "CODE128",
+        width: 2.5,
+        height: 60,
+        displayValue: true,
+        fontSize: 14,
+        margin: 8,
+        textMargin: 4
+      });
+    }
+    window.print();
+  }, 150);
 }
 
 /* ===================== STOCK BAJO / AGOTADOS / MAS VENDIDOS ===================== */
