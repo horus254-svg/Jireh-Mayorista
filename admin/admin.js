@@ -1115,6 +1115,153 @@ function filtrarPedidos() {
   renderPedidos(filtrados);
 }
 
+const ESTADO_ICONO_PEDIDO = { NUEVO: "🆕", PREPARANDO: "⚙️", ENVIADO: "📦", CANCELADO: "❌" };
+
+let pedidoDetalleActual = null;
+
+async function abrirDetallePedido(pedidoId) {
+  document.getElementById("pedidoDetalleBody").innerHTML = `<div class="text-center text-muted py-4">Cargando...</div>`;
+  document.getElementById("pedidoDetalleModalBackdrop").classList.add("show");
+
+  try {
+    const response = await fetch(API_URL + "?action=getDetallePedido&pedidoId=" + encodeURIComponent(pedidoId));
+    const data = await response.json();
+    if (!data.success) { toast(data.message || "No se pudo cargar el pedido", "error"); cerrarModalDetallePedido(); return; }
+
+    const { pedido, detalle } = data;
+    pedidoDetalleActual = { pedido, detalle };
+
+    // Botón imprimir: si hay PDF en Drive lo abre, si no genera el A4
+    const btnImprimir = document.querySelector("#pedidoDetalleModalBackdrop .btn-success");
+    if (btnImprimir) {
+      if (pedido.PDF_URL) {
+        btnImprimir.textContent = "📄 Ver PDF del pedido";
+        btnImprimir.onclick = () => window.open(pedido.PDF_URL, "_blank");
+      } else {
+        btnImprimir.textContent = "Imprimir pedido (A4)";
+        btnImprimir.onclick = imprimirNotaPedidoA4;
+      }
+    }
+
+    // Mostrar/ocultar botón etiqueta según estado
+    const btnEtiqueta = document.getElementById("btnImprimirEtiquetaDetalle");
+    if (btnEtiqueta) btnEtiqueta.style.display = pedido.ESTADO === "PREPARANDO" ? "inline-flex" : "none";
+
+    const simbolo = String(pedido.MONEDA || "ARS").toUpperCase() === "USD" ? "US$" : "$";
+    const filas = detalle.map(item => `
+      <tr>
+        <td style="padding:6px 0;">${item.cantidad}x ${escapeHtml(item.PRODUCTO)}</td>
+        <td style="padding:6px 0; text-align:right; font-family:var(--font-mono);">${simbolo}${(item.PRECIO * item.cantidad).toLocaleString("es-AR")}</td>
+      </tr>`).join("");
+
+    document.getElementById("pedidoDetalleBody").innerHTML = `
+      <div class="config-preview-hint mb-3">
+        <span class="ic">${ESTADO_ICONO_PEDIDO[pedido.ESTADO] || "📦"}</span>
+        Pedido <strong>${escapeHtml(pedido.PEDIDO_ID)}</strong> — Estado: <strong>${escapeHtml(pedido.ESTADO)}</strong>
+      </div>
+      <div class="mb-2"><strong style="font-size:15px;">${escapeHtml(pedido.CLIENTE)}</strong>${pedido.DNI ? ` · DNI/CUIT: ${escapeHtml(pedido.DNI)}` : ""}</div>
+      ${pedido.TELEFONO ? `<div class="mb-1" style="font-size:13px;color:var(--slate-500);">📞 ${escapeHtml(pedido.TELEFONO)}</div>` : ""}
+      ${pedido.DIRECCION ? `<div class="mb-1" style="font-size:13px;color:var(--slate-500);">📍 ${escapeHtml(pedido.DIRECCION)}${pedido.LOCALIDAD ? ", " + escapeHtml(pedido.LOCALIDAD) : ""}${pedido.PROVINCIA ? ", " + escapeHtml(pedido.PROVINCIA) : ""}${pedido.CODIGO_POSTAL ? " (CP " + escapeHtml(pedido.CODIGO_POSTAL) + ")" : ""}</div>` : ""}
+      ${pedido.EMPRESA ? `<div class="mb-3" style="font-size:13px;color:var(--slate-500);">🚚 ${escapeHtml(pedido.EMPRESA)}</div>` : `<div class="mb-3"></div>`}
+      <table style="width:100%; border-collapse:collapse; font-size:13.5px;">
+        <tbody>${filas}</tbody>
+        <tfoot>
+          <tr style="border-top:2px solid var(--slate-200);">
+            <td style="padding-top:10px;"><strong>Total</strong></td>
+            <td style="padding-top:10px; text-align:right; font-family:var(--font-mono);"><strong>${simbolo}${Number(pedido.TOTAL || 0).toLocaleString("es-AR")}</strong></td>
+          </tr>
+        </tfoot>
+      </table>`;
+
+  } catch (error) {
+    console.error("Error al abrir detalle de pedido:", error);
+    toast("Error al cargar el detalle del pedido", "error");
+    cerrarModalDetallePedido();
+  }
+}
+
+function cerrarModalDetallePedido() {
+  document.getElementById("pedidoDetalleModalBackdrop").classList.remove("show");
+  pedidoDetalleActual = null;
+}
+
+function imprimirEtiquetaDesdeDetalle() {
+  if (!pedidoDetalleActual) return;
+  const p = pedidoDetalleActual.pedido;
+  imprimirEtiquetaEnvio({
+    pedidoId: p.PEDIDO_ID, cliente: p.CLIENTE, telefono: p.TELEFONO || "",
+    direccion: p.DIRECCION || "", localidad: p.LOCALIDAD || "", provincia: p.PROVINCIA || "",
+    codigoPostal: p.CODIGO_POSTAL || p.CODIGOPOSTAL || "", dni: p.DNI || "", transporte: p.EMPRESA || ""
+  });
+}
+
+function imprimirNotaPedidoA4() {
+  if (!pedidoDetalleActual) return;
+  const { pedido, detalle } = pedidoDetalleActual;
+  const simbolo = String(pedido.MONEDA || "ARS").toUpperCase() === "USD" ? "US$" : "$";
+  const ahora = new Date().toLocaleString("es-AR");
+  const fechaPedido = pedido.FECHA ? new Date(pedido.FECHA).toLocaleDateString("es-AR") : "—";
+
+  const filasItems = detalle.map(item => `
+    <tr>
+      <td style="padding:6px; border:1px solid #ddd;">${escapeHtml(item.PRODUCTO)}</td>
+      <td style="padding:6px; border:1px solid #ddd; text-align:center;">${item.cantidad}</td>
+      <td style="padding:6px; border:1px solid #ddd; text-align:right;">${simbolo}${Number(item.PRECIO).toLocaleString("es-AR")}</td>
+      <td style="padding:6px; border:1px solid #ddd; text-align:right;">${simbolo}${(item.PRECIO * item.cantidad).toLocaleString("es-AR")}</td>
+    </tr>`).join("");
+
+  const filaDoc = (label, valor) => valor
+    ? `<tr><td style="padding:4px 8px; font-size:7pt; font-weight:700; text-transform:uppercase; color:#555; width:32mm; vertical-align:top;">${label}:</td><td style="padding:4px 8px; font-size:11pt; font-weight:700;">${escapeHtml(valor)}</td></tr>`
+    : "";
+
+  const cobradoStr = String(pedido.COBRADO || "").toUpperCase() === "SI"
+    ? `<div style="margin-top:4mm; font-size:11pt; color:#16a34a; font-weight:700;">Cobrado${pedido.FORMA_PAGO_COBRO ? " — " + escapeHtml(pedido.FORMA_PAGO_COBRO) : ""}</div>`
+    : `<div style="margin-top:4mm; font-size:11pt; color:#d32f2f; font-weight:700;">Pendiente de cobro</div>`;
+
+  const html = `
+    <div style="font-family:Arial,Helvetica,sans-serif; width:190mm; margin:10mm auto; padding:8mm; box-sizing:border-box; border:2px solid #000; border-radius:4mm;">
+      <div style="text-align:center; margin-bottom:6mm;">
+        <div style="font-size:20pt; font-weight:900;">Jireh Mayorista</div>
+      </div>
+      <div style="background:#0b1633; color:#fff; text-align:center; padding:4mm; border-radius:2mm; margin-bottom:6mm;">
+        <div style="font-size:14pt; font-weight:900; letter-spacing:2px;">NOTA DE PEDIDO</div>
+        <div style="font-size:11pt; font-weight:700;">${escapeHtml(pedido.PEDIDO_ID)} — ${fechaPedido}</div>
+      </div>
+      <table style="width:100%; border-collapse:collapse; font-size:11pt; margin-bottom:6mm;">
+        ${filaDoc("Cliente", pedido.CLIENTE)}
+        ${filaDoc("Teléfono", pedido.TELEFONO)}
+        ${filaDoc("Dirección", [pedido.DIRECCION, pedido.LOCALIDAD, pedido.PROVINCIA].filter(Boolean).join(", "))}
+        ${filaDoc("CP", pedido.CODIGO_POSTAL || pedido.CODIGOPOSTAL)}
+        ${filaDoc("DNI/CUIT", pedido.DNI)}
+        ${filaDoc("Transporte", pedido.EMPRESA)}
+        ${filaDoc("Estado", pedido.ESTADO)}
+      </table>
+      <table style="width:100%; border-collapse:collapse; font-size:11pt;">
+        <thead>
+          <tr style="background:#f4f4f4;">
+            <th style="padding:6px; text-align:left; border:1px solid #ddd;">Producto</th>
+            <th style="padding:6px; text-align:center; border:1px solid #ddd;">Cant.</th>
+            <th style="padding:6px; text-align:right; border:1px solid #ddd;">Precio</th>
+            <th style="padding:6px; text-align:right; border:1px solid #ddd;">Subtotal</th>
+          </tr>
+        </thead>
+        <tbody>${filasItems}</tbody>
+        <tfoot>
+          <tr>
+            <td colspan="3" style="padding:8px; text-align:right; border:1px solid #ddd;"><strong>TOTAL</strong></td>
+            <td style="padding:8px; text-align:right; border:1px solid #ddd;"><strong>${simbolo}${Number(pedido.TOTAL || 0).toLocaleString("es-AR")}</strong></td>
+          </tr>
+        </tfoot>
+      </table>
+      ${cobradoStr}
+      <div style="text-align:center; font-size:8pt; color:#aaa; margin-top:4mm;">Impreso el ${ahora}</div>
+    </div>`;
+
+  const area = document.getElementById("etiquetasPrintArea");
+  area.innerHTML = html;
+  setTimeout(() => window.print(), 120);
+}
+
 /**
  * Normaliza un número de teléfono argentino al formato internacional
  * que requiere wa.me (sin +, sin espacios, con código de país).
@@ -1242,8 +1389,7 @@ function renderPedidos(lista) {
         </select>
         ${btnWA}
         ${selectCobrado}
-        ${p.PDF_URL ? `<a href="${p.PDF_URL}" target="_blank" class="btn btn-outline-secondary btn-sm ms-auto">📄 PDF</a>` : ""}
-        ${p.ESTADO === "PREPARANDO" ? `<button class="btn btn-outline-secondary btn-sm" onclick='imprimirEtiquetaEnvio(${JSON.stringify({pedidoId:p.PEDIDO_ID,cliente:p.CLIENTE,telefono:p.TELEFONO||"",direccion:p.DIRECCION||"",localidad:p.LOCALIDAD||"",provincia:p.PROVINCIA||"",codigoPostal:p.CODIGO_POSTAL||p.CODIGOPOSTAL||"",dni:p.DNI||"",transporte:p.EMPRESA||""})})'>Imprimir etiqueta</button>` : ""}
+        <button class="btn btn-outline-secondary btn-sm ms-auto" onclick="abrirDetallePedido('${p.PEDIDO_ID}')">Ver / Reimprimir</button>
       </div>
     </div>`;
   }).join("");

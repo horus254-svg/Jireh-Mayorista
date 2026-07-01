@@ -1655,6 +1655,25 @@
   </div>
 </div>
 
+
+<!-- ===== MODAL DETALLE PEDIDO ===== -->
+<div class="product-modal-backdrop" id="pedidoDetalleModalBackdrop">
+  <div class="product-modal" style="width:min(560px, 94vw);">
+    <div class="product-modal-header">
+      <h6>Detalle del pedido</h6>
+      <button onclick="cerrarModalDetallePedido()">✕</button>
+    </div>
+    <div class="product-modal-body" id="pedidoDetalleBody">
+      <div class="text-center text-muted py-4">Cargando...</div>
+    </div>
+    <div class="product-modal-actions">
+      <button class="btn btn-outline-secondary" onclick="cerrarModalDetallePedido()">Cerrar</button>
+      <button class="btn btn-outline-secondary" id="btnImprimirEtiquetaDetalle" onclick="imprimirEtiquetaDesdeDetalle()">Imprimir etiqueta</button>
+      <button class="btn btn-success" onclick="imprimirNotaPedidoA4()">Imprimir pedido (A4)</button>
+    </div>
+  </div>
+</div>
+
 <!-- ===== THERMAL PRINT FRAME ===== -->
 <div id="thermalPrintFrame"></div>
 
