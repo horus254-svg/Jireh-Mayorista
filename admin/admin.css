@@ -1576,3 +1576,8 @@ kbd{
   font-size:11px; color:var(--slate-500);
   background:var(--slate-100); padding:2px 8px; border-radius:20px;
 }
+
+/* ===================== CLIENTES — CARD LIST ===================== */
+.cliente-card-deuda{ border-left:4px solid var(--red-500); }
+.cliente-card-credito{ border-left:4px solid var(--green-500, #16a34a); }
+.cliente-dato-label{ font-size:11px; color:var(--slate-500); font-weight:600; text-transform:uppercase; letter-spacing:.04em; }

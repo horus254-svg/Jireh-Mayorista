@@ -1795,56 +1795,74 @@ async function cargarClientesDesdeBackend() {
 }
 
 function renderTablaClientes(lista) {
-  const tbody = document.getElementById("tablaClientes");
-  if (!tbody) return;
+  const cont = document.getElementById("tablaClientes");
+  if (!cont) return;
 
   if (!lista || lista.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="10" class="text-center text-muted py-4">No se encontraron clientes</td></tr>`;
+    cont.innerHTML = `<div class="text-center text-muted py-5" style="font-size:14px;">No se encontraron clientes</div>`;
     return;
   }
 
-  let html = "";
-  lista.forEach(c => {
+  const html = lista.map(c => {
     const esCredito = String(c.A_CREDITO || "").toUpperCase() === "SI";
     const saldoArs = Number(c.SALDO_PENDIENTE_ARS || 0);
     const saldoUsd = Number(c.SALDO_PENDIENTE_USD || 0);
+    const tieneSaldo = esCredito && (saldoArs > 0 || saldoUsd > 0);
 
-    let celdaSaldo = "—";
+    // Borde color: rojo si tiene deuda, verde si es crédito sin deuda, azul por defecto
+    const bordeClase = tieneSaldo ? "cliente-card-deuda" : (esCredito ? "cliente-card-credito" : "");
+
+    // Saldo
+    let saldoHtml = "";
     if (esCredito) {
       const partes = [];
-      if (saldoArs > 0) partes.push(`<span style="color:var(--red-500); font-weight:700;">$${saldoArs.toLocaleString("es-AR")}</span>`);
-      if (saldoUsd > 0) partes.push(`<span style="color:var(--red-500); font-weight:700;">US$${saldoUsd.toLocaleString("es-AR")}</span>`);
-      celdaSaldo = partes.length > 0 ? partes.join("<br>") : `<span class="text-muted">Sin deuda</span>`;
+      if (saldoArs > 0) partes.push(`<span style="color:var(--red-500);font-weight:700;">$${saldoArs.toLocaleString("es-AR")}</span>`);
+      if (saldoUsd > 0) partes.push(`<span style="color:var(--red-500);font-weight:700;">US$${saldoUsd.toLocaleString("es-AR")}</span>`);
+      saldoHtml = partes.length > 0
+        ? `<span class="cliente-dato-label">Saldo</span> ${partes.join(" · ")}`
+        : `<span class="cliente-dato-label">Saldo</span> <span class="text-muted" style="font-size:12px;">Sin deuda</span>`;
     }
 
-    html += `
-    <tr>
-      <td>${escapeHtml(c.NOMBRE || c.CLIENTE)}</td>
-      <td>${escapeHtml(c.ALIAS || "")}</td>
-      <td>${escapeHtml(c.EMPRESA)}</td>
-      <td>${escapeHtml(c.TELEFONO)}</td>
-      <td>${escapeHtml(c.DNI)}</td>
-      <td>${c.PEDIDOS}</td>
-      <td class="money">$${Number(c.TOTAL_COMPRADO || c.TOTAL || 0).toLocaleString("es-AR")}</td>
-      <td>
-        ${esCredito
-          ? `<span class="badge" style="background:var(--green-50); color:var(--green-600);">A crédito</span>`
-          : `<span class="text-muted" style="font-size:12px;">—</span>`}
-      </td>
-      <td class="money">${celdaSaldo}</td>
-      <td>
-        <div class="d-flex flex-wrap gap-1">
-          ${c.CLIENTE_ID
-            ? `<button class="btn btn-outline-secondary btn-sm btn-accion-producto" onclick="abrirModalDetalleCliente('${escapeHtml(c.CLIENTE_ID)}')">Ver cuenta</button>
-               <button class="btn btn-warning btn-sm btn-accion-producto ms-1" onclick="abrirModalDeudaExtraDirecto('${escapeHtml(c.CLIENTE_ID)}', '${escapeHtml(c.NOMBRE || c.CLIENTE)}')">+ Deuda</button>
-               <button class="btn btn-primary btn-sm btn-accion-producto ms-1" onclick="abrirModalEditarCliente('${escapeHtml(c.CLIENTE_ID)}')">Editar</button>
-               <button class="btn btn-danger btn-sm btn-accion-producto ms-1" onclick="eliminarClienteForm('${escapeHtml(c.CLIENTE_ID)}', '${escapeHtml(c.NOMBRE)}')">Eliminar</button>`
-            : `<button class="btn btn-outline-success btn-sm" onclick="marcarClienteDesdeHistorialACredito('${escapeHtml(c.DNI)}')">Marcar a crédito</button>`}
+    const botones = c.CLIENTE_ID
+      ? `<button class="btn btn-outline-secondary btn-sm" onclick="abrirModalDetalleCliente('${escapeHtml(c.CLIENTE_ID)}')">Ver cuenta</button>
+         <button class="btn btn-warning btn-sm" onclick="abrirModalDeudaExtraDirecto('${escapeHtml(c.CLIENTE_ID)}', '${escapeHtml(c.NOMBRE || c.CLIENTE)}')">+ Deuda</button>
+         <button class="btn btn-primary btn-sm" onclick="abrirModalEditarCliente('${escapeHtml(c.CLIENTE_ID)}')">Editar</button>
+         <button class="btn btn-danger btn-sm" onclick="eliminarClienteForm('${escapeHtml(c.CLIENTE_ID)}', '${escapeHtml(c.NOMBRE)}')">Eliminar</button>`
+      : `<button class="btn btn-outline-success btn-sm" onclick="marcarClienteDesdeHistorialACredito('${escapeHtml(c.DNI)}')">Marcar a crédito</button>`;
+
+    return `
+    <div class="pedido-card ${bordeClase}">
+      <div class="pedido-card-top">
+        <div style="flex:1; min-width:0;">
+          <div class="pedido-card-id">${escapeHtml(c.DNI || "")}</div>
+          <div class="pedido-card-cliente">
+            ${escapeHtml(c.NOMBRE || c.CLIENTE)}
+            ${c.ALIAS ? `<span style="font-weight:500;color:var(--slate-500);font-size:13px;">· ${escapeHtml(c.ALIAS)}</span>` : ""}
+          </div>
+          <div class="pedido-card-dir" style="margin-top:4px; display:flex; flex-wrap:wrap; gap:10px;">
+            ${c.EMPRESA   ? `<span>🏢 ${escapeHtml(c.EMPRESA)}</span>` : ""}
+            ${c.TELEFONO  ? `<span>📞 ${escapeHtml(c.TELEFONO)}</span>` : ""}
+            ${c.DIRECCION ? `<span>📍 ${escapeHtml(c.DIRECCION)}</span>` : ""}
+          </div>
         </div>
-      </td>
-    </tr>`;
-  });
-  tbody.innerHTML = html;
+        <div class="text-end" style="flex-shrink:0;">
+          <div class="pedido-card-total" style="font-size:15px;">$${Number(c.TOTAL_COMPRADO || c.TOTAL || 0).toLocaleString("es-AR")}</div>
+          <div style="font-size:11px;color:var(--slate-500);margin-top:1px;">${c.PEDIDOS || 0} pedido${c.PEDIDOS !== 1 ? "s" : ""}</div>
+          <div class="mt-1">
+            ${esCredito
+              ? `<span class="pedido-estado-badge preparando">A crédito</span>`
+              : `<span class="pedido-estado-badge" style="background:var(--slate-100);color:var(--slate-500);">Contado</span>`}
+          </div>
+          ${tieneSaldo ? `<div class="mt-1" style="font-size:12px;">${saldoHtml}</div>` : ""}
+        </div>
+      </div>
+      <div class="pedido-card-controls">
+        ${botones}
+      </div>
+    </div>`;
+  }).join("");
+
+  cont.innerHTML = html;
 }
 
 /** Filters the already-loaded client list by name, alias, empresa, or DNI — no new backend call. Also applies the "solo crédito" checkbox. */
