@@ -181,7 +181,7 @@
     <div class="card p-3 mb-3">
       <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
         <input type="text" id="buscarCliente" class="form-control" style="max-width:300px"
-          placeholder="Buscar por nombre, alias, empresa o DNI..." onkeyup="filtrarClientes()">
+          placeholder="Buscar por nombre, alias, transporte o DNI..." onkeyup="filtrarClientes()">
         <div class="form-check">
           <input class="form-check-input" type="checkbox" id="filtroSoloCredito" onchange="filtrarClientes()">
           <label class="form-check-label" for="filtroSoloCredito" style="font-size:13px;">Mostrar solo clientes a crédito</label>
@@ -739,7 +739,7 @@
       </div>
       <div class="table-responsive">
         <table class="table table-striped table-sm">
-          <thead><tr><th>Cliente</th><th>Empresa</th><th>Pedidos</th><th>Total comprado</th></tr></thead>
+          <thead><tr><th>Cliente</th><th>Transporte</th><th>Pedidos</th><th>Total comprado</th></tr></thead>
           <tbody id="repClientesTabla"><tr><td colspan="4" class="text-center text-muted py-3">Sin datos para el rango elegido</td></tr></tbody>
         </table>
       </div>
@@ -1249,8 +1249,8 @@
       </div>
 
       <div class="mb-2">
-        <label class="form-label">Empresa <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
-        <input type="text" class="form-control" id="paEmpresa" placeholder="Ej: Almacén Don José">
+        <label class="form-label">Transporte <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+        <input type="text" class="form-control" id="paEmpresa" placeholder="Ej: Andreani, OCA, Correo Argentino...">
       </div>
 
       <div class="mb-2">
@@ -1467,7 +1467,7 @@
         </div>
       </div>
       <div class="mb-2">
-        <label class="form-label">Empresa <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+        <label class="form-label">Transporte <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
         <input type="text" class="form-control" id="clEmpresa" placeholder="">
       </div>
       <div class="mb-2">

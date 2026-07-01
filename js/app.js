@@ -809,7 +809,7 @@ async function checkoutWhatsapp(){
 🧾 Pedido: ${resultado.pedidoId}
 
 👤 Cliente: ${nombre}
-🏢 Empresa: ${empresa}
+🚚 Transporte: ${empresa}
 🏠 Dirección: ${direccion}
 📍 Localidad: ${localidad} (${provincia})${codigoPostal ? " - CP: " + codigoPostal : ""}
 📱 Teléfono: ${telefono}

@@ -1221,7 +1221,7 @@ function renderPedidos(lista) {
       <div class="pedido-card-top">
         <div>
           <div class="pedido-card-id">${escapeHtml(p.PEDIDO_ID)}</div>
-          <div class="pedido-card-cliente">${escapeHtml(p.CLIENTE)}${p.EMPRESA ? ` <span style="font-weight:500;color:var(--slate-500);font-size:13px;">· ${escapeHtml(p.EMPRESA)}</span>` : ""}</div>
+          <div class="pedido-card-cliente">${escapeHtml(p.CLIENTE)}${p.EMPRESA ? ` <span style="font-weight:500;color:var(--slate-500);font-size:13px;">· 🚚 ${escapeHtml(p.EMPRESA)}</span>` : ""}</div>
           ${p.DIRECCION ? `<div class="pedido-card-dir">📍 ${escapeHtml(p.DIRECCION)}${p.LOCALIDAD ? ", " + escapeHtml(p.LOCALIDAD) : ""}</div>` : ""}
           <div class="pedido-card-fecha">📅 ${new Date(p.FECHA).toLocaleDateString("es-AR", {day:"2-digit", month:"2-digit", year:"numeric"})}</div>
         </div>
@@ -1840,7 +1840,7 @@ function renderTablaClientes(lista) {
             ${c.ALIAS ? `<span style="font-weight:500;color:var(--slate-500);font-size:13px;">· ${escapeHtml(c.ALIAS)}</span>` : ""}
           </div>
           <div class="pedido-card-dir" style="margin-top:4px; display:flex; flex-wrap:wrap; gap:10px;">
-            ${c.EMPRESA   ? `<span>🏢 ${escapeHtml(c.EMPRESA)}</span>` : ""}
+            ${c.EMPRESA   ? `<span>🚚 ${escapeHtml(c.EMPRESA)}</span>` : ""}
             ${c.TELEFONO  ? `<span>📞 ${escapeHtml(c.TELEFONO)}</span>` : ""}
             ${c.DIRECCION ? `<span>📍 ${escapeHtml(c.DIRECCION)}</span>` : ""}
           </div>
