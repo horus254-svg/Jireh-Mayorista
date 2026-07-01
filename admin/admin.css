@@ -1517,3 +1517,62 @@ kbd{
   .mc-summary-row{ grid-template-columns:1fr; }
   .mc-form-row .form-control{ min-width:0; width:100%; }
 }
+
+/* ===================== PEDIDOS — CARD LIST ===================== */
+
+.pedido-card{
+  background:#fff;
+  border:1.5px solid var(--slate-200);
+  border-radius:12px;
+  padding:14px 16px;
+  margin-bottom:10px;
+  transition:box-shadow .15s, border-color .15s;
+}
+.pedido-card:hover{ border-color:var(--navy-600); box-shadow:0 2px 10px rgba(11,22,51,.07); }
+.pedido-card.estado-nuevo{ border-left:4px solid var(--amber-500, #f59e0b); }
+.pedido-card.estado-preparando{ border-left:4px solid var(--blue-500); }
+.pedido-card.estado-enviado{ border-left:4px solid var(--green-500, #16a34a); }
+.pedido-card.estado-cancelado{ border-left:4px solid var(--red-500); }
+
+.pedido-card-top{
+  display:flex; align-items:flex-start; justify-content:space-between;
+  gap:12px; flex-wrap:wrap; margin-bottom:10px;
+}
+.pedido-card-id{
+  font-family:var(--font-mono); font-size:11.5px; font-weight:700;
+  color:var(--slate-500); letter-spacing:.04em; margin-bottom:3px;
+}
+.pedido-card-cliente{ font-size:15px; font-weight:700; color:var(--navy-900); }
+.pedido-card-fecha{ font-size:12px; color:var(--slate-500); margin-top:2px; }
+.pedido-card-total{
+  font-family:var(--font-mono); font-size:18px; font-weight:800;
+  color:var(--navy-900); white-space:nowrap;
+}
+.pedido-card-dir{
+  font-size:12px; color:var(--slate-500); margin-top:3px;
+}
+
+.pedido-card-controls{
+  display:flex; align-items:center; gap:8px;
+  flex-wrap:wrap; padding-top:10px;
+  border-top:1px solid var(--slate-100);
+}
+
+.pedido-estado-badge{
+  display:inline-flex; align-items:center; gap:5px;
+  padding:3px 10px; border-radius:20px;
+  font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em;
+}
+.pedido-estado-badge.nuevo{ background:#fef9ec; color:#b45309; }
+.pedido-estado-badge.preparando{ background:#eaf1ff; color:var(--blue-500); }
+.pedido-estado-badge.enviado{ background:#eafaf0; color:var(--green-500, #16a34a); }
+.pedido-estado-badge.cancelado{ background:var(--red-50); color:var(--red-500); }
+
+.pedido-cobrado-badge{
+  display:inline-flex; align-items:center; gap:5px;
+  font-size:12px; font-weight:600; color:var(--green-500, #16a34a);
+}
+.pedido-cobrado-forma{
+  font-size:11px; color:var(--slate-500);
+  background:var(--slate-100); padding:2px 8px; border-radius:20px;
+}

@@ -240,18 +240,23 @@
 
   <!-- ===== PEDIDOS ===== -->
   <div id="pedidos" class="seccion">
-    <div class="page-header"><div><h1>Pedidos</h1><div class="sub">Seguimiento y estado de pedidos</div></div></div>
+    <div class="page-header">
+      <div><h1>Pedidos</h1><div class="sub">Seguimiento y estado de pedidos del catálogo web</div></div>
+    </div>
     <div class="card p-3">
-      <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-        <input type="text" id="buscarPedido" class="form-control" style="max-width:300px" placeholder="Buscar pedido, cliente o DNI..." onkeyup="filtrarPedidos()">
-        <span class="text-muted" style="font-size:13px;">Buscá por pedido, cliente o DNI</span>
+      <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+        <input type="text" id="buscarPedido" class="form-control" style="max-width:320px" placeholder="🔍 Buscar por pedido, cliente o DNI..." onkeyup="filtrarPedidos()">
+        <div class="d-flex gap-2 ms-auto flex-wrap">
+          <select class="form-select form-select-sm" id="filtroPedidoEstado" style="max-width:160px;" onchange="filtrarPedidos()">
+            <option value="">Todos los estados</option>
+            <option value="NUEVO">Nuevo</option>
+            <option value="PREPARANDO">Preparando</option>
+            <option value="ENVIADO">Enviado</option>
+            <option value="CANCELADO">Cancelado</option>
+          </select>
+        </div>
       </div>
-      <div class="table-responsive">
-        <table class="table table-striped">
-          <thead><tr><th>Pedido</th><th>Fecha</th><th>Cliente</th><th>Total</th><th>Estado</th><th>Cobrado en caja</th><th>PDF</th></tr></thead>
-          <tbody id="tablaPedidos"></tbody>
-        </table>
-      </div>
+      <div id="tablaPedidos"></div>
     </div>
   </div>
 

@@ -1103,11 +1103,15 @@ async function aplicarCobroPedido(pedidoId, cobrado, formaPago) {
 
 function filtrarPedidos() {
   const texto = document.getElementById("buscarPedido").value.toLowerCase();
-  const filtrados = pedidosGlobal.filter(p =>
-    String(p.PEDIDO_ID || "").toLowerCase().includes(texto) ||
-    String(p.CLIENTE   || "").toLowerCase().includes(texto) ||
-    String(p.DNI       || "").toLowerCase().includes(texto)
-  );
+  const estadoFiltro = (document.getElementById("filtroPedidoEstado")?.value || "").toUpperCase();
+  const filtrados = pedidosGlobal.filter(p => {
+    const coincideTexto =
+      String(p.PEDIDO_ID || "").toLowerCase().includes(texto) ||
+      String(p.CLIENTE   || "").toLowerCase().includes(texto) ||
+      String(p.DNI       || "").toLowerCase().includes(texto);
+    const coincideEstado = !estadoFiltro || String(p.ESTADO || "").toUpperCase() === estadoFiltro;
+    return coincideTexto && coincideEstado;
+  });
   renderPedidos(filtrados);
 }
 
@@ -1160,74 +1164,87 @@ function mensajeWhatsAppPorEstado(estado, pedidoId, cliente, total, pdfUrl) {
       return `Hola ${cliente}! 👋 Tu pedido *${pedidoId}* por ${totalStr} ya está siendo preparado. En cuanto esté listo te avisamos. ¡Gracias por tu compra!${linkPdf}`;
     case "ENVIADO":
       return `Hola ${cliente}! 📦 Tu pedido *${pedidoId}* por ${totalStr} ya fue enviado y está en camino. ¡Pronto lo tenés en tus manos!${linkPdf}`;
-    case "ENTREGADO":
-      return `Hola ${cliente}! ✅ Tu pedido *${pedidoId}* por ${totalStr} fue entregado. Esperamos que todo haya llegado perfecto. ¡Gracias por elegirnos!${linkPdf}`;
     default:
       return null;
   }
 }
 
 function renderPedidos(lista) {
-  let html = "";
   if (lista.length === 0) {
-    html = `<tr><td colspan="7" class="text-center text-muted py-4">No se encontraron pedidos</td></tr>`;
+    document.getElementById("tablaPedidos").innerHTML =
+      `<div class="text-center text-muted py-5" style="font-size:14px;">No se encontraron pedidos</div>`;
+    return;
   }
-  lista.forEach(p => {
-    const estadoColor = p.ESTADO === "NUEVO" ? "table-warning" : "";
+
+  const estadoClase = { NUEVO:"nuevo", PREPARANDO:"preparando", ENVIADO:"enviado", CANCELADO:"cancelado" };
+  const estadoIcono = { NUEVO:"🆕", PREPARANDO:"⚙️", ENVIADO:"📦", CANCELADO:"❌" };
+
+  const html = lista.map(p => {
+    const claseEstado = estadoClase[p.ESTADO] || "";
     const estaCobrado = String(p.COBRADO || "").toUpperCase() === "SI";
     const formaPagoActual = String(p.FORMA_PAGO_COBRO || "");
 
-    // Botón WhatsApp: solo en PREPARANDO, ENVIADO y ENTREGADO, y solo si hay teléfono
-    const estadosConWA = ["PREPARANDO", "ENVIADO", "ENTREGADO"];
+    // Botón WhatsApp — solo en PREPARANDO y ENVIADO
+    const estadosConWA = ["PREPARANDO", "ENVIADO"];
     const telefono = String(p.TELEFONO || "").trim();
     const numeroWA = normalizarTelefonoWA(telefono);
     const mensajeWA = mensajeWhatsAppPorEstado(p.ESTADO, p.PEDIDO_ID, p.CLIENTE, p.TOTAL, p.PDF_URL);
     const btnWA = (estadosConWA.includes(p.ESTADO) && numeroWA && mensajeWA)
-      ? `<a href="https://wa.me/${numeroWA}?text=${encodeURIComponent(mensajeWA)}" target="_blank" class="btn btn-success btn-sm ms-1" title="Notificar por WhatsApp">📲 WA</a>`
-      : (estadosConWA.includes(p.ESTADO) && !numeroWA
-          ? `<span class="text-muted ms-1" style="font-size:11px;" title="Sin teléfono válido">Sin tel.</span>`
-          : "");
+      ? `<a href="https://wa.me/${numeroWA}?text=${encodeURIComponent(mensajeWA)}" target="_blank" class="btn btn-success btn-sm" title="Notificar por WhatsApp">📲 WhatsApp</a>`
+      : "";
 
-    html += `
-    <tr class="${estadoColor}">
-      <td class="mono">${escapeHtml(p.PEDIDO_ID)}</td>
-      <td>${new Date(p.FECHA).toLocaleString("es-AR")}</td>
-      <td>${escapeHtml(p.CLIENTE)}</td>
-      <td class="money">$${Number(p.TOTAL || 0).toLocaleString("es-AR")}</td>
-      <td>
-        <div class="d-flex align-items-center gap-1">
-          <select class="form-select form-select-sm" onchange="cambiarEstado('${p.PEDIDO_ID}',this.value)">
-            <option value="NUEVO"      ${p.ESTADO==="NUEVO"?"selected":""}>NUEVO</option>
-            <option value="PREPARANDO" ${p.ESTADO==="PREPARANDO"?"selected":""}>PREPARANDO</option>
-            <option value="ENVIADO"    ${p.ESTADO==="ENVIADO"?"selected":""}>ENVIADO</option>
-            <option value="ENTREGADO"  ${p.ESTADO==="ENTREGADO"?"selected":""}>ENTREGADO</option>
-            <option value="CANCELADO"  ${p.ESTADO==="CANCELADO"?"selected":""}>CANCELADO</option>
-          </select>
-          ${btnWA}
+    const badgeCobrado = estaCobrado
+      ? `<span class="pedido-cobrado-badge">✓ Cobrado <span class="pedido-cobrado-forma">${formaPagoActual}</span></span>`
+      : "";
+
+    const selectCobrado = `
+      <div class="d-flex align-items-center gap-2">
+        <div class="form-check mb-0">
+          <input class="form-check-input" type="checkbox" id="cobrado-${p.PEDIDO_ID}"
+            ${estaCobrado ? "checked" : ""}
+            onchange="cambiarCobradoPedido('${p.PEDIDO_ID}', this.checked)">
+          <label class="form-check-label" for="cobrado-${p.PEDIDO_ID}" style="font-size:12.5px;">Cobrado</label>
         </div>
-      </td>
-      <td>
-        <div class="d-flex align-items-center gap-2 flex-wrap" style="min-width:230px;">
-          <div class="form-check mb-0">
-            <input class="form-check-input" type="checkbox" id="cobrado-${p.PEDIDO_ID}"
-              ${estaCobrado ? "checked" : ""}
-              onchange="cambiarCobradoPedido('${p.PEDIDO_ID}', this.checked)">
-            <label class="form-check-label" for="cobrado-${p.PEDIDO_ID}" style="font-size:12.5px;">Cobrado</label>
-          </div>
-          <select class="form-select form-select-sm" style="max-width:150px;"
-            id="formaPago-${p.PEDIDO_ID}"
-            ${estaCobrado ? "" : "disabled"}
-            onchange="cambiarFormaPagoPedido('${p.PEDIDO_ID}', this.value)">
-            <option value="">Forma de pago...</option>
-            <option value="EFECTIVO"      ${formaPagoActual==="EFECTIVO"?"selected":""}>Efectivo</option>
-            <option value="TRANSFERENCIA" ${formaPagoActual==="TRANSFERENCIA"?"selected":""}>Transferencia</option>
-            <option value="TARJETA"       ${formaPagoActual==="TARJETA"?"selected":""}>Tarjeta</option>
-          </select>
+        <select class="form-select form-select-sm" style="max-width:145px;"
+          id="formaPago-${p.PEDIDO_ID}"
+          ${estaCobrado ? "" : "disabled"}
+          onchange="cambiarFormaPagoPedido('${p.PEDIDO_ID}', this.value)">
+          <option value="">Forma de pago...</option>
+          <option value="EFECTIVO"      ${formaPagoActual==="EFECTIVO"?"selected":""}>Efectivo</option>
+          <option value="TRANSFERENCIA" ${formaPagoActual==="TRANSFERENCIA"?"selected":""}>Transferencia</option>
+          <option value="TARJETA"       ${formaPagoActual==="TARJETA"?"selected":""}>Tarjeta</option>
+        </select>
+      </div>`;
+
+    return `
+    <div class="pedido-card estado-${claseEstado}">
+      <div class="pedido-card-top">
+        <div>
+          <div class="pedido-card-id">${escapeHtml(p.PEDIDO_ID)}</div>
+          <div class="pedido-card-cliente">${escapeHtml(p.CLIENTE)}${p.EMPRESA ? ` <span style="font-weight:500;color:var(--slate-500);font-size:13px;">· ${escapeHtml(p.EMPRESA)}</span>` : ""}</div>
+          ${p.DIRECCION ? `<div class="pedido-card-dir">📍 ${escapeHtml(p.DIRECCION)}${p.LOCALIDAD ? ", " + escapeHtml(p.LOCALIDAD) : ""}</div>` : ""}
+          <div class="pedido-card-fecha">📅 ${new Date(p.FECHA).toLocaleDateString("es-AR", {day:"2-digit", month:"2-digit", year:"numeric"})}</div>
         </div>
-      </td>
-      <td>${p.PDF_URL ? `<a href="${p.PDF_URL}" target="_blank" class="btn btn-primary btn-sm">PDF</a>` : "-"}</td>
-    </tr>`;
-  });
+        <div class="text-end">
+          <div class="pedido-card-total">$${Number(p.TOTAL || 0).toLocaleString("es-AR")}</div>
+          <div class="mt-1"><span class="pedido-estado-badge ${claseEstado}">${estadoIcono[p.ESTADO] || ""} ${escapeHtml(p.ESTADO)}</span></div>
+          ${badgeCobrado ? `<div class="mt-1">${badgeCobrado}</div>` : ""}
+        </div>
+      </div>
+      <div class="pedido-card-controls">
+        <select class="form-select form-select-sm" style="max-width:160px;" onchange="cambiarEstado('${p.PEDIDO_ID}',this.value)">
+          <option value="NUEVO"      ${p.ESTADO==="NUEVO"?"selected":""}>🆕 Nuevo</option>
+          <option value="PREPARANDO" ${p.ESTADO==="PREPARANDO"?"selected":""}>⚙️ Preparando</option>
+          <option value="ENVIADO"    ${p.ESTADO==="ENVIADO"?"selected":""}>📦 Enviado</option>
+          <option value="CANCELADO"  ${p.ESTADO==="CANCELADO"?"selected":""}>❌ Cancelado</option>
+        </select>
+        ${btnWA}
+        ${selectCobrado}
+        ${p.PDF_URL ? `<a href="${p.PDF_URL}" target="_blank" class="btn btn-outline-secondary btn-sm ms-auto">📄 PDF</a>` : ""}
+      </div>
+    </div>`;
+  }).join("");
+
   document.getElementById("tablaPedidos").innerHTML = html;
 }
 
