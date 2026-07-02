@@ -1,0 +1,5369 @@
+/* ===================================================================
+   JIREH ADMIN — app logic v2
+   • All original Apps Script API calls preserved
+   • Thermal print (POS80 80mm) added
+   • Dashboard POS summary added
+   • Responsive mobile nav sync added
+=================================================================== */
+
+const API_URL =
+  "https://script.google.com/macros/s/AKfycbw1eY_mXImG503rU0Cqddx1WBuGIOhxaW_SXGoIMsug_CjsSC-HLsb2XzYwrovaGBU/exec";
+
+let pedidosGlobal = [];
+
+// Store last completed sale for "print from receipt modal"
+let ultimaVentaImprimible = null;
+
+// Store POS sales loaded for dashboard
+let ventasPOSGlobal = [];
+
+if (sessionStorage.getItem("admin") !== "true") {
+  window.location.href = "login.html";
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
+  mostrarSeccion("dashboard");
+  cargarConfigNegocioDesdeBackend(); // refresca el caché en memoria para los tickets impresos
+  reconectarImpresoraUSBSiPosible(); // intenta reconectar la impresora térmica sin mostrar el selector
+  await cargarMetricas();
+  cargarVentasPOS();
+
+  setInterval(() => {
+    const dashboardVisible = document.getElementById("dashboard").style.display === "block";
+    const pedidosVisible   = document.getElementById("pedidos").style.display === "block";
+    const clientesVisible  = document.getElementById("clientes").style.display === "block";
+
+    // Antes esto llamaba a cargarMetricas() siempre, aunque el cajero
+    // estuviera en Productos o en el POS vendiendo — son llamadas al
+    // backend (Apps Script + Sheets) que no hacían falta y competían
+    // con lo que el cajero estaba haciendo en ese momento. Ahora solo
+    // se actualiza la pantalla que efectivamente está en uso.
+    if (dashboardVisible) { cargarMetricas(); cargarVentasPOS(); }
+    if (pedidosVisible)   cargarPedidos();
+    if (clientesVisible)  cargarClientes();
+  }, 15000); // 15 s — near real-time without hammering the API
+
+  setupScannerListener();
+});
+
+
+/* ===================== UTILS ===================== */
+
+function escapeHtml(text) {
+  const div = document.createElement("div");
+  div.textContent = text || "";
+  return div.innerHTML;
+}
+
+/**
+ * Devuelve una versión "demorada" de una función: si se la llama
+ * varias veces seguidas (por ejemplo, una vez por cada tecla mientras
+ * alguien escribe rápido en un buscador), solo se ejecuta la ÚLTIMA
+ * llamada, esperando `demoraMs` desde que paró de llamarse — evita
+ * redibujar una tabla o grilla completa en cada tecla, cuando en la
+ * práctica el usuario ya tipeó la letra siguiente antes de llegar a
+ * ver el resultado intermedio.
+ *
+ * Uso: const buscarConDemora = debounce(buscarFunction, 150);
+ *      buscarConDemora(); // se llama igual que la función original
+ */
+function debounce(fn, demoraMs) {
+  let temporizador = null;
+  return function (...args) {
+    clearTimeout(temporizador);
+    temporizador = setTimeout(() => fn.apply(this, args), demoraMs);
+  };
+}
+
+function actualizarElemento(id, valor) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = valor;
+}
+
+/* ===================== CONFIGURACIÓN DEL NEGOCIO (encabezado del ticket) ===================== */
+
+// Valores por defecto — son los que ya venía usando el ticket, así que
+// si todavía no cargó la config del servidor, todo se imprime igual que antes.
+const CONFIG_NEGOCIO_DEFAULT = {
+  nombre:     "JIREH",
+  subtitulo:  "Punto de Venta",
+  direccion:  "",
+  telefono1:  "",
+  telefono2:  "",
+  pie:        "¡Gracias por su compra!",
+
+  bannerTitulo:    "Mayorista Jireh",
+  bannerSubtitulo: "Catálogo Mayorista Online",
+  bannerImagen:    "",
+  tema:            "navy"
+};
+
+// Caché en memoria de la config, para que imprimir un ticket no tenga
+// que esperar una llamada al servidor cada vez. Se carga al iniciar la
+// app y se refresca cada vez que se guarda desde el formulario.
+let configNegocioCache = { ...CONFIG_NEGOCIO_DEFAULT };
+
+/** Synchronous read used by the print functions — always returns instantly from the in-memory cache */
+function obtenerConfigNegocio() {
+  return configNegocioCache;
+}
+
+/** Fetches the saved config from the backend (hoja CONFIGURACION) and refreshes the in-memory cache */
+async function cargarConfigNegocioDesdeBackend() {
+  try {
+    const response = await fetch(API_URL + "?action=configuracionNegocio");
+    const data = await response.json();
+    if (data.success && data.config) {
+      configNegocioCache = { ...CONFIG_NEGOCIO_DEFAULT, ...data.config };
+      aplicarSidebarBrand(configNegocioCache);
+      aplicarTemaAdmin(configNegocioCache);
+    }
+  } catch (error) {
+    console.warn("No se pudo cargar la configuración del negocio:", error);
+  }
+  return configNegocioCache;
+}
+
+/** Loads the saved config into the form fields (called when the Configuración section opens) */
+async function cargarConfigNegocioForm() {
+  const form = document.getElementById("cfgNombreLocal");
+  if (form) form.placeholder = "Cargando...";
+
+  const cfg = await cargarConfigNegocioDesdeBackend();
+
+  document.getElementById("cfgNombreLocal").value = cfg.nombre;
+  document.getElementById("cfgSubtitulo").value   = cfg.subtitulo;
+  document.getElementById("cfgDireccion").value   = cfg.direccion;
+  document.getElementById("cfgTelefono1").value   = cfg.telefono1;
+  document.getElementById("cfgTelefono2").value   = cfg.telefono2;
+  document.getElementById("cfgPie").value         = cfg.pie;
+
+  cargarAparienciaForm(cfg);
+  cargarBeneficiosForm(cfg);
+  document.getElementById("cfgBannerTopMensajes").value = cfg.bannerTopMensajes ?? "";
+  cargarSidebarForm(cfg);
+  cargarDriveProductosForm(cfg);
+  cargarDrivePedidosForm(cfg);
+  cargarUrlCatalogoForm(cfg);
+
+  if (form) form.placeholder = "Ej: JIREH";
+}
+
+/** Reads the form fields and saves them to the backend (hoja CONFIGURACION) */
+async function guardarConfigNegocioForm() {
+  const nombre = document.getElementById("cfgNombreLocal").value.trim();
+
+  if (!nombre) {
+    toast("El nombre del local es obligatorio", "error");
+    return;
+  }
+
+  const cfg = {
+    nombre,
+    subtitulo: document.getElementById("cfgSubtitulo").value.trim(),
+    direccion: document.getElementById("cfgDireccion").value.trim(),
+    telefono1: document.getElementById("cfgTelefono1").value.trim(),
+    telefono2: document.getElementById("cfgTelefono2").value.trim(),
+    pie:       document.getElementById("cfgPie").value.trim()
+  };
+
+  const btn = document.getElementById("btnGuardarConfigNegocio");
+  const textoOriginal = btn ? btn.innerHTML : "";
+  if (btn) { btn.disabled = true; btn.innerHTML = "Guardando..."; }
+
+  try {
+    const params = new URLSearchParams({ action: "guardarConfiguracionNegocio", ...cfg });
+    const response = await fetch(API_URL + "?" + params.toString());
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo guardar la configuración", "error");
+      return;
+    }
+
+    configNegocioCache = { ...cfg };
+    toast("Configuración guardada", "success");
+
+  } catch (error) {
+    console.error("Error al guardar la configuración del negocio:", error);
+    toast("Error de conexión al guardar la configuración", "error");
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = textoOriginal; }
+  }
+}
+
+/** Resets the form (and the saved sheet values) back to the original JIREH defaults */
+async function restablecerConfigNegocio() {
+  if (!confirm("¿Restablecer los datos del local a los valores originales?")) return;
+
+  document.getElementById("cfgNombreLocal").value = CONFIG_NEGOCIO_DEFAULT.nombre;
+  document.getElementById("cfgSubtitulo").value   = CONFIG_NEGOCIO_DEFAULT.subtitulo;
+  document.getElementById("cfgDireccion").value   = CONFIG_NEGOCIO_DEFAULT.direccion;
+  document.getElementById("cfgTelefono1").value   = CONFIG_NEGOCIO_DEFAULT.telefono1;
+  document.getElementById("cfgTelefono2").value   = CONFIG_NEGOCIO_DEFAULT.telefono2;
+  document.getElementById("cfgPie").value         = CONFIG_NEGOCIO_DEFAULT.pie;
+
+  await guardarConfigNegocioForm();
+}
+
+/** Prints a sample receipt using the form's current (possibly unsaved) values, so the admin can check before saving */
+function vistaPreviaTicketConfig() {
+  const cfgPreview = {
+    nombre:    document.getElementById("cfgNombreLocal").value.trim() || CONFIG_NEGOCIO_DEFAULT.nombre,
+    subtitulo: document.getElementById("cfgSubtitulo").value.trim(),
+    direccion: document.getElementById("cfgDireccion").value.trim(),
+    telefono1: document.getElementById("cfgTelefono1").value.trim(),
+    telefono2: document.getElementById("cfgTelefono2").value.trim(),
+    pie:       document.getElementById("cfgPie").value.trim() || CONFIG_NEGOCIO_DEFAULT.pie
+  };
+
+  const itemsEjemplo = [
+    { PRODUCTO: "Producto de ejemplo", PRECIO: 1500, cantidad: 2 },
+    { PRODUCTO: "Otro producto", PRECIO: 800, cantidad: 1 }
+  ];
+  const total = itemsEjemplo.reduce((acc, i) => acc + i.PRECIO * i.cantidad, 0);
+
+  const frame = document.getElementById("thermalPrintFrame");
+  if (!frame) { toast("Error: frame de impresión no encontrado", "error"); return; }
+
+  frame.innerHTML = buildThermalHTML("PREVIEW", itemsEjemplo, total, "EFECTIVO", new Date(), null, cfgPreview);
+
+  setTimeout(() => { window.print(); }, 120);
+}
+
+/* ===================== APARIENCIA DEL PANEL ADMIN (letra + nombre del sidebar) ===================== */
+
+const SIDEBAR_BRAND_DEFAULT = {
+  sidebarMark:  "J",
+  sidebarTexto: "JIREH"
+};
+
+/** Applies the saved letter/name to the sidebar in the DOM — runs on every page load, not just inside Configuración */
+function aplicarSidebarBrand(cfg) {
+  const markEl  = document.getElementById("sidebarMark");
+  const textoEl = document.getElementById("sidebarLabelTexto");
+
+  if (markEl)  markEl.textContent  = (cfg.sidebarMark  || SIDEBAR_BRAND_DEFAULT.sidebarMark).toUpperCase();
+  if (textoEl) textoEl.textContent = (cfg.sidebarTexto || SIDEBAR_BRAND_DEFAULT.sidebarTexto).toUpperCase();
+}
+
+/** Loads the saved letter/name into the "Apariencia del panel admin" form */
+function cargarSidebarForm(cfg) {
+  document.getElementById("cfgSidebarMark").value  = cfg.sidebarMark  ?? SIDEBAR_BRAND_DEFAULT.sidebarMark;
+  document.getElementById("cfgSidebarTexto").value = cfg.sidebarTexto ?? SIDEBAR_BRAND_DEFAULT.sidebarTexto;
+}
+
+/** Reads the form and saves the sidebar letter/name to the backend (hoja CONFIGURACION) */
+async function guardarSidebarForm() {
+  const nombre = document.getElementById("cfgNombreLocal").value.trim();
+
+  if (!nombre) {
+    toast("Completá primero el nombre del local, arriba", "error");
+    return;
+  }
+
+  const cfg = {
+    nombre,
+    sidebarMark:  document.getElementById("cfgSidebarMark").value.trim() || SIDEBAR_BRAND_DEFAULT.sidebarMark,
+    sidebarTexto: document.getElementById("cfgSidebarTexto").value.trim()
+  };
+
+  const btn = document.getElementById("btnGuardarSidebar");
+  const textoOriginal = btn ? btn.innerHTML : "";
+  if (btn) { btn.disabled = true; btn.innerHTML = "Guardando..."; }
+
+  try {
+    const params = new URLSearchParams({ action: "guardarConfiguracionNegocio", ...cfg });
+    const response = await fetch(API_URL + "?" + params.toString());
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo guardar", "error");
+      return;
+    }
+
+    configNegocioCache = { ...configNegocioCache, ...cfg };
+    aplicarSidebarBrand(configNegocioCache);
+    toast("Listo, ya se ve en el sidebar", "success");
+
+  } catch (error) {
+    console.error("Error al guardar el sidebar:", error);
+    toast("Error de conexión al guardar", "error");
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = textoOriginal; }
+  }
+}
+
+/** Loads the configured Drive folder (for product photo uploads) into the Configuración form */
+function cargarDriveProductosForm(cfg) {
+  const input = document.getElementById("cfgDriveCarpetaProductos");
+  if (input) input.value = cfg.driveCarpetaProductosId || "";
+}
+
+/** Saves the Drive folder link/ID used for product photo uploads */
+async function guardarDriveProductosForm() {
+  const nombre = document.getElementById("cfgNombreLocal").value.trim();
+
+  if (!nombre) {
+    toast("Completá primero el nombre del local, arriba", "error");
+    return;
+  }
+
+  const cfg = {
+    nombre,
+    driveCarpetaProductosId: document.getElementById("cfgDriveCarpetaProductos").value.trim()
+  };
+
+  const btn = document.getElementById("btnGuardarDriveProductos");
+  const textoOriginal = btn ? btn.innerHTML : "";
+  if (btn) { btn.disabled = true; btn.innerHTML = "Guardando..."; }
+
+  try {
+    const params = new URLSearchParams({ action: "guardarConfiguracionNegocio", ...cfg });
+    const response = await fetch(API_URL + "?" + params.toString());
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo guardar", "error");
+      return;
+    }
+
+    configNegocioCache = { ...configNegocioCache, ...cfg };
+    toast("Carpeta de Drive guardada", "success");
+
+  } catch (error) {
+    console.error("Error al guardar la carpeta de Drive:", error);
+    toast("Error de conexión al guardar", "error");
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = textoOriginal; }
+  }
+}
+
+/** Loads the configured Drive folder (for order PDF storage) into the Configuración form */
+function cargarDrivePedidosForm(cfg) {
+  const carpetaInput = document.getElementById("cfgDriveCarpetaPedidos");
+  if (carpetaInput) carpetaInput.value = cfg.driveCarpetaPedidosId || "";
+
+  const subtituloInput = document.getElementById("cfgPedidoPdfSubtitulo");
+  if (subtituloInput) subtituloInput.value = cfg.pedidoPdfSubtitulo || "";
+
+  const pieInput = document.getElementById("cfgPedidoPdfPie");
+  if (pieInput) pieInput.value = cfg.pedidoPdfPie || "";
+}
+
+/** Loads the catalog public URL into the Configuración form, used to build price-QR links */
+function cargarUrlCatalogoForm(cfg) {
+  const input = document.getElementById("cfgUrlCatalogo");
+  if (input) input.value = cfg.urlCatalogo || "";
+}
+
+/** Saves the catalog public URL */
+async function guardarUrlCatalogoForm() {
+  const nombre = document.getElementById("cfgNombreLocal").value.trim();
+
+  if (!nombre) {
+    toast("Completá primero el nombre del local, arriba", "error");
+    return;
+  }
+
+  const cfg = {
+    nombre,
+    urlCatalogo: document.getElementById("cfgUrlCatalogo").value.trim().replace(/\/+$/, "") // sin / al final, evita //precio.html
+  };
+
+  const btn = document.getElementById("btnGuardarUrlCatalogo");
+  const textoOriginal = btn ? btn.innerHTML : "";
+  if (btn) { btn.disabled = true; btn.innerHTML = "Guardando..."; }
+
+  try {
+    const params = new URLSearchParams({ action: "guardarConfiguracionNegocio", ...cfg });
+    const response = await fetch(API_URL + "?" + params.toString());
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo guardar", "error");
+      return;
+    }
+
+    configNegocioCache = { ...configNegocioCache, ...cfg };
+    toast("URL del catálogo guardada", "success");
+
+  } catch (error) {
+    console.error("Error al guardar la URL del catálogo:", error);
+    toast("Error de conexión al guardar", "error");
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = textoOriginal; }
+  }
+}
+
+/** Saves both the Drive folder and the editable texts used by the order PDF */
+async function guardarDrivePedidosForm() {
+  const nombre = document.getElementById("cfgNombreLocal").value.trim();
+
+  if (!nombre) {
+    toast("Completá primero el nombre del local, arriba", "error");
+    return;
+  }
+
+  const cfg = {
+    nombre,
+    driveCarpetaPedidosId: document.getElementById("cfgDriveCarpetaPedidos").value.trim(),
+    pedidoPdfSubtitulo:    document.getElementById("cfgPedidoPdfSubtitulo").value.trim(),
+    pedidoPdfPie:          document.getElementById("cfgPedidoPdfPie").value.trim()
+  };
+
+  const btn = document.getElementById("btnGuardarDrivePedidos");
+  const textoOriginal = btn ? btn.innerHTML : "";
+  if (btn) { btn.disabled = true; btn.innerHTML = "Guardando..."; }
+
+  try {
+    const params = new URLSearchParams({ action: "guardarConfiguracionNegocio", ...cfg });
+    const response = await fetch(API_URL + "?" + params.toString());
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo guardar", "error");
+      return;
+    }
+
+    configNegocioCache = { ...configNegocioCache, ...cfg };
+    toast("Configuración del PDF de pedidos guardada", "success");
+
+  } catch (error) {
+    console.error("Error al guardar la carpeta de Drive:", error);
+    toast("Error de conexión al guardar", "error");
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = textoOriginal; }
+  }
+}
+
+/**
+ * Cambia el usuario/contraseña de acceso al panel. Requiere la
+ * contraseña actual — el backend la valida antes de aplicar el cambio.
+ * Por seguridad, este formulario nunca precarga el usuario/contraseña
+ * vigentes (a diferencia de los demás formularios de Configuración).
+ */
+async function guardarCredencialesForm() {
+  const passwordActual = document.getElementById("credPasswordActual").value;
+  const nuevoUsuario = document.getElementById("credNuevoUsuario").value.trim();
+  const nuevaPassword = document.getElementById("credNuevaPassword").value;
+
+  if (!passwordActual) {
+    toast("Ingresá tu contraseña actual para confirmar el cambio", "error");
+    return;
+  }
+
+  if (!nuevoUsuario || !nuevaPassword) {
+    toast("Completá el nuevo usuario y la nueva contraseña", "error");
+    return;
+  }
+
+  if (nuevaPassword.length < 4) {
+    toast("La nueva contraseña debe tener al menos 4 caracteres", "error");
+    return;
+  }
+
+  const btn = document.getElementById("btnGuardarCredenciales");
+  const textoOriginal = btn ? btn.innerHTML : "";
+  if (btn) { btn.disabled = true; btn.innerHTML = "Guardando..."; }
+
+  try {
+    const params = new URLSearchParams({
+      action: "guardarCredencialesAdmin",
+      passwordActual,
+      nuevoUsuario,
+      nuevaPassword
+    });
+    const response = await fetch(API_URL + "?" + params.toString());
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo cambiar el acceso", "error");
+      return;
+    }
+
+    document.getElementById("credPasswordActual").value = "";
+    document.getElementById("credNuevoUsuario").value = "";
+    document.getElementById("credNuevaPassword").value = "";
+    toast("Usuario y contraseña actualizados", "success");
+
+  } catch (error) {
+    console.error("Error al cambiar las credenciales:", error);
+    toast("Error de conexión al guardar", "error");
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = textoOriginal; }
+  }
+}
+
+/* ===================== APARIENCIA DEL CATÁLOGO WEB (banner + tema) ===================== */
+
+const APARIENCIA_DEFAULT = {
+  navbarTexto:     "Jireh Mayorista",
+  bannerTitulo:    "Mayorista Jireh",
+  bannerSubtitulo: "Catálogo Mayorista Online",
+  bannerImagen:    "",
+  tema:            "navy"
+};
+
+/**
+ * Aplica el tema de color al panel admin (este mismo selector pinta
+ * también el catálogo web — es un solo dato compartido en Sheets).
+ */
+function aplicarTemaAdmin(cfg) {
+  const tema = (cfg.tema || APARIENCIA_DEFAULT.tema).toLowerCase();
+  document.body.setAttribute("data-tema", tema);
+}
+
+/** Loads the saved banner/tema config into the "Apariencia" form (called when Configuración opens) */
+function cargarAparienciaForm(cfg) {
+  document.getElementById("cfgNavbarTexto").value     = cfg.navbarTexto     ?? APARIENCIA_DEFAULT.navbarTexto;
+  document.getElementById("cfgBannerTitulo").value    = cfg.bannerTitulo    ?? APARIENCIA_DEFAULT.bannerTitulo;
+  document.getElementById("cfgBannerSubtitulo").value = cfg.bannerSubtitulo ?? APARIENCIA_DEFAULT.bannerSubtitulo;
+  document.getElementById("cfgBannerImagen").value    = cfg.bannerImagen   ?? APARIENCIA_DEFAULT.bannerImagen;
+  document.getElementById("cfgTema").value            = cfg.tema           || APARIENCIA_DEFAULT.tema;
+}
+
+/**
+ * Saves both the ticket-header fields AND the banner/tema fields together,
+ * since both live in the same hoja CONFIGURACION and the backend expects
+ * the full set of keys in one call to guardarConfiguracionNegocio.
+ * El tema afecta a este mismo panel admin Y al catálogo web a la vez.
+ */
+async function guardarAparienciaForm() {
+  const nombre = document.getElementById("cfgNombreLocal").value.trim();
+
+  if (!nombre) {
+    toast("Completá primero el nombre del local, arriba", "error");
+    return;
+  }
+
+  const cfg = {
+    nombre,
+    subtitulo: document.getElementById("cfgSubtitulo").value.trim(),
+    direccion: document.getElementById("cfgDireccion").value.trim(),
+    telefono1: document.getElementById("cfgTelefono1").value.trim(),
+    telefono2: document.getElementById("cfgTelefono2").value.trim(),
+    pie:       document.getElementById("cfgPie").value.trim(),
+
+    bannerTitulo:    document.getElementById("cfgBannerTitulo").value.trim(),
+    bannerSubtitulo: document.getElementById("cfgBannerSubtitulo").value.trim(),
+    bannerImagen:    document.getElementById("cfgBannerImagen").value.trim(),
+    tema:            document.getElementById("cfgTema").value,
+    navbarTexto:     document.getElementById("cfgNavbarTexto").value.trim()
+  };
+
+  const btn = document.getElementById("btnGuardarApariencia");
+  const textoOriginal = btn ? btn.innerHTML : "";
+  if (btn) { btn.disabled = true; btn.innerHTML = "Guardando..."; }
+
+  try {
+    const params = new URLSearchParams({ action: "guardarConfiguracionNegocio", ...cfg });
+    const response = await fetch(API_URL + "?" + params.toString());
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo guardar la apariencia", "error");
+      return;
+    }
+
+    configNegocioCache = { ...configNegocioCache, ...cfg };
+    aplicarTemaAdmin(configNegocioCache);
+    toast("Apariencia guardada — ya se ve en el panel y en el catálogo", "success");
+
+  } catch (error) {
+    console.error("Error al guardar la apariencia:", error);
+    toast("Error de conexión al guardar la apariencia", "error");
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = textoOriginal; }
+  }
+}
+
+/* ===================== BENEFICIOS DEL CATÁLOGO WEB (chips bajo el banner) ===================== */
+
+const BENEFICIOS_DEFAULT = {
+  beneficioWhatsappNumero: "5491140975795",
+  beneficioInstagramUrl:   "",
+  beneficioTelefono1:      "",
+  beneficioTelefono2:      "",
+  beneficioDireccion:      "",
+  beneficioTextoLibre1:    "",
+  beneficioTextoLibre2:    ""
+};
+
+/** Loads the saved "Beneficios" config into the form (called when Configuración opens) */
+function cargarBeneficiosForm(cfg) {
+  document.getElementById("cfgBeneficioWhatsapp").value  = cfg.beneficioWhatsappNumero ?? BENEFICIOS_DEFAULT.beneficioWhatsappNumero;
+  document.getElementById("cfgBeneficioInstagram").value = cfg.beneficioInstagramUrl   ?? BENEFICIOS_DEFAULT.beneficioInstagramUrl;
+  document.getElementById("cfgBeneficioTelefono1").value = cfg.beneficioTelefono1      ?? BENEFICIOS_DEFAULT.beneficioTelefono1;
+  document.getElementById("cfgBeneficioTelefono2").value = cfg.beneficioTelefono2      ?? BENEFICIOS_DEFAULT.beneficioTelefono2;
+  document.getElementById("cfgBeneficioDireccion").value = cfg.beneficioDireccion      ?? BENEFICIOS_DEFAULT.beneficioDireccion;
+  document.getElementById("cfgBeneficioTexto1").value    = cfg.beneficioTextoLibre1    ?? BENEFICIOS_DEFAULT.beneficioTextoLibre1;
+  document.getElementById("cfgBeneficioTexto2").value    = cfg.beneficioTextoLibre2    ?? BENEFICIOS_DEFAULT.beneficioTextoLibre2;
+}
+
+/** Reads the "Beneficios" form fields and saves them to the backend (hoja CONFIGURACION) */
+async function guardarBeneficiosForm() {
+  const nombre = document.getElementById("cfgNombreLocal").value.trim();
+
+  if (!nombre) {
+    toast("Completá primero el nombre del local, arriba", "error");
+    return;
+  }
+
+  const whatsapp = document.getElementById("cfgBeneficioWhatsapp").value.trim();
+
+  const cfg = {
+    nombre,
+
+    beneficioWhatsappNumero: whatsapp || BENEFICIOS_DEFAULT.beneficioWhatsappNumero,
+    beneficioInstagramUrl:   document.getElementById("cfgBeneficioInstagram").value.trim(),
+    beneficioTelefono1:      document.getElementById("cfgBeneficioTelefono1").value.trim(),
+    beneficioTelefono2:      document.getElementById("cfgBeneficioTelefono2").value.trim(),
+    beneficioDireccion:      document.getElementById("cfgBeneficioDireccion").value.trim(),
+    beneficioTextoLibre1:    document.getElementById("cfgBeneficioTexto1").value.trim(),
+    beneficioTextoLibre2:    document.getElementById("cfgBeneficioTexto2").value.trim()
+  };
+
+  const btn = document.getElementById("btnGuardarBeneficios");
+  const textoOriginal = btn ? btn.innerHTML : "";
+  if (btn) { btn.disabled = true; btn.innerHTML = "Guardando..."; }
+
+  try {
+    const params = new URLSearchParams({ action: "guardarConfiguracionNegocio", ...cfg });
+    const response = await fetch(API_URL + "?" + params.toString());
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudieron guardar los beneficios", "error");
+      return;
+    }
+
+    configNegocioCache = { ...configNegocioCache, ...cfg };
+    toast("Beneficios guardados — ya se ven en el catálogo", "success");
+
+  } catch (error) {
+    console.error("Error al guardar los beneficios:", error);
+    toast("Error de conexión al guardar los beneficios", "error");
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = textoOriginal; }
+  }
+}
+
+/** Saves the rotating top-banner messages — one per line in the textarea, joined with newlines for the backend */
+async function guardarBannerTopForm() {
+  const bannerTopMensajes = document.getElementById("cfgBannerTopMensajes").value.trim();
+
+  const btn = document.getElementById("btnGuardarBannerTop");
+  const textoOriginal = btn ? btn.innerHTML : "";
+  if (btn) { btn.disabled = true; btn.innerHTML = "Guardando..."; }
+
+  try {
+    const params = new URLSearchParams({ action: "guardarConfiguracionNegocio", nombre: configNegocioCache.nombre, bannerTopMensajes });
+    const response = await fetch(API_URL + "?" + params.toString());
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo guardar el banner", "error");
+      return;
+    }
+
+    configNegocioCache.bannerTopMensajes = bannerTopMensajes;
+    toast("Banner superior guardado — ya se ve en el catálogo", "success");
+
+  } catch (error) {
+    console.error("Error al guardar el banner superior:", error);
+    toast("Error de conexión al guardar el banner", "error");
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = textoOriginal; }
+  }
+}
+
+/* ===================== TOASTS ===================== */
+
+function toast(mensaje, tipo) {
+  const stack = document.getElementById("toastStack");
+  if (!stack) return;
+  const el = document.createElement("div");
+  el.className = "toast-msg" + (tipo ? " " + tipo : "");
+  const icon = tipo === "error" ? "⚠️" : tipo === "success" ? "✓" : "ℹ️";
+  el.innerHTML = `<span>${icon}</span><span>${escapeHtml(mensaje)}</span>`;
+  stack.appendChild(el);
+  setTimeout(() => {
+    el.style.transition = "opacity .25s";
+    el.style.opacity = "0";
+    setTimeout(() => el.remove(), 250);
+  }, 2600);
+}
+
+/* ===================== METRICAS ===================== */
+
+async function cargarMetricas() {
+  try {
+    const response = await fetch(API_URL + "?action=metricas");
+    const data = await response.json();
+
+    // Pedidos
+    actualizarElemento("pedidosNuevos",   data.pedidosNuevos  || 0);
+    actualizarElemento("totalPedidos",    data.totalPedidos   || 0);
+
+    // Productos / stock
+    actualizarElemento("productosActivos", data.productosActivos || 0);
+    actualizarElemento("stockBajo",       data.stockBajo || 0);
+    actualizarElemento("agotados",        data.agotados  || 0);
+    actualizarElemento("clientesUnicos",  data.clientesUnicos || 0);
+
+    // Más vendido (tarjeta resumen del dashboard)
+    if (data.masVendidoCantidad > 0) {
+      actualizarElemento("cantidadMasVendidos", data.masVendidoCantidad + " uds · " + (data.masVendidoNombre || ""));
+    } else {
+      actualizarElemento("cantidadMasVendidos", "Ver ranking →");
+    }
+
+    // Ventas — combinadas (POS + Pedidos), usadas en tarjetas genéricas / Reportes
+    const ventasHoyTotal = Number(data.ventasHoy || 0);
+    const ventasMesTotal = Number(data.ventasMes || 0);
+    actualizarElemento("ventasHoy",     "$" + ventasHoyTotal.toLocaleString("es-AR"));
+    actualizarElemento("ventasMes",     "$" + ventasMesTotal.toLocaleString("es-AR"));
+    actualizarElemento("ventasTotales", "$" + ventasMesTotal.toLocaleString("es-AR"));
+
+    const tp = "$" + Math.round(data.ticketPromedio || 0).toLocaleString("es-AR");
+    actualizarElemento("ticketPromedio", tp);
+
+    // Ventas — POS (mostrador) hoy/mes
+    const posHoy = Number(data.ventasPOSHoy || 0);
+    const posMes = Number(data.ventasPOSMes || 0);
+    actualizarElemento("ventasPOSHoy", "$" + posHoy.toLocaleString("es-AR"));
+    actualizarElemento("ventasPOSMes", "$" + posMes.toLocaleString("es-AR"));
+
+    // Ventas — Pedidos hoy/mes
+    const pedHoy = Number(data.ventasPedidosHoy || 0);
+    const pedMes = Number(data.ventasPedidosMes || 0);
+    actualizarElemento("ventasPedidosHoy", "$" + pedHoy.toLocaleString("es-AR"));
+    actualizarElemento("ventasPedidosMes", "$" + pedMes.toLocaleString("es-AR"));
+
+    // POS summary banner (dashboard) — usa específicamente las ventas de mostrador
+    actualizarElemento("posVentasHoyBanner",  "$" + posHoy.toLocaleString("es-AR"));
+    actualizarElemento("posVentasMesBanner",  "$" + posMes.toLocaleString("es-AR"));
+    actualizarElemento("posTicketPromBanner", tp);
+    actualizarElemento("posTotalPedBanner",   data.totalVentasPOS || 0);
+
+    marcarActualizacionEnVivo();
+
+  } catch (error) {
+    console.error("Error métricas:", error);
+    marcarActualizacionEnVivo(true);
+  }
+}
+
+/** Updates the "live" badge on the dashboard so users can see the data is fresh */
+function marcarActualizacionEnVivo(fallo) {
+  const badge = document.getElementById("posLiveBadge");
+  if (!badge) return;
+  const hora = new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  if (fallo) {
+    badge.classList.add("ps-badge-error");
+    badge.innerHTML = `⚠️ Sin conexión`;
+    return;
+  }
+  badge.classList.remove("ps-badge-error");
+  badge.innerHTML = `📊 En vivo · ${hora}`;
+  badge.classList.remove("pulse");
+  void badge.offsetWidth;
+  badge.classList.add("pulse");
+}
+
+/* ===================== POS VENTAS RECIENTES (dashboard) ===================== */
+
+async function cargarVentasPOS() {
+  try {
+    const response = await fetch(API_URL + "?action=ventasPOS");
+    const data = await response.json();
+    ventasPOSGlobal = data.ventas || [];
+    renderVentasPOSRecientes(ventasPOSGlobal);
+  } catch (error) {
+    // Action may not exist yet on Apps Script — silently ignore
+    console.warn("ventasPOS action not available:", error);
+    renderVentasPOSRecientes([]);
+  }
+}
+
+function renderVentasPOSRecientes(lista) {
+  const tbody = document.getElementById("tablaPOSRecientes");
+  if (!tbody) return;
+
+  if (!lista || lista.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-3">No hay ventas del día aún</td></tr>`;
+    return;
+  }
+
+  let html = "";
+  lista.slice(0, 20).forEach(v => {
+    const hora = v.FECHA ? new Date(v.FECHA).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }) : "—";
+    const items = v.ITEMS || v.DETALLE || "—";
+    const pago  = v.FORMA_PAGO || v.PAGO || "—";
+    const total = Number(v.TOTAL || 0).toLocaleString("es-AR");
+
+    html += `
+      <tr>
+        <td class="mono">${escapeHtml(String(v.VENTA_ID || v.ID || "—"))}</td>
+        <td>${hora}</td>
+        <td>${escapeHtml(String(items))}</td>
+        <td>${escapeHtml(String(pago))}</td>
+        <td class="money">$${total}</td>
+        <td>
+          <button class="btn btn-sm btn-outline-secondary"
+            onclick='imprimirVentaDesdeData(${JSON.stringify(v)})'>🖨️</button>
+        </td>
+      </tr>
+    `;
+  });
+
+  tbody.innerHTML = html;
+}
+
+/* ===================== VENTAS POS — HISTORIAL (sección dedicada) ===================== */
+
+let ventasPOSHistorialGlobal = [];
+
+/** Loads POS sales history for the date range selected in the filter inputs (defaults to last 60 days) */
+async function cargarVentasPOSHistorial() {
+  const tbody = document.getElementById("tablaVentasPOSHistorial");
+  if (!tbody) return;
+
+  const desdeInput = document.getElementById("vpDesde");
+  const hastaInput = document.getElementById("vpHasta");
+
+  // Default the date pickers to a sensible range on first load (last 30 days)
+  if (desdeInput && !desdeInput.value) {
+    const hace30 = new Date();
+    hace30.setDate(hace30.getDate() - 30);
+    desdeInput.value = hace30.toISOString().slice(0, 10);
+  }
+  if (hastaInput && !hastaInput.value) {
+    hastaInput.value = new Date().toISOString().slice(0, 10);
+  }
+
+  tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-3">Cargando ventas...</td></tr>`;
+
+  try {
+    const params = new URLSearchParams({ action: "ventasPOSHistorial" });
+    if (desdeInput && desdeInput.value) params.set("desde", desdeInput.value);
+    if (hastaInput && hastaInput.value) params.set("hasta", hastaInput.value);
+
+    const response = await fetch(API_URL + "?" + params.toString());
+    const data = await response.json();
+
+    ventasPOSHistorialGlobal = data.ventas || [];
+    renderVentasPOSHistorial(ventasPOSHistorialGlobal);
+
+  } catch (error) {
+    console.error("Error al cargar historial de ventas POS:", error);
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-3">Error al cargar el historial</td></tr>`;
+  }
+}
+
+function renderVentasPOSHistorial(lista) {
+  const tbody = document.getElementById("tablaVentasPOSHistorial");
+  if (!tbody) return;
+
+  if (!lista || lista.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-3">No hay ventas en el rango seleccionado</td></tr>`;
+    return;
+  }
+
+  let html = "";
+  lista.forEach(v => {
+    const fechaObj = v.FECHA ? new Date(v.FECHA) : null;
+    const fecha = fechaObj ? fechaObj.toLocaleDateString("es-AR") : "—";
+    const hora  = fechaObj ? fechaObj.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }) : "—";
+    const items = v.ITEMS || v.DETALLE || "—";
+    const pago  = v.FORMA_PAGO || v.PAGO || "—";
+    const total = Number(v.TOTAL || 0).toLocaleString("es-AR");
+
+    html += `
+      <tr>
+        <td class="mono">${escapeHtml(String(v.VENTA_ID || v.ID || "—"))}</td>
+        <td>${fecha}</td>
+        <td>${hora}</td>
+        <td>${escapeHtml(String(items))}</td>
+        <td>${escapeHtml(String(pago))}</td>
+        <td class="money">$${total}</td>
+        <td>
+          <button class="btn btn-sm btn-outline-secondary"
+            onclick='imprimirVentaDesdeData(${JSON.stringify(v)})' title="Reimprimir ticket">🖨️ Reimprimir</button>
+          <button class="btn btn-sm btn-outline-danger ms-1"
+            onclick='eliminarVentaPOS(${JSON.stringify(v)})' title="Eliminar venta y devolver stock">🗑️ Eliminar</button>
+        </td>
+      </tr>
+    `;
+  });
+
+  tbody.innerHTML = html;
+}
+
+/**
+ * Deletes a sale (and returns its stock) after confirmation. Receives
+ * the full sale object (as rendered in the table) so the backend gets
+ * the cart directly, without needing to re-read DETALLE_VENTAS.
+ */
+async function eliminarVentaPOS(venta) {
+  if (!confirm(`¿Eliminar la venta ${venta.VENTA_ID || venta.ID}? Esta acción no se puede deshacer y va a devolver el stock de los productos vendidos.`)) return;
+
+  try {
+    const params = new URLSearchParams({
+      action: "eliminarVenta",
+      ventaId: venta.VENTA_ID || venta.ID,
+      carrito: venta.CARRITO || "[]"
+    });
+    const response = await fetch(API_URL + "?" + params.toString());
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo eliminar la venta", "error");
+      return;
+    }
+
+    toast("Venta eliminada y stock devuelto", "success");
+    cargarVentasPOSHistorial();
+    productosPOS = []; // fuerza a recargar el catálogo la próxima vez que se entre al POS, con el stock ya actualizado
+
+  } catch (error) {
+    console.error("Error al eliminar venta:", error);
+    toast("Error de conexión al eliminar la venta", "error");
+  }
+}
+
+/** Client-side filter by sale id or payment method, over the already-loaded historial */
+function filtrarVentasPOSHistorial() {
+  const input = document.getElementById("vpBuscar");
+  const termino = (input ? input.value : "").toLowerCase().trim();
+
+  if (!termino) {
+    renderVentasPOSHistorial(ventasPOSHistorialGlobal);
+    return;
+  }
+
+  const filtradas = ventasPOSHistorialGlobal.filter(v => {
+    const id   = String(v.VENTA_ID || v.ID || "").toLowerCase();
+    const pago = String(v.FORMA_PAGO || v.PAGO || "").toLowerCase();
+    const items = String(v.ITEMS || v.DETALLE || "").toLowerCase();
+    return id.includes(termino) || pago.includes(termino) || items.includes(termino);
+  });
+
+  renderVentasPOSHistorial(filtradas);
+}
+
+/* ===================== NAVEGACION ===================== */
+
+// Recuerda cuándo se cargó cada sección por última vez, para no volver a
+// pedirle al backend lo mismo si el cajero entra y sale de una sección
+// en pocos segundos (ej: mirar Pedidos, volver al POS, volver a Pedidos).
+// El timer de 15s de arriba sigue refrescando la sección activa con
+// normalidad; esto solo evita pedidos duplicados al navegar.
+const ULTIMA_CARGA_SECCION = {};
+const VENCIMIENTO_CACHE_MS = 10000; // 10 s
+
+function cargarSiVencido(clave, fn) {
+  const ahora = Date.now();
+  const ultima = ULTIMA_CARGA_SECCION[clave] || 0;
+  if (ahora - ultima < VENCIMIENTO_CACHE_MS) return; // todavía fresco, no repetir
+  ULTIMA_CARGA_SECCION[clave] = ahora;
+  fn();
+}
+
+function mostrarSeccion(id) {
+  document.querySelectorAll(".seccion").forEach(sec => { sec.style.display = "none"; });
+
+  const seccion = document.getElementById(id);
+  if (seccion) seccion.style.display = "block";
+
+  // Sync sidebar links
+  document.querySelectorAll("#navLinks a").forEach(a => {
+    a.classList.toggle("active", a.getAttribute("data-target") === id);
+  });
+
+  // Sync bottom nav links
+  document.querySelectorAll("#bottomNavLinks a").forEach(a => {
+    a.classList.toggle("active", a.getAttribute("data-target") === id);
+  });
+
+  if (id === "pedidos")   cargarSiVencido("pedidos", cargarPedidos);
+  if (id === "productos") cargarSiVencido("productos", cargarProductos);
+  if (id === "ventasPOS") cargarSiVencido("ventasPOS", cargarVentasPOSHistorial);
+  if (id === "configuracion") { cargarConfigNegocioForm(); actualizarEstadoUSBPrint(); }
+
+  if (id === "pos") {
+    asegurarProductosPOS().then(renderPosGrid);
+    setTimeout(() => {
+      const input = document.getElementById("posBusqueda");
+      if (input) input.focus();
+    }, 80);
+  }
+
+  if (id === "cierreCaja") cargarResumenCierreCaja();
+  if (id === "movimientosCaja") cargarMovimientosCajaHoy();
+  if (id === "reportes")   cargarSiVencido("reportes", cargarTodosLosReportes);
+}
+
+/* ===================== PEDIDOS ===================== */
+
+async function cargarPedidos() {
+  try {
+    const response = await fetch(API_URL + "?action=pedidos");
+    const data = await response.json();
+    pedidosGlobal = data.pedidos || [];
+    if (!data.pedidos) return;
+    renderPedidos(pedidosGlobal);
+  } catch (error) {
+    console.error("Error pedidos:", error);
+  }
+}
+
+async function cambiarEstado(pedidoId, estado) {
+  try {
+    const response = await fetch(
+      API_URL +
+      "?action=actualizarEstado" +
+      "&pedidoId=" + encodeURIComponent(pedidoId) +
+      "&estado="   + encodeURIComponent(estado)
+    );
+    const data = await response.json();
+    if (!data.success) { toast("No se pudo actualizar el pedido", "error"); return; }
+    toast("Estado actualizado", "success");
+  } catch (error) {
+    console.error(error);
+    toast("Error de conexión", "error");
+  }
+}
+
+/**
+ * Maneja el checkbox "Cobrado" de un pedido. Solo dispara la llamada
+ * al backend cuando YA hay una forma de pago elegida — si todavía no
+ * se eligió, simplemente habilita el desplegable y espera a que el
+ * usuario la complete (eso lo dispara cambiarFormaPagoPedido). Esto
+ * evita mandar "cobrado=SI" sin forma de pago, que el backend
+ * rechazaría de todas formas.
+ */
+async function cambiarCobradoPedido(pedidoId, marcado) {
+  const selectFormaPago = document.getElementById(`formaPago-${pedidoId}`);
+
+  if (!marcado) {
+    selectFormaPago.disabled = true;
+    selectFormaPago.value = "";
+    await aplicarCobroPedido(pedidoId, false, "");
+    return;
+  }
+
+  selectFormaPago.disabled = false;
+
+  const formaPagoElegida = selectFormaPago.value;
+  if (!formaPagoElegida) {
+    toast("Elegí la forma de pago para terminar de marcarlo como cobrado", "error");
+    return; // se queda tildado y con el desplegable habilitado, esperando la forma de pago
+  }
+
+  await aplicarCobroPedido(pedidoId, true, formaPagoElegida);
+}
+
+/** Maneja el desplegable de forma de pago — si el checkbox ya está tildado, aplica el cambio al elegir */
+async function cambiarFormaPagoPedido(pedidoId, formaPago) {
+  const checkbox = document.getElementById(`cobrado-${pedidoId}`);
+  if (!checkbox.checked) return; // todavía no se tildó "Cobrado", no hace nada hasta que se tilde
+  if (!formaPago) return;
+  await aplicarCobroPedido(pedidoId, true, formaPago);
+}
+
+/** Llama al backend para marcar/desmarcar el pedido como cobrado en caja, y refresca la lista */
+async function aplicarCobroPedido(pedidoId, cobrado, formaPago) {
+  try {
+    const response = await fetch(
+      API_URL +
+      "?action=marcarPedidoCobrado" +
+      "&pedidoId=" + encodeURIComponent(pedidoId) +
+      "&cobrado=" + (cobrado ? "SI" : "NO") +
+      "&formaPago=" + encodeURIComponent(formaPago || "")
+    );
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo actualizar el cobro del pedido", "error");
+      cargarPedidos(); // revierte cualquier cambio visual a lo que diga el backend
+      return;
+    }
+
+    toast(cobrado ? "Pedido marcado como cobrado — ya suma al cierre de caja de hoy" : "Pedido desmarcado — ya no suma al cierre de caja", "success");
+    cargarPedidos();
+
+  } catch (error) {
+    console.error("Error al marcar el pedido como cobrado:", error);
+    toast("Error de conexión al actualizar el cobro", "error");
+    cargarPedidos();
+  }
+}
+
+function filtrarPedidos() {
+  const texto = document.getElementById("buscarPedido").value.toLowerCase();
+  const estadoFiltro = (document.getElementById("filtroPedidoEstado")?.value || "").toUpperCase();
+  const filtrados = pedidosGlobal.filter(p => {
+    const coincideTexto =
+      String(p.PEDIDO_ID || "").toLowerCase().includes(texto) ||
+      String(p.CLIENTE   || "").toLowerCase().includes(texto) ||
+      String(p.DNI       || "").toLowerCase().includes(texto);
+    const coincideEstado = !estadoFiltro || String(p.ESTADO || "").toUpperCase() === estadoFiltro;
+    return coincideTexto && coincideEstado;
+  });
+  renderPedidos(filtrados);
+}
+
+const ESTADO_ICONO_PEDIDO = { NUEVO: "🆕", PREPARANDO: "⚙️", ENVIADO: "📦", CANCELADO: "❌" };
+
+let pedidoDetalleActual = null;
+
+async function abrirDetallePedido(pedidoId) {
+  document.getElementById("pedidoDetalleBody").innerHTML = `<div class="text-center text-muted py-4">Cargando...</div>`;
+  document.getElementById("pedidoDetalleModalBackdrop").classList.add("show");
+
+  try {
+    const response = await fetch(API_URL + "?action=getDetallePedido&pedidoId=" + encodeURIComponent(pedidoId));
+    const data = await response.json();
+    if (!data.success) { toast(data.message || "No se pudo cargar el pedido", "error"); cerrarModalDetallePedido(); return; }
+
+    const { pedido, detalle } = data;
+    pedidoDetalleActual = { pedido, detalle };
+
+    // Botón imprimir: si hay PDF en Drive lo abre, si no genera el A4
+    const btnImprimir = document.querySelector("#pedidoDetalleModalBackdrop .btn-success");
+    if (btnImprimir) {
+      if (pedido.PDF_URL) {
+        btnImprimir.textContent = "📄 Ver PDF del pedido";
+        btnImprimir.onclick = () => window.open(pedido.PDF_URL, "_blank");
+      } else {
+        btnImprimir.textContent = "Imprimir pedido (A4)";
+        btnImprimir.onclick = imprimirNotaPedidoA4;
+      }
+    }
+
+    // Mostrar/ocultar botón etiqueta según estado
+    const btnEtiqueta = document.getElementById("btnImprimirEtiquetaDetalle");
+    if (btnEtiqueta) btnEtiqueta.style.display = pedido.ESTADO === "PREPARANDO" ? "inline-flex" : "none";
+
+    const simbolo = String(pedido.MONEDA || "ARS").toUpperCase() === "USD" ? "US$" : "$";
+    const filas = detalle.map(item => `
+      <tr>
+        <td style="padding:6px 0;">${item.cantidad}x ${escapeHtml(item.PRODUCTO)}</td>
+        <td style="padding:6px 0; text-align:right; font-family:var(--font-mono);">${simbolo}${(item.PRECIO * item.cantidad).toLocaleString("es-AR")}</td>
+      </tr>`).join("");
+
+    document.getElementById("pedidoDetalleBody").innerHTML = `
+      <div class="config-preview-hint mb-3">
+        <span class="ic">${ESTADO_ICONO_PEDIDO[pedido.ESTADO] || "📦"}</span>
+        Pedido <strong>${escapeHtml(pedido.PEDIDO_ID)}</strong> — Estado: <strong>${escapeHtml(pedido.ESTADO)}</strong>
+      </div>
+      <div class="mb-2"><strong style="font-size:15px;">${escapeHtml(pedido.CLIENTE)}</strong>${pedido.DNI ? ` · DNI/CUIT: ${escapeHtml(pedido.DNI)}` : ""}</div>
+      ${pedido.TELEFONO ? `<div class="mb-1" style="font-size:13px;color:var(--slate-500);">📞 ${escapeHtml(pedido.TELEFONO)}</div>` : ""}
+      ${pedido.DIRECCION ? `<div class="mb-1" style="font-size:13px;color:var(--slate-500);">📍 ${escapeHtml(pedido.DIRECCION)}${pedido.LOCALIDAD ? ", " + escapeHtml(pedido.LOCALIDAD) : ""}${pedido.PROVINCIA ? ", " + escapeHtml(pedido.PROVINCIA) : ""}${pedido.CODIGO_POSTAL ? " (CP " + escapeHtml(pedido.CODIGO_POSTAL) + ")" : ""}</div>` : ""}
+      ${pedido.EMPRESA ? `<div class="mb-3" style="font-size:13px;color:var(--slate-500);">🚚 ${escapeHtml(pedido.EMPRESA)}</div>` : `<div class="mb-3"></div>`}
+      <table style="width:100%; border-collapse:collapse; font-size:13.5px;">
+        <tbody>${filas}</tbody>
+        <tfoot>
+          ${Number(pedido.DESCUENTO || 0) > 0 ? `
+          <tr style="border-top:1px solid var(--slate-200);">
+            <td style="padding-top:8px; color:var(--slate-500);">Subtotal</td>
+            <td style="padding-top:8px; text-align:right; font-family:var(--font-mono); color:var(--slate-500);">${simbolo}${Number(pedido.SUBTOTAL || pedido.TOTAL || 0).toLocaleString("es-AR")}</td>
+          </tr>
+          <tr>
+            <td style="padding-top:4px; color:var(--red-500); font-weight:700;">Descuento${pedido.DESCUENTO_ETIQUETA ? " (" + pedido.DESCUENTO_ETIQUETA + ")" : ""}</td>
+            <td style="padding-top:4px; text-align:right; font-family:var(--font-mono); color:var(--red-500); font-weight:700;">-${simbolo}${Number(pedido.DESCUENTO).toLocaleString("es-AR")}</td>
+          </tr>` : ""}
+          <tr style="border-top:2px solid var(--slate-200);">
+            <td style="padding-top:10px;"><strong>Total</strong></td>
+            <td style="padding-top:10px; text-align:right; font-family:var(--font-mono);"><strong>${simbolo}${Number(pedido.TOTAL || 0).toLocaleString("es-AR")}</strong></td>
+          </tr>
+        </tfoot>
+      </table>`;
+
+  } catch (error) {
+    console.error("Error al abrir detalle de pedido:", error);
+    toast("Error al cargar el detalle del pedido", "error");
+    cerrarModalDetallePedido();
+  }
+}
+
+function cerrarModalDetallePedido() {
+  document.getElementById("pedidoDetalleModalBackdrop").classList.remove("show");
+  pedidoDetalleActual = null;
+}
+
+function imprimirEtiquetaDesdeDetalle() {
+  if (!pedidoDetalleActual) return;
+  const p = pedidoDetalleActual.pedido;
+  imprimirEtiquetaEnvio({
+    pedidoId: p.PEDIDO_ID, cliente: p.CLIENTE, telefono: p.TELEFONO || "",
+    direccion: p.DIRECCION || "", localidad: p.LOCALIDAD || "", provincia: p.PROVINCIA || "",
+    codigoPostal: p.CODIGO_POSTAL || p.CODIGOPOSTAL || "", dni: p.DNI || "", transporte: p.EMPRESA || ""
+  });
+}
+
+function imprimirNotaPedidoA4() {
+  if (!pedidoDetalleActual) return;
+  const { pedido, detalle } = pedidoDetalleActual;
+  const simbolo = String(pedido.MONEDA || "ARS").toUpperCase() === "USD" ? "US$" : "$";
+  const ahora = new Date().toLocaleString("es-AR");
+  const fechaPedido = pedido.FECHA ? new Date(pedido.FECHA).toLocaleDateString("es-AR") : "—";
+
+  const filasItems = detalle.map(item => `
+    <tr>
+      <td style="padding:6px; border:1px solid #ddd;">${escapeHtml(item.PRODUCTO)}</td>
+      <td style="padding:6px; border:1px solid #ddd; text-align:center;">${item.cantidad}</td>
+      <td style="padding:6px; border:1px solid #ddd; text-align:right;">${simbolo}${Number(item.PRECIO).toLocaleString("es-AR")}</td>
+      <td style="padding:6px; border:1px solid #ddd; text-align:right;">${simbolo}${(item.PRECIO * item.cantidad).toLocaleString("es-AR")}</td>
+    </tr>`).join("");
+
+  const filaDoc = (label, valor) => valor
+    ? `<tr><td style="padding:4px 8px; font-size:7pt; font-weight:700; text-transform:uppercase; color:#555; width:32mm; vertical-align:top;">${label}:</td><td style="padding:4px 8px; font-size:11pt; font-weight:700;">${escapeHtml(valor)}</td></tr>`
+    : "";
+
+  const cobradoStr = String(pedido.COBRADO || "").toUpperCase() === "SI"
+    ? `<div style="margin-top:4mm; font-size:11pt; color:#16a34a; font-weight:700;">Cobrado${pedido.FORMA_PAGO_COBRO ? " — " + escapeHtml(pedido.FORMA_PAGO_COBRO) : ""}</div>`
+    : `<div style="margin-top:4mm; font-size:11pt; color:#d32f2f; font-weight:700;">Pendiente de cobro</div>`;
+
+  const html = `
+    <div style="font-family:Arial,Helvetica,sans-serif; width:190mm; margin:10mm auto; padding:8mm; box-sizing:border-box; border:2px solid #000; border-radius:4mm;">
+      <div style="text-align:center; margin-bottom:6mm;">
+        <div style="font-size:20pt; font-weight:900;">Jireh Mayorista</div>
+      </div>
+      <div style="background:#0b1633; color:#fff; text-align:center; padding:4mm; border-radius:2mm; margin-bottom:6mm;">
+        <div style="font-size:14pt; font-weight:900; letter-spacing:2px;">NOTA DE PEDIDO</div>
+        <div style="font-size:11pt; font-weight:700;">${escapeHtml(pedido.PEDIDO_ID)} — ${fechaPedido}</div>
+      </div>
+      <table style="width:100%; border-collapse:collapse; font-size:11pt; margin-bottom:6mm;">
+        ${filaDoc("Cliente", pedido.CLIENTE)}
+        ${filaDoc("Teléfono", pedido.TELEFONO)}
+        ${filaDoc("Dirección", [pedido.DIRECCION, pedido.LOCALIDAD, pedido.PROVINCIA].filter(Boolean).join(", "))}
+        ${filaDoc("CP", pedido.CODIGO_POSTAL || pedido.CODIGOPOSTAL)}
+        ${filaDoc("DNI/CUIT", pedido.DNI)}
+        ${filaDoc("Transporte", pedido.EMPRESA)}
+        ${filaDoc("Estado", pedido.ESTADO)}
+      </table>
+      <table style="width:100%; border-collapse:collapse; font-size:11pt;">
+        <thead>
+          <tr style="background:#f4f4f4;">
+            <th style="padding:6px; text-align:left; border:1px solid #ddd;">Producto</th>
+            <th style="padding:6px; text-align:center; border:1px solid #ddd;">Cant.</th>
+            <th style="padding:6px; text-align:right; border:1px solid #ddd;">Precio</th>
+            <th style="padding:6px; text-align:right; border:1px solid #ddd;">Subtotal</th>
+          </tr>
+        </thead>
+        <tbody>${filasItems}</tbody>
+        <tfoot>
+          ${Number(pedido.DESCUENTO || 0) > 0 ? `
+          <tr>
+            <td colspan="3" style="padding:6px; text-align:right; border:1px solid #ddd; color:#555;">Subtotal</td>
+            <td style="padding:6px; text-align:right; border:1px solid #ddd; color:#555;">${simbolo}${Number(pedido.SUBTOTAL || pedido.TOTAL || 0).toLocaleString("es-AR")}</td>
+          </tr>
+          <tr>
+            <td colspan="3" style="padding:6px; text-align:right; border:1px solid #ddd; color:#d32f2f; font-weight:700;">Descuento${pedido.DESCUENTO_ETIQUETA ? " (" + pedido.DESCUENTO_ETIQUETA + ")" : ""}</td>
+            <td style="padding:6px; text-align:right; border:1px solid #ddd; color:#d32f2f; font-weight:700;">-${simbolo}${Number(pedido.DESCUENTO).toLocaleString("es-AR")}</td>
+          </tr>` : ""}
+          <tr>
+            <td colspan="3" style="padding:8px; text-align:right; border:1px solid #ddd;"><strong>TOTAL</strong></td>
+            <td style="padding:8px; text-align:right; border:1px solid #ddd;"><strong>${simbolo}${Number(pedido.TOTAL || 0).toLocaleString("es-AR")}</strong></td>
+          </tr>
+        </tfoot>
+      </table>
+      ${cobradoStr}
+      <div style="text-align:center; font-size:8pt; color:#aaa; margin-top:4mm;">Impreso el ${ahora}</div>
+    </div>`;
+
+  const area = document.getElementById("etiquetasPrintArea");
+  area.innerHTML = html;
+  setTimeout(() => window.print(), 120);
+}
+
+/**
+ * Normaliza un número de teléfono argentino al formato internacional
+ * que requiere wa.me (sin +, sin espacios, con código de país).
+ * Maneja: 011XXXXXXXX, 15XXXXXXXX, 9XXXXXXXX, 54911XXXXXXXX, etc.
+ */
+function normalizarTelefonoWA(tel) {
+  if (!tel) return null;
+
+  // Quita todo lo que no sea dígito
+  let num = String(tel).replace(/\D/g, "");
+
+  // Si ya empieza con 54 y tiene 13 dígitos → ya está listo
+  if (num.startsWith("54") && num.length === 13) return num;
+
+  // Si empieza con 54 pero le falta el 9 de celular (5411XXXXXXXX → 54911XXXXXXXX)
+  if (num.startsWith("54") && num.length === 12) return "549" + num.slice(2);
+
+  // Quita el 0 inicial de área si lo tiene (0351... → 351...)
+  if (num.startsWith("0")) num = num.slice(1);
+
+  // Quita el 15 de celular si lo tiene después del área (351158... → 35158...)
+  // Área argentina: 2-4 dígitos, luego el número. El 15 aparece en posición variable.
+  // Estrategia: si el número tiene exactamente 10 dígitos (área 2-4 + número 6-8)
+  // lo armamos directo. Si tiene 11, probablemente tenga el 15 incluido.
+  if (num.length === 11 && num.charAt(2) === "1" && num.charAt(3) === "5") {
+    num = num.slice(0, 2) + num.slice(4); // quita el 15 tras el área de 2 dígitos
+  } else if (num.length === 11 && num.charAt(3) === "1" && num.charAt(4) === "5") {
+    num = num.slice(0, 3) + num.slice(5); // quita el 15 tras el área de 3 dígitos
+  } else if (num.length === 11 && num.charAt(4) === "1" && num.charAt(5) === "5") {
+    num = num.slice(0, 4) + num.slice(6); // quita el 15 tras el área de 4 dígitos
+  }
+
+  // Agrega código de país Argentina + 9 de celular
+  // (WA Argentina requiere 549 + área + número = 13 dígitos total)
+  if (num.length === 10) return "549" + num;
+  if (num.length === 8)  return "5491" + num; // número corto sin área, asume GBA
+
+  return null; // no se pudo normalizar — el botón no se muestra
+}
+
+/** Genera el mensaje de WhatsApp según el estado del pedido */
+function mensajeWhatsAppPorEstado(estado, pedidoId, cliente, total, pdfUrl) {
+  const totalStr = "$" + Number(total || 0).toLocaleString("es-AR");
+  const linkPdf = pdfUrl ? `\n\nComprobante de pedido: ${pdfUrl}` : "";
+  switch(estado) {
+    case "NUEVO":
+      return `Hola ${cliente}! Recibimos tu pedido ${pedidoId} por ${totalStr}.\n\nPara confirmar tu pedido, realizá la transferencia a:\nAlias: jireholga\nNombre: Olga Carbajal Alvis\n\nUna vez realizado el pago, envianos el comprobante por este medio para que podamos empezar a preparar tu pedido. Gracias por elegirnos!${linkPdf}`;
+    case "PREPARANDO":
+      return `Hola ${cliente}! Tu pedido ${pedidoId} por ${totalStr} ya esta siendo preparado. En cuanto este listo te avisamos. Gracias por tu compra!${linkPdf}`;
+    case "ENVIADO":
+      return `Hola ${cliente}! Tu pedido ${pedidoId} por ${totalStr} ya fue enviado y esta en camino. Pronto lo tenes en tus manos!${linkPdf}`;
+    default:
+      return null;
+  }
+}
+
+function renderPedidos(lista) {
+  if (lista.length === 0) {
+    document.getElementById("tablaPedidos").innerHTML =
+      `<div class="text-center text-muted py-5" style="font-size:14px;">No se encontraron pedidos</div>`;
+    return;
+  }
+
+  const estadoClase = { NUEVO:"nuevo", PREPARANDO:"preparando", ENVIADO:"enviado", CANCELADO:"cancelado" };
+  const estadoIcono = { NUEVO:"🆕", PREPARANDO:"⚙️", ENVIADO:"📦", CANCELADO:"❌" };
+
+  const html = lista.map(p => {
+    const claseEstado = estadoClase[p.ESTADO] || "";
+    const estaCobrado = String(p.COBRADO || "").toUpperCase() === "SI";
+    const formaPagoActual = String(p.FORMA_PAGO_COBRO || "");
+
+    // Botón WhatsApp — en NUEVO, PREPARANDO y ENVIADO
+    const estadosConWA = ["NUEVO", "PREPARANDO", "ENVIADO"];
+    const telefono = String(p.TELEFONO || "").trim();
+    const numeroWA = normalizarTelefonoWA(telefono);
+    const mensajeWA = mensajeWhatsAppPorEstado(p.ESTADO, p.PEDIDO_ID, p.CLIENTE, p.TOTAL, p.PDF_URL);
+    const btnWA = (estadosConWA.includes(p.ESTADO) && numeroWA && mensajeWA)
+      ? `<a href="https://wa.me/${numeroWA}?text=${encodeURIComponent(mensajeWA)}" target="_blank" class="btn btn-success btn-sm" title="Notificar por WhatsApp">📲 WhatsApp</a>`
+      : "";
+
+    const badgeCobrado = estaCobrado
+      ? `<span class="pedido-cobrado-badge">✓ Cobrado <span class="pedido-cobrado-forma">${formaPagoActual}</span></span>`
+      : "";
+
+    const selectCobrado = `
+      <div class="d-flex align-items-center gap-2">
+        <div class="form-check mb-0">
+          <input class="form-check-input" type="checkbox" id="cobrado-${p.PEDIDO_ID}"
+            ${estaCobrado ? "checked" : ""}
+            onchange="cambiarCobradoPedido('${p.PEDIDO_ID}', this.checked)">
+          <label class="form-check-label" for="cobrado-${p.PEDIDO_ID}" style="font-size:12.5px;">Cobrado</label>
+        </div>
+        <select class="form-select form-select-sm" style="max-width:145px;"
+          id="formaPago-${p.PEDIDO_ID}"
+          ${estaCobrado ? "" : "disabled"}
+          onchange="cambiarFormaPagoPedido('${p.PEDIDO_ID}', this.value)">
+          <option value="">Forma de pago...</option>
+          <option value="EFECTIVO"      ${formaPagoActual==="EFECTIVO"?"selected":""}>Efectivo</option>
+          <option value="TRANSFERENCIA" ${formaPagoActual==="TRANSFERENCIA"?"selected":""}>Transferencia</option>
+          <option value="TARJETA"       ${formaPagoActual==="TARJETA"?"selected":""}>Tarjeta</option>
+        </select>
+      </div>`;
+
+    return `
+    <div class="pedido-card estado-${claseEstado}">
+      <div class="pedido-card-top">
+        <div>
+          <div class="pedido-card-id">${escapeHtml(p.PEDIDO_ID)}</div>
+          <div class="pedido-card-cliente">${escapeHtml(p.CLIENTE)}${p.EMPRESA ? ` <span style="font-weight:500;color:var(--slate-500);font-size:13px;">· 🚚 ${escapeHtml(p.EMPRESA)}</span>` : ""}</div>
+          ${p.DIRECCION ? `<div class="pedido-card-dir">📍 ${escapeHtml(p.DIRECCION)}${p.LOCALIDAD ? ", " + escapeHtml(p.LOCALIDAD) : ""}</div>` : ""}
+          <div class="pedido-card-fecha">📅 ${new Date(p.FECHA).toLocaleDateString("es-AR", {day:"2-digit", month:"2-digit", year:"numeric"})}</div>
+        </div>
+        <div class="text-end">
+          <div class="pedido-card-total">$${Number(p.TOTAL || 0).toLocaleString("es-AR")}</div>
+          <div class="mt-1"><span class="pedido-estado-badge ${claseEstado}">${estadoIcono[p.ESTADO] || ""} ${escapeHtml(p.ESTADO)}</span></div>
+          ${badgeCobrado ? `<div class="mt-1">${badgeCobrado}</div>` : ""}
+        </div>
+      </div>
+      <div class="pedido-card-controls">
+        <select class="form-select form-select-sm" style="max-width:160px;" onchange="cambiarEstado('${p.PEDIDO_ID}',this.value)">
+          <option value="NUEVO"      ${p.ESTADO==="NUEVO"?"selected":""}>🆕 Nuevo</option>
+          <option value="PREPARANDO" ${p.ESTADO==="PREPARANDO"?"selected":""}>⚙️ Preparando</option>
+          <option value="ENVIADO"    ${p.ESTADO==="ENVIADO"?"selected":""}>📦 Enviado</option>
+          <option value="CANCELADO"  ${p.ESTADO==="CANCELADO"?"selected":""}>❌ Cancelado</option>
+        </select>
+        ${btnWA}
+        ${selectCobrado}
+        <button class="btn btn-outline-secondary btn-sm ms-auto" onclick="abrirDetallePedido('${p.PEDIDO_ID}')">Ver / Reimprimir</button>
+      </div>
+    </div>`;
+  }).join("");
+
+  document.getElementById("tablaPedidos").innerHTML = html;
+}
+
+/* ===================== PRODUCTOS (tabla admin) ===================== */
+
+async function cargarProductos() {
+  try {
+    const response = await fetch(API_URL + "?action=productosAdmin");
+    const data = await response.json();
+    if (!data.productos) return;
+
+    productosAdminGlobal = data.productos;
+
+    poblarFiltroCategoriasProductos();
+    filtrarProductos();
+
+  } catch (error) {
+    console.error("Error productos:", error);
+  }
+}
+
+function renderTablaProductos(lista) {
+  const tbody = document.getElementById("tablaProductos");
+  if (!tbody) return;
+
+  if (!lista || lista.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-4">No se encontraron productos</td></tr>`;
+    return;
+  }
+
+  let html = "";
+  lista.forEach(p => {
+    const publicado = String(p.PUBLICADO || "").toUpperCase() === "SI";
+    const stock = Number(p.STOCK || 0);
+    const stockBadge = stock === 0
+      ? `<span class="tile-stock out">Sin stock</span>`
+      : (stock <= 5 ? `<span class="tile-stock low">${stock}</span>` : stock);
+
+    const imagenUrl = p.IMAGEN ? String(p.IMAGEN).trim() : "";
+    const fotoHtml = imagenUrl
+      ? `<img src="${escapeHtml(imagenUrl)}" alt="" loading="lazy" onerror="this.parentElement.innerHTML='🛒';">`
+      : "🛒";
+
+    html += `
+    <tr>
+      <td><input type="checkbox" class="check-producto-etiqueta" value="${escapeHtml(p.CODIGO)}" onchange="actualizarSeleccionEtiquetas()"></td>
+      <td><div class="tabla-producto-thumb">${fotoHtml}</div></td>
+      <td class="mono">${escapeHtml(p.CODIGO)}</td>
+      <td>${escapeHtml(p.PRODUCTO)}</td>
+      <td>${escapeHtml(p.CATEGORIA || "—")}</td>
+      <td class="money">$${Number(p.PRECIO || 0).toLocaleString("es-AR")}</td>
+      <td>${stockBadge}</td>
+      <td>
+        <span class="badge ${publicado ? "bg-success" : "bg-secondary"}">${publicado ? "Publicado" : "Oculto"}</span>
+      </td>
+      <td>
+        <button class="btn btn-outline-success btn-sm btn-accion-producto" onclick="abrirModalStock('${escapeHtml(p.CODIGO)}')" title="Sumar stock">📦 Stock</button>
+        <button class="btn btn-primary btn-sm btn-accion-producto ms-2" onclick="editarProducto('${escapeHtml(p.CODIGO)}')">Editar</button>
+        <button class="btn btn-danger btn-sm btn-accion-producto ms-2" onclick="eliminarProducto('${escapeHtml(p.CODIGO)}')">Eliminar</button>
+      </td>
+    </tr>`;
+  });
+  tbody.innerHTML = html;
+
+  // El checkbox "seleccionar todos" no sobrevive a un re-render de la
+  // tabla (filtro, búsqueda, etc.) — se resetea para evitar que quede
+  // marcado mientras la tabla ya no refleja esa selección completa.
+  const checkTodos = document.getElementById("checkTodosProductos");
+  if (checkTodos) checkTodos.checked = false;
+  actualizarSeleccionEtiquetas();
+}
+
+/** Fills the category <select> filter with the distinct categories currently in use */
+function poblarFiltroCategoriasProductos() {
+  const select = document.getElementById("filtroCategoriaProductos");
+  if (!select) return;
+
+  const valorActual = select.value;
+  const categorias = [...new Set(
+    productosAdminGlobal.map(p => String(p.CATEGORIA || "").trim()).filter(Boolean)
+  )].sort();
+
+  select.innerHTML = `<option value="">Todas las categorías</option>` +
+    categorias.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
+
+  // Preserve the user's selection across refreshes when still valid
+  if (categorias.includes(valorActual)) select.value = valorActual;
+}
+
+/** Client-side filter by name/code (text) and category (select), over the already-loaded product list */
+function filtrarProductos() {
+  const inputBuscar = document.getElementById("buscarProducto");
+  const selectCategoria = document.getElementById("filtroCategoriaProductos");
+
+  const termino = (inputBuscar ? inputBuscar.value : "").toLowerCase().trim();
+  const categoria = selectCategoria ? selectCategoria.value : "";
+
+  let filtrados = productosAdminGlobal;
+
+  if (termino) {
+    filtrados = filtrados.filter(p => {
+      const codigo = String(p.CODIGO || "").toLowerCase();
+      const nombre = String(p.PRODUCTO || "").toLowerCase();
+      return codigo.includes(termino) || nombre.includes(termino);
+    });
+  }
+
+  if (categoria) {
+    filtrados = filtrados.filter(p => String(p.CATEGORIA || "").trim() === categoria);
+  }
+
+  renderTablaProductos(filtrados);
+}
+
+/**
+ * Versión con demora de filtrarProductos, usada SOLO por el tecleo en
+ * el buscador (onkeyup) — el cambio de categoría (onchange del
+ * <select>) y la carga inicial siguen llamando a filtrarProductos()
+ * directo, sin demora, porque ahí no hay riesgo de redibujar la
+ * tabla completa en cada tecla.
+ */
+const filtrarProductosConDemora = debounce(filtrarProductos, 150);
+
+/* ===================== PRODUCTOS — ALTA / EDICIÓN (modal) ===================== */
+
+let productosAdminGlobal = [];
+
+/** Opens the modal in "create" mode */
+function nuevoProducto() {
+  document.getElementById("productModalTitle").textContent = "+ Nuevo Producto";
+  document.getElementById("pmCodigoOriginal").value = "";
+  document.getElementById("pmCodigo").value = "";
+  document.getElementById("pmCodigo").disabled = false;
+  document.getElementById("pmNombre").value = "";
+  document.getElementById("pmCategoria").value = "";
+  document.getElementById("pmPrecio").value = "";
+  document.getElementById("pmStock").value = "";
+  document.getElementById("pmImagen").value = "";
+  document.getElementById("pmImagenArchivo").value = "";
+  document.getElementById("pmImagenPreview").innerHTML = "🖼️";
+  document.getElementById("pmImagenStatus").textContent = "";
+  document.getElementById("pmImagenStatus").className = "pm-image-status";
+  document.getElementById("pmPublicado").checked = true;
+  document.getElementById("pmDestacado").checked = false;
+  document.getElementById("pmOferta").checked = false;
+
+  poblarCategoriasDatalist();
+  document.getElementById("productModalBackdrop").classList.add("show");
+  setTimeout(() => document.getElementById("pmNombre").focus(), 80);
+}
+
+/** Opens the modal in "edit" mode, pre-filled with the product's current data */
+function editarProducto(codigo) {
+  const p = productosAdminGlobal.find(x => String(x.CODIGO) === String(codigo));
+  if (!p) { toast("No se encontró el producto para editar", "error"); return; }
+
+  document.getElementById("productModalTitle").textContent = "✏️ Editar Producto";
+  document.getElementById("pmCodigoOriginal").value = p.CODIGO;
+  document.getElementById("pmCodigo").value = p.CODIGO;
+  document.getElementById("pmNombre").value = p.PRODUCTO || "";
+  document.getElementById("pmCategoria").value = p.CATEGORIA || "";
+  document.getElementById("pmPrecio").value = Number(p.PRECIO || 0);
+  document.getElementById("pmStock").value = Number(p.STOCK || 0);
+  document.getElementById("pmImagen").value = p.IMAGEN || "";
+  document.getElementById("pmImagenArchivo").value = "";
+  document.getElementById("pmImagenStatus").textContent = "";
+  document.getElementById("pmImagenStatus").className = "pm-image-status";
+  document.getElementById("pmPublicado").checked = String(p.PUBLICADO || "").toUpperCase() === "SI";
+  document.getElementById("pmDestacado").checked = String(p.DESTACADO || "").toUpperCase() === "SI";
+  document.getElementById("pmOferta").checked = String(p.OFERTA || "").toUpperCase() === "SI";
+
+  actualizarPreviewImagenProducto();
+  poblarCategoriasDatalist();
+  document.getElementById("productModalBackdrop").classList.add("show");
+}
+
+function cerrarModalProducto() {
+  document.getElementById("productModalBackdrop").classList.remove("show");
+}
+
+/* ===================== AGREGAR STOCK (entrada de mercadería) ===================== */
+
+/** Opens the "Agregar Stock" modal pre-filled with the product's current data */
+function abrirModalStock(codigo) {
+  const p = productosAdminGlobal.find(x => String(x.CODIGO) === String(codigo));
+  if (!p) { toast("No se encontró el producto", "error"); return; }
+
+  document.getElementById("smCodigo").value = p.CODIGO;
+  document.getElementById("smNombre").textContent = p.PRODUCTO || "—";
+  document.getElementById("smCodigoLabel").textContent = p.CODIGO;
+  const stockActual = Number(p.STOCK || 0);
+  document.getElementById("smStockActual").textContent = stockActual.toLocaleString("es-AR");
+  document.getElementById("smStockActual").dataset.valor = stockActual;
+  document.getElementById("smCantidad").value = "";
+
+  const imagenUrl = p.IMAGEN ? String(p.IMAGEN).trim() : "";
+  document.getElementById("smFoto").innerHTML = imagenUrl
+    ? `<img src="${escapeHtml(imagenUrl)}" alt="" onerror="this.parentElement.innerHTML='🛒';">`
+    : "🛒";
+
+  const resultadoEl = document.getElementById("smResultado");
+  resultadoEl.classList.remove("show");
+
+  document.getElementById("stockModalBackdrop").classList.add("show");
+  setTimeout(() => document.getElementById("smCantidad").focus(), 80);
+}
+
+function cerrarModalStock() {
+  document.getElementById("stockModalBackdrop").classList.remove("show");
+}
+
+/** Live preview: shows "stock actual + cantidad = stock nuevo" as the user types */
+function actualizarPreviewStock() {
+  const actual = Number(document.getElementById("smStockActual").dataset.valor || 0);
+  const cantidad = Number(document.getElementById("smCantidad").value || 0);
+  const resultadoEl = document.getElementById("smResultado");
+
+  if (!cantidad || cantidad <= 0) {
+    resultadoEl.classList.remove("show");
+    return;
+  }
+
+  const nuevo = actual + cantidad;
+  resultadoEl.innerHTML = `<span>Nuevo stock</span><strong>${actual.toLocaleString("es-AR")} + ${cantidad.toLocaleString("es-AR")} = ${nuevo.toLocaleString("es-AR")}</strong>`;
+  resultadoEl.classList.add("show");
+}
+
+/** Sends the stock addition to the backend (sumarStockProducto) */
+async function confirmarAgregarStock() {
+  const codigo = document.getElementById("smCodigo").value.trim();
+  const cantidad = document.getElementById("smCantidad").value;
+
+  if (!cantidad || Number(cantidad) <= 0) {
+    toast("Ingresá una cantidad válida, mayor a 0", "error");
+    return;
+  }
+
+  const btn = document.getElementById("btnConfirmarStock");
+  const textoOriginal = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = "Guardando...";
+
+  try {
+    const params = new URLSearchParams({
+      action: "sumarStockProducto",
+      codigo: codigo,
+      cantidad: cantidad
+    });
+
+    const response = await fetch(API_URL + "?" + params.toString());
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo sumar el stock", "error");
+      return;
+    }
+
+    toast(`Stock actualizado: ${data.stockAnterior.toLocaleString("es-AR")} → ${data.stockNuevo.toLocaleString("es-AR")}`, "success");
+    cerrarModalStock();
+    cargarProductos();
+
+    // Refresh in-memory POS catalog too, so the new stock shows up right away
+    productosPOS = [];
+
+  } catch (error) {
+    console.error("Error al sumar stock:", error);
+    toast("Error de conexión al sumar el stock", "error");
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = textoOriginal;
+  }
+}
+
+/** Live preview of the image URL pasted into the product modal */
+function actualizarPreviewImagenProducto() {
+  const url = document.getElementById("pmImagen").value.trim();
+  const preview = document.getElementById("pmImagenPreview");
+  if (!preview) return;
+  if (!url) { preview.innerHTML = "🖼️"; return; }
+  preview.innerHTML = `<img src="${escapeHtml(url)}" alt="" onerror="this.parentElement.innerHTML='⚠️';">`;
+}
+
+/**
+ * Redimensiona y comprime una imagen en el navegador antes de subirla,
+ * para que una foto de celular de varios MB no tarde una eternidad en
+ * subir ni ocupe espacio de más en Drive. Devuelve siempre JPEG
+ * (excepto si el original es más chico que el límite, en cuyo caso ni
+ * vale la pena recomprimir).
+ *
+ * Estrategia: redimensiona al lado mayor = LADO_MAXIMO_PX, y si con
+ * calidad inicial sigue pesando más que PESO_OBJETIVO_KB, vuelve a
+ * comprimir con menos calidad (hasta MAX_INTENTOS veces). Nunca rechaza
+ * la imagen — en el peor caso, sube la versión más liviana que logró.
+ */
+async function comprimirImagenProducto(file) {
+
+  const LADO_MAXIMO_PX   = 900;
+  const PESO_OBJETIVO_KB = 700;
+  const CALIDADES        = [0.82, 0.7, 0.55, 0.4]; // intentos sucesivos, de mejor a peor calidad
+
+  const imagen = await new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload  = () => resolve(img);
+    img.onerror = () => reject(new Error("No se pudo leer la imagen seleccionada"));
+    img.src = URL.createObjectURL(file);
+  });
+
+  let { width, height } = imagen;
+  if (width > LADO_MAXIMO_PX || height > LADO_MAXIMO_PX) {
+    if (width >= height) {
+      height = Math.round(height * (LADO_MAXIMO_PX / width));
+      width  = LADO_MAXIMO_PX;
+    } else {
+      width  = Math.round(width * (LADO_MAXIMO_PX / height));
+      height = LADO_MAXIMO_PX;
+    }
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#ffffff"; // si el original tenía transparencia (ej. PNG), JPEG no la soporta
+  ctx.fillRect(0, 0, width, height);
+  ctx.drawImage(imagen, 0, 0, width, height);
+  URL.revokeObjectURL(imagen.src);
+
+  let ultimoBase64 = null;
+
+  for (const calidad of CALIDADES) {
+    const base64 = await new Promise(resolve => {
+      canvas.toBlob(blob => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.readAsDataURL(blob);
+      }, "image/jpeg", calidad);
+    });
+
+    ultimoBase64 = base64;
+    const pesoKB = Math.round((base64.length * 0.75) / 1024);
+    if (pesoKB <= PESO_OBJETIVO_KB) break; // ya entra cómodo, no hace falta seguir bajando calidad
+  }
+
+  return { base64: ultimoBase64, tipoMime: "image/jpeg" };
+}
+
+/** Handles the file picker: compresses the chosen image, then uploads it to Drive */
+async function onSeleccionarArchivoImagenProducto(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+
+  const statusEl = document.getElementById("pmImagenStatus");
+
+  if (!file.type.startsWith("image/")) {
+    if (statusEl) { statusEl.className = "pm-image-status error"; statusEl.textContent = "Elegí un archivo de imagen (jpg, png, webp)."; }
+    event.target.value = "";
+    return;
+  }
+
+  // Tope de seguridad sobre el archivo original: una foto de celular normal
+  // pesa 2-8MB. Más que esto probablemente sea un error de selección
+  // (video, RAW, etc.) — se rechaza antes de gastar tiempo procesándolo.
+  const TAMANO_ORIGINAL_MAXIMO_MB = 20;
+  if (file.size > TAMANO_ORIGINAL_MAXIMO_MB * 1024 * 1024) {
+    if (statusEl) { statusEl.className = "pm-image-status error"; statusEl.textContent = `⚠️ El archivo pesa demasiado (máx. ${TAMANO_ORIGINAL_MAXIMO_MB}MB). Elegí una foto más liviana.`; }
+    event.target.value = "";
+    return;
+  }
+
+  // Local preview inmediata, mientras se comprime y sube en segundo plano
+  const localUrl = URL.createObjectURL(file);
+  const preview = document.getElementById("pmImagenPreview");
+  if (preview) preview.innerHTML = `<img src="${localUrl}" alt="">`;
+
+  if (statusEl) { statusEl.className = "pm-image-status uploading"; statusEl.textContent = "⏳ Optimizando imagen..."; }
+
+  try {
+    const pesoOriginalKB = Math.round(file.size / 1024);
+    const { base64, tipoMime } = await comprimirImagenProducto(file);
+    const pesoFinalKB = Math.round((base64.length * 0.75) / 1024); // estimación: base64 pesa ~33% más que los bytes reales
+
+    if (statusEl) {
+      statusEl.className = "pm-image-status uploading";
+      statusEl.textContent = pesoFinalKB < pesoOriginalKB
+        ? `⏳ Subiendo a Drive... (${pesoOriginalKB}KB → ${pesoFinalKB}KB)`
+        : "⏳ Subiendo a Drive...";
+    }
+
+    const codigoProducto = document.getElementById("pmCodigo").value.trim() || document.getElementById("pmCodigoOriginal").value.trim();
+
+    const response = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" }, // evita preflight CORS contra Apps Script
+      body: JSON.stringify({
+        action: "subirImagenProducto",
+        imagenBase64: base64,
+        tipoMime: tipoMime,
+        codigoProducto: codigoProducto
+      })
+    });
+
+    const data = await response.json();
+
+    if (!data.success) {
+      if (statusEl) { statusEl.className = "pm-image-status error"; statusEl.textContent = "⚠️ " + (data.message || "No se pudo subir la imagen."); }
+      return;
+    }
+
+    document.getElementById("pmImagen").value = data.url;
+    if (statusEl) { statusEl.className = "pm-image-status success"; statusEl.textContent = `✓ Imagen subida (${pesoFinalKB}KB)`; }
+
+  } catch (error) {
+    console.error("Error al subir imagen de producto:", error);
+    if (statusEl) { statusEl.className = "pm-image-status error"; statusEl.textContent = "⚠️ Error de conexión al subir la imagen."; }
+  } finally {
+    URL.revokeObjectURL(localUrl);
+  }
+}
+
+/** Fills the category <datalist> with the distinct categories already in use */
+function poblarCategoriasDatalist() {
+  const datalist = document.getElementById("pmCategoriasList");
+  if (!datalist) return;
+  const categorias = [...new Set(
+    productosAdminGlobal.map(p => String(p.CATEGORIA || "").trim()).filter(Boolean)
+  )].sort();
+  datalist.innerHTML = categorias.map(c => `<option value="${escapeHtml(c)}"></option>`).join("");
+}
+
+/** Saves the product form — creates a new product or updates an existing one */
+async function guardarProductoForm() {
+  const codigoOriginal = document.getElementById("pmCodigoOriginal").value.trim();
+  const codigo   = document.getElementById("pmCodigo").value.trim();
+  const nombre   = document.getElementById("pmNombre").value.trim();
+  const categoria = document.getElementById("pmCategoria").value.trim();
+  const precio   = document.getElementById("pmPrecio").value;
+  const stock    = document.getElementById("pmStock").value;
+  const imagen   = document.getElementById("pmImagen").value.trim();
+  const publicado = document.getElementById("pmPublicado").checked ? "SI" : "NO";
+  const destacado  = document.getElementById("pmDestacado").checked ? "SI" : "NO";
+  const oferta     = document.getElementById("pmOferta").checked ? "SI" : "NO";
+
+  if (!nombre) { toast("El nombre del producto es obligatorio", "error"); return; }
+  if (precio === "" || Number(precio) < 0) { toast("Ingresá un precio válido", "error"); return; }
+
+  const esEdicion = !!codigoOriginal;
+  const btn = document.getElementById("btnGuardarProducto");
+  const textoOriginal = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = "Guardando...";
+
+  try {
+    const params = new URLSearchParams({
+      action: esEdicion ? "actualizarProducto" : "guardarProducto",
+      CODIGO: codigo,
+      PRODUCTO: nombre,
+      CATEGORIA: categoria,
+      PRECIO: precio || 0,
+      STOCK: stock || 0,
+      IMAGEN: imagen,
+      PUBLICADO: publicado,
+      DESTACADO: destacado,
+      OFERTA: oferta
+    });
+    if (esEdicion) params.set("codigoOriginal", codigoOriginal);
+
+    const response = await fetch(API_URL + "?" + params.toString());
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo guardar el producto", "error");
+      return;
+    }
+
+    toast(esEdicion ? "Producto actualizado" : "Producto creado", "success");
+    cerrarModalProducto();
+    cargarProductos();
+
+    // Refresh in-memory POS catalog too, so the new/edited product shows up right away
+    productosPOS = [];
+
+  } catch (error) {
+    console.error("Error al guardar producto:", error);
+    toast("Error de conexión al guardar el producto", "error");
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = textoOriginal;
+  }
+}
+
+/** Deletes a product after confirmation */
+async function eliminarProducto(codigo) {
+  if (!confirm("¿Eliminar el producto \"" + codigo + "\"? Esta acción no se puede deshacer.")) return;
+
+  try {
+    const params = new URLSearchParams({ action: "eliminarProducto", codigo });
+    const response = await fetch(API_URL + "?" + params.toString());
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo eliminar el producto", "error");
+      return;
+    }
+
+    toast("Producto eliminado", "success");
+    cargarProductos();
+    productosPOS = [];
+
+  } catch (error) {
+    console.error("Error al eliminar producto:", error);
+    toast("Error de conexión al eliminar el producto", "error");
+  }
+}
+
+/* ===================== CLIENTES ===================== */
+
+let clientesGlobal = [];
+
+/** Refresca manualmente la tabla de clientes desde el backend, con feedback visual en el botón */
+async function actualizarClientesForm() {
+  const btn = document.getElementById("btnActualizarClientes");
+  const textoOriginal = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = "Actualizando...";
+
+  try {
+    await cargarClientesDesdeBackend();
+    toast("Clientes actualizados", "success");
+  } catch (error) {
+    console.error("Error al actualizar clientes:", error);
+    toast("Error de conexión al actualizar", "error");
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = textoOriginal;
+  }
+}
+
+async function cargarClientesDesdeBackend() {
+  try {
+    const response = await fetch(API_URL + "?action=clientesConCredito");
+    const data = await response.json();
+    if (!data.clientes) return;
+    clientesGlobal = data.clientes;
+    filtrarClientes();
+  } catch (error) {
+    console.error("Error clientes:", error);
+  }
+}
+
+function renderTablaClientes(lista) {
+  const cont = document.getElementById("tablaClientes");
+  if (!cont) return;
+
+  if (!lista || lista.length === 0) {
+    cont.innerHTML = `<div class="text-center text-muted py-5" style="font-size:14px;">No se encontraron clientes</div>`;
+    return;
+  }
+
+  const html = lista.map(c => {
+    const esCredito = String(c.A_CREDITO || "").toUpperCase() === "SI";
+    const saldoArs = Number(c.SALDO_PENDIENTE_ARS || 0);
+    const saldoUsd = Number(c.SALDO_PENDIENTE_USD || 0);
+    const tieneSaldo = esCredito && (saldoArs > 0 || saldoUsd > 0);
+
+    // Borde color: rojo si tiene deuda, verde si es crédito sin deuda, azul por defecto
+    const bordeClase = tieneSaldo ? "cliente-card-deuda" : (esCredito ? "cliente-card-credito" : "");
+
+    // Saldo
+    let saldoHtml = "";
+    if (esCredito) {
+      const partes = [];
+      if (saldoArs > 0) partes.push(`<span style="color:var(--red-500);font-weight:700;">$${saldoArs.toLocaleString("es-AR")}</span>`);
+      if (saldoUsd > 0) partes.push(`<span style="color:var(--red-500);font-weight:700;">US$${saldoUsd.toLocaleString("es-AR")}</span>`);
+      saldoHtml = partes.length > 0
+        ? `<span class="cliente-dato-label">Saldo</span> ${partes.join(" · ")}`
+        : `<span class="cliente-dato-label">Saldo</span> <span class="text-muted" style="font-size:12px;">Sin deuda</span>`;
+    }
+
+    const botones = c.CLIENTE_ID
+      ? `<button class="btn btn-outline-secondary btn-sm" onclick="abrirModalDetalleCliente('${escapeHtml(c.CLIENTE_ID)}')">Ver cuenta</button>
+         <button class="btn btn-warning btn-sm" onclick="abrirModalDeudaExtraDirecto('${escapeHtml(c.CLIENTE_ID)}', '${escapeHtml(c.NOMBRE || c.CLIENTE)}')">+ Deuda</button>
+         <button class="btn btn-primary btn-sm" onclick="abrirModalEditarCliente('${escapeHtml(c.CLIENTE_ID)}')">Editar</button>
+         <button class="btn btn-danger btn-sm" onclick="eliminarClienteForm('${escapeHtml(c.CLIENTE_ID)}', '${escapeHtml(c.NOMBRE)}')">Eliminar</button>`
+      : `<button class="btn btn-outline-success btn-sm" onclick="marcarClienteDesdeHistorialACredito('${escapeHtml(c.DNI)}')">Marcar a crédito</button>`;
+
+    return `
+    <div class="pedido-card ${bordeClase}">
+      <div class="pedido-card-top">
+        <div style="flex:1; min-width:0;">
+          <div class="pedido-card-id">${escapeHtml(c.DNI || "")}</div>
+          <div class="pedido-card-cliente">
+            ${escapeHtml(c.NOMBRE || c.CLIENTE)}
+            ${c.ALIAS ? `<span style="font-weight:500;color:var(--slate-500);font-size:13px;">· ${escapeHtml(c.ALIAS)}</span>` : ""}
+          </div>
+          <div class="pedido-card-dir" style="margin-top:4px; display:flex; flex-wrap:wrap; gap:10px;">
+            ${c.EMPRESA   ? `<span>🚚 ${escapeHtml(c.EMPRESA)}</span>` : ""}
+            ${c.TELEFONO  ? `<span>📞 ${escapeHtml(c.TELEFONO)}</span>` : ""}
+            ${c.DIRECCION ? `<span>📍 ${escapeHtml(c.DIRECCION)}</span>` : ""}
+          </div>
+        </div>
+        <div class="text-end" style="flex-shrink:0;">
+          <div class="pedido-card-total" style="font-size:15px;">$${Number(c.TOTAL_COMPRADO || c.TOTAL || 0).toLocaleString("es-AR")}</div>
+          <div style="font-size:11px;color:var(--slate-500);margin-top:1px;">${c.PEDIDOS || 0} pedido${c.PEDIDOS !== 1 ? "s" : ""}</div>
+          <div class="mt-1">
+            ${esCredito
+              ? `<span class="pedido-estado-badge preparando">A crédito</span>`
+              : `<span class="pedido-estado-badge" style="background:var(--slate-100);color:var(--slate-500);">Contado</span>`}
+          </div>
+          ${tieneSaldo ? `<div class="mt-1" style="font-size:12px;">${saldoHtml}</div>` : ""}
+        </div>
+      </div>
+      <div class="pedido-card-controls">
+        ${botones}
+      </div>
+    </div>`;
+  }).join("");
+
+  cont.innerHTML = html;
+}
+
+/** Filters the already-loaded client list by name, alias, empresa, or DNI — no new backend call. Also applies the "solo crédito" checkbox. */
+function filtrarClientes() {
+  const input = document.getElementById("buscarCliente");
+  const soloCredito = document.getElementById("filtroSoloCredito");
+  const termino = (input ? input.value : "").toLowerCase().trim();
+
+  let filtrados = clientesGlobal;
+
+  if (termino) {
+    filtrados = filtrados.filter(c => {
+      const nombre = String(c.NOMBRE || c.CLIENTE || "").toLowerCase();
+      const alias = String(c.ALIAS || "").toLowerCase();
+      const empresa = String(c.EMPRESA || "").toLowerCase();
+      const dni = String(c.DNI || "").toLowerCase();
+      return nombre.includes(termino) || alias.includes(termino) || empresa.includes(termino) || dni.includes(termino);
+    });
+  }
+
+  if (soloCredito && soloCredito.checked) {
+    filtrados = filtrados.filter(c => String(c.A_CREDITO || "").toUpperCase() === "SI");
+  }
+
+  renderTablaClientes(filtrados);
+}
+
+/**
+ * Wrapper público: mantiene el nombre que ya usan el menú y el timer de
+ * fondo, pero evita pedir de nuevo al backend si se llamó hace menos de
+ * VENCIMIENTO_CACHE_MS (ej: el cajero entra y sale de Clientes seguido).
+ */
+function cargarClientes() {
+  cargarSiVencido("clientes", cargarClientesDesdeBackend);
+}
+
+/* ===================== CLIENTES — ALTA Y CRÉDITO ===================== */
+
+function abrirModalNuevoCliente() {
+  document.getElementById("clClienteIdEditando").value = "";
+  document.getElementById("clienteModalTitulo").textContent = "+ Nuevo Cliente";
+  document.getElementById("clACreditoWrap").style.display = "block";
+  document.getElementById("clNombre").value = "";
+  document.getElementById("clAlias").value = "";
+  document.getElementById("clDni").value = "";
+  document.getElementById("clTelefono").value = "";
+  document.getElementById("clEmpresa").value = "";
+  document.getElementById("clDireccion").value = "";
+  document.getElementById("clACredito").checked = false;
+  document.getElementById("clienteModalBackdrop").classList.add("show");
+}
+
+/** Opens the same client modal, pre-filled for editing — now also shows the "a crédito" checkbox, pre-checked with the client's current value, so it can be toggled directly from here */
+function abrirModalEditarCliente(clienteId) {
+  const cliente = clientesGlobal.find(c => String(c.CLIENTE_ID) === String(clienteId));
+  if (!cliente) { toast("No se encontró el cliente", "error"); return; }
+
+  document.getElementById("clClienteIdEditando").value = clienteId;
+  document.getElementById("clienteModalTitulo").textContent = "✏️ Editar Cliente";
+  document.getElementById("clACreditoWrap").style.display = "block";
+  document.getElementById("clNombre").value = cliente.NOMBRE || "";
+  document.getElementById("clAlias").value = cliente.ALIAS || "";
+  document.getElementById("clDni").value = cliente.DNI || "";
+  document.getElementById("clTelefono").value = cliente.TELEFONO || "";
+  document.getElementById("clEmpresa").value = cliente.EMPRESA || "";
+  document.getElementById("clDireccion").value = cliente.DIRECCION || "";
+  document.getElementById("clACredito").checked = String(cliente.A_CREDITO || "").toUpperCase() === "SI";
+  document.getElementById("clienteModalBackdrop").classList.add("show");
+}
+
+function cerrarModalNuevoCliente() {
+  document.getElementById("clienteModalBackdrop").classList.remove("show");
+}
+
+let guardandoCliente = false;
+
+async function guardarNuevoCliente() {
+  if (guardandoCliente) return; // evita doble click mientras la petición anterior sigue en vuelo
+  guardandoCliente = true;
+
+  const nombre = document.getElementById("clNombre").value.trim();
+  if (!nombre) {
+    toast("Ingresá el nombre del cliente", "error");
+    guardandoCliente = false;
+    return;
+  }
+
+  const clienteIdEditando = document.getElementById("clClienteIdEditando").value.trim();
+  const editando = !!clienteIdEditando;
+
+  const btn = document.getElementById("btnGuardarNuevoCliente");
+  const textoOriginal = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = "Guardando...";
+
+  try {
+    const cuerpo = editando
+      ? {
+          action: "editarCliente",
+          clienteId: clienteIdEditando,
+          nombre,
+          alias: document.getElementById("clAlias").value.trim(),
+          dni: document.getElementById("clDni").value.trim(),
+          telefono: document.getElementById("clTelefono").value.trim(),
+          empresa: document.getElementById("clEmpresa").value.trim(),
+          direccion: document.getElementById("clDireccion").value.trim(),
+          aCredito: document.getElementById("clACredito").checked ? "SI" : "NO"
+        }
+      : {
+          action: "crearCliente",
+          nombre,
+          alias: document.getElementById("clAlias").value.trim(),
+          dni: document.getElementById("clDni").value.trim(),
+          telefono: document.getElementById("clTelefono").value.trim(),
+          empresa: document.getElementById("clEmpresa").value.trim(),
+          direccion: document.getElementById("clDireccion").value.trim(),
+          aCredito: document.getElementById("clACredito").checked ? "SI" : "NO"
+        };
+
+    const response = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(cuerpo)
+    });
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || (editando ? "No se pudo editar el cliente" : "No se pudo crear el cliente"), "error");
+      return;
+    }
+
+    toast(editando ? "Cliente actualizado" : "Cliente creado", "success");
+    cerrarModalNuevoCliente();
+    await cargarClientesDesdeBackend();
+
+  } catch (error) {
+    console.error("Error al crear cliente:", error);
+    toast("Error de conexión al crear el cliente", "error");
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = textoOriginal;
+    guardandoCliente = false;
+  }
+}
+
+/** Used from the "Marcar a crédito" button on a client that only exists in the PEDIDOS-derived ranking (not yet in CLIENTES) */
+async function marcarClienteDesdeHistorialACredito(dni) {
+  if (!confirm(`¿Crear un registro de cliente para "${dni}" y marcarlo a crédito?`)) return;
+
+  try {
+    const response = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action: "crearClienteDesdeHistorialYMarcarCredito", dni })
+    });
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo marcar a crédito", "error");
+      return;
+    }
+
+    toast("Cliente marcado a crédito", "success");
+    cargarClientesDesdeBackend();
+
+  } catch (error) {
+    console.error("Error al marcar cliente a crédito:", error);
+    toast("Error de conexión", "error");
+  }
+}
+
+/** Deletes a client — only removes the CLIENTES row, never touches their past PEDIDOS or PAGOS_CREDITO history */
+async function eliminarClienteForm(clienteId, nombre) {
+  const cliente = clientesGlobal.find(c => String(c.CLIENTE_ID) === String(clienteId));
+  const tieneSaldo = cliente && (Number(cliente.SALDO_PENDIENTE_ARS || 0) > 0 || Number(cliente.SALDO_PENDIENTE_USD || 0) > 0);
+
+  const mensaje = tieneSaldo
+    ? `⚠️ "${nombre}" todavía tiene saldo pendiente. ¿Eliminar igual su ficha de cliente? (sus pedidos y pagos pasados NO se borran, solo deja de aparecer en esta lista como cliente)`
+    : `¿Eliminar al cliente "${nombre}"? Sus pedidos y pagos pasados no se borran, solo su ficha de cliente.`;
+
+  if (!confirm(mensaje)) return;
+
+  try {
+    const response = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action: "eliminarCliente", clienteId })
+    });
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo eliminar el cliente", "error");
+      return;
+    }
+
+    toast("Cliente eliminado", "success");
+    cargarClientesDesdeBackend();
+
+  } catch (error) {
+    console.error("Error al eliminar cliente:", error);
+    toast("Error de conexión al eliminar el cliente", "error");
+  }
+}
+
+let detalleClienteDatosActuales = null;
+
+async function abrirModalDetalleCliente(clienteId) {
+  document.getElementById("detalleClienteModalBackdrop").classList.add("show");
+  document.getElementById("detalleClienteNombre").textContent = "Cargando...";
+  document.getElementById("pagoMonto").value = "";
+  document.getElementById("pagoObservaciones").value = "";
+  document.getElementById("pagoMonedaPago").value = "ARS";
+  document.getElementById("pagoPrioridad").value = "ARS";
+  document.getElementById("pagoTipoCambio").value = "";
+  document.getElementById("pagoTipoCambioWrap").style.display = "none";
+  const btnPago = document.getElementById("btnRegistrarPago");
+  if (btnPago) { btnPago.disabled = false; btnPago.textContent = "💾 Registrar pago"; }
+  detalleClienteIdActual = clienteId;
+
+  try {
+    const response = await fetch(API_URL + "?action=detalleClienteCredito&clienteId=" + encodeURIComponent(clienteId));
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo cargar el cliente", "error");
+      cerrarModalDetalleCliente();
+      return;
+    }
+
+    detalleClienteDatosActuales = data;
+
+    document.getElementById("detalleClienteNombre").textContent =
+      data.cliente.ALIAS ? `${data.cliente.NOMBRE} (${data.cliente.ALIAS})` : data.cliente.NOMBRE;
+
+    const esCredito = String(data.cliente.A_CREDITO || "").toUpperCase() === "SI";
+
+    document.getElementById("cardAvisoNoCredito").style.display = esCredito ? "none" : "block";
+    document.getElementById("cardFormularioPago").style.display = esCredito ? "block" : "none";
+
+    if (esCredito) {
+      // Cliente a crédito: los números son una deuda real, vienen
+      // calculados del backend (ya restan los pagos registrados).
+      document.getElementById("detalleClienteTotalCompradoArs").textContent = "$" + Number(data.totalCompradoArs).toLocaleString("es-AR");
+      document.getElementById("detalleClienteTotalPagadoArs").textContent = "$" + Number(data.totalPagadoArs).toLocaleString("es-AR");
+      document.getElementById("detalleClienteSaldoArs").textContent = "$" + Number(data.saldoPendienteArs).toLocaleString("es-AR");
+
+      document.getElementById("detalleClienteTotalCompradoUsd").textContent = "US$" + Number(data.totalCompradoUsd).toLocaleString("es-AR");
+      document.getElementById("detalleClienteTotalPagadoUsd").textContent = "US$" + Number(data.totalPagadoUsd).toLocaleString("es-AR");
+      document.getElementById("detalleClienteSaldoUsd").textContent = "US$" + Number(data.saldoPendienteUsd).toLocaleString("es-AR");
+    } else {
+      // Cliente NO a crédito: sus pedidos fueron compras al contado.
+      // El total comprado es solo informativo (no es deuda), y el
+      // saldo pendiente siempre es $0 — nunca debe nada.
+      let totalArsInformativo = 0, totalUsdInformativo = 0;
+      (data.pedidos || []).forEach(p => {
+        if (String(p.MONEDA || "ARS").toUpperCase() === "USD") totalUsdInformativo += Number(p.TOTAL || 0);
+        else totalArsInformativo += Number(p.TOTAL || 0);
+      });
+
+      document.getElementById("detalleClienteTotalCompradoArs").textContent = "$" + totalArsInformativo.toLocaleString("es-AR");
+      document.getElementById("detalleClienteTotalPagadoArs").textContent = "$" + totalArsInformativo.toLocaleString("es-AR");
+      document.getElementById("detalleClienteSaldoArs").textContent = "$0";
+
+      document.getElementById("detalleClienteTotalCompradoUsd").textContent = "US$" + totalUsdInformativo.toLocaleString("es-AR");
+      document.getElementById("detalleClienteTotalPagadoUsd").textContent = "US$" + totalUsdInformativo.toLocaleString("es-AR");
+      document.getElementById("detalleClienteSaldoUsd").textContent = "US$0";
+    }
+
+    const pedidosTbody = document.getElementById("detalleClientePedidosTabla");
+    pedidosTbody.innerHTML = data.pedidos.length === 0
+      ? `<tr><td colspan="4" class="text-center text-muted">Sin pedidos</td></tr>`
+      : data.pedidos.map(p => {
+          const moneda = String(p.MONEDA || "ARS").toUpperCase();
+          const simbolo = moneda === "USD" ? "US$" : "$";
+          return `
+          <tr>
+            <td>${p.FECHA ? new Date(p.FECHA).toLocaleDateString("es-AR") : "—"}</td>
+            <td class="money">${simbolo}${Number(p.TOTAL || 0).toLocaleString("es-AR")}</td>
+            <td>${moneda}${moneda === "USD" && p.TIPO_CAMBIO ? ` (TC ${p.TIPO_CAMBIO})` : ""}</td>
+            <td>${escapeHtml(p.ESTADO || "")}</td>
+          </tr>`;
+        }).join("");
+
+    const pagosTbody = document.getElementById("detalleClientePagosTabla");
+    pagosTbody.innerHTML = data.pagos.length === 0
+      ? `<tr><td colspan="6" class="text-center text-muted">Sin pagos registrados todavía</td></tr>`
+      : data.pagos.map(pago => `
+          <tr>
+            <td>${pago.FECHA ? new Date(pago.FECHA).toLocaleDateString("es-AR") : "—"}</td>
+            <td class="money">${String(pago.MONEDA_PAGO || "ARS").toUpperCase() === "USD" ? "US$" : "$"}${Number(pago.MONTO_PAGO || 0).toLocaleString("es-AR")}</td>
+            <td class="money">${Number(pago.MONTO_APLICADO_ARS || 0) > 0 ? "$" + Number(pago.MONTO_APLICADO_ARS).toLocaleString("es-AR") : "—"}</td>
+            <td class="money">${Number(pago.MONTO_APLICADO_USD || 0) > 0 ? "US$" + Number(pago.MONTO_APLICADO_USD).toLocaleString("es-AR") : "—"}</td>
+            <td>${escapeHtml(pago.FORMA_PAGO || "")}</td>
+            <td>${escapeHtml(pago.OBSERVACIONES || "")}</td>
+          </tr>`).join("");
+
+    // Deudas extra
+    const deudasExtra = data.deudasExtra || [];
+    const deudasWrap = document.getElementById("deudaExtraTablaWrap");
+    const deudasTbody = document.getElementById("detalleClienteDeudasExtraTabla");
+    if (deudasExtra.length > 0) {
+      deudasWrap.style.display = "block";
+      deudasTbody.innerHTML = deudasExtra.map(d => {
+        const simbolo = String(d.MONEDA || "ARS").toUpperCase() === "USD" ? "US$" : "$";
+        return `<tr>
+          <td>${d.FECHA ? new Date(d.FECHA).toLocaleDateString("es-AR") : "—"}</td>
+          <td>${escapeHtml(String(d.MONEDA || "ARS").toUpperCase())}</td>
+          <td class="money">${simbolo}${Number(d.MONTO || 0).toLocaleString("es-AR")}</td>
+          <td>${escapeHtml(d.CONCEPTO || "")}</td>
+        </tr>`;
+      }).join("");
+    } else {
+      deudasWrap.style.display = "none";
+    }
+
+  } catch (error) {
+    console.error("Error al cargar el detalle del cliente:", error);
+    toast("Error de conexión al cargar el cliente", "error");
+  }
+}
+
+function cerrarModalDetalleCliente() {
+  document.getElementById("detalleClienteModalBackdrop").classList.remove("show");
+  detalleClienteIdActual = null;
+  detalleClienteDatosActuales = null;
+}
+
+let deudaExtraClienteId = null;
+
+function abrirModalDeudaExtraDirecto(clienteId, nombre) {
+  deudaExtraClienteId = clienteId;
+  document.getElementById("deudaExtraModalNombre").textContent = nombre;
+  document.getElementById("deudaExtraModalMonto").value = "";
+  document.getElementById("deudaExtraModalMoneda").value = "ARS";
+  document.getElementById("deudaExtraModalConcepto").value = "";
+  const btnDeuda = document.getElementById("btnRegistrarDeudaExtra");
+  if (btnDeuda) { btnDeuda.disabled = false; btnDeuda.textContent = "💾 Registrar deuda"; }
+  document.getElementById("deudaExtraModalBackdrop").classList.add("show");
+  setTimeout(() => document.getElementById("deudaExtraModalMonto").focus(), 100);
+}
+
+function cerrarModalDeudaExtra() {
+  document.getElementById("deudaExtraModalBackdrop").classList.remove("show");
+  deudaExtraClienteId = null;
+}
+
+async function registrarDeudaExtraForm() {
+  if (!deudaExtraClienteId) return;
+
+  const monto = Number(document.getElementById("deudaExtraModalMonto").value);
+  if (!monto || monto <= 0) { toast("Ingresá un monto válido", "error"); return; }
+
+  const moneda = document.getElementById("deudaExtraModalMoneda").value;
+  const concepto = document.getElementById("deudaExtraModalConcepto").value.trim();
+  if (!concepto) { toast("El concepto es obligatorio", "error"); return; }
+
+  const btn = document.getElementById("btnRegistrarDeudaExtra");
+  if (btn) { btn.disabled = true; btn.textContent = "Registrando..."; }
+
+  try {
+    const response = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({
+        action: "crearDeudaExtra",
+        clienteId: deudaExtraClienteId,
+        monto,
+        moneda,
+        concepto
+      })
+    });
+    const data = await response.json();
+    if (!data.success) {
+      toast(data.message || "No se pudo registrar la deuda", "error");
+      if (btn) { btn.disabled = false; btn.textContent = "💾 Registrar deuda"; }
+      return;
+    }
+    toast("Deuda registrada correctamente", "success");
+    cerrarModalDeudaExtra();
+    cargarClientesDesdeBackend();
+  } catch (error) {
+    console.error("Error al registrar deuda extra:", error);
+    toast("Error de conexión al registrar la deuda", "error");
+    if (btn) { btn.disabled = false; btn.textContent = "💾 Registrar deuda"; }
+  }
+}
+
+function toggleFormDeudaExtra() {
+  const form = document.getElementById("deudaExtraForm");
+  const icon = document.getElementById("deudaExtraToggleIcon");
+  const visible = form.style.display !== "none";
+  form.style.display = visible ? "none" : "block";
+  icon.textContent = visible ? "▼ Expandir" : "▲ Cerrar";
+}
+
+/** Shows the exchange-rate field only when the payment currency and the priority currency differ — that's the only case where a conversion is actually needed */
+function actualizarVisibilidadTipoCambioPago() {
+  const monedaPago = document.getElementById("pagoMonedaPago").value;
+  const prioridad = document.getElementById("pagoPrioridad").value;
+  document.getElementById("pagoTipoCambioWrap").style.display = monedaPago !== prioridad ? "block" : "none";
+}
+
+async function registrarPagoCreditoForm() {
+  if (!detalleClienteIdActual) return;
+
+  const monto = Number(document.getElementById("pagoMonto").value);
+  if (!monto || monto <= 0) { toast("Ingresá un monto válido", "error"); return; }
+
+  const monedaPago = document.getElementById("pagoMonedaPago").value;
+  const prioridad = document.getElementById("pagoPrioridad").value;
+  const tipoCambio = document.getElementById("pagoTipoCambio").value.trim();
+
+  if (monedaPago !== prioridad && (!tipoCambio || Number(tipoCambio) <= 0)) {
+    toast("Ingresá el tipo de cambio para convertir entre pesos y dólares", "error");
+    return;
+  }
+
+  const btn = document.getElementById("btnRegistrarPago");
+  if (btn) { btn.disabled = true; btn.textContent = "Registrando..."; }
+
+  try {
+    const response = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({
+        action: "registrarPagoCredito",
+        clienteId: detalleClienteIdActual,
+        monto,
+        monedaPago,
+        prioridad,
+        tipoCambio: tipoCambio || "",
+        formaPago: document.getElementById("pagoFormaPago").value,
+        observaciones: document.getElementById("pagoObservaciones").value.trim()
+      })
+    });
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo registrar el pago", "error");
+      if (btn) { btn.disabled = false; btn.textContent = "💾 Registrar pago"; }
+      return;
+    }
+
+    toast("Pago registrado", "success");
+    abrirModalDetalleCliente(detalleClienteIdActual);
+    cargarClientesDesdeBackend();
+
+  } catch (error) {
+    console.error("Error al registrar el pago:", error);
+    toast("Error de conexión al registrar el pago", "error");
+    if (btn) { btn.disabled = false; btn.textContent = "💾 Registrar pago"; }
+  }
+}
+
+let detalleClienteIdActual = null;
+
+/**
+ * Genera un informe A4 (no térmico) con el resumen de cuenta del
+ * cliente que está abierto en el modal de detalle — saldos por
+ * moneda, detalle de pedidos, y detalle de pagos. Reutiliza
+ * #etiquetasPrintArea, el mismo contenedor que ya usa el sistema
+ * para imprimir en A4 (las etiquetas de producto usan el mismo
+ * mecanismo, ver imprimirEtiquetas).
+ */
+function imprimirInformeCliente() {
+  if (!detalleClienteDatosActuales) { toast("Esperá a que termine de cargar el cliente", "error"); return; }
+
+  const data = detalleClienteDatosActuales;
+  const cliente = data.cliente;
+  const fechaHoy = new Date().toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" });
+
+  const filasPedidos = data.pedidos.length === 0
+    ? `<tr><td colspan="4" style="text-align:center; color:#888;">Sin pedidos</td></tr>`
+    : data.pedidos.map(p => {
+        const moneda = String(p.MONEDA || "ARS").toUpperCase();
+        const simbolo = moneda === "USD" ? "US$" : "$";
+        return `<tr>
+          <td>${p.FECHA ? new Date(p.FECHA).toLocaleDateString("es-AR") : "—"}</td>
+          <td style="text-align:right;">${simbolo}${Number(p.TOTAL || 0).toLocaleString("es-AR")}</td>
+          <td>${moneda}</td>
+          <td>${escapeHtml(p.ESTADO || "")}</td>
+        </tr>`;
+      }).join("");
+
+  const filasPagos = data.pagos.length === 0
+    ? `<tr><td colspan="5" style="text-align:center; color:#888;">Sin pagos registrados</td></tr>`
+    : data.pagos.map(pago => `<tr>
+        <td>${pago.FECHA ? new Date(pago.FECHA).toLocaleDateString("es-AR") : "—"}</td>
+        <td style="text-align:right;">${String(pago.MONEDA_PAGO || "ARS").toUpperCase() === "USD" ? "US$" : "$"}${Number(pago.MONTO_PAGO || 0).toLocaleString("es-AR")}</td>
+        <td style="text-align:right;">${Number(pago.MONTO_APLICADO_ARS || 0) > 0 ? "$" + Number(pago.MONTO_APLICADO_ARS).toLocaleString("es-AR") : "—"}</td>
+        <td style="text-align:right;">${Number(pago.MONTO_APLICADO_USD || 0) > 0 ? "US$" + Number(pago.MONTO_APLICADO_USD).toLocaleString("es-AR") : "—"}</td>
+        <td>${escapeHtml(pago.FORMA_PAGO || "")}</td>
+      </tr>`).join("");
+
+  const html = `
+    <div style="font-family:Arial, sans-serif; color:#1a1a1a; padding:10mm;">
+      <h2 style="margin:0 0 4px;">${escapeHtml((configNegocioCache && configNegocioCache.nombre) || "Informe de cuenta")}</h2>
+      <div style="color:#666; font-size:12px; margin-bottom:18px;">Informe de cuenta corriente — generado el ${fechaHoy}</div>
+
+      <div style="border:1px solid #ddd; border-radius:8px; padding:12px 16px; margin-bottom:18px;">
+        <strong>${escapeHtml(cliente.NOMBRE)}</strong>${cliente.ALIAS ? ` (${escapeHtml(cliente.ALIAS)})` : ""}<br>
+        ${cliente.DNI ? `DNI/CUIT: ${escapeHtml(cliente.DNI)}<br>` : ""}
+        ${cliente.TELEFONO ? `Tel: ${escapeHtml(cliente.TELEFONO)}<br>` : ""}
+        ${cliente.DIRECCION ? `Dirección: ${escapeHtml(cliente.DIRECCION)}` : ""}
+      </div>
+
+      <table style="width:100%; border-collapse:collapse; margin-bottom:18px;">
+        <tr style="background:#f4f4f4;">
+          <th style="padding:8px; text-align:left; border:1px solid #ddd;"></th>
+          <th style="padding:8px; text-align:right; border:1px solid #ddd;">Comprado</th>
+          <th style="padding:8px; text-align:right; border:1px solid #ddd;">Pagado</th>
+          <th style="padding:8px; text-align:right; border:1px solid #ddd;">Saldo</th>
+        </tr>
+        <tr>
+          <td style="padding:8px; border:1px solid #ddd;"><strong>Pesos (ARS)</strong></td>
+          <td style="padding:8px; text-align:right; border:1px solid #ddd;">$${Number(data.totalCompradoArs).toLocaleString("es-AR")}</td>
+          <td style="padding:8px; text-align:right; border:1px solid #ddd;">$${Number(data.totalPagadoArs).toLocaleString("es-AR")}</td>
+          <td style="padding:8px; text-align:right; border:1px solid #ddd; font-weight:bold;">$${Number(data.saldoPendienteArs).toLocaleString("es-AR")}</td>
+        </tr>
+        <tr>
+          <td style="padding:8px; border:1px solid #ddd;"><strong>Dólares (USD)</strong></td>
+          <td style="padding:8px; text-align:right; border:1px solid #ddd;">US$${Number(data.totalCompradoUsd).toLocaleString("es-AR")}</td>
+          <td style="padding:8px; text-align:right; border:1px solid #ddd;">US$${Number(data.totalPagadoUsd).toLocaleString("es-AR")}</td>
+          <td style="padding:8px; text-align:right; border:1px solid #ddd; font-weight:bold;">US$${Number(data.saldoPendienteUsd).toLocaleString("es-AR")}</td>
+        </tr>
+      </table>
+
+      <h4 style="margin:0 0 8px;">Pedidos</h4>
+      <table style="width:100%; border-collapse:collapse; margin-bottom:18px; font-size:13px;">
+        <tr style="background:#f4f4f4;">
+          <th style="padding:6px; text-align:left; border:1px solid #ddd;">Fecha</th>
+          <th style="padding:6px; text-align:right; border:1px solid #ddd;">Total</th>
+          <th style="padding:6px; text-align:left; border:1px solid #ddd;">Moneda</th>
+          <th style="padding:6px; text-align:left; border:1px solid #ddd;">Estado</th>
+        </tr>
+        ${filasPedidos}
+      </table>
+
+      <h4 style="margin:0 0 8px;">Pagos</h4>
+      <table style="width:100%; border-collapse:collapse; font-size:13px;">
+        <tr style="background:#f4f4f4;">
+          <th style="padding:6px; text-align:left; border:1px solid #ddd;">Fecha</th>
+          <th style="padding:6px; text-align:right; border:1px solid #ddd;">Pago</th>
+          <th style="padding:6px; text-align:right; border:1px solid #ddd;">Aplicado ARS</th>
+          <th style="padding:6px; text-align:right; border:1px solid #ddd;">Aplicado USD</th>
+          <th style="padding:6px; text-align:left; border:1px solid #ddd;">Forma</th>
+        </tr>
+        ${filasPagos}
+      </table>
+    </div>
+  `;
+
+  document.getElementById("etiquetasPrintArea").innerHTML = html;
+
+  setTimeout(() => {
+    window.print();
+  }, 100);
+}
+
+/**
+ * Imprime una etiqueta de envío A4 para un pedido en estado PREPARANDO.
+ * Usa el mismo #etiquetasPrintArea que el resto de las impresiones A4.
+ * Incluye un código de barras Code128 con el número de pedido, generado
+ * con JsBarcode (ya cargado en el panel).
+ */
+function imprimirEtiquetaEnvio(datos) {
+  const { pedidoId, cliente, telefono, direccion, localidad, provincia, codigoPostal, dni, transporte } = datos;
+
+  const cpStr = codigoPostal ? `  CP:${codigoPostal}` : "";
+  const localidadStr = [localidad, cpStr].filter(Boolean).join("").trim();
+
+  const html = `
+    <div style="
+      font-family: Arial, Helvetica, sans-serif;
+      width: 190mm;
+      min-height: 130mm;
+      margin: 10mm auto;
+      padding: 8mm;
+      box-sizing: border-box;
+      border: 2px solid #000;
+      border-radius: 4mm;
+      page-break-inside: avoid;
+    ">
+
+      <!-- Franja frágil / cabecera -->
+      <div style="background:#d32f2f; color:#fff; text-align:center; padding:6mm 4mm; border-radius:2mm; margin-bottom:6mm;">
+        <div style="font-size:18pt; font-weight:900; letter-spacing:2px; text-transform:uppercase;">POR FAVOR</div>
+        <div style="font-size:11pt; font-weight:700; letter-spacing:4px; text-transform:uppercase;">MANEJESE CON CUIDADO</div>
+        <div style="font-size:26pt; font-weight:900; letter-spacing:6px; margin:4px 0;">FRAGIL</div>
+        <div style="font-size:11pt; font-weight:700; letter-spacing:3px;">== GRACIAS ==</div>
+      </div>
+
+      <!-- Datos del destinatario -->
+      <table style="width:100%; border-collapse:collapse; font-size:13pt;">
+        <tr>
+          <td style="font-size:7pt; font-weight:700; text-transform:uppercase; color:#555; width:28mm; vertical-align:top; padding-top:4px;">Nombre:</td>
+          <td style="font-size:16pt; font-weight:900; text-transform:uppercase; letter-spacing:1px;">${escapeHtml(cliente)}</td>
+        </tr>
+        ${telefono ? `<tr>
+          <td style="font-size:7pt; font-weight:700; text-transform:uppercase; color:#555; padding-top:4px;">Teléfono:</td>
+          <td style="font-size:14pt; font-weight:700;">${escapeHtml(telefono)}</td>
+        </tr>` : ""}
+        ${direccion ? `<tr>
+          <td style="font-size:7pt; font-weight:700; text-transform:uppercase; color:#555; padding-top:4px;">Dirección:</td>
+          <td style="font-size:14pt; font-weight:700; text-transform:uppercase;">${escapeHtml(direccion)}</td>
+        </tr>` : ""}
+        ${localidadStr ? `<tr>
+          <td style="font-size:7pt; font-weight:700; text-transform:uppercase; color:#555; padding-top:4px;">Localidad:</td>
+          <td style="font-size:14pt; font-weight:700; text-transform:uppercase;">${escapeHtml(localidadStr)}</td>
+        </tr>` : ""}
+        ${provincia ? `<tr>
+          <td style="font-size:7pt; font-weight:700; text-transform:uppercase; color:#555; padding-top:4px;">Provincia:</td>
+          <td style="font-size:14pt; font-weight:700; text-transform:uppercase;">${escapeHtml(provincia)}</td>
+        </tr>` : ""}
+        ${dni ? `<tr>
+          <td style="font-size:7pt; font-weight:700; text-transform:uppercase; color:#555; padding-top:4px;">DNI:</td>
+          <td style="font-size:14pt; font-weight:700;">${escapeHtml(dni)}</td>
+        </tr>` : ""}
+        ${transporte ? `<tr>
+          <td style="font-size:7pt; font-weight:700; text-transform:uppercase; color:#555; padding-top:4px;">Transporte:</td>
+          <td style="font-size:14pt; font-weight:700; text-transform:uppercase;">${escapeHtml(transporte)}</td>
+        </tr>` : ""}
+      </table>
+
+      <!-- Código de barras con número de pedido -->
+      <div style="margin-top:6mm; text-align:center; border-top:1px solid #ddd; padding-top:4mm;">
+        <svg id="barcode-etiqueta-${pedidoId.replace(/[^a-zA-Z0-9]/g,'_')}"></svg>
+      </div>
+
+    </div>
+  `;
+
+  const area = document.getElementById("etiquetasPrintArea");
+  area.innerHTML = html;
+
+  // Generar el código de barras después de que el DOM esté listo
+  setTimeout(() => {
+    const svgId = `barcode-etiqueta-${pedidoId.replace(/[^a-zA-Z0-9]/g,'_')}`;
+    const svgEl = document.getElementById(svgId);
+    if (svgEl && typeof JsBarcode !== "undefined") {
+      JsBarcode(svgEl, pedidoId, {
+        format: "CODE128",
+        width: 2.5,
+        height: 60,
+        displayValue: true,
+        fontSize: 14,
+        margin: 8,
+        textMargin: 4
+      });
+    }
+    window.print();
+  }, 150);
+}
+
+/* ===================== STOCK BAJO / AGOTADOS / MAS VENDIDOS ===================== */
+
+async function cargarStockBajo() {
+  mostrarSeccion("stockBajoProductos");
+  try {
+    const response = await fetch(API_URL + "?action=productos");
+    const data = await response.json();
+    let html = "";
+    const filtrados = data.productos.filter(p => { const s = Number(p.STOCK || 0); return s > 0 && s <= 5; });
+    if (filtrados.length === 0) {
+      html = `<tr><td colspan="3" class="text-center text-muted py-4">Sin productos con stock bajo 🎉</td></tr>`;
+    }
+    filtrados.forEach(p => {
+      html += `<tr><td class="mono">${escapeHtml(p.CODIGO)}</td><td>${escapeHtml(p.PRODUCTO)}</td><td>${p.STOCK}</td></tr>`;
+    });
+    document.getElementById("tablaStockBajo").innerHTML = html;
+  } catch (error) {
+    console.error("Error stock bajo:", error);
+  }
+}
+
+async function cargarAgotados() {
+  mostrarSeccion("productosAgotados");
+  try {
+    const response = await fetch(API_URL + "?action=productos");
+    const data = await response.json();
+    let html = "";
+    const filtrados = data.productos.filter(p => Number(p.STOCK || 0) === 0);
+    if (filtrados.length === 0) {
+      html = `<tr><td colspan="3" class="text-center text-muted py-4">No hay productos agotados 🎉</td></tr>`;
+    }
+    filtrados.forEach(p => {
+      html += `<tr><td class="mono">${escapeHtml(p.CODIGO)}</td><td>${escapeHtml(p.PRODUCTO)}</td><td>0</td></tr>`;
+    });
+    document.getElementById("tablaAgotados").innerHTML = html;
+  } catch (error) {
+    console.error("Error agotados:", error);
+  }
+}
+
+async function cargarMasVendidos() {
+  try {
+    const response = await fetch(API_URL + "?action=masVendidos");
+    const data = await response.json();
+    let html = "";
+    (data.productos || []).forEach(p => {
+      html += `<tr><td class="mono">${p.CODIGO}</td><td>${p.PRODUCTO}</td><td>${p.VENDIDOS}</td></tr>`;
+    });
+    document.getElementById("tablaMasVendidos").innerHTML = html;
+  } catch (error) {
+    console.error("Error más vendidos:", error);
+  }
+}
+
+/* ===================================================================
+   PUNTO DE VENTA
+=================================================================== */
+
+let productosPOS    = [];
+let ticketPOS        = [];
+let categoriaActivaPOS = "TODAS";
+let formaPagoPOS    = "EFECTIVO";
+let ultimoCodigoAgregadoPOS = null; // usado por el atajo +/- de cantidad
+let posTileFocusIdx  = -1;          // índice de la tarjeta con foco de teclado en el grid
+
+// Descuento aplicado al ticket actual
+let descuentoTipoPOS   = "PORCENTAJE"; // "PORCENTAJE" | "MONTO"
+let descuentoValorPOS  = 0;            // valor ingresado (ej: 10 para 10%, o 500 para $500)
+let descuentoActivoPOS = false;
+
+async function asegurarProductosPOS() {
+  if (productosPOS.length === 0) {
+    const response = await fetch(API_URL + "?action=productos");
+    const data = await response.json();
+    productosPOS = data.productos || [];
+    construirCategoriasPOS();
+  }
+}
+
+function construirCategoriasPOS() {
+  const cont = document.getElementById("posCategorias");
+  if (!cont) return;
+
+  // Permite desplazar las categorías con la rueda normal del mouse
+  // (vertical), sin necesidad de Shift+rueda ni de arrastrar — se
+  // agrega una sola vez, porque este <div> no se recrea entre
+  // llamadas (solo cambia su innerHTML más abajo).
+  if (!cont.dataset.wheelListo) {
+    cont.addEventListener("wheel", (e) => {
+      if (e.deltaY === 0) return; // ya es un scroll horizontal nativo (trackpad), no interferir
+      e.preventDefault();
+      cont.scrollLeft += e.deltaY;
+    });
+    cont.dataset.wheelListo = "1";
+  }
+
+  const categorias = new Set();
+  productosPOS.forEach(p => { if (p.CATEGORIA) categorias.add(String(p.CATEGORIA).trim()); });
+  if (categorias.size === 0) { cont.innerHTML = ""; return; }
+  let html = `<div class="cat-chip active" data-cat="TODAS" onclick="filtrarCategoriaPOS('TODAS', this)">Todas</div>`;
+  categorias.forEach(c => {
+    html += `<div class="cat-chip" data-cat="${escapeHtml(c)}" onclick="filtrarCategoriaPOS('${escapeHtml(c)}', this)">${escapeHtml(c)}</div>`;
+  });
+  cont.innerHTML = html;
+}
+
+function filtrarCategoriaPOS(cat, el) {
+  categoriaActivaPOS = cat;
+  posTileFocusIdx = -1;
+  document.querySelectorAll(".cat-chip").forEach(c => c.classList.remove("active"));
+  if (el) el.classList.add("active");
+  renderPosGrid();
+}
+
+/* ---- product grid ---- */
+
+function renderPosGrid(filtroTexto) {
+  const grid = document.getElementById("posProductGrid");
+  if (!grid) return;
+
+  let lista = productosPOS;
+  if (categoriaActivaPOS && categoriaActivaPOS !== "TODAS") {
+    lista = lista.filter(p => String(p.CATEGORIA || "").trim() === categoriaActivaPOS);
+  }
+  if (filtroTexto) {
+    const texto = filtroTexto.toLowerCase();
+    lista = lista.filter(p =>
+      String(p.CODIGO).toLowerCase().includes(texto) ||
+      String(p.PRODUCTO).toLowerCase().includes(texto)
+    );
+  }
+
+  if (lista.length === 0) {
+    grid.innerHTML = `
+      <div class="pos-empty-state" style="grid-column:1/-1;">
+        <div class="ic">🔍</div>
+        <strong>Sin resultados</strong>
+        <span>Probá con otro código o nombre</span>
+      </div>`;
+    return;
+  }
+
+  let html = "";
+  const visibleList = lista.slice(0, 60);
+
+  visibleList.forEach((p, idx) => {
+    const stock     = p.STOCK !== undefined ? Number(p.STOCK) : null;
+    const agotado   = stock !== null && stock <= 0;
+    const stockBajo = stock !== null && stock > 0 && stock <= 5;
+
+    let stockBadge = "";
+    if (agotado)        stockBadge = `<span class="tile-stock out">Sin stock</span>`;
+    else if (stockBajo) stockBadge = `<span class="tile-stock low">Stock: ${stock}</span>`;
+    else if (stock !== null) stockBadge = `<span class="tile-stock ok">Stock: ${stock}</span>`;
+
+    const cat = p.CATEGORIA ? escapeHtml(String(p.CATEGORIA).trim()) : "";
+    const imagenUrl = p.IMAGEN ? String(p.IMAGEN).trim() : "";
+
+    html += `
+      <button type="button"
+        class="product-tile ${agotado ? "disabled" : ""}"
+        data-idx="${idx}"
+        ${agotado ? "disabled" : ""}>
+        <div class="tile-photo">
+          ${imagenUrl
+            ? `<img src="${escapeHtml(imagenUrl)}" alt="" loading="lazy" onerror="this.parentElement.innerHTML='🛒';">`
+            : "🛒"}
+        </div>
+        <div class="tile-info">
+          <span class="tile-code">${escapeHtml(p.CODIGO)}</span>
+          <span class="tile-name">${escapeHtml(p.PRODUCTO)}</span>
+          ${cat ? `<span class="tile-cat">${cat}</span>` : ""}
+        </div>
+        <div class="tile-right">
+          <span class="tile-price">$${Number(p.PRECIO || 0).toLocaleString("es-AR")}</span>
+          ${stockBadge}
+        </div>
+        <span class="tile-add">+</span>
+      </button>`;
+  });
+
+  grid.innerHTML = html;
+
+  grid.querySelectorAll(".product-tile[data-idx]").forEach(tile => {
+    const idx     = Number(tile.getAttribute("data-idx"));
+    const producto = visibleList[idx];
+    if (producto && !tile.disabled) {
+      tile.dataset.codigo = producto.CODIGO;
+      tile.addEventListener("click", () => agregarProductoPOS(producto.CODIGO));
+    }
+  });
+}
+
+function onPosInputKeyup(e) {
+  const input = e.target;
+  if (e.key === "Enter") {
+    const valor = input.value.trim();
+    if (valor !== "") {
+      agregarProductoPorCodigo(valor);
+      input.value = "";
+      renderPosGrid();
+    }
+    return;
+  }
+  posTileFocusIdx = -1;
+  // El redibujado de la grilla (hasta 60 tarjetas, cada una con su
+  // imagen y badges) se demora un poco para no reconstruirla en cada
+  // tecla mientras se escribe rápido — el Enter de arriba, en cambio,
+  // sigue siendo instantáneo, porque ahí la respuesta inmediata
+  // importa de verdad (escaneo de código de barras).
+  renderPosGridConDemora(input.value.trim());
+}
+
+const renderPosGridConDemora = debounce(renderPosGrid, 150);
+
+/* ---- adding items ---- */
+
+async function agregarProductoPorCodigo(codigo) {
+  codigo = String(codigo).trim();
+  if (codigo === "") return;
+  await asegurarProductosPOS();
+  const producto = productosPOS.find(p => String(p.CODIGO).trim().toLowerCase() === codigo.toLowerCase());
+  if (!producto) { toast(`Producto no encontrado: ${codigo}`, "error"); return; }
+  agregarProductoPOS(producto.CODIGO);
+}
+
+function agregarProductoPOS(codigo) {
+  codigo = String(codigo).trim();
+  const producto = productosPOS.find(p => String(p.CODIGO).trim() === codigo);
+  if (!producto) { toast("Producto no encontrado", "error"); return; }
+  const stock = producto.STOCK !== undefined ? Number(producto.STOCK) : null;
+  if (stock !== null && stock <= 0) { toast(`${producto.PRODUCTO} está sin stock`, "error"); return; }
+
+  const existente = ticketPOS.find(item => String(item.CODIGO).trim() === codigo);
+  if (existente) {
+    existente.cantidad++;
+  } else {
+    ticketPOS.push({ CODIGO: producto.CODIGO, PRODUCTO: producto.PRODUCTO, PRECIO: Number(producto.PRECIO || 0), cantidad: 1 });
+  }
+  renderTicketPOS();
+  flashTile(codigo);
+  mostrarUltimoEscaneado(producto);
+  ultimoCodigoAgregadoPOS = codigo;
+  scrollTicketAlProducto(codigo);
+
+  const input = document.getElementById("posBusqueda");
+  if (input) { input.value = ""; input.focus(); }
+}
+
+/** Scrolls the ticket list so the row for this product is visible (used when adding/incrementing it) */
+function scrollTicketAlProducto(codigo) {
+  const fila = document.querySelector(`.ticket-row[data-codigo="${cssEscape(codigo)}"]`);
+  if (fila) fila.scrollIntoView({ block: "end", behavior: "smooth" });
+}
+
+/** Updates the "last scanned product" panel with its photo, name, code and price */
+function mostrarUltimoEscaneado(producto) {
+  const panel = document.getElementById("scanResultPanel");
+  if (!panel) return;
+
+  const thumb = document.getElementById("scanResultThumb");
+  const imagenUrl = producto.IMAGEN ? String(producto.IMAGEN).trim() : "";
+
+  if (thumb) {
+    thumb.innerHTML = imagenUrl
+      ? `<img src="${escapeHtml(imagenUrl)}" alt="" onerror="this.parentElement.innerHTML='🛒';">`
+      : "🛒";
+  }
+
+  actualizarElemento("scanResultName", producto.PRODUCTO);
+  actualizarElemento("scanResultCode", producto.CODIGO);
+  actualizarElemento("scanResultPrice", "$" + Number(producto.PRECIO || 0).toLocaleString("es-AR"));
+
+  panel.classList.add("has-product");
+}
+
+function flashTile(codigo) {
+  const tile = document.querySelector(`.product-tile[data-codigo="${cssEscape(codigo)}"]`);
+  if (!tile) return;
+  tile.classList.remove("just-added");
+  void tile.offsetWidth;
+  tile.classList.add("just-added");
+}
+
+function cssEscape(value) {
+  return String(value).replace(/["\\]/g, "\\$&");
+}
+
+function cambiarCantidadPOS(codigo, delta) {
+  const item = ticketPOS.find(i => String(i.CODIGO).trim() === String(codigo).trim());
+  if (!item) return;
+  item.cantidad += delta;
+  if (item.cantidad <= 0) { quitarProductoPOS(codigo); return; }
+  renderTicketPOS();
+}
+
+/** Lets the cashier type the quantity directly instead of tapping +/- repeatedly */
+function actualizarCantidadManualPOS(codigo, valor) {
+  const item = ticketPOS.find(i => String(i.CODIGO).trim() === String(codigo).trim());
+  if (!item) return;
+
+  let cantidad = parseInt(valor, 10);
+
+  if (isNaN(cantidad) || cantidad <= 0) {
+    quitarProductoPOS(codigo);
+    return;
+  }
+
+  item.cantidad = cantidad;
+  renderTicketPOS();
+}
+
+/** Selects the whole quantity value on focus, so typing a new number replaces it instead of appending */
+function seleccionarCantidadPOS(input) {
+  input.select();
+}
+
+function quitarProductoPOS(codigo) {
+  ticketPOS = ticketPOS.filter(i => String(i.CODIGO).trim() !== String(codigo).trim());
+  renderTicketPOS();
+}
+
+function vaciarTicketPOS() {
+  if (ticketPOS.length === 0) return;
+  if (!confirm("¿Vaciar el ticket actual?")) return;
+  ticketPOS = [];
+  resetearDescuentoPOS();
+  renderTicketPOS();
+}
+
+/* ---- ticket rendering ---- */
+
+function renderTicketPOS() {
+  let html = "";
+  let subtotal = 0;
+  let totalItems = 0;
+
+  ticketPOS.forEach(item => {
+    const sub = item.PRECIO * item.cantidad;
+    subtotal += sub;
+    totalItems += item.cantidad;
+    html += `
+      <div class="ticket-row" data-codigo="${escapeHtml(item.CODIGO)}">
+        <div class="ti-info">
+          <div class="ti-name">${escapeHtml(item.PRODUCTO)}</div>
+          <div class="ti-price">$${item.PRECIO.toLocaleString("es-AR")} c/u</div>
+        </div>
+        <div class="ti-qty">
+          <button class="qty-btn" onclick="cambiarCantidadPOS('${item.CODIGO}', -1)">−</button>
+          <input
+            type="number"
+            class="qty-input-pos"
+            min="1"
+            step="1"
+            inputmode="numeric"
+            value="${item.cantidad}"
+            onfocus="seleccionarCantidadPOS(this)"
+            onchange="actualizarCantidadManualPOS('${item.CODIGO}', this.value)">
+          <button class="qty-btn" onclick="cambiarCantidadPOS('${item.CODIGO}', 1)">+</button>
+        </div>
+        <div class="ti-sub money">$${sub.toLocaleString("es-AR")}</div>
+        <button class="ti-remove" onclick="quitarProductoPOS('${item.CODIGO}')" title="Quitar">✕</button>
+      </div>`;
+  });
+
+  const tabla = document.getElementById("ticketPOS");
+  if (tabla) tabla.innerHTML = html;
+
+  const emptyState = document.getElementById("ticketEmptyState");
+  if (emptyState) emptyState.style.display = ticketPOS.length === 0 ? "flex" : "none";
+
+  const { montoDescuento, total } = calcularDescuentoPOS(subtotal);
+
+  const subtotalEl = document.getElementById("subtotalPOS");
+  if (subtotalEl) subtotalEl.innerText = subtotal.toLocaleString("es-AR");
+
+  const rowDescuentoEl = document.getElementById("rowDescuentoPOS");
+  const descuentoMontoEl = document.getElementById("descuentoMontoPOS");
+  if (rowDescuentoEl && descuentoMontoEl) {
+    if (descuentoActivoPOS && montoDescuento > 0) {
+      rowDescuentoEl.style.display = "flex";
+      descuentoMontoEl.innerText = "-$" + montoDescuento.toLocaleString("es-AR");
+    } else {
+      rowDescuentoEl.style.display = "none";
+    }
+  }
+
+  const totalEl = document.getElementById("totalPOS");
+  if (totalEl) totalEl.innerText = total.toLocaleString("es-AR");
+
+  const countEl = document.getElementById("ticketCount");
+  if (countEl) countEl.innerText = ticketPOS.length;
+
+  const itemsCountEl = document.getElementById("ticketItemsCount");
+  if (itemsCountEl) itemsCountEl.innerText = totalItems;
+
+  const finalizeBtn = document.getElementById("btnFinalizarVenta");
+  if (finalizeBtn) finalizeBtn.disabled = ticketPOS.length === 0;
+
+  const generarPedidoBtn = document.getElementById("btnGenerarPedido");
+  if (generarPedidoBtn) generarPedidoBtn.disabled = ticketPOS.length === 0;
+
+  const printBtn = document.getElementById("btnImprimirTicket");
+  if (printBtn) printBtn.disabled = ticketPOS.length === 0;
+
+  actualizarUIDescuentoPOS();
+}
+
+/* ---- discount ---- */
+
+/** Computes the discount amount (clamped to the subtotal) and the resulting total */
+function calcularDescuentoPOS(subtotal) {
+  if (!descuentoActivoPOS || descuentoValorPOS <= 0) {
+    return { montoDescuento: 0, total: subtotal };
+  }
+
+  let monto = descuentoTipoPOS === "PORCENTAJE"
+    ? subtotal * (descuentoValorPOS / 100)
+    : descuentoValorPOS;
+
+  monto = Math.max(0, Math.min(monto, subtotal)); // nunca negativo ni mayor al subtotal
+
+  return { montoDescuento: monto, total: subtotal - monto };
+}
+
+function toggleDescuentoPOS() {
+  const panel = document.getElementById("discountPanel");
+  if (!panel) return;
+  const abierto = panel.style.display !== "none";
+  panel.style.display = abierto ? "none" : "flex";
+  if (!abierto) {
+    setTimeout(() => {
+      const input = document.getElementById("descuentoValorInput");
+      if (input) input.focus();
+    }, 50);
+  }
+}
+
+function elegirTipoDescuento(el, tipo) {
+  descuentoTipoPOS = tipo;
+  document.querySelectorAll(".discount-type-btn").forEach(b => b.classList.remove("active"));
+  el.classList.add("active");
+
+  const input = document.getElementById("descuentoValorInput");
+  if (input) input.placeholder = tipo === "PORCENTAJE" ? "Ej: 10" : "Ej: 500";
+
+  aplicarDescuentoPOS();
+}
+
+function aplicarDescuentoPOS() {
+  const input = document.getElementById("descuentoValorInput");
+  const valor = Number(input ? input.value : 0) || 0;
+
+  descuentoValorPOS = Math.max(0, valor);
+  descuentoActivoPOS = descuentoValorPOS > 0;
+
+  renderTicketPOS();
+}
+
+function quitarDescuentoPOS() {
+  resetearDescuentoPOS();
+  const panel = document.getElementById("discountPanel");
+  if (panel) panel.style.display = "none";
+  renderTicketPOS();
+}
+
+function resetearDescuentoPOS() {
+  descuentoActivoPOS = false;
+  descuentoValorPOS = 0;
+  const input = document.getElementById("descuentoValorInput");
+  if (input) input.value = "";
+  const motivo = document.getElementById("descuentoMotivoInput");
+  if (motivo) motivo.value = "";
+}
+
+/** Returns a short human-readable label for the active discount, e.g. "10% (-$500)" or "-$300" */
+function obtenerEtiquetaDescuentoPOS(subtotal) {
+  if (!descuentoActivoPOS || descuentoValorPOS <= 0) return "";
+  const { montoDescuento } = calcularDescuentoPOS(subtotal);
+  const motivo = (document.getElementById("descuentoMotivoInput") || {}).value || "";
+  let etiqueta = descuentoTipoPOS === "PORCENTAJE"
+    ? `${descuentoValorPOS}% (-$${Math.round(montoDescuento).toLocaleString("es-AR")})`
+    : `-$${Math.round(montoDescuento).toLocaleString("es-AR")}`;
+  if (motivo.trim()) etiqueta += ` — ${motivo.trim()}`;
+  return etiqueta;
+}
+
+/** Keeps the toggle button label/style in sync with the current discount state */
+function actualizarUIDescuentoPOS() {
+  const btn = document.getElementById("btnToggleDescuento");
+  const label = document.getElementById("discountToggleLabel");
+  if (!btn || !label) return;
+
+  if (descuentoActivoPOS && descuentoValorPOS > 0) {
+    btn.classList.add("has-discount");
+    label.innerText = descuentoTipoPOS === "PORCENTAJE"
+      ? `Descuento aplicado: ${descuentoValorPOS}%`
+      : `Descuento aplicado: $${descuentoValorPOS.toLocaleString("es-AR")}`;
+  } else {
+    btn.classList.remove("has-discount");
+    label.innerText = "Agregar descuento";
+  }
+}
+
+/* ---- payment method ---- */
+
+function elegirFormaPago(el, valor) {
+  formaPagoPOS = valor;
+  document.querySelectorAll(".pay-method-btn").forEach(b => b.classList.remove("active"));
+  el.classList.add("active");
+}
+
+/* ---- finalize sale ---- */
+
+async function finalizarVentaPOS() {
+  if (ticketPOS.length === 0) { toast("El ticket está vacío", "error"); return; }
+
+  const subtotal = ticketPOS.reduce((acc, item) => acc + (item.PRECIO * item.cantidad), 0);
+  const { montoDescuento, total } = calcularDescuentoPOS(subtotal);
+  const etiquetaDescuento = obtenerEtiquetaDescuentoPOS(subtotal);
+
+  const btn = document.getElementById("btnFinalizarVenta");
+  const textoOriginal = btn ? btn.innerHTML : "";
+  if (btn) { btn.disabled = true; btn.innerHTML = "Procesando..."; }
+
+  try {
+    const response = await fetch(
+      API_URL +
+      "?action=guardarVenta" +
+      "&total="         + encodeURIComponent(total) +
+      "&formaPago="     + encodeURIComponent(formaPagoPOS) +
+      "&observaciones=" + encodeURIComponent(etiquetaDescuento ? "Descuento: " + etiquetaDescuento : "") +
+      "&carrito="       + encodeURIComponent(JSON.stringify(ticketPOS))
+    );
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo registrar la venta", "error");
+      if (btn) { btn.disabled = false; btn.innerHTML = textoOriginal; }
+      return;
+    }
+
+    // Save a copy for thermal printing from receipt modal
+    ultimaVentaImprimible = {
+      ventaId:    data.ventaId,
+      items:      [...ticketPOS],
+      total:      total,
+      subtotal:   subtotal,
+      descuento:  montoDescuento,
+      descuentoEtiqueta: etiquetaDescuento,
+      formaPago:  formaPagoPOS,
+      fecha:      new Date()
+    };
+
+    mostrarRecibo(data.ventaId, ticketPOS, total, subtotal, montoDescuento);
+    ticketPOS = [];
+    resetearDescuentoPOS();
+    renderTicketPOS();
+
+    ultimoCodigoAgregadoPOS = null;
+    posTileFocusIdx = -1;
+    productosPOS = [];
+    await asegurarProductosPOS();
+    renderPosGrid();
+    cargarMetricas();
+    cargarVentasPOS();
+
+  } catch (error) {
+    console.error("Error al finalizar venta:", error);
+    toast("Error de conexión al registrar la venta", "error");
+  } finally {
+    if (btn) { btn.disabled = ticketPOS.length === 0; btn.innerHTML = textoOriginal; }
+  }
+}
+
+/* ---- generar pedido desde el POS (no es una venta, no descuenta stock) ---- */
+
+/** Opens the "Generar Pedido" modal, pre-filling the current ticket total */
+function abrirModalPedidoAdmin() {
+  if (ticketPOS.length === 0) { toast("El ticket está vacío, agregá productos primero", "error"); return; }
+
+  const subtotal = ticketPOS.reduce((acc, item) => acc + (item.PRECIO * item.cantidad), 0);
+  const { total } = calcularDescuentoPOS(subtotal);
+
+  document.getElementById("paNombre").value = "";
+  document.getElementById("paEmpresa").value = "";
+  document.getElementById("paDireccion").value = "";
+  document.getElementById("paLocalidad").value = "";
+  document.getElementById("paProvincia").value = "";
+  document.getElementById("paCodigoPostal").value = "";
+  document.getElementById("paTelefono").value = "";
+  document.getElementById("paDni").value = "";
+  document.getElementById("paTotal").textContent = "$" + total.toLocaleString("es-AR");
+  document.getElementById("paMonedaWrap").style.display = "none";
+  document.getElementById("paTipoCambioWrap").style.display = "none";
+  document.getElementById("paMoneda").value = "ARS";
+  document.getElementById("paTipoCambio").value = "";
+
+  document.getElementById("pedidoAdminModalBackdrop").classList.add("show");
+  setTimeout(() => document.getElementById("paNombre").focus(), 80);
+}
+
+function cerrarModalPedidoAdmin() {
+  document.getElementById("pedidoAdminModalBackdrop").classList.remove("show");
+}
+
+/** Checks if the typed DNI belongs to a client already marked as "a crédito" — if so, shows the currency selector */
+async function chequearClienteCreditoPedidoAdmin() {
+  const dni = document.getElementById("paDni").value.trim();
+  const wrap = document.getElementById("paMonedaWrap");
+
+  if (!dni) {
+    wrap.style.display = "none";
+    document.getElementById("paTipoCambioWrap").style.display = "none";
+    return;
+  }
+
+  try {
+    const response = await fetch(API_URL + "?action=consultarClienteCreditoPorDni&dni=" + encodeURIComponent(dni));
+    const data = await response.json();
+
+    wrap.style.display = data.esCredito ? "block" : "none";
+    if (!data.esCredito) {
+      document.getElementById("paTipoCambioWrap").style.display = "none";
+    } else {
+      actualizarVisibilidadTipoCambioPedidoAdmin();
+    }
+  } catch (error) {
+    console.error("Error al consultar cliente a crédito:", error);
+    // Un error puntual de red no debe bloquear el pedido — simplemente
+    // no se muestra el selector de moneda, y el pedido sigue en ARS.
+  }
+}
+
+function actualizarVisibilidadTipoCambioPedidoAdmin() {
+  const moneda = document.getElementById("paMoneda").value;
+  document.getElementById("paTipoCambioWrap").style.display = moneda === "USD" ? "block" : "none";
+}
+
+async function confirmarPedidoAdmin() {
+  if (ticketPOS.length === 0) { toast("El ticket está vacío", "error"); cerrarModalPedidoAdmin(); return; }
+
+  const nombre = document.getElementById("paNombre").value.trim();
+  const empresa = document.getElementById("paEmpresa").value.trim();
+  const direccion = document.getElementById("paDireccion").value.trim();
+  const localidad = document.getElementById("paLocalidad").value.trim();
+  const provincia = document.getElementById("paProvincia").value.trim();
+  const codigoPostal = document.getElementById("paCodigoPostal").value.trim();
+  const telefono = document.getElementById("paTelefono").value.trim();
+  const dni = document.getElementById("paDni").value.trim();
+
+  if (!nombre || !direccion || !localidad || !provincia || !telefono || !dni) {
+    toast("Completá Nombre, Dirección, Localidad, Provincia, Teléfono y DNI/CUIT", "error");
+    return;
+  }
+
+  // Moneda y tipo de cambio solo importan si el selector está visible
+  // (cliente a crédito) — para cualquier otro pedido, queda en ARS sin
+  // tipo de cambio, igual que siempre.
+  const monedaWrapVisible = document.getElementById("paMonedaWrap").style.display !== "none";
+  const moneda = monedaWrapVisible ? document.getElementById("paMoneda").value : "ARS";
+  const tipoCambio = document.getElementById("paTipoCambio").value.trim();
+
+  if (moneda === "USD" && (!tipoCambio || Number(tipoCambio) <= 0)) {
+    toast("Ingresá el tipo de cambio para un pedido en dólares", "error");
+    return;
+  }
+
+  const subtotal = ticketPOS.reduce((acc, item) => acc + (item.PRECIO * item.cantidad), 0);
+  const { total } = calcularDescuentoPOS(subtotal);
+
+  const btn = document.getElementById("btnConfirmarPedidoAdmin");
+  const textoOriginal = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = "Creando pedido...";
+
+  try {
+    const params = new URLSearchParams({
+      action: "guardarPedidoAdmin",
+      nombre, empresa, direccion, localidad, provincia, codigoPostal, telefono, dni,
+      total: total,
+      moneda: moneda,
+      tipoCambio: moneda === "USD" ? tipoCambio : "",
+      carrito: JSON.stringify(ticketPOS)
+    });
+
+    const response = await fetch(API_URL + "?" + params.toString());
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo crear el pedido", "error");
+      return;
+    }
+
+    toast(`Pedido ${data.pedidoId} creado`, "success");
+    cerrarModalPedidoAdmin();
+
+    // El pedido no es una venta: el ticket se vacía igual, para que el
+    // cajero pueda empezar de cero, pero sin tocar stock ni métricas
+    // de ventas (a diferencia de finalizarVentaPOS).
+    ticketPOS = [];
+    resetearDescuentoPOS();
+    renderTicketPOS();
+    ultimoCodigoAgregadoPOS = null;
+    posTileFocusIdx = -1;
+
+  } catch (error) {
+    console.error("Error al crear el pedido:", error);
+    toast("Error de conexión al crear el pedido", "error");
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = textoOriginal;
+  }
+}
+
+/* ---- receipt modal ---- */
+
+function mostrarRecibo(ventaId, items, total, subtotal, montoDescuento) {
+  document.getElementById("receiptId").innerText = "#" + (ventaId || "—");
+
+  let html = "";
+  items.forEach(item => {
+    const sub = item.PRECIO * item.cantidad;
+    html += `
+      <tr>
+        <td>${item.cantidad}x ${escapeHtml(item.PRODUCTO)}</td>
+        <td style="text-align:right;">$${sub.toLocaleString("es-AR")}</td>
+      </tr>`;
+  });
+
+  if (montoDescuento > 0) {
+    html += `
+      <tr>
+        <td>Subtotal</td>
+        <td style="text-align:right;">$${Number(subtotal).toLocaleString("es-AR")}</td>
+      </tr>
+      <tr>
+        <td style="color:var(--red-500);">Descuento</td>
+        <td style="text-align:right;color:var(--red-500);">-$${Math.round(montoDescuento).toLocaleString("es-AR")}</td>
+      </tr>`;
+  }
+
+  document.getElementById("receiptItems").innerHTML = html;
+  document.getElementById("receiptTotal").innerText = "$" + total.toLocaleString("es-AR");
+  document.getElementById("receiptBackdrop").classList.add("show");
+  toast("Venta registrada con éxito", "success");
+}
+
+function cerrarRecibo() {
+  document.getElementById("receiptBackdrop").classList.remove("show");
+}
+
+function nuevaVentaPOS() {
+  cerrarRecibo();
+  const input = document.getElementById("posBusqueda");
+  if (input) input.focus();
+}
+
+/* =====================================================
+   THERMAL PRINT — POS80 80mm paper
+   Renders a receipt into #thermalPrintFrame and calls
+   window.print(). The @media print rule hides everything
+   except #thermalPrintFrame, and @page sets 80mm width.
+===================================================== */
+
+/**
+ * Build the thermal HTML string.
+ * @param {string}  ventaId
+ * @param {Array}   items   — [{PRODUCTO, PRECIO, cantidad}, …]
+ * @param {number}  total
+ * @param {string}  formaPago
+ * @param {Date}    fecha
+ * @param {Object}  [descuento] — { monto, etiqueta } opcional, si la venta tuvo descuento
+ * @param {Object}  [cfgOverride] — config del negocio a usar en vez de la guardada (solo para vista previa)
+ */
+function buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, cfgOverride) {
+  const cfg = cfgOverride || obtenerConfigNegocio();
+
+  const fechaStr = (fecha || new Date()).toLocaleString("es-AR", {
+    day:"2-digit", month:"2-digit", year:"numeric",
+    hour:"2-digit", minute:"2-digit"
+  });
+
+  let rows = "";
+  let subtotal = 0;
+  items.forEach(item => {
+    const sub = item.PRECIO * item.cantidad;
+    subtotal += sub;
+    const unitStr = `${item.cantidad} x $${Number(item.PRECIO).toLocaleString("es-AR")}`;
+    rows += `
+      <tr>
+        <td colspan="2" style="padding-bottom:0;">${escapeHtml(item.PRODUCTO)}</td>
+      </tr>
+      <tr>
+        <td>${unitStr}</td>
+        <td style="text-align:right;">$${sub.toLocaleString("es-AR")}</td>
+      </tr>`;
+  });
+
+  const tieneDescuento = descuento && Number(descuento.monto) > 0;
+
+  let filasTotales = "";
+  if (tieneDescuento) {
+    filasTotales += `
+      <tr>
+        <td>Subtotal</td>
+        <td style="text-align:right;">$${subtotal.toLocaleString("es-AR")}</td>
+      </tr>
+      <tr>
+        <td>Descuento${descuento.etiqueta ? " (" + escapeHtml(descuento.etiqueta) + ")" : ""}</td>
+        <td style="text-align:right;">-$${Math.round(descuento.monto).toLocaleString("es-AR")}</td>
+      </tr>`;
+  }
+  filasTotales += `
+    <tr class="th-total-row">
+      <td><strong>TOTAL</strong></td>
+      <td style="text-align:right;"><strong>$${Number(total).toLocaleString("es-AR")}</strong></td>
+    </tr>`;
+
+  // Encabezado: nombre + subtítulo + dirección + teléfono(s), todos configurables
+  let encabezado = `<div class="th-center th-big">${escapeHtml(cfg.nombre)}</div>`;
+  if (cfg.subtitulo) {
+    encabezado += `<div class="th-center" style="font-size:9.5pt;font-weight:bold;">${escapeHtml(cfg.subtitulo)}</div>`;
+  }
+  if (cfg.direccion) {
+    encabezado += `<div class="th-center" style="font-size:9pt;font-weight:bold;">${escapeHtml(cfg.direccion)}</div>`;
+  }
+  const telefonos = [cfg.telefono1, cfg.telefono2].filter(Boolean).join(" · ");
+  if (telefonos) {
+    encabezado += `<div class="th-center" style="font-size:9pt;font-weight:bold;margin-bottom:2mm;">Tel: ${escapeHtml(telefonos)}</div>`;
+  } else {
+    encabezado += `<div style="margin-bottom:2mm;"></div>`;
+  }
+
+  // Pie de página
+  let pie = "";
+  if (cfg.pie) {
+    pie += `<div class="th-footer">${escapeHtml(cfg.pie)}</div>`;
+  }
+  pie += `<div class="th-footer" style="margin-top:1mm;">${escapeHtml(cfg.nombre)} &bull; Sistema POS</div>`;
+
+  return `
+    <div class="thermal-receipt">
+      ${encabezado}
+      <hr class="th-sep-solid">
+      <div>Fecha: ${fechaStr}</div>
+      <div>Venta: #${escapeHtml(String(ventaId || "—"))}</div>
+      <div>Pago: ${escapeHtml(String(formaPago || "—"))}</div>
+      <hr class="th-sep">
+      <table>
+        <tbody>${rows}</tbody>
+        ${filasTotales}
+      </table>
+      <hr class="th-sep">
+      ${pie}
+      <br><br>
+    </div>`;
+}
+
+/* ===================================================================
+   IMPRESIÓN DIRECTA USB (Web Serial API — Chrome/Edge, sin diálogo)
+   Construye los mismos tickets que buildThermalHTML/buildThermalCierreHTML
+   pero como comandos ESC/POS en bytes crudos, enviados directo al
+   puerto USB de la impresora. Es un camino alternativo: si está
+   desactivado (o el navegador no lo soporta), todo sigue imprimiendo
+   con el diálogo normal de Chrome, sin ningún cambio.
+=================================================================== */
+
+const USB_PRINT_PREF_KEY = "jireh_usb_print_enabled";
+const ANCHO_TICKET_USB = 42; // columnas para fuente normal en 80mm (12 cpl aprox.)
+
+let puertoImpresoraUSB = null; // SerialPort activo, o null si no hay conexión
+
+/** Whether the browser supports Web Serial at all */
+function soportaImpresionUSB() {
+  return "serial" in navigator;
+}
+
+/** Reads the saved on/off preference for USB direct printing (per-browser, default off) */
+function usbPrintHabilitado() {
+  return soportaImpresionUSB() && localStorage.getItem(USB_PRINT_PREF_KEY) === "true";
+}
+
+/* ---------------------- ESC/POS byte builders ---------------------- */
+
+const ESC = 0x1B;
+const GS  = 0x1D;
+
+const ESCPOS = {
+  INIT:          [ESC, 0x40],             // reset printer
+  ALIGN_LEFT:    [ESC, 0x61, 0x00],
+  ALIGN_CENTER:  [ESC, 0x61, 0x01],
+  BOLD_ON:       [ESC, 0x45, 0x01],
+  BOLD_OFF:      [ESC, 0x45, 0x00],
+  SIZE_NORMAL:   [GS, 0x21, 0x00],
+  SIZE_DOUBLE_H: [GS, 0x21, 0x01],         // double height
+  SIZE_BIG:      [GS, 0x21, 0x11],         // double width + height
+  CUT:           [GS, 0x56, 0x01],         // partial cut
+  FEED:          (n) => [ESC, 0x64, n]     // feed n lines
+};
+
+/** Builds the raw byte buffer (Uint8Array) for a sale ticket, mirroring buildThermalHTML */
+function buildThermalESCPOS(ventaId, items, total, formaPago, fecha, descuento, cfgOverride) {
+  const cfg = cfgOverride || obtenerConfigNegocio();
+  const b = new EscPosBuilder();
+
+  const fechaStr = (fecha || new Date()).toLocaleString("es-AR", {
+    day:"2-digit", month:"2-digit", year:"numeric",
+    hour:"2-digit", minute:"2-digit"
+  });
+
+  b.init();
+  b.center(); b.big(); b.text(cfg.nombre); b.feed(1);
+  b.normal();
+  if (cfg.subtitulo) { b.center(); b.bold(); b.text(cfg.subtitulo); b.feed(1); b.boldOff(); }
+  if (cfg.direccion) { b.center(); b.bold(); b.text(cfg.direccion); b.feed(1); b.boldOff(); }
+  const telefonos = [cfg.telefono1, cfg.telefono2].filter(Boolean).join(" / ");
+  if (telefonos) { b.center(); b.bold(); b.text("Tel: " + telefonos); b.feed(1); b.boldOff(); }
+
+  b.left();
+  b.sepSolid();
+  b.bold();
+  b.text("Fecha: " + fechaStr); b.feed(1);
+  b.text("Venta: #" + String(ventaId || "—")); b.feed(1);
+  b.text("Pago: " + String(formaPago || "—")); b.feed(1);
+  b.sep();
+
+  let subtotal = 0;
+  items.forEach(item => {
+    const sub = item.PRECIO * item.cantidad;
+    subtotal += sub;
+    b.bold();
+    b.text(item.PRODUCTO); b.feed(1);
+    b.row(`${item.cantidad} x $${money(item.PRECIO)}`, "$" + money(sub));
+  });
+
+  const tieneDescuento = descuento && Number(descuento.monto) > 0;
+  if (tieneDescuento) {
+    b.sep();
+    b.row("Subtotal", "$" + money(subtotal));
+    const etiquetaDesc = descuento.etiqueta ? `Descuento (${descuento.etiqueta})` : "Descuento";
+    b.row(etiquetaDesc, "-$" + money(descuento.monto));
+  }
+
+  b.sepSolid();
+  b.doubleH();
+  b.row("TOTAL", "$" + money(total));
+  b.normal();
+  b.sep();
+
+  b.bold();
+  if (cfg.pie) { b.center(); b.text(cfg.pie); b.feed(1); }
+  b.center(); b.text(cfg.nombre + " - Sistema POS"); b.feed(1);
+  b.boldOff();
+
+  b.feed(3);
+  b.cut();
+
+  return b.build();
+}
+
+/** Builds the raw byte buffer for a cierre de caja receipt, mirroring buildThermalCierreHTML */
+function buildThermalCierreESCPOS(resumen) {
+  const cfg = obtenerConfigNegocio();
+  const b = new EscPosBuilder();
+
+  const fechaStr = formatearFechaCierre(resumen.fecha);
+  const horaStr = new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+
+  function filaMetodo(etiqueta, m) {
+    const signo = m.diferencia > 0 ? "+" : "";
+    b.bold();
+    b.text(etiqueta); b.feed(1);
+    b.row("Esperado", "$" + money(m.esperado));
+    b.row("Contado", "$" + money(m.contado));
+    b.row("Diferencia", signo + "$" + money(Math.round(m.diferencia)));
+  }
+
+  b.init();
+  b.center(); b.big(); b.text(cfg.nombre); b.feed(1);
+  b.normal();
+  b.center(); b.bold(); b.text("Cierre de Caja"); b.feed(1); b.boldOff();
+  if (cfg.direccion) { b.center(); b.bold(); b.text(cfg.direccion); b.feed(1); b.boldOff(); }
+  const telefonos = [cfg.telefono1, cfg.telefono2].filter(Boolean).join(" / ");
+  if (telefonos) { b.center(); b.bold(); b.text("Tel: " + telefonos); b.feed(1); b.boldOff(); }
+
+  b.left();
+  b.sepSolid();
+  b.bold();
+  b.text("Fecha: " + fechaStr); b.feed(1);
+  b.text("Hora impresión: " + horaStr); b.feed(1);
+  b.text("Cierre: #" + String(resumen.cierreId || "—")); b.feed(1);
+  b.text("Vendedor: " + String(resumen.vendedor || "—")); b.feed(1);
+  b.sep();
+
+  filaMetodo("EFECTIVO", resumen.efectivo); b.feed(1);
+  filaMetodo("TRANSFERENCIA", resumen.transferencia); b.feed(1);
+  filaMetodo("TARJETA", resumen.tarjeta);
+
+  b.sepSolid();
+  const signoTotal = resumen.total.diferencia > 0 ? "+" : "";
+  b.row("TOTAL ESPERADO", "$" + money(resumen.total.esperado));
+  b.row("TOTAL CONTADO", "$" + money(resumen.total.contado));
+  b.row("DIFERENCIA", signoTotal + "$" + money(Math.round(resumen.total.diferencia)));
+  b.sep();
+
+  if (resumen.observaciones) {
+    b.bold();
+    b.text("Obs: " + resumen.observaciones); b.feed(1);
+    b.sep();
+  }
+
+  b.bold();
+  b.text("Cierre generado por " + cfg.nombre + " POS"); b.feed(1);
+  b.boldOff();
+
+  b.feed(3);
+  b.cut();
+
+  return b.build();
+}
+
+function money(n) {
+  return Number(n || 0).toLocaleString("es-AR");
+}
+
+/** Small helper that accumulates ESC/POS bytes with simple word-wrap and two-column row support */
+class EscPosBuilder {
+  constructor() {
+    this.bytes = [];
+  }
+  push(arr) { this.bytes.push(...arr); }
+  init()    { this.push(ESCPOS.INIT); }
+  center()  { this.push(ESCPOS.ALIGN_CENTER); }
+  left()    { this.push(ESCPOS.ALIGN_LEFT); }
+  bold()    { this.push(ESCPOS.BOLD_ON); }
+  boldOff() { this.push(ESCPOS.BOLD_OFF); }
+  normal()  { this.push(ESCPOS.SIZE_NORMAL); }
+  doubleH() { this.push(ESCPOS.SIZE_DOUBLE_H); }
+  big()     { this.push(ESCPOS.SIZE_BIG); }
+  cut()     { this.push(ESCPOS.CUT); }
+  feed(n)   { this.push(ESCPOS.FEED(n)); }
+
+  /** Encodes text as bytes (Latin-1, which covers Spanish accents on most ESC/POS printers) */
+  text(str) {
+    const encoder = new TextEncoder(); // UTF-8; most modern POS80 controllers accept it fine
+    this.push(Array.from(encoder.encode(String(str))));
+  }
+
+  sep() {
+    this.bold();
+    this.text("-".repeat(ANCHO_TICKET_USB));
+    this.feed(1);
+    this.boldOff();
+  }
+
+  sepSolid() {
+    this.bold();
+    this.text("=".repeat(ANCHO_TICKET_USB));
+    this.feed(1);
+    this.boldOff();
+  }
+
+  /** Prints a left label and a right-aligned value on the same 42-col line (wraps the label if too long) */
+  row(left, right) {
+    const rightStr = String(right);
+    const maxLeft = ANCHO_TICKET_USB - rightStr.length - 1;
+    let leftStr = String(left);
+    if (leftStr.length > maxLeft) leftStr = leftStr.slice(0, Math.max(0, maxLeft));
+    const spaces = Math.max(1, ANCHO_TICKET_USB - leftStr.length - rightStr.length);
+    this.text(leftStr + " ".repeat(spaces) + rightStr);
+    this.feed(1);
+  }
+
+  build() {
+    return new Uint8Array(this.bytes);
+  }
+}
+
+/* ---------------------- Web Serial connection ---------------------- */
+
+/** Prompts the browser's port picker and opens the connection (must be called from a user gesture) */
+async function conectarImpresoraUSB() {
+  if (!soportaImpresionUSB()) {
+    toast("Este navegador no soporta impresión directa", "error");
+    return;
+  }
+  try {
+    const port = await navigator.serial.requestPort();
+    await port.open({ baudRate: 9600 });
+    puertoImpresoraUSB = port;
+    actualizarEstadoUSBPrint();
+    toast("Impresora conectada", "success");
+  } catch (error) {
+    if (error.name !== "NotFoundError") { // user just closed the picker without choosing
+      console.error("Error al conectar la impresora USB:", error);
+      toast("No se pudo conectar con la impresora", "error");
+    }
+  }
+}
+
+async function desconectarImpresoraUSB() {
+  if (puertoImpresoraUSB) {
+    try { await puertoImpresoraUSB.close(); } catch (e) { /* ignore */ }
+  }
+  puertoImpresoraUSB = null;
+  actualizarEstadoUSBPrint();
+  toast("Impresora desconectada", "success");
+}
+
+/** Tries to silently reconnect to a previously-authorized port (no picker shown) when the app loads */
+async function reconectarImpresoraUSBSiPosible() {
+  if (!soportaImpresionUSB()) return;
+  try {
+    const ports = await navigator.serial.getPorts();
+    if (ports.length > 0) {
+      const port = ports[0];
+      await port.open({ baudRate: 9600 });
+      puertoImpresoraUSB = port;
+    }
+  } catch (error) {
+    // Port may be in use or unplugged — just leave it disconnected, the admin can reconnect manually
+    puertoImpresoraUSB = null;
+  }
+  actualizarEstadoUSBPrint();
+}
+
+/** Sends a raw byte buffer to the connected printer over Web Serial */
+async function enviarBytesAImpresoraUSB(bytes) {
+  if (!puertoImpresoraUSB || !puertoImpresoraUSB.writable) {
+    throw new Error("La impresora USB no está conectada");
+  }
+  const writer = puertoImpresoraUSB.writable.getWriter();
+  try {
+    await writer.write(bytes);
+  } finally {
+    writer.releaseLock();
+  }
+}
+
+function probarImpresoraUSB() {
+  const b = new EscPosBuilder();
+  b.init();
+  b.center(); b.big(); b.text("PRUEBA"); b.feed(2);
+  b.normal(); b.bold();
+  b.text("Si ves esto, la impresión"); b.feed(1);
+  b.text("directa por USB funciona bien."); b.feed(1);
+  b.boldOff();
+  b.feed(3);
+  b.cut();
+
+  enviarBytesAImpresoraUSB(b.build())
+    .then(() => toast("Ticket de prueba enviado", "success"))
+    .catch(error => {
+      console.error("Error en impresión de prueba:", error);
+      toast("No se pudo imprimir: revisá la conexión USB", "error");
+    });
+}
+
+function onToggleUsbPrint() {
+  const checked = document.getElementById("usbPrintToggle").checked;
+  if (checked && !puertoImpresoraUSB) {
+    toast("Conectá la impresora primero", "error");
+    document.getElementById("usbPrintToggle").checked = false;
+    return;
+  }
+  localStorage.setItem(USB_PRINT_PREF_KEY, checked ? "true" : "false");
+  toast(checked ? "Impresión directa activada" : "Impresión directa desactivada", "success");
+}
+
+/** Refreshes the Configuración card UI to reflect support/connection state */
+function actualizarEstadoUSBPrint() {
+  const unsupportedEl = document.getElementById("usbPrintUnsupported");
+  const supportedEl   = document.getElementById("usbPrintSupported");
+  if (!unsupportedEl || !supportedEl) return; // section not in the DOM yet
+
+  if (!soportaImpresionUSB()) {
+    unsupportedEl.style.display = "flex";
+    supportedEl.style.display = "none";
+    return;
+  }
+
+  unsupportedEl.style.display = "none";
+  supportedEl.style.display = "block";
+
+  const statusEl     = document.getElementById("usbPrintStatus");
+  const statusTextEl = document.getElementById("usbPrintStatusText");
+  const btnConectar   = document.getElementById("btnConectarImpresora");
+  const btnDesconectar = document.getElementById("btnDesconectarImpresora");
+  const btnProbar      = document.getElementById("btnProbarImpresora");
+  const toggle          = document.getElementById("usbPrintToggle");
+
+  if (puertoImpresoraUSB) {
+    statusEl.className = "usb-print-status ok";
+    statusTextEl.textContent = "Impresora conectada";
+    btnConectar.style.display = "none";
+    btnDesconectar.style.display = "inline-block";
+    btnProbar.style.display = "inline-block";
+  } else {
+    statusEl.className = "usb-print-status";
+    statusTextEl.textContent = "Impresora no conectada";
+    btnConectar.style.display = "inline-block";
+    btnDesconectar.style.display = "none";
+    btnProbar.style.display = "none";
+
+    // Can't keep "impresión directa" on if there's nothing connected
+    if (toggle) toggle.checked = false;
+    localStorage.setItem(USB_PRINT_PREF_KEY, "false");
+  }
+
+  if (toggle) toggle.checked = usbPrintHabilitado();
+}
+
+/** Print the current (unsaved) ticket as a pre-sale receipt */
+function imprimirTicketThermal() {
+  if (ticketPOS.length === 0) { toast("El ticket está vacío", "error"); return; }
+  const subtotal = ticketPOS.reduce((acc, i) => acc + i.PRECIO * i.cantidad, 0);
+  const { montoDescuento, total } = calcularDescuentoPOS(subtotal);
+  const etiqueta = obtenerEtiquetaDescuentoPOS(subtotal);
+  _ejecutarImpresion("PREVIO", ticketPOS, total, formaPagoPOS, new Date(),
+    montoDescuento > 0 ? { monto: montoDescuento, etiqueta } : null);
+}
+
+/** Print after a completed sale (from receipt modal) */
+function imprimirUltimoRecibo() {
+  if (!ultimaVentaImprimible) { toast("No hay venta para imprimir", "error"); return; }
+  const u = ultimaVentaImprimible;
+  _ejecutarImpresion(u.ventaId, u.items, u.total, u.formaPago, u.fecha,
+    u.descuento > 0 ? { monto: u.descuento, etiqueta: u.descuentoEtiqueta } : null);
+}
+
+/** Print a sale from the dashboard recent-sales table or the Ventas POS history */
+function imprimirVentaDesdeData(ventaObj) {
+  const items = [];
+  // Try to parse items if stored as JSON string or array
+  if (ventaObj.CARRITO) {
+    try {
+      const parsed = typeof ventaObj.CARRITO === "string"
+        ? JSON.parse(ventaObj.CARRITO)
+        : ventaObj.CARRITO;
+      if (Array.isArray(parsed)) items.push(...parsed);
+    } catch(e) { /* ignore */ }
+  }
+  // Fallback: show just a total line if no item detail
+  if (items.length === 0) {
+    items.push({ PRODUCTO: ventaObj.DETALLE || "Venta", PRECIO: Number(ventaObj.TOTAL || 0), cantidad: 1 });
+  }
+
+  // El descuento (si lo hubo) quedó guardado como texto en OBSERVACIONES,
+  // ej: "Descuento: 10% (-$500) — cliente frecuente". Lo reconstruimos
+  // calculando subtotal real de items vs. el TOTAL guardado (ya con descuento).
+  const subtotalItems = items.reduce((acc, i) => acc + Number(i.PRECIO) * Number(i.cantidad), 0);
+  const totalGuardado = Number(ventaObj.TOTAL || 0);
+  const diferencia = subtotalItems - totalGuardado;
+
+  const obs = String(ventaObj.OBSERVACIONES || "");
+  let descuentoInfo = null;
+  if (diferencia > 0.5 && /descuento/i.test(obs)) {
+    descuentoInfo = { monto: diferencia, etiqueta: obs.replace(/^Descuento:\s*/i, "") };
+  }
+
+  _ejecutarImpresion(
+    ventaObj.VENTA_ID || ventaObj.ID || "—",
+    items,
+    totalGuardado,
+    ventaObj.FORMA_PAGO || ventaObj.PAGO || "—",
+    ventaObj.FECHA ? new Date(ventaObj.FECHA) : new Date(),
+    descuentoInfo
+  );
+}
+
+function _ejecutarImpresion(ventaId, items, total, formaPago, fecha, descuento) {
+  if (usbPrintHabilitado() && puertoImpresoraUSB) {
+    const bytes = buildThermalESCPOS(ventaId, items, total, formaPago, fecha, descuento);
+    enviarBytesAImpresoraUSB(bytes).catch(error => {
+      console.error("Error al imprimir por USB:", error);
+      toast("Error al imprimir por USB — se abre el diálogo normal", "error");
+      _imprimirConDialogo(buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento));
+    });
+    return;
+  }
+
+  _imprimirConDialogo(buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento));
+}
+
+/** Falls back to the regular browser print dialog (used when USB printing is off, unsupported, or fails) */
+function _imprimirConDialogo(html) {
+  const frame = document.getElementById("thermalPrintFrame");
+  if (!frame) { toast("Error: frame de impresión no encontrado", "error"); return; }
+
+  // Si antes se generaron etiquetas de código de barras o QR, ese
+  // contenedor pudo haber quedado con contenido — y como el CSS de
+  // impresión decide qué mostrar según cuál de los dos NO esté vacío,
+  // hay que vaciarlo siempre antes de imprimir un ticket, o la
+  // impresión podría mostrar las etiquetas viejas en vez del ticket.
+  const etiquetasArea = document.getElementById("etiquetasPrintArea");
+  if (etiquetasArea) etiquetasArea.innerHTML = "";
+
+  frame.innerHTML = html;
+
+  // Small delay to let the DOM paint before triggering print dialog
+  setTimeout(() => {
+    window.print();
+  }, 120);
+}
+
+/* =====================================================
+   THERMAL PRINT — CIERRE DE CAJA (POS80 80mm)
+   Reusa el mismo #thermalPrintFrame y las reglas @media
+   print ya definidas para el ticket de venta.
+===================================================== */
+
+/**
+ * Build the thermal HTML string for a cash-register closing (cierre de caja).
+ * @param {Object} resumen  — { fecha, cierreId, vendedor, observaciones,
+ *                               efectivo:{esperado,contado,diferencia},
+ *                               transferencia:{...}, tarjeta:{...}, total:{...} }
+ */
+function buildThermalCierreHTML(resumen) {
+  const cfg = obtenerConfigNegocio();
+
+  const fechaStr = formatearFechaCierre(resumen.fecha);
+  const horaStr = new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+
+  function filaMetodo(etiqueta, m) {
+    const signo = m.diferencia > 0 ? "+" : "";
+    return `
+      <tr>
+        <td colspan="2" style="padding-top:2mm;"><strong>${etiqueta}</strong></td>
+      </tr>
+      <tr>
+        <td>Esperado</td>
+        <td style="text-align:right;">$${Number(m.esperado).toLocaleString("es-AR")}</td>
+      </tr>
+      <tr>
+        <td>Contado</td>
+        <td style="text-align:right;">$${Number(m.contado).toLocaleString("es-AR")}</td>
+      </tr>
+      <tr>
+        <td>Diferencia</td>
+        <td style="text-align:right;">${signo}$${Math.round(m.diferencia).toLocaleString("es-AR")}</td>
+      </tr>`;
+  }
+
+  const signoTotal = resumen.total.diferencia > 0 ? "+" : "";
+
+  // Encabezado: nombre del local + dirección + teléfono(s) (sin subtítulo, este ticket no es de venta)
+  let encabezado = `<div class="th-center th-big">${escapeHtml(cfg.nombre)}</div>`;
+  encabezado += `<div class="th-center" style="font-size:13pt;font-weight:bold;">Cierre de Caja</div>`;
+  if (cfg.direccion) {
+    encabezado += `<div class="th-center" style="font-size:13pt;font-weight:bold;">${escapeHtml(cfg.direccion)}</div>`;
+  }
+  const telefonos = [cfg.telefono1, cfg.telefono2].filter(Boolean).join(" · ");
+  if (telefonos) {
+    encabezado += `<div class="th-center" style="font-size:13pt;font-weight:bold;margin-bottom:2mm;">Tel: ${escapeHtml(telefonos)}</div>`;
+  } else {
+    encabezado += `<div style="margin-bottom:2mm;"></div>`;
+  }
+
+  return `
+    <div class="thermal-receipt">
+      ${encabezado}
+      <hr class="th-sep-solid">
+      <div>Fecha: ${escapeHtml(fechaStr)}</div>
+      <div>Hora impresión: ${escapeHtml(horaStr)}</div>
+      <div>Cierre: #${escapeHtml(String(resumen.cierreId || "—"))}</div>
+      <div>Vendedor: ${escapeHtml(String(resumen.vendedor || "—"))}</div>
+      <hr class="th-sep">
+      <table>
+        <tbody>
+          ${filaMetodo("EFECTIVO", resumen.efectivo)}
+          ${filaMetodo("TRANSFERENCIA", resumen.transferencia)}
+          ${filaMetodo("TARJETA", resumen.tarjeta)}
+        </tbody>
+        <tr class="th-total-row">
+          <td><strong>TOTAL ESPERADO</strong></td>
+          <td style="text-align:right;"><strong>$${Number(resumen.total.esperado).toLocaleString("es-AR")}</strong></td>
+        </tr>
+        <tr>
+          <td><strong>TOTAL CONTADO</strong></td>
+          <td style="text-align:right;"><strong>$${Number(resumen.total.contado).toLocaleString("es-AR")}</strong></td>
+        </tr>
+        <tr>
+          <td><strong>DIFERENCIA</strong></td>
+          <td style="text-align:right;"><strong>${signoTotal}$${Math.round(resumen.total.diferencia).toLocaleString("es-AR")}</strong></td>
+        </tr>
+      </table>
+      <hr class="th-sep">
+      ${resumen.observaciones ? `<div style="font-size:13pt;font-weight:bold;">Obs: ${escapeHtml(resumen.observaciones)}</div><hr class="th-sep">` : ""}
+      <div class="th-footer">Cierre generado por ${escapeHtml(cfg.nombre)} POS</div>
+      <br><br>
+    </div>`;
+}
+
+/**
+ * Imprime el cierre de caja actualmente visible en pantalla.
+ * Usa los montos "esperado" ya cargados (cierreCajaResumenActual)
+ * y los montos "contado" tal cual están en los inputs en este momento,
+ * sin necesidad de haber guardado el cierre primero.
+ */
+function imprimirCierreCaja() {
+  if (!cierreCajaResumenActual) {
+    toast("Esperá a que se calculen las ventas del día", "error");
+    return;
+  }
+
+  const esp = cierreCajaResumenActual.esperado;
+
+  const efectivoContado      = Number(document.getElementById("ccEfectivoContado").value || 0);
+  const transferenciaContado = Number(document.getElementById("ccTransferenciaContado").value || 0);
+  const tarjetaContado       = Number(document.getElementById("ccTarjetaContado").value || 0);
+  const observaciones        = document.getElementById("ccObservaciones").value || "";
+
+  const efectivo = {
+    esperado: esp.EFECTIVO,
+    contado: efectivoContado,
+    diferencia: efectivoContado - esp.EFECTIVO
+  };
+  const transferencia = {
+    esperado: esp.TRANSFERENCIA,
+    contado: transferenciaContado,
+    diferencia: transferenciaContado - esp.TRANSFERENCIA
+  };
+  const tarjeta = {
+    esperado: esp.TARJETA,
+    contado: tarjetaContado,
+    diferencia: tarjetaContado - esp.TARJETA
+  };
+
+  const totalEsperado = efectivo.esperado + transferencia.esperado + tarjeta.esperado;
+  const totalContado  = efectivo.contado  + transferencia.contado  + tarjeta.contado;
+
+  const resumen = {
+    fecha: cierreCajaResumenActual.fecha,
+    cierreId: (cierreCajaResumenActual.cierreExistente && cierreCajaResumenActual.cierreExistente.CIERRE_ID) || "PREVIO",
+    vendedor: (cierreCajaResumenActual.cierreExistente && cierreCajaResumenActual.cierreExistente.VENDEDOR) || "ADMIN",
+    observaciones,
+    efectivo,
+    transferencia,
+    tarjeta,
+    total: {
+      esperado: totalEsperado,
+      contado: totalContado,
+      diferencia: totalContado - totalEsperado
+    }
+  };
+
+  if (usbPrintHabilitado() && puertoImpresoraUSB) {
+    const bytes = buildThermalCierreESCPOS(resumen);
+    enviarBytesAImpresoraUSB(bytes).catch(error => {
+      console.error("Error al imprimir cierre por USB:", error);
+      toast("Error al imprimir por USB — se abre el diálogo normal", "error");
+      _imprimirConDialogo(buildThermalCierreHTML(resumen));
+    });
+    return;
+  }
+
+  _imprimirConDialogo(buildThermalCierreHTML(resumen));
+}
+
+/* ===================================================================
+   BARCODE SCANNER SUPPORT + ATAJOS DE TECLADO DEL POS
+=================================================================== */
+
+let scanBuffer    = "";
+let lastKeyTime   = 0;
+const SCAN_KEY_THRESHOLD_MS = 40;
+
+function setupScannerListener() {
+  document.addEventListener("keydown", (e) => {
+    const posSection = document.getElementById("pos");
+    const posVisible = posSection && posSection.style.display === "block";
+    if (!posVisible) return;
+
+    // Ctrl+K / Cmd+K: foco directo al buscador, funciona incluso si el foco está en otro lado
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+      e.preventDefault();
+      const input = document.getElementById("posBusqueda");
+      if (input) input.focus();
+      return;
+    }
+
+    const activeTag  = document.activeElement ? document.activeElement.tagName : "";
+    const isOurInput = document.activeElement && document.activeElement.id === "posBusqueda";
+
+    // F2 finaliza la venta desde cualquier lado dentro del POS (incluso con el buscador enfocado)
+    if (e.key === "F2") {
+      e.preventDefault();
+      finalizarVentaPOS();
+      return;
+    }
+
+    if (!isOurInput && (activeTag === "INPUT" || activeTag === "SELECT" || activeTag === "TEXTAREA")) return;
+
+    // ---- Atajos que solo aplican cuando NO se está escribiendo en el buscador ----
+    if (!isOurInput) {
+      if (e.key === "ArrowRight" || e.key === "ArrowLeft" || e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        moverFocoPosGrid(e.key);
+        return;
+      }
+      if (e.key === "Enter" && posTileFocusIdx >= 0) {
+        e.preventDefault();
+        agregarProductoEnFoco();
+        return;
+      }
+      if (e.key === "+" || e.key === "=") {
+        if (ultimoCodigoAgregadoPOS) { e.preventDefault(); cambiarCantidadPOS(ultimoCodigoAgregadoPOS, 1); }
+        return;
+      }
+      if (e.key === "-") {
+        if (ultimoCodigoAgregadoPOS) { e.preventDefault(); cambiarCantidadPOS(ultimoCodigoAgregadoPOS, -1); }
+        return;
+      }
+      if (e.key === "1" || e.key === "2" || e.key === "3") {
+        const mapa = { "1": "EFECTIVO", "2": "TRANSFERENCIA", "3": "TARJETA" };
+        const btn = document.querySelector(`.pay-method-btn[data-val="${mapa[e.key]}"]`);
+        if (btn) { e.preventDefault(); elegirFormaPago(btn, mapa[e.key]); }
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        vaciarTicketPOS();
+        return;
+      }
+    }
+
+    const now     = Date.now();
+    const elapsed = now - lastKeyTime;
+    lastKeyTime   = now;
+
+    if (e.key === "Enter") {
+      // Si el foco está en el buscador del POS, onPosInputKeyup (el
+      // oninput="" de ese mismo <input>) ya se encarga de procesar
+      // este Enter — dejarlo pasar también acá disparaba
+      // agregarProductoPorCodigo() DOS VECES para el mismo escaneo
+      // (una desde cada listener), una condición de carrera que podía
+      // hacer fallar una de las dos búsquedas y mostrar "Producto no
+      // encontrado" aunque el producto sí se agregara por la otra vía.
+      if (isOurInput) { scanBuffer = ""; return; }
+
+      if (scanBuffer.length >= 3) { agregarProductoPorCodigo(scanBuffer); setScannerStatus("listening"); }
+      scanBuffer = "";
+      return;
+    }
+
+    if (e.key.length === 1) {
+      if (elapsed > 250) scanBuffer = "";
+      scanBuffer += e.key;
+      if (elapsed < SCAN_KEY_THRESHOLD_MS && scanBuffer.length >= 3) setScannerStatus("listening");
+    }
+  });
+
+  setInterval(() => {
+    if (Date.now() - lastKeyTime > 1200) setScannerStatus("idle");
+  }, 500);
+}
+
+/** Moves the keyboard focus highlight across the visible product tiles in the grid */
+function moverFocoPosGrid(tecla) {
+  const tiles = Array.from(document.querySelectorAll("#posProductGrid .product-tile:not(.disabled)"));
+  if (tiles.length === 0) return;
+
+  // Estimate columns from actual layout so left/right and up/down both feel natural
+  const primerTop = tiles[0].getBoundingClientRect().top;
+  let columnas = 1;
+  for (let i = 1; i < tiles.length; i++) {
+    if (Math.abs(tiles[i].getBoundingClientRect().top - primerTop) > 2) { columnas = i; break; }
+  }
+
+  let nuevoIdx = posTileFocusIdx;
+  if (nuevoIdx < 0) {
+    nuevoIdx = 0;
+  } else if (tecla === "ArrowRight") {
+    nuevoIdx = Math.min(tiles.length - 1, nuevoIdx + 1);
+  } else if (tecla === "ArrowLeft") {
+    nuevoIdx = Math.max(0, nuevoIdx - 1);
+  } else if (tecla === "ArrowDown") {
+    nuevoIdx = Math.min(tiles.length - 1, nuevoIdx + columnas);
+  } else if (tecla === "ArrowUp") {
+    nuevoIdx = Math.max(0, nuevoIdx - columnas);
+  }
+
+  tiles.forEach(t => t.classList.remove("kbd-focus"));
+  posTileFocusIdx = nuevoIdx;
+  const tileActivo = tiles[posTileFocusIdx];
+  if (tileActivo) {
+    tileActivo.classList.add("kbd-focus");
+    tileActivo.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
+}
+
+/** Adds to the ticket whichever tile currently has keyboard focus */
+function agregarProductoEnFoco() {
+  const tiles = Array.from(document.querySelectorAll("#posProductGrid .product-tile:not(.disabled)"));
+  const tile = tiles[posTileFocusIdx];
+  if (!tile || !tile.dataset.codigo) return;
+  agregarProductoPOS(tile.dataset.codigo);
+}
+
+function setScannerStatus(estado) {
+  const el = document.getElementById("scannerStatus");
+  if (!el) return;
+  if (estado === "listening") {
+    el.className = "scanner-status listening";
+    el.innerHTML = `<span class="dot"></span> Leyendo...`;
+  } else if (estado === "camera") {
+    el.className = "scanner-status camera";
+    el.innerHTML = `<span class="dot"></span> Cámara activa`;
+  } else {
+    el.className = "scanner-status idle";
+    el.innerHTML = `<span class="dot"></span> Listo`;
+  }
+}
+
+/* ---- shortcuts help modal ---- */
+
+function toggleShortcutsHelp() {
+  document.getElementById("shortcutsHelpBackdrop").classList.toggle("show");
+}
+function cerrarShortcutsHelp(e) {
+  if (e.target.id === "shortcutsHelpBackdrop") e.target.classList.remove("show");
+}
+
+/* ---- camera-based scanning ---- */
+
+let camaraStream = null;
+let camaraDetectorTimer = null;
+
+async function abrirCamaraScan() {
+  const backdrop  = document.getElementById("scanModalBackdrop");
+  const videoWrap = document.getElementById("scanVideoWrap");
+  const video     = document.getElementById("scanVideo");
+
+  backdrop.classList.add("show");
+
+  if (!("BarcodeDetector" in window)) {
+    videoWrap.innerHTML = `
+      <div class="scan-unsupported">
+        Tu navegador no soporta el escaneo por cámara nativo.<br>
+        Usá un lector USB, o Chrome/Edge en Android.
+      </div>`;
+    return;
+  }
+
+  try {
+    camaraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+    video.srcObject = camaraStream;
+    setScannerStatus("camera");
+    document.getElementById("btnCameraScan").classList.add("active");
+
+    const detector = new BarcodeDetector({
+      formats: ["ean_13","ean_8","upc_a","upc_e","code_128","code_39","qr_code","itf"]
+    });
+
+    camaraDetectorTimer = setInterval(async () => {
+      try {
+        const codigos = await detector.detect(video);
+        if (codigos.length > 0) {
+          const valor = codigos[0].rawValue;
+          cerrarCamaraScan();
+          agregarProductoPorCodigo(valor);
+        }
+      } catch (err) { /* frame errors expected */ }
+    }, 350);
+
+  } catch (error) {
+    console.error("Error de cámara:", error);
+    videoWrap.innerHTML = `
+      <div class="scan-unsupported">
+        No se pudo acceder a la cámara.<br>
+        Revisá los permisos del navegador e intentá de nuevo.
+      </div>`;
+  }
+}
+
+function cerrarCamaraScan() {
+  const backdrop = document.getElementById("scanModalBackdrop");
+  backdrop.classList.remove("show");
+
+  if (camaraDetectorTimer) { clearInterval(camaraDetectorTimer); camaraDetectorTimer = null; }
+  if (camaraStream) { camaraStream.getTracks().forEach(t => t.stop()); camaraStream = null; }
+
+  document.getElementById("btnCameraScan").classList.remove("active");
+  setScannerStatus("idle");
+
+  document.getElementById("scanVideoWrap").innerHTML = `
+    <video id="scanVideo" autoplay playsinline muted></video>
+    <div class="scan-reticle"></div>`;
+}
+
+/* ===================================================================
+   CIERRE DE CAJA — RECONCILIACION DIARIA
+   Compara lo esperado (según VENTAS_LOCAL, por forma de pago) contra
+   lo contado físicamente al cierre del día. Guarda el resultado en
+   la hoja "CIERRES_CAJA" vía el backend.
+=================================================================== */
+
+let cierreCajaResumenActual = null; // último resumen "esperado" cargado del backend
+
+/** Loads today's expected totals by payment method and pre-fills the form */
+async function cargarResumenCierreCaja(fecha) {
+  const estadoEl = document.getElementById("cierreCajaEstado");
+  if (estadoEl) estadoEl.textContent = "Calculando ventas del día...";
+
+  try {
+    const url = API_URL + "?action=cierreCajaResumen" + (fecha ? "&fecha=" + encodeURIComponent(fecha) : "");
+    const response = await fetch(url);
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo calcular el resumen de caja", "error");
+      if (estadoEl) estadoEl.textContent = "";
+      return;
+    }
+
+    cierreCajaResumenActual = data;
+
+    actualizarElemento("ccFechaLabel", formatearFechaCierre(data.fecha));
+    actualizarElemento("ccCantidadVentas", data.cantidadVentas + (data.cantidadVentas === 1 ? " venta" : " ventas"));
+
+    actualizarElemento("ccEfectivoEsperado",      "$" + Number(data.esperado.EFECTIVO).toLocaleString("es-AR"));
+    actualizarElemento("ccTransferenciaEsperado", "$" + Number(data.esperado.TRANSFERENCIA).toLocaleString("es-AR"));
+    actualizarElemento("ccTarjetaEsperado",       "$" + Number(data.esperado.TARJETA).toLocaleString("es-AR"));
+    actualizarElemento("ccTotalEsperado",         "$" + Number(data.esperado.TOTAL).toLocaleString("es-AR"));
+
+    // Desglose de efectivo: solo se muestra si hubo ingresos/egresos manuales
+    // ese día — si no hubo, "esperado" es directamente igual a las ventas
+    // y no tiene sentido mostrar un desglose vacío.
+    const movDetalleEl = document.getElementById("ccMovimientosDetalle");
+    const mov = data.movimientosCaja;
+    if (movDetalleEl && mov && (mov.ingresos > 0 || mov.egresos > 0)) {
+      actualizarElemento("ccVentasEfectivo", "$" + Number(data.ventasEfectivo || 0).toLocaleString("es-AR"));
+      actualizarElemento("ccMovIngresos", "+$" + Number(mov.ingresos).toLocaleString("es-AR"));
+      actualizarElemento("ccMovEgresos", "-$" + Number(mov.egresos).toLocaleString("es-AR"));
+      movDetalleEl.style.display = "flex";
+    } else if (movDetalleEl) {
+      movDetalleEl.style.display = "none";
+    }
+
+    // If a closing already exists for this date, pre-fill counted amounts so the user can review/edit
+    const inputEfectivo      = document.getElementById("ccEfectivoContado");
+    const inputTransferencia = document.getElementById("ccTransferenciaContado");
+    const inputTarjeta       = document.getElementById("ccTarjetaContado");
+
+    if (data.yaCerrado && data.cierreExistente) {
+      const c = data.cierreExistente;
+      if (inputEfectivo)      inputEfectivo.value      = Number(c.EFECTIVO_CONTADO || 0);
+      if (inputTransferencia) inputTransferencia.value = Number(c.TRANSFERENCIA_CONTADO || 0);
+      if (inputTarjeta)       inputTarjeta.value        = Number(c.TARJETA_CONTADO || 0);
+      const obsEl = document.getElementById("ccObservaciones");
+      if (obsEl) obsEl.value = c.OBSERVACIONES || "";
+      if (estadoEl) estadoEl.innerHTML = `⚠️ Ya existe un cierre guardado para esta fecha. Guardar de nuevo lo actualizará.`;
+    } else {
+      if (inputEfectivo)      inputEfectivo.value      = "";
+      if (inputTransferencia) inputTransferencia.value = "";
+      if (inputTarjeta)       inputTarjeta.value        = "";
+      if (estadoEl) estadoEl.textContent = "";
+    }
+
+    calcularDiferenciasCierreCaja();
+    cargarHistorialCierres();
+
+  } catch (error) {
+    console.error("Error al cargar resumen de cierre de caja:", error);
+    toast("Error de conexión al calcular el cierre de caja", "error");
+    if (estadoEl) estadoEl.textContent = "";
+  }
+}
+
+function formatearFechaCierre(fechaStr) {
+  if (!fechaStr) return "—";
+  const [y, m, d] = fechaStr.split("-");
+  return `${d}/${m}/${y}`;
+}
+
+/** Recalculates differences live as the user types counted amounts */
+function calcularDiferenciasCierreCaja() {
+  if (!cierreCajaResumenActual) return;
+
+  const efectivoContado      = Number(document.getElementById("ccEfectivoContado").value || 0);
+  const transferenciaContado = Number(document.getElementById("ccTransferenciaContado").value || 0);
+  const tarjetaContado       = Number(document.getElementById("ccTarjetaContado").value || 0);
+
+  const esp = cierreCajaResumenActual.esperado;
+
+  const difEfectivo      = efectivoContado - esp.EFECTIVO;
+  const difTransferencia = transferenciaContado - esp.TRANSFERENCIA;
+  const difTarjeta       = tarjetaContado - esp.TARJETA;
+  const difTotal         = difEfectivo + difTransferencia + difTarjeta;
+
+  pintarDiferencia("ccEfectivoDif", difEfectivo);
+  pintarDiferencia("ccTransferenciaDif", difTransferencia);
+  pintarDiferencia("ccTarjetaDif", difTarjeta);
+  pintarDiferencia("ccTotalDif", difTotal, true);
+
+  const totalContado = efectivoContado + transferenciaContado + tarjetaContado;
+  actualizarElemento("ccTotalContado", "$" + totalContado.toLocaleString("es-AR"));
+}
+
+function pintarDiferencia(id, valor, esTotal) {
+  const el = document.getElementById(id);
+  if (!el) return;
+
+  const signo = valor > 0 ? "+" : "";
+  el.textContent = signo + "$" + Math.round(valor).toLocaleString("es-AR");
+
+  el.classList.remove("cc-dif-ok", "cc-dif-sobra", "cc-dif-falta");
+
+  if (Math.abs(valor) < 1)      el.classList.add("cc-dif-ok");
+  else if (valor > 0)           el.classList.add("cc-dif-sobra");
+  else                          el.classList.add("cc-dif-falta");
+}
+
+/** Saves the daily reconciliation to the backend (CIERRES_CAJA sheet) */
+async function guardarCierreCajaForm() {
+  if (!cierreCajaResumenActual) { toast("Esperá a que se calculen las ventas del día", "error"); return; }
+
+  const efectivoContado      = document.getElementById("ccEfectivoContado").value;
+  const transferenciaContado = document.getElementById("ccTransferenciaContado").value;
+  const tarjetaContado       = document.getElementById("ccTarjetaContado").value;
+  const observaciones        = document.getElementById("ccObservaciones").value;
+
+  if (efectivoContado === "" && transferenciaContado === "" && tarjetaContado === "") {
+    toast("Ingresá al menos un monto contado", "error");
+    return;
+  }
+
+  const btn = document.getElementById("btnGuardarCierreCaja");
+  const textoOriginal = btn ? btn.innerHTML : "";
+  if (btn) { btn.disabled = true; btn.innerHTML = "Guardando..."; }
+
+  try {
+    const params = new URLSearchParams({
+      action: "guardarCierreCaja",
+      fecha: cierreCajaResumenActual.fecha,
+      efectivoEsperado:      cierreCajaResumenActual.esperado.EFECTIVO,
+      efectivoContado:       efectivoContado || 0,
+      transferenciaEsperado: cierreCajaResumenActual.esperado.TRANSFERENCIA,
+      transferenciaContado:  transferenciaContado || 0,
+      tarjetaEsperado:       cierreCajaResumenActual.esperado.TARJETA,
+      tarjetaContado:        tarjetaContado || 0,
+      observaciones:         observaciones || ""
+    });
+
+    const response = await fetch(API_URL + "?" + params.toString());
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo guardar el cierre de caja", "error");
+      return;
+    }
+
+    toast(data.actualizado ? "Cierre de caja actualizado" : "Cierre de caja guardado", "success");
+    cargarHistorialCierres();
+
+  } catch (error) {
+    console.error("Error al guardar cierre de caja:", error);
+    toast("Error de conexión al guardar el cierre", "error");
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = textoOriginal; }
+  }
+}
+
+/** Loads the recent reconciliation history table */
+async function cargarHistorialCierres() {
+  const tbody = document.getElementById("tablaCierresCaja");
+  if (!tbody) return;
+
+  try {
+    const response = await fetch(API_URL + "?action=historialCierres");
+    const data = await response.json();
+    const lista = data.cierres || [];
+
+    if (lista.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-3">Todavía no hay cierres guardados</td></tr>`;
+      return;
+    }
+
+    let html = "";
+    lista.forEach(c => {
+      const fecha = formatearFechaCierre(
+        c.FECHA instanceof Date
+          ? c.FECHA.toISOString().slice(0, 10)
+          : String(c.FECHA).slice(0, 10)
+      );
+      const totalDif = Number(c.TOTAL_DIFERENCIA || 0);
+      const claseDif = Math.abs(totalDif) < 1 ? "cc-dif-ok" : (totalDif > 0 ? "cc-dif-sobra" : "cc-dif-falta");
+      const signo = totalDif > 0 ? "+" : "";
+
+      html += `
+        <tr>
+          <td>${escapeHtml(fecha)}</td>
+          <td class="money">$${Number(c.TOTAL_ESPERADO || 0).toLocaleString("es-AR")}</td>
+          <td class="money">$${Number(c.TOTAL_CONTADO || 0).toLocaleString("es-AR")}</td>
+          <td class="money ${claseDif}">${signo}$${Math.round(totalDif).toLocaleString("es-AR")}</td>
+          <td>${escapeHtml(c.VENDEDOR || "—")}</td>
+          <td>${escapeHtml(c.OBSERVACIONES || "—")}</td>
+        </tr>`;
+    });
+
+    tbody.innerHTML = html;
+
+  } catch (error) {
+    console.error("Error al cargar historial de cierres:", error);
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-3">Error al cargar el historial</td></tr>`;
+  }
+}
+
+/* ===================== REPORTES ===================== */
+
+/** Lee el filtro de fecha compartido por los 6 reportes. Si está vacío, el backend usa el mes en curso. */
+function obtenerRangoReportes() {
+  const desde = document.getElementById("repDesde").value;
+  const hasta = document.getElementById("repHasta").value;
+  let qs = "";
+  if (desde) qs += "&desde=" + encodeURIComponent(desde);
+  if (hasta) qs += "&hasta=" + encodeURIComponent(hasta);
+  return qs;
+}
+
+/** Dispara los 6 reportes a la vez con el rango de fecha actual. */
+function cargarTodosLosReportes() {
+  cargarReporteVentasPeriodo();
+  cargarReporteProductos();
+  cargarReporteCategorias();
+  cargarReporteFormasPago();
+  cargarReporteCierres();
+  cargarReporteClientes();
+}
+
+/** Sincroniza los inputs de fecha "Desde"/"Hasta" con el rango que devolvió el backend (cuando no se eligió nada, para que el usuario vea qué período se está mostrando). */
+function sincronizarRangoReportes(desde, hasta) {
+  const inputDesde = document.getElementById("repDesde");
+  const inputHasta = document.getElementById("repHasta");
+  if (inputDesde && !inputDesde.value) inputDesde.value = desde;
+  if (inputHasta && !inputHasta.value) inputHasta.value = hasta;
+}
+
+/* ---- Reporte 1: Ventas por período ---- */
+async function cargarReporteVentasPeriodo() {
+  const tbody = document.getElementById("repVentasPeriodoTabla");
+  const resumenWrap = document.getElementById("repVentasPeriodoResumen");
+
+  try {
+    const response = await fetch(API_URL + "?action=reporteVentasPeriodo" + obtenerRangoReportes());
+    const data = await response.json();
+    if (!data.success) return;
+
+    sincronizarRangoReportes(data.desde, data.hasta);
+
+    const r = data.resumen || {};
+    resumenWrap.innerHTML = `
+      <div class="col-6 col-md-3"><div class="card p-2 text-center"><div class="text-muted" style="font-size:11.5px;">Total POS</div><div class="money fw-bold">$${Number(r.totalPOS || 0).toLocaleString("es-AR")}</div></div></div>
+      <div class="col-6 col-md-3"><div class="card p-2 text-center"><div class="text-muted" style="font-size:11.5px;">Total Pedidos</div><div class="money fw-bold">$${Number(r.totalPedidos || 0).toLocaleString("es-AR")}</div></div></div>
+      <div class="col-6 col-md-3"><div class="card p-2 text-center"><div class="text-muted" style="font-size:11.5px;">Total general</div><div class="money fw-bold">$${Number(r.totalGeneral || 0).toLocaleString("es-AR")}</div></div></div>
+      <div class="col-6 col-md-3"><div class="card p-2 text-center"><div class="text-muted" style="font-size:11.5px;">Ticket promedio</div><div class="money fw-bold">$${Number(r.ticketPromedio || 0).toLocaleString("es-AR")}</div></div></div>`;
+
+    if (!data.dias || data.dias.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-3">Sin ventas para el rango elegido</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = data.dias.map(d => `
+      <tr>
+        <td>${escapeHtml(d.fecha)}</td>
+        <td class="money">$${Number(d.pos || 0).toLocaleString("es-AR")}</td>
+        <td class="money">$${Number(d.pedidos || 0).toLocaleString("es-AR")}</td>
+        <td class="money fw-bold">$${Number(d.total || 0).toLocaleString("es-AR")}</td>
+      </tr>`).join("");
+
+  } catch (error) {
+    console.error("Error al cargar reporte de ventas por período:", error);
+    tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-3">Error al cargar el reporte</td></tr>`;
+  }
+}
+
+/* ---- Reporte 2: Productos más vendidos ---- */
+async function cargarReporteProductos() {
+  const tbody = document.getElementById("repProductosTabla");
+
+  try {
+    const response = await fetch(API_URL + "?action=reporteProductosVendidos" + obtenerRangoReportes());
+    const data = await response.json();
+    if (!data.success) return;
+
+    sincronizarRangoReportes(data.desde, data.hasta);
+
+    if (!data.productos || data.productos.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-3">Sin ventas para el rango elegido</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = data.productos.map(p => `
+      <tr>
+        <td class="mono">${escapeHtml(p.CODIGO)}</td>
+        <td>${escapeHtml(p.PRODUCTO)}</td>
+        <td class="money">${Number(p.VENDIDOS || 0).toLocaleString("es-AR")}</td>
+        <td class="money">$${Number(p.INGRESOS || 0).toLocaleString("es-AR")}</td>
+      </tr>`).join("");
+
+  } catch (error) {
+    console.error("Error al cargar reporte de productos vendidos:", error);
+    tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-3">Error al cargar el reporte</td></tr>`;
+  }
+}
+
+/* ---- Reporte 3: Ventas por categoría ---- */
+async function cargarReporteCategorias() {
+  const tbody = document.getElementById("repCategoriasTabla");
+
+  try {
+    const response = await fetch(API_URL + "?action=reporteVentasPorCategoria" + obtenerRangoReportes());
+    const data = await response.json();
+    if (!data.success) return;
+
+    sincronizarRangoReportes(data.desde, data.hasta);
+
+    if (!data.categorias || data.categorias.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="3" class="text-center text-muted py-3">Sin ventas para el rango elegido</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = data.categorias.map(c => `
+      <tr>
+        <td>${escapeHtml(c.categoria)}</td>
+        <td class="money">${Number(c.cantidad || 0).toLocaleString("es-AR")}</td>
+        <td class="money">$${Number(c.ingresos || 0).toLocaleString("es-AR")}</td>
+      </tr>`).join("");
+
+  } catch (error) {
+    console.error("Error al cargar reporte de ventas por categoría:", error);
+    tbody.innerHTML = `<tr><td colspan="3" class="text-center text-muted py-3">Error al cargar el reporte</td></tr>`;
+  }
+}
+
+/* ---- Reporte 4: Formas de pago ---- */
+async function cargarReporteFormasPago() {
+  const tbody = document.getElementById("repFormasPagoTabla");
+
+  try {
+    const response = await fetch(API_URL + "?action=reporteFormasPago" + obtenerRangoReportes());
+    const data = await response.json();
+    if (!data.success) return;
+
+    sincronizarRangoReportes(data.desde, data.hasta);
+
+    if (!data.formas || data.formas.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="3" class="text-center text-muted py-3">Sin ventas para el rango elegido</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = data.formas.map(f => `
+      <tr>
+        <td>${escapeHtml(f.forma)}</td>
+        <td class="money">${Number(f.cantidad || 0).toLocaleString("es-AR")}</td>
+        <td class="money">$${Number(f.total || 0).toLocaleString("es-AR")}</td>
+      </tr>`).join("");
+
+  } catch (error) {
+    console.error("Error al cargar reporte de formas de pago:", error);
+    tbody.innerHTML = `<tr><td colspan="3" class="text-center text-muted py-3">Error al cargar el reporte</td></tr>`;
+  }
+}
+
+/* ---- Reporte 5: Historial de cierres de caja ---- */
+async function cargarReporteCierres() {
+  const tbody = document.getElementById("repCierresTabla");
+
+  try {
+    const response = await fetch(API_URL + "?action=reporteCierresCaja" + obtenerRangoReportes());
+    const data = await response.json();
+    if (!data.success) return;
+
+    sincronizarRangoReportes(data.desde, data.hasta);
+
+    if (!data.cierres || data.cierres.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-3">Sin cierres para el rango elegido</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = data.cierres.map(c => {
+      const fecha = c.FECHA ? new Date(c.FECHA).toLocaleDateString("es-AR") : "—";
+      const totalDif = Number(c.TOTAL_DIFERENCIA || 0);
+      const claseDif = Math.abs(totalDif) < 1 ? "cc-dif-ok" : (totalDif > 0 ? "cc-dif-sobra" : "cc-dif-falta");
+      const signo = totalDif > 0 ? "+" : "";
+      return `
+      <tr>
+        <td>${escapeHtml(fecha)}</td>
+        <td class="money">$${Number(c.TOTAL_ESPERADO || 0).toLocaleString("es-AR")}</td>
+        <td class="money">$${Number(c.TOTAL_CONTADO || 0).toLocaleString("es-AR")}</td>
+        <td class="money ${claseDif}">${signo}$${Math.round(totalDif).toLocaleString("es-AR")}</td>
+        <td>${escapeHtml(c.VENDEDOR || "—")}</td>
+      </tr>`;
+    }).join("");
+
+  } catch (error) {
+    console.error("Error al cargar reporte de cierres de caja:", error);
+    tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-3">Error al cargar el reporte</td></tr>`;
+  }
+}
+
+/* ---- Reporte 6: Clientes que más compran ---- */
+async function cargarReporteClientes() {
+  const tbody = document.getElementById("repClientesTabla");
+
+  try {
+    const response = await fetch(API_URL + "?action=reporteClientes" + obtenerRangoReportes());
+    const data = await response.json();
+    if (!data.success) return;
+
+    sincronizarRangoReportes(data.desde, data.hasta);
+
+    if (!data.clientes || data.clientes.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-3">Sin pedidos para el rango elegido</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = data.clientes.map(c => `
+      <tr>
+        <td>${escapeHtml(c.CLIENTE)}</td>
+        <td>${escapeHtml(c.EMPRESA || "—")}</td>
+        <td class="money">${Number(c.PEDIDOS || 0).toLocaleString("es-AR")}</td>
+        <td class="money">$${Number(c.TOTAL || 0).toLocaleString("es-AR")}</td>
+      </tr>`).join("");
+
+  } catch (error) {
+    console.error("Error al cargar reporte de clientes:", error);
+    tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-3">Error al cargar el reporte</td></tr>`;
+  }
+}
+
+/* ---- Exportar cualquiera de los 6 reportes a PDF ---- */
+/**
+ * Toma la tarjeta del reporte (por su id), lee la tabla que tiene
+ * adentro, y genera un PDF con jsPDF + autoTable. Funciona igual
+ * para los 6 reportes porque todos son <table> dentro de una .card.
+ */
+function exportarReportePDF(cardId, tituloReporte) {
+  try {
+    const card = document.getElementById(cardId);
+    if (!card) return;
+
+    const tabla = card.querySelector("table");
+    if (!tabla) {
+      toast("Este reporte no tiene datos para exportar", "error");
+      return;
+    }
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+
+    const nombreLocal = (obtenerConfigNegocio().nombre || "Reporte").toString();
+    const desde = document.getElementById("repDesde").value || "—";
+    const hasta = document.getElementById("repHasta").value || "—";
+
+    doc.setFontSize(14);
+    doc.text(`${nombreLocal} — ${tituloReporte}`, 30, 30);
+    doc.setFontSize(10);
+    doc.setTextColor(110, 110, 110);
+    doc.text(`Período: ${desde} a ${hasta}  ·  Generado: ${new Date().toLocaleString("es-AR")}`, 30, 46);
+
+    doc.autoTable({
+      html: tabla,
+      startY: 58,
+      theme: "grid",
+      styles: { fontSize: 9, cellPadding: 5 },
+      headStyles: { fillColor: [18, 32, 71], textColor: [255, 255, 255] }
+    });
+
+    const nombreArchivo = `${tituloReporte.replace(/\s+/g, "_")}_${desde}_a_${hasta}.pdf`;
+    doc.save(nombreArchivo);
+
+  } catch (error) {
+    console.error("Error al exportar el reporte a PDF:", error);
+    toast("No se pudo generar el PDF", "error");
+  }
+}
+
+
+/* ===================================================================
+   MOVIMIENTOS DE CAJA — ingresos y egresos manuales (no son ventas)
+=================================================================== */
+
+let tipoMovimientoCajaActivo = "INGRESO";
+
+function elegirTipoMovimientoCaja(el, tipo) {
+  tipoMovimientoCajaActivo = tipo;
+  document.querySelectorAll(".mc-tipo-btn").forEach(b => b.classList.remove("active"));
+  el.classList.add("active");
+}
+
+/** Loads today's manual cash movements and the running totals */
+async function cargarMovimientosCajaHoy() {
+  try {
+    const response = await fetch(API_URL + "?action=movimientosCajaHoy");
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo cargar movimientos de caja", "error");
+      return;
+    }
+
+    actualizarElemento("mcTotalIngresos", "$" + Number(data.totalIngresos).toLocaleString("es-AR"));
+    actualizarElemento("mcTotalEgresos",  "$" + Number(data.totalEgresos).toLocaleString("es-AR"));
+
+    const netoEl = document.getElementById("mcSaldoNeto");
+    if (netoEl) {
+      netoEl.textContent = (data.neto >= 0 ? "$" : "-$") + Math.abs(data.neto).toLocaleString("es-AR");
+      netoEl.style.color = data.neto >= 0 ? "var(--green-600)" : "var(--red-500)";
+    }
+
+    renderTablaMovimientosCaja(data.movimientos || []);
+
+  } catch (error) {
+    console.error("Error al cargar movimientos de caja:", error);
+    toast("Error de conexión al cargar movimientos de caja", "error");
+  }
+}
+
+function renderTablaMovimientosCaja(lista) {
+  const tbody = document.getElementById("tablaMovimientosCaja");
+  if (!tbody) return;
+
+  if (lista.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-3">Todavía no hay movimientos registrados hoy</td></tr>`;
+    return;
+  }
+
+  let html = "";
+  lista.forEach(m => {
+    const esIngreso = String(m.TIPO).toUpperCase() === "INGRESO";
+    const hora = m.FECHA_REGISTRO ? new Date(m.FECHA_REGISTRO).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }) : "—";
+
+    html += `
+    <tr>
+      <td>${hora}</td>
+      <td><span class="mc-tag ${esIngreso ? "mc-ingreso" : "mc-egreso"}">${esIngreso ? "⬆️ Ingreso" : "⬇️ Egreso"}</span></td>
+      <td>${escapeHtml(m.MOTIVO || "—")}</td>
+      <td class="money" style="color:${esIngreso ? "var(--green-600)" : "var(--red-500)"};">
+        ${esIngreso ? "+" : "-"}$${Number(m.MONTO || 0).toLocaleString("es-AR")}
+      </td>
+      <td>${escapeHtml(m.VENDEDOR || "—")}</td>
+      <td><button class="btn btn-outline-danger btn-sm" onclick="eliminarMovimientoCajaForm('${escapeHtml(m.MOVIMIENTO_ID)}')">Eliminar</button></td>
+    </tr>`;
+  });
+
+  tbody.innerHTML = html;
+}
+
+/** Saves a new manual income/expense movement */
+async function guardarMovimientoCajaForm() {
+  const monto = document.getElementById("mcMonto").value;
+  const motivo = document.getElementById("mcMotivo").value.trim();
+
+  if (!monto || Number(monto) <= 0) { toast("Ingresá un monto válido", "error"); return; }
+  if (!motivo) { toast("Ingresá un motivo para el movimiento", "error"); return; }
+
+  const btn = document.getElementById("btnGuardarMovimientoCaja");
+  const textoOriginal = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = "Guardando...";
+
+  try {
+    const params = new URLSearchParams({
+      action: "guardarMovimientoCaja",
+      tipo: tipoMovimientoCajaActivo,
+      monto: monto,
+      motivo: motivo
+    });
+
+    const response = await fetch(API_URL + "?" + params.toString());
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo registrar el movimiento", "error");
+      return;
+    }
+
+    toast(tipoMovimientoCajaActivo === "INGRESO" ? "Ingreso registrado" : "Egreso registrado", "success");
+    document.getElementById("mcMonto").value = "";
+    document.getElementById("mcMotivo").value = "";
+    cargarMovimientosCajaHoy();
+
+  } catch (error) {
+    console.error("Error al guardar movimiento de caja:", error);
+    toast("Error de conexión al registrar el movimiento", "error");
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = textoOriginal;
+  }
+}
+
+/** Deletes a movement after confirmation */
+async function eliminarMovimientoCajaForm(movimientoId) {
+  if (!confirm("¿Eliminar este movimiento de caja? Esta acción no se puede deshacer.")) return;
+
+  try {
+    const response = await fetch(API_URL + "?action=eliminarMovimientoCaja&movimientoId=" + encodeURIComponent(movimientoId));
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo eliminar el movimiento", "error");
+      return;
+    }
+
+    toast("Movimiento eliminado", "success");
+    cargarMovimientosCajaHoy();
+
+  } catch (error) {
+    console.error("Error al eliminar movimiento de caja:", error);
+    toast("Error de conexión al eliminar el movimiento", "error");
+  }
+}
+
+/* ===================================================================
+   ETIQUETAS DE CÓDIGO DE BARRAS (para estantería/góndola)
+=================================================================== */
+
+/** Updates the selection counter and enables/disables the three label/QR generation buttons */
+function actualizarSeleccionEtiquetas() {
+  const checks = document.querySelectorAll(".check-producto-etiqueta:checked");
+  const info = document.getElementById("etiquetasSeleccionInfo");
+  const btnEtiquetas = document.getElementById("btnGenerarEtiquetas");
+  const btnQR = document.getElementById("btnGenerarQR");
+  const btnQROffline = document.getElementById("btnGenerarQROffline");
+
+  const cantidad = checks.length;
+
+  if (info) {
+    info.textContent = cantidad === 0
+      ? "Ningún producto seleccionado"
+      : cantidad === 1
+        ? "1 producto seleccionado"
+        : `${cantidad} productos seleccionados`;
+  }
+
+  if (btnEtiquetas) btnEtiquetas.disabled = cantidad === 0;
+  if (btnQR) btnQR.disabled = cantidad === 0;
+  if (btnQROffline) btnQROffline.disabled = cantidad === 0;
+}
+
+/** Toggles every visible product checkbox via the header checkbox */
+function toggleTodosProductos(checkboxHeader) {
+  document.querySelectorAll(".check-producto-etiqueta").forEach(c => {
+    c.checked = checkboxHeader.checked;
+  });
+  actualizarSeleccionEtiquetas();
+}
+
+/** Returns the list of currently-checked product codes */
+function obtenerCodigosSeleccionados() {
+  return Array.from(document.querySelectorAll(".check-producto-etiqueta:checked")).map(c => c.value);
+}
+
+function abrirModalEtiquetas() {
+  const codigos = obtenerCodigosSeleccionados();
+  if (codigos.length === 0) { toast("Seleccioná al menos un producto", "error"); return; }
+
+  actualizarPreviewEtiquetas();
+  document.getElementById("etiquetasModalBackdrop").classList.add("show");
+}
+
+function cerrarModalEtiquetas() {
+  document.getElementById("etiquetasModalBackdrop").classList.remove("show");
+}
+
+/** Shows a quick text summary (no barcodes yet — those render only at print time) */
+function actualizarPreviewEtiquetas() {
+  const codigos = obtenerCodigosSeleccionados();
+  const copias = Math.max(1, Number(document.getElementById("etqCantidadCopias").value || 1));
+  const totalEtiquetas = codigos.length * copias;
+
+  const info = document.getElementById("etiquetasPreviewInfo");
+  if (info) {
+    info.textContent = `Se van a imprimir ${totalEtiquetas} etiqueta${totalEtiquetas === 1 ? "" : "s"} en total (${codigos.length} producto${codigos.length === 1 ? "" : "s"} × ${copias} copia${copias === 1 ? "" : "s"}).`;
+  }
+}
+
+/**
+ * Builds the printable label grid (one <div> per label, with an <svg>
+ * placeholder per barcode) and renders the actual barcodes into those
+ * placeholders with JsBarcode — then triggers the browser's print
+ * dialog. Runs entirely client-side, same approach as the PDF catalog
+ * download: no server round-trip per label.
+ */
+function imprimirEtiquetas() {
+  const codigos = obtenerCodigosSeleccionados();
+  if (codigos.length === 0) { toast("Seleccioná al menos un producto", "error"); return; }
+
+  const copias = Math.max(1, Number(document.getElementById("etqCantidadCopias").value || 1));
+  const columnas = document.getElementById("etqColumnas").value;
+
+  const productos = codigos
+    .map(codigo => productosAdminGlobal.find(p => String(p.CODIGO) === String(codigo)))
+    .filter(Boolean);
+
+  if (productos.length === 0) {
+    toast("No se encontraron los productos seleccionados", "error");
+    return;
+  }
+
+  const printArea = document.getElementById("etiquetasPrintArea");
+
+  // Por si quedó contenido de una impresión de ticket térmico anterior
+  // a medio camino, se limpia el otro contenedor de impresión para que
+  // el CSS de :empty/:not(:empty) elija el correcto sin ambigüedad.
+  const thermalFrame = document.getElementById("thermalPrintFrame");
+  if (thermalFrame) thermalFrame.innerHTML = "";
+
+  let html = `<div class="etiquetas-grid cols-${columnas}">`;
+
+  let idx = 0;
+  productos.forEach(p => {
+    for (let copia = 0; copia < copias; copia++) {
+      const svgId = `etqSvg${idx}`;
+      html += `
+        <div class="etiqueta-item">
+          <div class="etiqueta-nombre">${escapeHtml(p.PRODUCTO)}</div>
+          <svg class="etiqueta-barcode-svg" id="${svgId}"></svg>
+          <div class="etiqueta-codigo-texto">${escapeHtml(p.CODIGO)}</div>
+          <div class="etiqueta-precio">$${Number(p.PRECIO || 0).toLocaleString("es-AR")}</div>
+        </div>`;
+      idx++;
+    }
+  });
+
+  html += `</div>`;
+  printArea.innerHTML = html;
+
+  // JsBarcode necesita que el <svg> ya esté en el DOM antes de dibujar
+  // adentro — por eso se llena el HTML primero y se recorre después.
+  idx = 0;
+  productos.forEach(p => {
+    for (let copia = 0; copia < copias; copia++) {
+      try {
+        JsBarcode(`#etqSvg${idx}`, String(p.CODIGO), {
+          format: "CODE128",
+          displayValue: false, // el código ya se muestra como texto aparte, en una fuente más legible
+          width: 1.6,
+          height: 38,
+          margin: 4
+        });
+      } catch (error) {
+        // Un código vacío o con caracteres no soportados no debe
+        // frenar la impresión del resto de las etiquetas.
+        console.error("No se pudo generar el código de barras para", p.CODIGO, error);
+      }
+      idx++;
+    }
+  });
+
+  cerrarModalEtiquetas();
+
+  // Pequeño delay para asegurar que los SVG ya se pintaron en el DOM
+  // antes de que el navegador capture el contenido para imprimir.
+  setTimeout(() => {
+    window.print();
+  }, 200);
+}
+
+/* ===================================================================
+   QR DE PRECIO (consulta pública del precio actualizado, sin login)
+=================================================================== */
+
+function abrirModalQR() {
+  const codigos = obtenerCodigosSeleccionados();
+  if (codigos.length === 0) { toast("Seleccioná al menos un producto", "error"); return; }
+
+  if (!configNegocioCache.urlCatalogo) {
+    toast("Configurá primero la URL del catálogo en Configuración → Catálogo online", "error");
+    return;
+  }
+
+  actualizarPreviewQR();
+  document.getElementById("qrModalBackdrop").classList.add("show");
+}
+
+function cerrarModalQR() {
+  document.getElementById("qrModalBackdrop").classList.remove("show");
+}
+
+function actualizarPreviewQR() {
+  const codigos = obtenerCodigosSeleccionados();
+  const copias = Math.max(1, Number(document.getElementById("qrCantidadCopias").value || 1));
+  const totalQR = codigos.length * copias;
+
+  const info = document.getElementById("qrPreviewInfo");
+  if (info) {
+    info.textContent = `Se van a imprimir ${totalQR} código${totalQR === 1 ? "" : "s"} QR en total (${codigos.length} producto${codigos.length === 1 ? "" : "s"} × ${copias} copia${copias === 1 ? "" : "s"}).`;
+  }
+}
+
+/** Builds the public "consultar precio" URL for a given product code */
+function construirUrlPrecio(codigo) {
+  const base = (configNegocioCache.urlCatalogo || "").replace(/\/+$/, "");
+  return `${base}/precio.html?codigo=${encodeURIComponent(codigo)}`;
+}
+
+/**
+ * Builds the printable QR grid and renders each QR with QRCode.js into
+ * its placeholder <div> — then triggers the print dialog. Same
+ * client-side approach as the barcode labels: no server round-trip.
+ */
+function imprimirQR() {
+  const codigos = obtenerCodigosSeleccionados();
+  if (codigos.length === 0) { toast("Seleccioná al menos un producto", "error"); return; }
+
+  if (!configNegocioCache.urlCatalogo) {
+    toast("Configurá primero la URL del catálogo en Configuración → Catálogo online", "error");
+    return;
+  }
+
+  const copias = Math.max(1, Number(document.getElementById("qrCantidadCopias").value || 1));
+  const columnas = document.getElementById("qrColumnas").value;
+
+  const productos = codigos
+    .map(codigo => productosAdminGlobal.find(p => String(p.CODIGO) === String(codigo)))
+    .filter(Boolean);
+
+  if (productos.length === 0) {
+    toast("No se encontraron los productos seleccionados", "error");
+    return;
+  }
+
+  const printArea = document.getElementById("etiquetasPrintArea");
+
+  // Mismo cuidado que en las etiquetas de código de barras: se limpia
+  // el otro contenedor de impresión para que el CSS :empty/:not(:empty)
+  // elija el correcto sin ambigüedad.
+  const thermalFrame = document.getElementById("thermalPrintFrame");
+  if (thermalFrame) thermalFrame.innerHTML = "";
+
+  let html = `<div class="etiquetas-grid cols-${columnas}">`;
+
+  let idx = 0;
+  productos.forEach(p => {
+    for (let copia = 0; copia < copias; copia++) {
+      html += `
+        <div class="qr-item">
+          <div class="qr-nombre">${escapeHtml(p.PRODUCTO)}</div>
+          <div id="qrCanvas${idx}"></div>
+          <div class="qr-leyenda">Escaneá para ver el precio</div>
+        </div>`;
+      idx++;
+    }
+  });
+
+  html += `</div>`;
+  printArea.innerHTML = html;
+
+  // QRCode.js necesita que el contenedor ya esté en el DOM antes de
+  // dibujar adentro — por eso se llena el HTML primero y se recorre después.
+  idx = 0;
+  productos.forEach(p => {
+    const url = construirUrlPrecio(p.CODIGO);
+    for (let copia = 0; copia < copias; copia++) {
+      try {
+        new QRCode(document.getElementById(`qrCanvas${idx}`), {
+          text: url,
+          width: 120,
+          height: 120,
+          colorDark: "#000000",
+          colorLight: "#ffffff",
+          correctLevel: QRCode.CorrectLevel.M
+        });
+      } catch (error) {
+        // Un error puntual generando un QR no debe frenar la
+        // impresión del resto.
+        console.error("No se pudo generar el QR para", p.CODIGO, error);
+      }
+      idx++;
+    }
+  });
+
+  cerrarModalQR();
+
+  setTimeout(() => {
+    window.print();
+  }, 200);
+}
+
+/* ===================================================================
+   QR DE IDENTIFICACIÓN (offline, solo nombre del producto)
+   A diferencia del QR de Precio, NO apunta a ninguna URL — codifica
+   directamente el texto del nombre. Por eso cualquier lector de QR lo
+   muestra al instante, sin necesidad de internet ni de que el backend
+   esté disponible. Pensado para identificar cajas en el depósito.
+=================================================================== */
+
+function abrirModalQROffline() {
+  const codigos = obtenerCodigosSeleccionados();
+  if (codigos.length === 0) { toast("Seleccioná al menos un producto", "error"); return; }
+
+  actualizarPreviewQROffline();
+  document.getElementById("qrOfflineModalBackdrop").classList.add("show");
+}
+
+function cerrarModalQROffline() {
+  document.getElementById("qrOfflineModalBackdrop").classList.remove("show");
+}
+
+function actualizarPreviewQROffline() {
+  const codigos = obtenerCodigosSeleccionados();
+  const copias = Math.max(1, Number(document.getElementById("qrOfflineCantidadCopias").value || 1));
+  const totalQR = codigos.length * copias;
+
+  const info = document.getElementById("qrOfflinePreviewInfo");
+  if (info) {
+    info.textContent = `Se van a imprimir ${totalQR} código${totalQR === 1 ? "" : "s"} QR en total (${codigos.length} producto${codigos.length === 1 ? "" : "s"} × ${copias} copia${copias === 1 ? "" : "s"}).`;
+  }
+}
+
+/**
+ * Builds the printable QR grid where each QR encodes just the plain
+ * product name as text (not a URL) — works with any QR reader with
+ * zero network involved, on either end.
+ */
+function imprimirQROffline() {
+  const codigos = obtenerCodigosSeleccionados();
+  if (codigos.length === 0) { toast("Seleccioná al menos un producto", "error"); return; }
+
+  const copias = Math.max(1, Number(document.getElementById("qrOfflineCantidadCopias").value || 1));
+  const columnas = document.getElementById("qrOfflineColumnas").value;
+
+  const productos = codigos
+    .map(codigo => productosAdminGlobal.find(p => String(p.CODIGO) === String(codigo)))
+    .filter(Boolean);
+
+  if (productos.length === 0) {
+    toast("No se encontraron los productos seleccionados", "error");
+    return;
+  }
+
+  const printArea = document.getElementById("etiquetasPrintArea");
+
+  const thermalFrame = document.getElementById("thermalPrintFrame");
+  if (thermalFrame) thermalFrame.innerHTML = "";
+
+  let html = `<div class="etiquetas-grid cols-${columnas}">`;
+
+  let idx = 0;
+  productos.forEach(p => {
+    for (let copia = 0; copia < copias; copia++) {
+      html += `
+        <div class="qr-item">
+          <div class="qr-nombre">${escapeHtml(p.PRODUCTO)}</div>
+          <div id="qrOfflineCanvas${idx}"></div>
+          <div class="qr-leyenda">Funciona sin internet</div>
+        </div>`;
+      idx++;
+    }
+  });
+
+  html += `</div>`;
+  printArea.innerHTML = html;
+
+  idx = 0;
+  productos.forEach(p => {
+    for (let copia = 0; copia < copias; copia++) {
+      try {
+        new QRCode(document.getElementById(`qrOfflineCanvas${idx}`), {
+          text: String(p.PRODUCTO || ""),
+          width: 120,
+          height: 120,
+          colorDark: "#000000",
+          colorLight: "#ffffff",
+          correctLevel: QRCode.CorrectLevel.M
+        });
+      } catch (error) {
+        console.error("No se pudo generar el QR de identificación para", p.CODIGO, error);
+      }
+      idx++;
+    }
+  });
+
+  cerrarModalQROffline();
+
+  setTimeout(() => {
+    window.print();
+  }, 200);
+}
+
