@@ -262,15 +262,15 @@
       <button class="btn btn-success" onclick="nuevoProducto()">+ Nuevo Producto</button>
     </div>
 
-    <div class="card p-3 mb-3">
-      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <input type="text" id="buscarProducto" class="form-control" style="max-width:300px"
-          placeholder="Buscar por código o nombre..." onkeyup="filtrarProductosConDemora()">
-        <div class="d-flex gap-2 flex-wrap align-items-center">
-          <select id="filtroCategoriaProductos" class="form-select form-select-sm" style="max-width:200px" onchange="filtrarProductos()">
+    <div style="position:sticky; top:0; z-index:10; background:var(--slate-50); padding:8px 0 6px;">
+      <div class="card p-2">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <input type="text" id="buscarProducto" class="form-control form-control-sm" style="max-width:260px"
+            placeholder="Buscar por código o nombre..." onkeyup="filtrarProductosConDemora()">
+          <select id="filtroCategoriaProductos" class="form-select form-select-sm" style="max-width:180px" onchange="filtrarProductos()">
             <option value="">Todas las categorías</option>
           </select>
-          <select id="filtroEstadoProducto" class="form-select form-select-sm" style="max-width:180px" onchange="filtrarProductos()">
+          <select id="filtroEstadoProducto" class="form-select form-select-sm" style="max-width:170px" onchange="filtrarProductos()">
             <option value="">Todos los productos</option>
             <option value="sin_imagen">Sin imagen</option>
             <option value="sin_stock">Sin stock (0)</option>
@@ -278,21 +278,20 @@
           </select>
         </div>
       </div>
-    </div>
-
-    <div class="card p-3 mb-3 etiquetas-bar">
-      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <span class="text-muted" style="font-size:13px;" id="etiquetasSeleccionInfo">Ningún producto seleccionado</span>
-        <div class="d-flex gap-2 flex-wrap">
-          <button class="btn btn-outline-dark btn-sm" id="btnGenerarQROffline" onclick="abrirModalQROffline()" disabled>
-            📦 Generar QR de Identificación
-          </button>
-          <button class="btn btn-outline-secondary btn-sm" id="btnGenerarQR" onclick="abrirModalQR()" disabled>
-            📱 Generar QR de Precio
-          </button>
-          <button class="btn btn-outline-primary btn-sm" id="btnGenerarEtiquetas" onclick="abrirModalEtiquetas()" disabled>
-            🏷️ Generar Etiquetas
-          </button>
+      <div class="card p-2 mt-1 etiquetas-bar">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <span class="text-muted" style="font-size:12px;" id="etiquetasSeleccionInfo">Ningún producto seleccionado</span>
+          <div class="d-flex gap-2 flex-wrap">
+            <button class="btn btn-outline-dark btn-sm" id="btnGenerarQROffline" onclick="abrirModalQROffline()" disabled>
+              📦 Generar QR de Identificación
+            </button>
+            <button class="btn btn-outline-secondary btn-sm" id="btnGenerarQR" onclick="abrirModalQR()" disabled>
+              📱 Generar QR de Precio
+            </button>
+            <button class="btn btn-outline-primary btn-sm" id="btnGenerarEtiquetas" onclick="abrirModalEtiquetas()" disabled>
+              🏷️ Generar Etiquetas
+            </button>
+          </div>
         </div>
       </div>
     </div>
