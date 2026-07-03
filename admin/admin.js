@@ -1505,9 +1505,11 @@ function poblarFiltroCategoriasProductos() {
 function filtrarProductos() {
   const inputBuscar = document.getElementById("buscarProducto");
   const selectCategoria = document.getElementById("filtroCategoriaProductos");
+  const selectEstado = document.getElementById("filtroEstadoProducto");
 
   const termino = (inputBuscar ? inputBuscar.value : "").toLowerCase().trim();
   const categoria = selectCategoria ? selectCategoria.value : "";
+  const estado = selectEstado ? selectEstado.value : "";
 
   let filtrados = productosAdminGlobal;
 
@@ -1521,6 +1523,14 @@ function filtrarProductos() {
 
   if (categoria) {
     filtrados = filtrados.filter(p => String(p.CATEGORIA || "").trim() === categoria);
+  }
+
+  if (estado === "sin_imagen") {
+    filtrados = filtrados.filter(p => !String(p.IMAGEN || "").trim());
+  } else if (estado === "sin_stock") {
+    filtrados = filtrados.filter(p => Number(p.STOCK ?? 0) <= 0);
+  } else if (estado === "sin_imagen_y_stock") {
+    filtrados = filtrados.filter(p => !String(p.IMAGEN || "").trim() && Number(p.STOCK ?? 0) <= 0);
   }
 
   renderTablaProductos(filtrados);

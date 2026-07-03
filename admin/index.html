@@ -266,9 +266,17 @@
       <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
         <input type="text" id="buscarProducto" class="form-control" style="max-width:300px"
           placeholder="Buscar por código o nombre..." onkeyup="filtrarProductosConDemora()">
-        <select id="filtroCategoriaProductos" class="form-select form-select-sm" style="max-width:200px" onchange="filtrarProductos()">
-          <option value="">Todas las categorías</option>
-        </select>
+        <div class="d-flex gap-2 flex-wrap align-items-center">
+          <select id="filtroCategoriaProductos" class="form-select form-select-sm" style="max-width:200px" onchange="filtrarProductos()">
+            <option value="">Todas las categorías</option>
+          </select>
+          <select id="filtroEstadoProducto" class="form-select form-select-sm" style="max-width:180px" onchange="filtrarProductos()">
+            <option value="">Todos los productos</option>
+            <option value="sin_imagen">Sin imagen</option>
+            <option value="sin_stock">Sin stock (0)</option>
+            <option value="sin_imagen_y_stock">Sin imagen y sin stock</option>
+          </select>
+        </div>
       </div>
     </div>
 
