@@ -736,7 +736,7 @@ html,body{
 
 .ticket-row{
   display:flex; align-items:center; gap:10px;
-  padding:11px 4px; border-bottom:1px solid var(--slate-100);
+  padding:7px 4px; border-bottom:1px solid var(--slate-100);
 }
 .ticket-row:last-child{ border-bottom:none; }
 .ticket-row .ti-info{ flex:1; min-width:0; }
@@ -786,9 +786,9 @@ html,body{
 
 .ticket-footer{
   border-top:1px solid var(--slate-100);
-  padding:14px 18px 16px; background:var(--slate-50);
+  padding:10px 18px 12px; background:var(--slate-50);
   flex-shrink:0;
-  max-height:62%;
+  max-height:48%;
   overflow-y:auto;
 }
 
