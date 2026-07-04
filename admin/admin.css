@@ -735,16 +735,16 @@ html,body{
 .ticket-empty span{ font-size:13px; }
 
 .ticket-row{
-  display:flex; align-items:center; gap:10px;
-  padding:7px 4px; border-bottom:1px solid var(--slate-100);
+  display:flex; align-items:center; gap:6px;
+  padding:5px 4px; border-bottom:1px solid var(--slate-100);
 }
 .ticket-row:last-child{ border-bottom:none; }
 .ticket-row .ti-info{ flex:1; min-width:0; }
 .ticket-row .ti-name{
-  font-size:13.5px; font-weight:600; color:var(--navy-900);
+  font-size:12.5px; font-weight:600; color:var(--navy-900);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
-.ticket-row .ti-price{ font-family:var(--font-mono); font-size:12px; color:var(--slate-500); }
+.ticket-row .ti-price{ font-family:var(--font-mono); font-size:11px; color:var(--slate-500); }
 .ticket-row .ti-qty{ display:flex; align-items:center; gap:6px; flex-shrink:0; }
 
 .qty-btn{
@@ -759,9 +759,9 @@ html,body{
 
 .qty-input-pos{
   font-family:var(--font-mono); font-weight:700;
-  font-size:13.5px; min-width:34px; width:34px; text-align:center;
+  font-size:13px; min-width:38px; width:38px; text-align:center;
   border:1.5px solid var(--slate-200); border-radius:6px;
-  height:28px; padding:0 2px; background:#fff;
+  height:24px; padding:0 2px; background:#fff;
   -moz-appearance:textfield;
 }
 .qty-input-pos::-webkit-outer-spin-button,
@@ -774,13 +774,13 @@ html,body{
 }
 .ticket-row .ti-sub{
   font-family:var(--font-mono); font-weight:700;
-  font-size:13.5px; color:var(--navy-900);
-  width:72px; text-align:right; flex-shrink:0;
+  font-size:13px; color:var(--navy-900);
+  width:68px; text-align:right; flex-shrink:0;
 }
 .ticket-row .ti-remove{
-  width:28px; height:28px; border-radius:6px; border:none;
+  width:22px; height:22px; border-radius:5px; border:none;
   background:none; color:var(--slate-400); cursor:pointer;
-  font-size:14px; flex-shrink:0; touch-action:manipulation;
+  font-size:12px; flex-shrink:0; touch-action:manipulation;
 }
 .ticket-row .ti-remove:hover{ color:var(--red-500); background:var(--red-50); }
 

@@ -3049,7 +3049,6 @@ function renderTicketPOS() {
           <div class="ti-price">$${item.PRECIO.toLocaleString("es-AR")} c/u</div>
         </div>
         <div class="ti-qty">
-          <button class="qty-btn" onclick="cambiarCantidadPOS('${item.CODIGO}', -1)">−</button>
           <input
             type="number"
             class="qty-input-pos"
@@ -3059,7 +3058,6 @@ function renderTicketPOS() {
             value="${item.cantidad}"
             onfocus="seleccionarCantidadPOS(this)"
             onchange="actualizarCantidadManualPOS('${item.CODIGO}', this.value)">
-          <button class="qty-btn" onclick="cambiarCantidadPOS('${item.CODIGO}', 1)">+</button>
         </div>
         <div class="ti-sub money">$${sub.toLocaleString("es-AR")}</div>
         <button class="ti-remove" onclick="quitarProductoPOS('${item.CODIGO}')" title="Quitar">✕</button>
