@@ -126,15 +126,11 @@ async function cargarProductos(){
         .filter(p => Number(String(p.STOCK).trim()) > 0)
         .sort((a,b)=>{
 
-            // Antes esto comparaba el texto alfabéticamente, lo cual hacía
-            // que cualquier valor no vacío en DESTACADO (no solo "SI")
-            // pudiera ordenarse antes que uno verdaderamente destacado.
-            // Ahora es una comparación real de "es destacado sí o no".
             const esDestacadaA = String(a.DESTACADO || "").trim().toUpperCase() === "SI";
             const esDestacadaB = String(b.DESTACADO || "").trim().toUpperCase() === "SI";
 
             if(esDestacadaA === esDestacadaB) return 0;
-            return esDestacadaA ? -1 : 1; // los destacados reales van primero
+            return esDestacadaA ? -1 : 1;
         });
 
         renderChips();
@@ -147,6 +143,15 @@ async function cargarProductos(){
         document.getElementById("productos").innerHTML = "";
 
         mostrarToast("No pudimos cargar el catálogo. Revisá tu conexión y volvé a intentar.", "error");
+
+    } finally {
+
+        // Ocultar el loading cat al terminar — con o sin error
+        const cat = document.getElementById("loadingCat");
+        if(cat){
+            cat.style.opacity = "0";
+            setTimeout(() => cat.remove(), 500);
+        }
     }
 }
 

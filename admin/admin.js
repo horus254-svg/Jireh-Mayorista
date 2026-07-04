@@ -23,10 +23,17 @@ if (sessionStorage.getItem("admin") !== "true") {
 
 document.addEventListener("DOMContentLoaded", async () => {
   mostrarSeccion("dashboard");
-  cargarConfigNegocioDesdeBackend(); // refresca el caché en memoria para los tickets impresos
-  reconectarImpresoraUSBSiPosible(); // intenta reconectar la impresora térmica sin mostrar el selector
+  cargarConfigNegocioDesdeBackend();
+  reconectarImpresoraUSBSiPosible();
   await cargarMetricas();
   cargarVentasPOS();
+
+  // Ocultar el loading cat una vez que el dashboard cargó
+  const cat = document.getElementById("loadingCat");
+  if (cat) {
+    cat.style.opacity = "0";
+    setTimeout(() => cat.remove(), 500);
+  }
 
   setInterval(() => {
     const dashboardVisible = document.getElementById("dashboard").style.display === "block";
