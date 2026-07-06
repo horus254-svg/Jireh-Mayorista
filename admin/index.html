@@ -605,22 +605,18 @@
             <button class="pay-method-btn"        data-val="TARJETA"       onclick="elegirFormaPago(this,'TARJETA')"><span class="ic">💳</span>Tarjeta <kbd>3</kbd></button>
           </div>
 
-          <!-- Descuento: acción opcional y menos frecuente, queda colapsada por defecto -->
+          <!-- Descuento siempre visible -->
           <div class="discount-box" id="discountBox">
-            <button class="discount-toggle" id="btnToggleDescuento" onclick="toggleDescuentoPOS()">
-              <span class="ic">🏷️</span>
-              <span id="discountToggleLabel">Agregar descuento</span>
-            </button>
-
-            <div class="discount-panel" id="discountPanel" style="display:none;">
+            <div class="discount-panel" id="discountPanel">
               <div class="discount-type-row">
+                <span style="font-size:11px;font-weight:700;color:var(--slate-500);white-space:nowrap;">🏷️ Desc.</span>
                 <button class="discount-type-btn active" data-tipo="PORCENTAJE" onclick="elegirTipoDescuento(this,'PORCENTAJE')">%</button>
                 <button class="discount-type-btn" data-tipo="MONTO" onclick="elegirTipoDescuento(this,'MONTO')">$</button>
                 <input type="number" id="descuentoValorInput" class="form-control form-control-sm" placeholder="0" min="0" step="1" oninput="aplicarDescuentoPOS()">
                 <button class="discount-clear" id="btnQuitarDescuento" onclick="quitarDescuentoPOS()" title="Quitar descuento">✕</button>
               </div>
               <div class="discount-motivo-row">
-                <input type="text" id="descuentoMotivoInput" class="form-control form-control-sm" placeholder="Motivo (opcional, ej: cliente frecuente)" oninput="renderTicketPOS()">
+                <input type="text" id="descuentoMotivoInput" class="form-control form-control-sm" placeholder="Motivo descuento (opcional)" oninput="renderTicketPOS()">
               </div>
             </div>
           </div>
@@ -679,23 +675,39 @@
       <button class="btn btn-outline-secondary btn-sm" onclick="cargarVentasPOSHistorial()">↻ Actualizar</button>
     </div>
 
-    <div class="card p-3 mb-3">
-      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <div style="margin-top:18px;">
-          <input type="text" id="vpBuscar" class="form-control form-control-sm" style="max-width:260px"
-            placeholder="Buscar por #venta o forma de pago..." onkeyup="filtrarVentasPOSHistorial()">
+    <div class="card p-2 mb-3">
+      <div class="d-flex align-items-end flex-wrap gap-2">
+        <div>
+          <label class="form-label" style="font-size:11px;margin-bottom:2px;">Buscar</label>
+          <input type="text" id="vpBuscar" class="form-control form-control-sm" style="max-width:200px"
+            placeholder="# venta..." onkeyup="filtrarVentasPOSHistorial()">
         </div>
-        <div class="d-flex flex-wrap gap-2 align-items-center">
-          <div>
-            <label class="form-label" style="font-size:12px; margin-bottom:2px;">Desde</label>
-            <input type="date" id="vpDesde" class="form-control form-control-sm" style="max-width:160px;">
-          </div>
-          <div>
-            <label class="form-label" style="font-size:12px; margin-bottom:2px;">Hasta</label>
-            <input type="date" id="vpHasta" class="form-control form-control-sm" style="max-width:160px;">
-          </div>
-          <button class="btn btn-outline-primary btn-sm" style="margin-top:18px;" onclick="cargarVentasPOSHistorial()">Filtrar</button>
+        <div>
+          <label class="form-label" style="font-size:11px;margin-bottom:2px;">Forma de pago</label>
+          <select id="vpFormaPago" class="form-select form-select-sm" style="max-width:145px;" onchange="filtrarVentasPOSHistorial()">
+            <option value="">Todas</option>
+            <option value="EFECTIVO">Efectivo</option>
+            <option value="TRANSFERENCIA">Transferencia</option>
+            <option value="TARJETA">Tarjeta</option>
+          </select>
         </div>
+        <div>
+          <label class="form-label" style="font-size:11px;margin-bottom:2px;">Estado</label>
+          <select id="vpEstado" class="form-select form-select-sm" style="max-width:130px;" onchange="filtrarVentasPOSHistorial()">
+            <option value="">Todas</option>
+            <option value="activas">Solo activas</option>
+            <option value="anuladas">Solo anuladas</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label" style="font-size:11px;margin-bottom:2px;">Desde</label>
+          <input type="date" id="vpDesde" class="form-control form-control-sm" style="max-width:140px;">
+        </div>
+        <div>
+          <label class="form-label" style="font-size:11px;margin-bottom:2px;">Hasta</label>
+          <input type="date" id="vpHasta" class="form-control form-control-sm" style="max-width:140px;">
+        </div>
+        <button class="btn btn-outline-primary btn-sm" onclick="cargarVentasPOSHistorial()">Filtrar</button>
       </div>
     </div>
 
@@ -1914,6 +1926,28 @@
       <button class="btn btn-outline-secondary" onclick="cerrarModalDetallePedido()">Cerrar</button>
       <button class="btn btn-outline-secondary" id="btnImprimirEtiquetaDetalle" onclick="imprimirEtiquetaDesdeDetalle()">Imprimir etiqueta</button>
       <button class="btn btn-success" onclick="imprimirNotaPedidoA4()">Imprimir pedido (A4)</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ===== MODAL MOTIVO ANULACIÓN ===== -->
+<div class="product-modal-backdrop" id="modalAnulacionBackdrop">
+  <div class="product-modal" style="max-width:420px;">
+    <div class="product-modal-header">
+      <h6>🗑️ Anular venta <span id="motivoAnulacionVentaId" style="font-family:monospace;font-size:12px;color:var(--slate-500);"></span></h6>
+      <button onclick="cerrarModalAnulacion()">✕</button>
+    </div>
+    <div class="product-modal-body">
+      <p style="font-size:13px;color:var(--slate-600);margin-bottom:12px;">
+        La venta seguirá visible en el historial marcada como anulada, pero no contará en el cierre de caja. El stock se devolverá automáticamente.
+      </p>
+      <label class="form-label" style="font-size:12.5px;font-weight:600;">Motivo de anulación <span style="color:var(--red-500);">*</span></label>
+      <input type="text" class="form-control" id="motivoAnulacionInput" placeholder="Ej: Error en precio, devolución del cliente...">
+    </div>
+    <div class="product-modal-actions">
+      <button class="btn btn-outline-secondary" onclick="cerrarModalAnulacion()">Cancelar</button>
+      <button class="btn btn-danger" id="btnConfirmarAnulacion" onclick="confirmarAnulacionVenta()">Anular venta</button>
     </div>
   </div>
 </div>

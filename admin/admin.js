@@ -889,24 +889,27 @@ function renderVentasPOSHistorial(lista) {
     const anulada = String(v.ANULADA || "").toUpperCase() === "SI";
     const motivo  = v.MOTIVO_ANULACION || "";
 
-    const estiloFila = anulada ? 'style="opacity:.5; text-decoration:line-through;"' : "";
+    const estiloFila = anulada
+      ? 'style="background:#fff0f0; color:#b91c1c;"'
+      : "";
     const badgeAnulada = anulada
       ? `<span class="badge bg-danger ms-1" style="font-size:10px;text-decoration:none;">ANULADA${motivo ? " · " + escapeHtml(motivo) : ""}</span>`
       : "";
 
     html += `
       <tr ${estiloFila}>
-        <td class="mono">${escapeHtml(String(v.VENTA_ID || v.ID || "—"))}${badgeAnulada}</td>
+        <td class="mono" style="${anulada ? 'text-decoration:line-through;' : ''}">${escapeHtml(String(v.VENTA_ID || v.ID || "—"))}${badgeAnulada}</td>
         <td>${fecha}</td>
         <td>${hora}</td>
         <td>${escapeHtml(String(items))}</td>
         <td>${escapeHtml(String(pago))}</td>
-        <td class="money">$${total}</td>
+        <td class="money" style="${anulada ? 'text-decoration:line-through;' : ''}">$${total}</td>
         <td>
           <button class="btn btn-sm btn-outline-secondary"
             onclick='imprimirVentaDesdeData(${JSON.stringify(v)})' title="Reimprimir ticket">🖨️ Reimprimir</button>
-          ${!anulada ? `<button class="btn btn-sm btn-outline-danger ms-1"
-            onclick='eliminarVentaPOS(${JSON.stringify(v)})' title="Anular venta">🗑️ Anular</button>` : ""}
+          <button class="btn btn-sm btn-outline-danger ms-1"
+            onclick='eliminarVentaPOS(${JSON.stringify(v)})'
+            ${anulada ? 'disabled title="Ya está anulada"' : 'title="Anular venta"'}>🗑️ Anular</button>
         </td>
       </tr>
     `;
@@ -920,54 +923,94 @@ function renderVentasPOSHistorial(lista) {
  * the full sale object (as rendered in the table) so the backend gets
  * the cart directly, without needing to re-read DETALLE_VENTAS.
  */
-async function eliminarVentaPOS(venta) {
-  const motivo = prompt(`Motivo de anulación de la venta ${venta.VENTA_ID || venta.ID}:\n(La venta seguirá visible en el historial pero no contará en el cierre de caja)`);
-  if (motivo === null) return; // canceló
-  if (!motivo.trim()) {
+/** Muestra un modal para ingresar el motivo de anulación */
+function eliminarVentaPOS(venta) {
+  const ventaId = venta.VENTA_ID || venta.ID;
+
+  // Si ya está anulada, no hacer nada
+  if (String(venta.ANULADA || "").toUpperCase() === "SI") {
+    toast("Esta venta ya está anulada", "error");
+    return;
+  }
+
+  // Guardar la venta en variable global para usarla al confirmar
+  window._ventaParaAnular = venta;
+
+  // Limpiar y mostrar modal
+  document.getElementById("motivoAnulacionInput").value = "";
+  document.getElementById("motivoAnulacionVentaId").textContent = ventaId;
+  document.getElementById("btnConfirmarAnulacion").disabled = false;
+  document.getElementById("btnConfirmarAnulacion").textContent = "Anular venta";
+  document.getElementById("modalAnulacionBackdrop").classList.add("show");
+  setTimeout(() => document.getElementById("motivoAnulacionInput").focus(), 100);
+}
+
+function cerrarModalAnulacion() {
+  document.getElementById("modalAnulacionBackdrop").classList.remove("show");
+  window._ventaParaAnular = null;
+}
+
+async function confirmarAnulacionVenta() {
+  const venta = window._ventaParaAnular;
+  if (!venta) return;
+
+  const motivo = document.getElementById("motivoAnulacionInput").value.trim();
+  if (!motivo) {
     toast("Ingresá un motivo para anular la venta", "error");
     return;
   }
+
+  const btn = document.getElementById("btnConfirmarAnulacion");
+  btn.disabled = true;
+  btn.textContent = "Anulando...";
 
   try {
     const params = new URLSearchParams({
       action: "eliminarVenta",
       ventaId: venta.VENTA_ID || venta.ID,
       carrito: venta.CARRITO || "[]",
-      motivo: motivo.trim()
+      motivo: motivo
     });
     const response = await fetch(API_URL + "?" + params.toString());
     const data = await response.json();
 
     if (!data.success) {
       toast(data.message || "No se pudo anular la venta", "error");
+      btn.disabled = false;
+      btn.textContent = "Anular venta";
       return;
     }
 
     toast("Venta anulada — sigue en el historial pero ya no cuenta en caja", "success");
+    cerrarModalAnulacion();
     cargarVentasPOSHistorial();
     productosPOS = [];
 
   } catch (error) {
     console.error("Error al anular venta:", error);
     toast("Error de conexión al anular la venta", "error");
+    btn.disabled = false;
+    btn.textContent = "Anular venta";
   }
 }
 
 /** Client-side filter by sale id or payment method, over the already-loaded historial */
 function filtrarVentasPOSHistorial() {
-  const input = document.getElementById("vpBuscar");
-  const termino = (input ? input.value : "").toLowerCase().trim();
-
-  if (!termino) {
-    renderVentasPOSHistorial(ventasPOSHistorialGlobal);
-    return;
-  }
+  const termino   = (document.getElementById("vpBuscar")?.value || "").toLowerCase().trim();
+  const formaPago = (document.getElementById("vpFormaPago")?.value || "").toUpperCase();
+  const estado    = (document.getElementById("vpEstado")?.value || "");
 
   const filtradas = ventasPOSHistorialGlobal.filter(v => {
-    const id   = String(v.VENTA_ID || v.ID || "").toLowerCase();
-    const pago = String(v.FORMA_PAGO || v.PAGO || "").toLowerCase();
-    const items = String(v.ITEMS || v.DETALLE || "").toLowerCase();
-    return id.includes(termino) || pago.includes(termino) || items.includes(termino);
+    const id     = String(v.VENTA_ID || v.ID || "").toLowerCase();
+    const items  = String(v.ITEMS || v.DETALLE || "").toLowerCase();
+    const pago   = String(v.FORMA_PAGO || v.PAGO || "").toUpperCase();
+    const anulada = String(v.ANULADA || "").toUpperCase() === "SI";
+
+    if (termino && !id.includes(termino) && !items.includes(termino)) return false;
+    if (formaPago && pago !== formaPago) return false;
+    if (estado === "activas"  &&  anulada) return false;
+    if (estado === "anuladas" && !anulada) return false;
+    return true;
   });
 
   renderVentasPOSHistorial(filtradas);
@@ -3270,8 +3313,6 @@ function aplicarDescuentoPOS() {
 
 function quitarDescuentoPOS() {
   resetearDescuentoPOS();
-  const panel = document.getElementById("discountPanel");
-  if (panel) panel.style.display = "none";
   renderTicketPOS();
 }
 
@@ -3366,6 +3407,10 @@ async function finalizarVentaPOS() {
     mostrarRecibo(data.ventaId, ticketPOS, total, subtotal, montoDescuento);
     ticketPOS = [];
     resetearDescuentoPOS();
+    const inputRec = document.getElementById("inputRecibido");
+    const cambioEl = document.getElementById("cambioValor");
+    if (inputRec) inputRec.value = "";
+    if (cambioEl) { cambioEl.textContent = "—"; cambioEl.classList.remove("negativo"); }
     renderTicketPOS();
 
     ultimoCodigoAgregadoPOS = null;

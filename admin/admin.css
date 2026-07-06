@@ -846,45 +846,32 @@ html,body{
   gap:6px; margin-bottom:10px;
 }
 .pay-method-btn{
-  padding:6px 4px; border-radius:8px;
+  padding:4px 3px; border-radius:7px;
   border:1.5px solid var(--slate-200); background:#fff;
-  font-size:11px; font-weight:600; color:var(--slate-600);
+  font-size:10.5px; font-weight:600; color:var(--slate-600);
   cursor:pointer; display:flex; flex-direction:row;
-  align-items:center; justify-content:center; gap:5px; transition:.15s;
+  align-items:center; justify-content:center; gap:4px; transition:.15s;
   touch-action:manipulation;
 }
-.pay-method-btn .ic{ font-size:13px; }
+.pay-method-btn .ic{ font-size:12px; }
 .pay-method-btn:hover{ border-color:var(--slate-300); }
 .pay-method-btn.active{ background:var(--navy-900); border-color:var(--navy-900); color:#fff; }
 
 /* ===================== DESCUENTO (ticket POS) ===================== */
 
-.discount-box{ margin-bottom:12px; }
-
-.discount-toggle{
-  width:100%; display:flex; align-items:center; gap:8px;
-  background:#fff; border:1.5px dashed var(--slate-300); border-radius:10px;
-  padding:10px 12px; font-size:13px; font-weight:600; color:var(--slate-600);
-  cursor:pointer; transition:.15s; touch-action:manipulation;
-}
-.discount-toggle:hover{ border-color:var(--amber-500); color:var(--amber-500); }
-.discount-toggle.has-discount{
-  border-style:solid; border-color:var(--amber-500);
-  background:var(--amber-50); color:var(--amber-500);
-}
-.discount-toggle .ic{ font-size:15px; }
+.discount-box{ margin-bottom:6px; }
 
 .discount-panel{
-  margin-top:8px; padding:10px; background:#fff;
-  border:1.5px solid var(--slate-200); border-radius:10px;
-  display:flex; flex-direction:column; gap:8px;
+  padding:6px 8px; background:#fff;
+  border:1.5px solid var(--slate-200); border-radius:8px;
+  display:flex; flex-direction:column; gap:5px;
 }
 
-.discount-type-row{ display:flex; gap:6px; align-items:center; }
+.discount-type-row{ display:flex; gap:5px; align-items:center; }
 .discount-type-btn{
-  flex-shrink:0; width:36px; height:32px; border-radius:8px;
+  flex-shrink:0; width:28px; height:26px; border-radius:6px;
   border:1.5px solid var(--slate-200); background:#fff;
-  font-size:13px; font-weight:700; color:var(--slate-600);
+  font-size:11px; font-weight:700; color:var(--slate-600);
   cursor:pointer; transition:.15s; touch-action:manipulation;
 }
 .discount-type-btn:hover{ border-color:var(--slate-300); }
@@ -893,9 +880,9 @@ html,body{
 .discount-type-row input[type="number"]{ flex:1; }
 
 .discount-clear{
-  flex-shrink:0; width:32px; height:32px; border-radius:8px;
+  flex-shrink:0; width:26px; height:26px; border-radius:6px;
   border:none; background:var(--red-50); color:var(--red-500);
-  font-size:14px; cursor:pointer; transition:.15s; touch-action:manipulation;
+  font-size:12px; cursor:pointer; transition:.15s; touch-action:manipulation;
 }
 .discount-clear:hover{ background:var(--red-100, #fee2e2); }
 
@@ -903,15 +890,15 @@ html,body{
 
 /* Print thermal button next to Finalize */
 .ticket-action-row{
-  display:flex; gap:8px;
+  display:flex; gap:6px;
 }
 .btn-print-ticket{
   flex-shrink:0;
   background:#fff;
   border:1.5px solid var(--slate-300);
-  border-radius:12px;
-  padding:15px 14px;
-  font-size:18px;
+  border-radius:10px;
+  padding:10px 11px;
+  font-size:16px;
   cursor:pointer;
   display:flex; align-items:center; justify-content:center;
   transition:.15s;
@@ -924,11 +911,11 @@ html,body{
 .btn-finalize{
   flex:1;
   background:var(--green-500); color:#fff;
-  border:none; border-radius:12px; padding:15px;
-  font-size:16px; font-weight:700; cursor:pointer;
+  border:none; border-radius:10px; padding:10px;
+  font-size:14px; font-weight:700; cursor:pointer;
   display:flex; align-items:center; justify-content:center;
-  gap:8px; transition:.15s;
-  box-shadow:0 4px 14px rgba(22,163,74,.3);
+  gap:6px; transition:.15s;
+  box-shadow:0 3px 10px rgba(22,163,74,.25);
   touch-action:manipulation;
 }
 .btn-finalize:hover{ background:var(--green-600); }
