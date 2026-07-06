@@ -886,10 +886,17 @@ function renderVentasPOSHistorial(lista) {
     const items = v.ITEMS || v.DETALLE || "—";
     const pago  = v.FORMA_PAGO || v.PAGO || "—";
     const total = Number(v.TOTAL || 0).toLocaleString("es-AR");
+    const anulada = String(v.ANULADA || "").toUpperCase() === "SI";
+    const motivo  = v.MOTIVO_ANULACION || "";
+
+    const estiloFila = anulada ? 'style="opacity:.5; text-decoration:line-through;"' : "";
+    const badgeAnulada = anulada
+      ? `<span class="badge bg-danger ms-1" style="font-size:10px;text-decoration:none;">ANULADA${motivo ? " · " + escapeHtml(motivo) : ""}</span>`
+      : "";
 
     html += `
-      <tr>
-        <td class="mono">${escapeHtml(String(v.VENTA_ID || v.ID || "—"))}</td>
+      <tr ${estiloFila}>
+        <td class="mono">${escapeHtml(String(v.VENTA_ID || v.ID || "—"))}${badgeAnulada}</td>
         <td>${fecha}</td>
         <td>${hora}</td>
         <td>${escapeHtml(String(items))}</td>
@@ -898,8 +905,8 @@ function renderVentasPOSHistorial(lista) {
         <td>
           <button class="btn btn-sm btn-outline-secondary"
             onclick='imprimirVentaDesdeData(${JSON.stringify(v)})' title="Reimprimir ticket">🖨️ Reimprimir</button>
-          <button class="btn btn-sm btn-outline-danger ms-1"
-            onclick='eliminarVentaPOS(${JSON.stringify(v)})' title="Eliminar venta y devolver stock">🗑️ Eliminar</button>
+          ${!anulada ? `<button class="btn btn-sm btn-outline-danger ms-1"
+            onclick='eliminarVentaPOS(${JSON.stringify(v)})' title="Anular venta">🗑️ Anular</button>` : ""}
         </td>
       </tr>
     `;
@@ -914,29 +921,35 @@ function renderVentasPOSHistorial(lista) {
  * the cart directly, without needing to re-read DETALLE_VENTAS.
  */
 async function eliminarVentaPOS(venta) {
-  if (!confirm(`¿Eliminar la venta ${venta.VENTA_ID || venta.ID}? Esta acción no se puede deshacer y va a devolver el stock de los productos vendidos.`)) return;
+  const motivo = prompt(`Motivo de anulación de la venta ${venta.VENTA_ID || venta.ID}:\n(La venta seguirá visible en el historial pero no contará en el cierre de caja)`);
+  if (motivo === null) return; // canceló
+  if (!motivo.trim()) {
+    toast("Ingresá un motivo para anular la venta", "error");
+    return;
+  }
 
   try {
     const params = new URLSearchParams({
       action: "eliminarVenta",
       ventaId: venta.VENTA_ID || venta.ID,
-      carrito: venta.CARRITO || "[]"
+      carrito: venta.CARRITO || "[]",
+      motivo: motivo.trim()
     });
     const response = await fetch(API_URL + "?" + params.toString());
     const data = await response.json();
 
     if (!data.success) {
-      toast(data.message || "No se pudo eliminar la venta", "error");
+      toast(data.message || "No se pudo anular la venta", "error");
       return;
     }
 
-    toast("Venta eliminada y stock devuelto", "success");
+    toast("Venta anulada — sigue en el historial pero ya no cuenta en caja", "success");
     cargarVentasPOSHistorial();
-    productosPOS = []; // fuerza a recargar el catálogo la próxima vez que se entre al POS, con el stock ya actualizado
+    productosPOS = [];
 
   } catch (error) {
-    console.error("Error al eliminar venta:", error);
-    toast("Error de conexión al eliminar la venta", "error");
+    console.error("Error al anular venta:", error);
+    toast("Error de conexión al anular la venta", "error");
   }
 }
 
@@ -1007,7 +1020,15 @@ function mostrarSeccion(id) {
     }, 80);
   }
 
-  if (id === "cierreCaja") cargarResumenCierreCaja();
+  if (id === "cierreCaja") {
+    const selector = document.getElementById("ccFechaSelector");
+    if (selector && !selector.value) {
+      const ayer = new Date();
+      ayer.setDate(ayer.getDate() - 1);
+      selector.value = ayer.toISOString().slice(0, 10);
+    }
+    cargarResumenCierreCaja(selector ? selector.value : null);
+  }
   if (id === "movimientosCaja") cargarMovimientosCajaHoy();
   if (id === "reportes")   cargarSiVencido("reportes", cargarTodosLosReportes);
 }
@@ -2706,10 +2727,15 @@ function imprimirEtiquetaEnvio(datos) {
 async function cargarStockBajo() {
   mostrarSeccion("stockBajoProductos");
   try {
-    const response = await fetch(API_URL + "?action=productos");
-    const data = await response.json();
+    // Reusar productos ya cacheados si están disponibles
+    let productos = productosPOS.length > 0 ? productosPOS : null;
+    if (!productos) {
+      const response = await fetch(API_URL + "?action=productos");
+      const data = await response.json();
+      productos = data.productos || [];
+    }
     let html = "";
-    const filtrados = data.productos.filter(p => { const s = Number(p.STOCK || 0); return s > 0 && s <= 5; });
+    const filtrados = productos.filter(p => { const s = Number(p.STOCK || 0); return s > 0 && s <= 5; });
     if (filtrados.length === 0) {
       html = `<tr><td colspan="3" class="text-center text-muted py-4">Sin productos con stock bajo 🎉</td></tr>`;
     }
@@ -2725,10 +2751,14 @@ async function cargarStockBajo() {
 async function cargarAgotados() {
   mostrarSeccion("productosAgotados");
   try {
-    const response = await fetch(API_URL + "?action=productos");
-    const data = await response.json();
+    let productos = productosPOS.length > 0 ? productosPOS : null;
+    if (!productos) {
+      const response = await fetch(API_URL + "?action=productos");
+      const data = await response.json();
+      productos = data.productos || [];
+    }
     let html = "";
-    const filtrados = data.productos.filter(p => Number(p.STOCK || 0) === 0);
+    const filtrados = productos.filter(p => Number(p.STOCK || 0) === 0);
     if (filtrados.length === 0) {
       html = `<tr><td colspan="3" class="text-center text-muted py-4">No hay productos agotados 🎉</td></tr>`;
     }
@@ -2771,12 +2801,53 @@ let descuentoTipoPOS   = "PORCENTAJE"; // "PORCENTAJE" | "MONTO"
 let descuentoValorPOS  = 0;            // valor ingresado (ej: 10 para 10%, o 500 para $500)
 let descuentoActivoPOS = false;
 
+/** Limpia el caché de productos del POS y recarga desde el backend */
+async function actualizarCatalogoPOSManual() {
+  try { localStorage.removeItem("veekpos_productos_cache"); } catch(e) {}
+  productosPOS = [];
+  toast("Actualizando catálogo...", "success");
+  await asegurarProductosPOS();
+  toast("Catálogo actualizado", "success");
+}
+
 async function asegurarProductosPOS() {
-  if (productosPOS.length === 0) {
+  if (productosPOS.length > 0) return;
+
+  const CACHE_KEY = "veekpos_productos_cache";
+  const CACHE_TTL = 10 * 60 * 1000;
+  try {
+    const cached = localStorage.getItem(CACHE_KEY);
+    if (cached) {
+      const { ts, productos } = JSON.parse(cached);
+      if (Date.now() - ts < CACHE_TTL && productos.length > 0) {
+        productosPOS = productos;
+        construirCategoriasPOS();
+        renderPOSGrid();
+        _actualizarCacheProductosPOS(CACHE_KEY);
+        return;
+      }
+    }
+  } catch(e) {}
+
+  await _actualizarCacheProductosPOS(CACHE_KEY);
+}
+
+async function _actualizarCacheProductosPOS(cacheKey) {
+  try {
     const response = await fetch(API_URL + "?action=productos");
     const data = await response.json();
-    productosPOS = data.productos || [];
-    construirCategoriasPOS();
+    const productos = data.productos || [];
+    localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), productos }));
+    if (JSON.stringify(productos.map(p => p.CODIGO + p.STOCK)) !==
+        JSON.stringify(productosPOS.map(p => p.CODIGO + p.STOCK))) {
+      productosPOS = productos;
+      construirCategoriasPOS();
+      renderPOSGrid();
+    } else {
+      productosPOS = productos;
+    }
+  } catch(e) {
+    console.error("Error actualizando caché de productos POS:", e);
   }
 }
 
@@ -3028,6 +3099,10 @@ function vaciarTicketPOS() {
   if (!confirm("¿Vaciar el ticket actual?")) return;
   ticketPOS = [];
   resetearDescuentoPOS();
+  const inputRecibido = document.getElementById("inputRecibido");
+  const cambioValor = document.getElementById("cambioValor");
+  if (inputRecibido) inputRecibido.value = "";
+  if (cambioValor) { cambioValor.textContent = "—"; cambioValor.classList.remove("negativo"); }
   renderTicketPOS();
 }
 
@@ -3122,6 +3197,41 @@ function calcularDescuentoPOS(subtotal) {
   monto = Math.max(0, Math.min(monto, subtotal)); // nunca negativo ni mayor al subtotal
 
   return { montoDescuento: monto, total: subtotal - monto };
+}
+
+/** Calcula y muestra el cambio a entregar según lo recibido */
+function calcularCambio() {
+  const totalEl = document.getElementById("totalPOS");
+  const recibidoEl = document.getElementById("inputRecibido");
+  const cambioEl = document.getElementById("cambioValor");
+  if (!totalEl || !recibidoEl || !cambioEl) return;
+
+  const total = Number(String(totalEl.textContent).replace(/\./g, "").replace(",", ".")) || 0;
+  const recibido = Number(recibidoEl.value) || 0;
+
+  if (!recibido) {
+    cambioEl.textContent = "—";
+    cambioEl.classList.remove("negativo");
+    return;
+  }
+
+  const cambio = recibido - total;
+  cambioEl.textContent = "$" + Math.abs(cambio).toLocaleString("es-AR");
+  if (cambio < 0) {
+    cambioEl.classList.add("negativo");
+    cambioEl.textContent = "-$" + Math.abs(cambio).toLocaleString("es-AR");
+  } else {
+    cambioEl.classList.remove("negativo");
+  }
+}
+
+/** Devuelve el monto recibido y el cambio para incluirlos en el ticket */
+function obtenerDatosCambio() {
+  const recibidoEl = document.getElementById("inputRecibido");
+  const cambioEl = document.getElementById("cambioValor");
+  const recibido = recibidoEl ? Number(recibidoEl.value) || 0 : 0;
+  const cambioTexto = cambioEl ? cambioEl.textContent : "—";
+  return { recibido, cambioTexto };
 }
 
 function toggleDescuentoPOS() {
@@ -3474,7 +3584,7 @@ function nuevaVentaPOS() {
  * @param {Object}  [descuento] — { monto, etiqueta } opcional, si la venta tuvo descuento
  * @param {Object}  [cfgOverride] — config del negocio a usar en vez de la guardada (solo para vista previa)
  */
-function buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, cfgOverride) {
+function buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, cfgOverride, cambioData) {
   const cfg = cfgOverride || obtenerConfigNegocio();
 
   const fechaStr = (fecha || new Date()).toLocaleString("es-AR", {
@@ -3517,6 +3627,19 @@ function buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, cf
       <td><strong>TOTAL</strong></td>
       <td style="text-align:right;"><strong>$${Number(total).toLocaleString("es-AR")}</strong></td>
     </tr>`;
+
+  // Recibido y cambio — solo si se ingresó un monto recibido
+  if (cambioData && cambioData.recibido > 0) {
+    filasTotales += `
+    <tr>
+      <td>Recibido</td>
+      <td style="text-align:right;">$${Number(cambioData.recibido).toLocaleString("es-AR")}</td>
+    </tr>
+    <tr>
+      <td><strong>Cambio</strong></td>
+      <td style="text-align:right;"><strong>${cambioData.cambioTexto}</strong></td>
+    </tr>`;
+  }
 
   // Encabezado: nombre + subtítulo + dirección + teléfono(s), todos configurables
   let encabezado = `<div class="th-center th-big">${escapeHtml(cfg.nombre)}</div>`;
@@ -3971,17 +4094,19 @@ function imprimirVentaDesdeData(ventaObj) {
 }
 
 function _ejecutarImpresion(ventaId, items, total, formaPago, fecha, descuento) {
+  const cambioData = obtenerDatosCambio();
+
   if (usbPrintHabilitado() && puertoImpresoraUSB) {
     const bytes = buildThermalESCPOS(ventaId, items, total, formaPago, fecha, descuento);
     enviarBytesAImpresoraUSB(bytes).catch(error => {
       console.error("Error al imprimir por USB:", error);
       toast("Error al imprimir por USB — se abre el diálogo normal", "error");
-      _imprimirConDialogo(buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento));
+      _imprimirConDialogo(buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, null, cambioData));
     });
     return;
   }
 
-  _imprimirConDialogo(buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento));
+  _imprimirConDialogo(buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, null, cambioData));
 }
 
 /** Falls back to the regular browser print dialog (used when USB printing is off, unsupported, or fails) */

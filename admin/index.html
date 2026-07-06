@@ -625,6 +625,20 @@
             </div>
           </div>
 
+          <!-- Recibido / Cambio -->
+          <div class="recibido-row" id="recibidoRow">
+            <div class="recibido-inputs">
+              <div class="recibido-field">
+                <label>Recibido $</label>
+                <input type="number" id="inputRecibido" class="recibido-input" min="0" placeholder="0" oninput="calcularCambio()">
+              </div>
+              <div class="cambio-field">
+                <label>Cambio $</label>
+                <div class="cambio-valor" id="cambioValor">—</div>
+              </div>
+            </div>
+          </div>
+
           <!-- Acción principal: Finalizar manda, imprimir y vaciar quedan secundarios -->
           <div class="ticket-action-row">
             <button class="btn-finalize" id="btnFinalizarVenta" onclick="finalizarVentaPOS()">✅ Finalizar Venta <kbd>F2</kbd></button>
@@ -700,19 +714,23 @@
     <div class="page-header">
       <div><h1>🧮 Cierre de Caja</h1><div class="sub">Reconciliación diaria — compará lo esperado contra lo contado</div></div>
       <div style="display:flex; gap:8px;">
-        <button class="btn btn-outline-secondary btn-sm" onclick="cargarResumenCierreCaja()">↻ Recalcular</button>
+        <button class="btn btn-outline-secondary btn-sm" onclick="cargarResumenCierreCaja(document.getElementById('ccFechaSelector')?.value)">↻ Recalcular</button>
         <button class="btn btn-outline-primary btn-sm" onclick="imprimirCierreCaja()">🖨️ Imprimir Cierre</button>
       </div>
     </div>
 
     <div class="card p-3 mb-3">
       <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
-        <div>
-          <div class="sub" style="margin:0;">Fecha del cierre</div>
-          <h5 style="margin:0;" id="ccFechaLabel">—</h5>
+        <div class="d-flex align-items-center gap-3">
+          <div>
+            <div class="sub" style="margin:0;">Fecha del cierre</div>
+            <h5 style="margin:0;" id="ccFechaLabel">—</h5>
+          </div>
+          <input type="date" id="ccFechaSelector" class="form-control form-control-sm" style="max-width:160px;"
+            onchange="cargarResumenCierreCaja(this.value)">
         </div>
         <div class="text-end">
-          <div class="sub" style="margin:0;">Ventas registradas hoy</div>
+          <div class="sub" style="margin:0;">Ventas registradas</div>
           <h5 style="margin:0;" id="ccCantidadVentas">0 ventas</h5>
         </div>
       </div>

@@ -786,10 +786,46 @@ html,body{
 
 .ticket-footer{
   border-top:1px solid var(--slate-100);
-  padding:10px 18px 12px; background:var(--slate-50);
+  padding:8px 14px 10px; background:var(--slate-50);
   flex-shrink:0;
-  max-height:48%;
-  overflow-y:auto;
+  overflow:visible;
+}
+
+/* Recibido / Cambio */
+.recibido-row{
+  margin-bottom:6px;
+}
+.recibido-inputs{
+  display:flex; gap:8px; align-items:center;
+}
+.recibido-field, .cambio-field{
+  flex:1; display:flex; flex-direction:column; gap:2px;
+}
+.recibido-field label, .cambio-field label{
+  font-size:10px; font-weight:700; text-transform:uppercase;
+  letter-spacing:.05em; color:var(--slate-500);
+}
+.recibido-input{
+  border:1.5px solid var(--slate-200); border-radius:7px;
+  padding:5px 8px; font-size:14px; font-weight:700;
+  font-family:var(--font-mono); color:var(--navy-900);
+  background:#fff; width:100%;
+  -moz-appearance:textfield;
+}
+.recibido-input::-webkit-outer-spin-button,
+.recibido-input::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
+.recibido-input:focus{
+  outline:none; border-color:var(--blue-500);
+  box-shadow:0 0 0 3px var(--blue-50);
+}
+.cambio-valor{
+  padding:5px 8px; font-size:14px; font-weight:800;
+  font-family:var(--font-mono); color:var(--green-600, #16a34a);
+  background:#eafaf0; border-radius:7px; border:1.5px solid #bbf7d0;
+  min-height:32px; display:flex; align-items:center;
+}
+.cambio-valor.negativo{
+  color:var(--red-500); background:var(--red-50); border-color:#fecaca;
 }
 
 .ticket-totals{ display:flex; flex-direction:column; gap:4px; margin-bottom:10px; }
