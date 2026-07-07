@@ -896,6 +896,10 @@ function renderVentasPOSHistorial(lista) {
       ? `<span class="badge bg-danger ms-1" style="font-size:10px;text-decoration:none;">ANULADA${motivo ? " · " + escapeHtml(motivo) : ""}</span>`
       : "";
 
+    // Guardar en mapa global para acceso seguro desde onclick sin JSON inline
+    const _vid = String(v.VENTA_ID || v.ID || "");
+    _ventasMapPOS[_vid] = v;
+
     html += `
       <tr ${estiloFila}>
         <td class="mono" style="${anulada ? 'text-decoration:line-through;' : ''}">${escapeHtml(String(v.VENTA_ID || v.ID || "—"))}${badgeAnulada}</td>
@@ -906,9 +910,9 @@ function renderVentasPOSHistorial(lista) {
         <td class="money" style="${anulada ? 'text-decoration:line-through;' : ''}">$${total}</td>
         <td>
           <button class="btn btn-sm btn-outline-secondary"
-            onclick='imprimirVentaDesdeData(${JSON.stringify(v)})' title="Reimprimir ticket">🖨️ Reimprimir</button>
+            onclick='imprimirVentaDesdeData(_ventasMapPOS[${JSON.stringify(v.VENTA_ID||v.ID)}])' title="Reimprimir ticket">🖨️ Reimprimir</button>
           <button class="btn btn-sm btn-outline-danger ms-1"
-            onclick='eliminarVentaPOS(${JSON.stringify(v)})'
+            onclick='eliminarVentaPOS(_ventasMapPOS[${JSON.stringify(v.VENTA_ID||v.ID)}])'
             ${anulada ? 'disabled title="Ya está anulada"' : 'title="Anular venta"'}>🗑️ Anular</button>
         </td>
       </tr>
@@ -954,11 +958,17 @@ async function confirmarAnulacionVenta() {
   const venta = window._ventaParaAnular;
   if (!venta) return;
 
-  const motivo = document.getElementById("motivoAnulacionInput").value.trim();
+  const motivoInput = document.getElementById("motivoAnulacionInput");
+  const motivoError = document.getElementById("motivoAnulacionError");
+  const motivo = motivoInput.value.trim();
   if (!motivo) {
-    toast("Ingresá un motivo para anular la venta", "error");
+    motivoInput.style.borderColor = "var(--red-500)";
+    if (motivoError) motivoError.style.display = "block";
+    motivoInput.focus();
     return;
   }
+  motivoInput.style.borderColor = "";
+  if (motivoError) motivoError.style.display = "none";
 
   const btn = document.getElementById("btnConfirmarAnulacion");
   btn.disabled = true;
@@ -2042,6 +2052,20 @@ async function cargarClientesDesdeBackend() {
   }
 }
 
+// Cache separado para el selector de pedidos (incluye dirección y todos los campos)
+let _clientesPedidoCache = [];
+async function cargarClientesParaPedido() {
+  if (_clientesPedidoCache.length > 0) return _clientesPedidoCache;
+  try {
+    const response = await fetch(API_URL + "?action=todosClientes");
+    const data = await response.json();
+    _clientesPedidoCache = data.clientes || [];
+    return _clientesPedidoCache;
+  } catch (e) {
+    return [];
+  }
+}
+
 function renderTablaClientes(lista) {
   const cont = document.getElementById("tablaClientes");
   if (!cont) return;
@@ -2833,6 +2857,7 @@ async function cargarMasVendidos() {
 =================================================================== */
 
 let productosPOS    = [];
+const _ventasMapPOS = {}; // mapa ventaId → objeto venta, para evitar JSON en onclick
 let ticketPOS        = [];
 let categoriaActivaPOS = "TODAS";
 let formaPagoPOS    = "EFECTIVO";
@@ -3364,6 +3389,156 @@ function elegirFormaPago(el, valor) {
 
 /* ---- finalize sale ---- */
 
+/* ---- Modal Finalizar Venta ---- */
+let mfvTipoDescuento = "PORCENTAJE";
+let mfvFormaPago = "EFECTIVO";
+
+function abrirModalFinalizarVenta() {
+  if (ticketPOS.length === 0) { toast("El ticket está vacío", "error"); return; }
+
+  try {
+  // Pre-cargar valores del ticket actual
+  const subtotal = ticketPOS.reduce((a, i) => a + i.PRECIO * i.cantidad, 0);
+  const { montoDescuento, total } = calcularDescuentoPOS(subtotal);
+
+  document.getElementById("mfvTotal").textContent = "$" + total.toLocaleString("es-AR");
+
+  // Descuento — prellenar con el valor actual del ticket
+  document.getElementById("mfvDescuentoValor").value = descuentoValorPOS || "";
+  document.getElementById("mfvDescuentoMotivo").value =
+    (document.getElementById("descuentoMotivoInput") || {}).value || "";
+
+  // Tipo de descuento
+  mfvTipoDescuento = descuentoTipoPOS || "PORCENTAJE";
+  document.getElementById("mfvTipoPct").classList.toggle("active", mfvTipoDescuento === "PORCENTAJE");
+  document.getElementById("mfvTipoMonto").classList.toggle("active", mfvTipoDescuento === "MONTO");
+  mfvActualizarDescuento();
+
+  // Forma de pago
+  mfvFormaPago = formaPagoPOS || "EFECTIVO";
+  document.querySelectorAll("#mfvPayMethods .pay-method-btn").forEach(b => {
+    b.classList.toggle("active", b.dataset.val === mfvFormaPago);
+  });
+  mfvMostrarRecibido();
+
+  // Recibido
+  document.getElementById("mfvRecibido").value = "";
+  document.getElementById("mfvCambio").textContent = "—";
+  document.getElementById("mfvCambio").classList.remove("negativo");
+
+  document.getElementById("btnConfirmarVenta").disabled = false;
+  document.getElementById("btnConfirmarVenta").textContent = "✅ Confirmar venta";
+  document.getElementById("modalFinalizarVentaBackdrop").classList.add("show");
+  setTimeout(() => {
+    const el = mfvFormaPago === "EFECTIVO"
+      ? document.getElementById("mfvRecibido")
+      : document.getElementById("btnConfirmarVenta");
+    if (el) el.focus();
+  }, 120);
+  } catch(err) {
+    console.error("Error al abrir modal finalizar:", err);
+    // Fallback: abrir el modal igual aunque haya error de prefill
+    document.getElementById("modalFinalizarVentaBackdrop").classList.add("show");
+  }
+}
+
+function cerrarModalFinalizarVenta() {
+  document.getElementById("modalFinalizarVentaBackdrop").classList.remove("show");
+}
+
+function mfvElegirPago(btn, valor) {
+  mfvFormaPago = valor;
+  document.querySelectorAll("#mfvPayMethods .pay-method-btn").forEach(b =>
+    b.classList.toggle("active", b.dataset.val === valor));
+  mfvMostrarRecibido();
+  if (valor === "EFECTIVO") setTimeout(() => document.getElementById("mfvRecibido").focus(), 50);
+}
+
+function mfvMostrarRecibido() {
+  const wrap = document.getElementById("mfvRecibidoWrap");
+  if (wrap) wrap.style.display = mfvFormaPago === "EFECTIVO" ? "block" : "none";
+}
+
+function mfvElegirTipo(btn, tipo) {
+  mfvTipoDescuento = tipo;
+  document.querySelectorAll("#mfvPayMethods .discount-type-btn, .product-modal .discount-type-btn").forEach(b => {
+    if (b.dataset.tipo) b.classList.toggle("active", b.dataset.tipo === tipo);
+  });
+  btn.closest(".product-modal-body").querySelectorAll(".discount-type-btn").forEach(b =>
+    b.classList.toggle("active", b.dataset.tipo === tipo));
+  mfvActualizarDescuento();
+}
+
+function mfvLimpiarDescuento() {
+  document.getElementById("mfvDescuentoValor").value = "";
+  document.getElementById("mfvDescuentoMotivo").value = "";
+  mfvActualizarDescuento();
+}
+
+function mfvActualizarDescuento() {
+  const subtotal = ticketPOS.reduce((a, i) => a + i.PRECIO * i.cantidad, 0);
+  const val = Number(document.getElementById("mfvDescuentoValor").value) || 0;
+  let monto = 0;
+  if (mfvTipoDescuento === "PORCENTAJE") monto = subtotal * val / 100;
+  else monto = val;
+  monto = Math.min(monto, subtotal);
+  const total = subtotal - monto;
+  document.getElementById("mfvTotal").textContent = "$" + total.toLocaleString("es-AR");
+  const info = document.getElementById("mfvDescuentoInfo");
+  if (monto > 0) {
+    info.style.display = "block";
+    info.textContent = `Descuento: -$${monto.toLocaleString("es-AR")} → Total: $${total.toLocaleString("es-AR")}`;
+  } else {
+    info.style.display = "none";
+  }
+  if (mfvFormaPago === "EFECTIVO") mfvCalcularCambio();
+}
+
+function mfvCalcularCambio() {
+  const totalStr = document.getElementById("mfvTotal").textContent.replace(/\$/g, "").replace(/\./g, "").replace(",", ".");
+  const total = Number(totalStr) || 0;
+  const recibido = Number(document.getElementById("mfvRecibido").value) || 0;
+  const cambioEl = document.getElementById("mfvCambio");
+  if (!recibido) { cambioEl.textContent = "—"; cambioEl.classList.remove("negativo"); return; }
+  const cambio = recibido - total;
+  cambioEl.textContent = "$" + Math.abs(cambio).toLocaleString("es-AR");
+  cambioEl.classList.toggle("negativo", cambio < 0);
+  if (cambio < 0) cambioEl.textContent = "-$" + Math.abs(cambio).toLocaleString("es-AR");
+}
+
+async function confirmarFinalizarVenta() {
+  // Aplicar descuento del modal al estado real del POS antes de finalizar
+  const valDescuento = document.getElementById("mfvDescuentoValor").value;
+  const motivoDescuento = document.getElementById("mfvDescuentoMotivo").value;
+  if (valDescuento && Number(valDescuento) > 0) {
+    descuentoTipoPOS = mfvTipoDescuento;
+    if (document.getElementById("descuentoValorInput"))
+      document.getElementById("descuentoValorInput").value = valDescuento;
+    if (document.getElementById("descuentoMotivoInput"))
+      document.getElementById("descuentoMotivoInput").value = motivoDescuento;
+    aplicarDescuentoPOS();
+  } else {
+    resetearDescuentoPOS();
+  }
+
+  // Aplicar forma de pago
+  const btnPago = document.querySelector(`#mfvPayMethods .pay-method-btn[data-val="${mfvFormaPago}"]`);
+  if (btnPago) elegirFormaPago(btnPago, mfvFormaPago);
+
+  // Guardar recibido para el ticket
+  const recibido = Number(document.getElementById("mfvRecibido").value) || 0;
+  const inputRec = document.getElementById("inputRecibido");
+  if (inputRec) inputRec.value = recibido || "";
+  if (recibido) calcularCambio();
+
+  const btn = document.getElementById("btnConfirmarVenta");
+  btn.disabled = true;
+  btn.textContent = "Procesando...";
+
+  cerrarModalFinalizarVenta();
+  await finalizarVentaPOS();
+}
+
 async function finalizarVentaPOS() {
   if (ticketPOS.length === 0) { toast("El ticket está vacío", "error"); return; }
 
@@ -3438,22 +3613,73 @@ function abrirModalPedidoAdmin() {
   const subtotal = ticketPOS.reduce((acc, item) => acc + (item.PRECIO * item.cantidad), 0);
   const { total } = calcularDescuentoPOS(subtotal);
 
-  document.getElementById("paNombre").value = "";
-  document.getElementById("paEmpresa").value = "";
-  document.getElementById("paDireccion").value = "";
-  document.getElementById("paLocalidad").value = "";
-  document.getElementById("paProvincia").value = "";
-  document.getElementById("paCodigoPostal").value = "";
-  document.getElementById("paTelefono").value = "";
-  document.getElementById("paDni").value = "";
+  // Limpiar formulario
+  paLimpiarCliente();
   document.getElementById("paTotal").textContent = "$" + total.toLocaleString("es-AR");
-  document.getElementById("paMonedaWrap").style.display = "none";
   document.getElementById("paTipoCambioWrap").style.display = "none";
   document.getElementById("paMoneda").value = "ARS";
   document.getElementById("paTipoCambio").value = "";
 
+  // Poblar selector con clientes existentes — cargar si no están en memoria
+  const selector = document.getElementById("paClienteSelector");
+  if (selector) {
+    selector.innerHTML = '<option value="">— Nuevo cliente / ingresar datos —</option>';
+    const poblarSelector = (lista) => {
+      const ordenados = [...lista].sort((a, b) =>
+        (a.NOMBRE || a.CLIENTE || "").localeCompare(b.NOMBRE || b.CLIENTE || ""));
+      ordenados.forEach(c => {
+        const nombre = c.NOMBRE || c.CLIENTE || "";
+        const dni = c.DNI ? ` · ${c.DNI}` : "";
+        const opt = document.createElement("option");
+        opt.value = c.CLIENTE_ID || c.DNI || "";
+        opt.textContent = nombre + dni;
+        selector.appendChild(opt);
+      });
+    };
+    if (_clientesPedidoCache.length > 0) {
+      poblarSelector(_clientesPedidoCache);
+    } else {
+      // Cargar todos los clientes de la hoja CLIENTES
+      cargarClientesParaPedido().then(lista => { if (lista.length > 0) poblarSelector(lista); });
+    }
+  }
+
   document.getElementById("pedidoAdminModalBackdrop").classList.add("show");
-  setTimeout(() => document.getElementById("paNombre").focus(), 80);
+  setTimeout(() => {
+    const sel = document.getElementById("paClienteSelector");
+    if (sel) sel.focus(); else document.getElementById("paNombre").focus();
+  }, 80);
+}
+
+/** Rellena el formulario con los datos del cliente seleccionado */
+function paSeleccionarCliente(clienteId) {
+  if (!clienteId) { paLimpiarCliente(); return; }
+  const lista = _clientesPedidoCache.length > 0 ? _clientesPedidoCache : clientesGlobal;
+  const cliente = lista.find(c =>
+    String(c.CLIENTE_ID || c.DNI || "") === String(clienteId));
+  if (!cliente) return;
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ""; };
+  set("paNombre",       cliente.NOMBRE || cliente.CLIENTE);
+  set("paEmpresa",      cliente.EMPRESA || "");
+  set("paDireccion",    cliente.DIRECCION || "");
+  set("paLocalidad",    cliente.LOCALIDAD || "");
+  set("paProvincia",    cliente.PROVINCIA || "");
+  set("paCodigoPostal", cliente.CODIGO_POSTAL || "");
+  set("paTelefono",     cliente.TELEFONO || "");
+  set("paDni",          cliente.DNI || "");
+  chequearClienteCreditoPedidoAdmin();
+}
+
+/** Limpia el formulario para ingresar datos de cliente nuevo */
+function paLimpiarCliente() {
+  const sel = document.getElementById("paClienteSelector");
+  if (sel) sel.value = "";
+  ["paNombre","paEmpresa","paDireccion","paLocalidad","paProvincia",
+   "paCodigoPostal","paTelefono","paDni"].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = "";
+  });
+  const monedaWrap = document.getElementById("paMonedaWrap");
+  if (monedaWrap) monedaWrap.style.display = "none";
 }
 
 function cerrarModalPedidoAdmin() {
@@ -4357,7 +4583,7 @@ function setupScannerListener() {
     // F2 finaliza la venta desde cualquier lado dentro del POS (incluso con el buscador enfocado)
     if (e.key === "F2") {
       e.preventDefault();
-      finalizarVentaPOS();
+      abrirModalFinalizarVenta();
       return;
     }
 
@@ -5123,6 +5349,7 @@ function renderTablaMovimientosCaja(lista) {
 async function guardarMovimientoCajaForm() {
   const monto = document.getElementById("mcMonto").value;
   const motivo = document.getElementById("mcMotivo").value.trim();
+  const formaPago = (document.getElementById("mcFormaPago")?.value || "EFECTIVO").toUpperCase();
 
   if (!monto || Number(monto) <= 0) { toast("Ingresá un monto válido", "error"); return; }
   if (!motivo) { toast("Ingresá un motivo para el movimiento", "error"); return; }
@@ -5137,7 +5364,8 @@ async function guardarMovimientoCajaForm() {
       action: "guardarMovimientoCaja",
       tipo: tipoMovimientoCajaActivo,
       monto: monto,
-      motivo: motivo
+      motivo: motivo,
+      formaPago: formaPago
     });
 
     const response = await fetch(API_URL + "?" + params.toString());

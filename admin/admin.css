@@ -888,25 +888,24 @@ html,body{
 
 .discount-motivo-row input{ width:100%; }
 
-/* Print thermal button next to Finalize */
 .ticket-action-row{
-  display:flex; gap:6px;
+  display:flex; gap:5px; align-items:stretch;
 }
-.btn-print-ticket{
-  flex-shrink:0;
-  background:#fff;
-  border:1.5px solid var(--slate-300);
-  border-radius:10px;
-  padding:10px 11px;
-  font-size:16px;
-  cursor:pointer;
-  display:flex; align-items:center; justify-content:center;
-  transition:.15s;
-  color:var(--slate-600);
-  touch-action:manipulation;
+
+.ticket-secondary-btns{
+  display:flex; gap:4px; flex-shrink:0;
 }
-.btn-print-ticket:hover{ border-color:var(--navy-900); color:var(--navy-900); }
-.btn-print-ticket:disabled{ opacity:.4; cursor:not-allowed; }
+
+.btn-ticket-icon{
+  width:32px; height:100%;
+  background:#fff; border:1.5px solid var(--slate-200);
+  border-radius:8px; font-size:15px;
+  cursor:pointer; display:flex; align-items:center; justify-content:center;
+  transition:.15s; touch-action:manipulation; flex-shrink:0;
+}
+.btn-ticket-icon:hover{ border-color:var(--slate-400); }
+.btn-ticket-clear{ }
+.btn-ticket-clear:hover{ border-color:var(--red-500); background:var(--red-50); }
 
 .btn-finalize{
   flex:1;
@@ -1604,3 +1603,57 @@ kbd{
 .cliente-card-deuda{ border-left:4px solid var(--red-500); }
 .cliente-card-credito{ border-left:4px solid var(--green-500, #16a34a); }
 .cliente-dato-label{ font-size:11px; color:var(--slate-500); font-weight:600; text-transform:uppercase; letter-spacing:.04em; }
+
+/* ===================== POS ACTION BAR (4 botones) ===================== */
+
+.pos-action-bar{
+  display:grid;
+  grid-template-columns:1fr auto auto auto;
+  gap:5px;
+  margin-top:8px;
+}
+
+.pos-action-btn{
+  border:none; border-radius:9px; cursor:pointer;
+  font-size:13px; font-weight:700; padding:10px 8px;
+  display:flex; align-items:center; justify-content:center;
+  gap:5px; transition:.15s; touch-action:manipulation;
+  white-space:nowrap;
+}
+.pos-action-btn kbd{
+  background:rgba(255,255,255,.25); border:none;
+  border-radius:4px; padding:1px 4px; font-size:10px;
+}
+
+/* Verde — acción principal */
+.pos-btn-finalize{
+  background:#16a34a; color:#fff;
+  box-shadow:0 3px 8px rgba(22,163,74,.3);
+}
+.pos-btn-finalize:hover{ background:#15803d; }
+.pos-btn-finalize:disabled{ background:var(--slate-300); box-shadow:none; cursor:not-allowed; }
+
+/* Azul oscuro — imprimir */
+.pos-btn-print{
+  background:var(--navy-800); color:#fff; width:42px;
+}
+.pos-btn-print:hover{ background:var(--navy-700); }
+.pos-btn-print:disabled{ opacity:.4; cursor:not-allowed; }
+
+/* Naranja — generar pedido */
+.pos-btn-pedido{
+  background:#ea580c; color:#fff; width:42px;
+}
+.pos-btn-pedido:hover{ background:#c2410c; }
+
+/* Rojo — vaciar */
+.pos-btn-clear{
+  background:var(--red-500); color:#fff; width:42px;
+}
+.pos-btn-clear:hover{ background:#b91c1c; }
+
+/* Modal finalizar venta */
+.mfv-label{
+  font-size:12px; font-weight:700; color:var(--slate-600);
+  text-transform:uppercase; letter-spacing:.04em; margin-bottom:6px;
+}

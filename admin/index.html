@@ -586,8 +586,6 @@
         </div>
 
         <div class="ticket-footer">
-
-          <!-- Total: lo primero que se ve, es el dato que el cajero necesita decir en voz alta -->
           <div class="ticket-totals">
             <div class="trow"><span>Artículos</span><span class="money" id="ticketItemsCount">0</span></div>
             <div class="trow"><span>Subtotal</span><span class="money">$<span id="subtotalPOS">0</span></span></div>
@@ -597,53 +595,13 @@
             </div>
             <div class="trow grand"><span>Total</span><span class="money">$<span id="totalPOS">0</span></span></div>
           </div>
-
-          <!-- Forma de pago: sigue naturalmente al total, antes de cualquier ajuste opcional -->
-          <div class="pay-methods" id="payMethods">
-            <button class="pay-method-btn active" data-val="EFECTIVO"      onclick="elegirFormaPago(this,'EFECTIVO')"><span class="ic">💵</span>Efectivo <kbd>1</kbd></button>
-            <button class="pay-method-btn"        data-val="TRANSFERENCIA" onclick="elegirFormaPago(this,'TRANSFERENCIA')"><span class="ic">📲</span>Transfer. <kbd>2</kbd></button>
-            <button class="pay-method-btn"        data-val="TARJETA"       onclick="elegirFormaPago(this,'TARJETA')"><span class="ic">💳</span>Tarjeta <kbd>3</kbd></button>
+          <!-- 4 botones compactos en fila -->
+          <div class="pos-action-bar">
+            <button class="pos-action-btn pos-btn-finalize" id="btnFinalizarVenta" onclick="abrirModalFinalizarVenta()">✅ Finalizar <kbd>F2</kbd></button>
+            <button class="pos-action-btn pos-btn-print"   id="btnImprimirTicket" onclick="imprimirTicketThermal()" title="Imprimir" disabled>🖨️</button>
+            <button class="pos-action-btn pos-btn-pedido"  id="btnGenerarPedido"  onclick="abrirModalPedidoAdmin()" title="Pedido">📦</button>
+            <button class="pos-action-btn pos-btn-clear"   id="btnVaciarTicket"   onclick="vaciarTicketPOS()"       title="Vaciar">🗑️</button>
           </div>
-
-          <!-- Descuento siempre visible -->
-          <div class="discount-box" id="discountBox">
-            <div class="discount-panel" id="discountPanel">
-              <div class="discount-type-row">
-                <span style="font-size:11px;font-weight:700;color:var(--slate-500);white-space:nowrap;">🏷️ Desc.</span>
-                <button class="discount-type-btn active" data-tipo="PORCENTAJE" onclick="elegirTipoDescuento(this,'PORCENTAJE')">%</button>
-                <button class="discount-type-btn" data-tipo="MONTO" onclick="elegirTipoDescuento(this,'MONTO')">$</button>
-                <input type="number" id="descuentoValorInput" class="form-control form-control-sm" placeholder="0" min="0" step="1" oninput="aplicarDescuentoPOS()">
-                <button class="discount-clear" id="btnQuitarDescuento" onclick="quitarDescuentoPOS()" title="Quitar descuento">✕</button>
-              </div>
-              <div class="discount-motivo-row">
-                <input type="text" id="descuentoMotivoInput" class="form-control form-control-sm" placeholder="Motivo descuento (opcional)" oninput="renderTicketPOS()">
-              </div>
-            </div>
-          </div>
-
-          <!-- Recibido / Cambio -->
-          <div class="recibido-row" id="recibidoRow">
-            <div class="recibido-inputs">
-              <div class="recibido-field">
-                <label>Recibido $</label>
-                <input type="number" id="inputRecibido" class="recibido-input" min="0" placeholder="0" oninput="calcularCambio()">
-              </div>
-              <div class="cambio-field">
-                <label>Cambio $</label>
-                <div class="cambio-valor" id="cambioValor">—</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Acción principal: Finalizar manda, imprimir y vaciar quedan secundarios -->
-          <div class="ticket-action-row">
-            <button class="btn-finalize" id="btnFinalizarVenta" onclick="finalizarVentaPOS()">✅ Finalizar Venta <kbd>F2</kbd></button>
-            <button class="btn-print-ticket" id="btnImprimirTicket" onclick="imprimirTicketThermal()" title="Imprimir ticket" disabled>🖨️</button>
-          </div>
-
-          <button class="btn-generar-pedido" id="btnGenerarPedido" onclick="abrirModalPedidoAdmin()">📦 Generar Pedido (no es venta)</button>
-
-          <button class="ticket-clear" id="btnVaciarTicket" onclick="vaciarTicketPOS()">Vaciar ticket</button>
         </div>
       </div>
     </div>
@@ -870,8 +828,13 @@
           <button type="button" class="mc-tipo-btn active" data-tipo="INGRESO" onclick="elegirTipoMovimientoCaja(this,'INGRESO')">⬆️ Ingreso</button>
           <button type="button" class="mc-tipo-btn" data-tipo="EGRESO" onclick="elegirTipoMovimientoCaja(this,'EGRESO')">⬇️ Egreso</button>
         </div>
-        <input type="number" class="form-control" id="mcMonto" placeholder="Monto" min="0" step="1" style="max-width:160px;">
-        <input type="text" class="form-control" id="mcMotivo" placeholder="Motivo (ej: Retiro para el banco, Compra de bolsas...)">
+        <input type="number" class="form-control" id="mcMonto" placeholder="Monto" min="0" step="1" style="max-width:130px;">
+        <select class="form-select" id="mcFormaPago" style="max-width:145px;">
+          <option value="EFECTIVO">💵 Efectivo</option>
+          <option value="TRANSFERENCIA">📲 Transferencia</option>
+          <option value="TARJETA">💳 Tarjeta</option>
+        </select>
+        <input type="text" class="form-control" id="mcMotivo" placeholder="Motivo (ej: Retiro para el banco...)">
         <button class="btn btn-success" id="btnGuardarMovimientoCaja" onclick="guardarMovimientoCajaForm()">+ Registrar</button>
       </div>
     </div>
@@ -1499,6 +1462,18 @@
         Esto crea un pedido (queda en la sección Pedidos) — no es una venta y no descuenta stock. El ticket actual del POS se usa como detalle del pedido.
       </div>
 
+      <!-- Selector de cliente existente -->
+      <div class="mb-3 pa-cliente-selector" id="paClienteSelectorWrap">
+        <label class="form-label fw-bold">¿Para qué cliente?</label>
+        <div class="d-flex gap-2">
+          <select class="form-select" id="paClienteSelector" onchange="paSeleccionarCliente(this.value)">
+            <option value="">— Nuevo cliente / ingresar datos —</option>
+          </select>
+          <button class="btn btn-outline-secondary btn-sm" style="white-space:nowrap;" onclick="paLimpiarCliente()" title="Limpiar y cargar nuevo">✕ Nuevo</button>
+        </div>
+      </div>
+
+      <div id="paFormularioCliente">
       <div class="mb-2">
         <label class="form-label">Nombre y Apellido *</label>
         <input type="text" class="form-control" id="paNombre" placeholder="Nombre del cliente" autofocus>
@@ -1557,6 +1532,8 @@
         <label class="form-label">Tipo de cambio <span class="text-muted" style="font-size:11px;">(para registrar el valor del día)</span></label>
         <input type="number" class="form-control" id="paTipoCambio" placeholder="Ej: 1200">
       </div>
+
+      </div><!-- /paFormularioCliente -->
 
       <div class="pedido-admin-resumen">
         <span>Total del pedido</span>
@@ -1942,8 +1919,14 @@
       <p style="font-size:13px;color:var(--slate-600);margin-bottom:12px;">
         La venta seguirá visible en el historial marcada como anulada, pero no contará en el cierre de caja. El stock se devolverá automáticamente.
       </p>
-      <label class="form-label" style="font-size:12.5px;font-weight:600;">Motivo de anulación <span style="color:var(--red-500);">*</span></label>
-      <input type="text" class="form-control" id="motivoAnulacionInput" placeholder="Ej: Error en precio, devolución del cliente...">
+      <label class="form-label" style="font-size:13px;font-weight:700;">Motivo de anulación <span style="color:var(--red-500);">*</span></label>
+      <input type="text" class="form-control form-control-lg" id="motivoAnulacionInput"
+        placeholder="Ej: Error en precio, devolución del cliente..."
+        style="border:2px solid var(--slate-300); font-size:14px;"
+        onkeydown="if(event.key==='Enter') confirmarAnulacionVenta()">
+      <div id="motivoAnulacionError" style="color:var(--red-500);font-size:12px;margin-top:4px;display:none;">
+        El motivo es obligatorio para anular la venta.
+      </div>
     </div>
     <div class="product-modal-actions">
       <button class="btn btn-outline-secondary" onclick="cerrarModalAnulacion()">Cancelar</button>
@@ -1952,6 +1935,71 @@
   </div>
 </div>
 
+
+<!-- ===== MODAL FINALIZAR VENTA ===== -->
+<div class="product-modal-backdrop" id="modalFinalizarVentaBackdrop">
+  <div class="product-modal" style="width:min(420px,94vw);">
+    <div class="product-modal-header">
+      <h6>✅ Finalizar venta — <span id="mfvTotal" style="font-family:monospace;color:var(--green-600);">$0</span></h6>
+      <button onclick="cerrarModalFinalizarVenta()">✕</button>
+    </div>
+    <div class="product-modal-body" style="display:flex;flex-direction:column;gap:14px;">
+
+      <!-- Descuento -->
+      <div>
+        <div class="mfv-label">🏷️ Descuento (opcional)</div>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <button class="discount-type-btn active" id="mfvTipoPct" data-tipo="PORCENTAJE" onclick="mfvElegirTipo(this,'PORCENTAJE')">%</button>
+          <button class="discount-type-btn"        id="mfvTipoMonto" data-tipo="MONTO"      onclick="mfvElegirTipo(this,'MONTO')">$</button>
+          <input type="number" id="mfvDescuentoValor" class="form-control form-control-sm" placeholder="0" min="0" oninput="mfvActualizarDescuento()">
+          <button class="discount-clear" onclick="mfvLimpiarDescuento()">✕</button>
+        </div>
+        <input type="text" id="mfvDescuentoMotivo" class="form-control form-control-sm mt-1" placeholder="Motivo (opcional)">
+        <div id="mfvDescuentoInfo" style="font-size:12px;color:var(--red-500);margin-top:4px;display:none;"></div>
+      </div>
+
+      <!-- Forma de pago -->
+      <div>
+        <div class="mfv-label">💳 Forma de pago</div>
+        <div class="pay-methods" id="mfvPayMethods" style="gap:6px;">
+          <button class="pay-method-btn active" data-val="EFECTIVO"      onclick="mfvElegirPago(this,'EFECTIVO')">      <span class="ic">💵</span>Efectivo</button>
+          <button class="pay-method-btn"        data-val="TRANSFERENCIA" onclick="mfvElegirPago(this,'TRANSFERENCIA')"><span class="ic">📲</span>Transfer.</button>
+          <button class="pay-method-btn"        data-val="TARJETA"       onclick="mfvElegirPago(this,'TARJETA')">       <span class="ic">💳</span>Tarjeta</button>
+        </div>
+      </div>
+
+      <!-- Recibido / Cambio — solo efectivo -->
+      <div id="mfvRecibidoWrap">
+        <div class="mfv-label">💵 Efectivo recibido</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="number" id="mfvRecibido" class="recibido-input" style="flex:1;" min="0" placeholder="0" oninput="mfvCalcularCambio()" autofocus>
+          <div style="flex:1;">
+            <div style="font-size:10px;font-weight:700;color:var(--slate-500);text-transform:uppercase;">Cambio</div>
+            <div class="cambio-valor" id="mfvCambio">—</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <div class="product-modal-actions">
+      <button class="btn btn-outline-secondary" onclick="cerrarModalFinalizarVenta()">Cancelar</button>
+      <button class="btn btn-success fw-bold" id="btnConfirmarVenta" onclick="confirmarFinalizarVenta()">✅ Confirmar venta</button>
+    </div>
+  </div>
+</div>
+
+<!-- Campos ocultos para compatibilidad con finalizarVentaPOS y calcularCambio -->
+<div style="display:none;">
+  <input id="descuentoValorInput" type="number">
+  <input id="descuentoMotivoInput" type="text">
+  <input id="inputRecibido" type="number">
+  <div id="cambioValor"></div>
+  <div id="payMethods">
+    <button class="pay-method-btn active" data-val="EFECTIVO" onclick="elegirFormaPago(this,'EFECTIVO')"></button>
+    <button class="pay-method-btn" data-val="TRANSFERENCIA" onclick="elegirFormaPago(this,'TRANSFERENCIA')"></button>
+    <button class="pay-method-btn" data-val="TARJETA" onclick="elegirFormaPago(this,'TARJETA')"></button>
+  </div>
+</div>
 <!-- ===== THERMAL PRINT FRAME ===== -->
 <div id="thermalPrintFrame"></div>
 
