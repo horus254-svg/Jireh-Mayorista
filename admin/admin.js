@@ -840,7 +840,6 @@ async function cargarVentasPOSHistorial() {
   const desdeInput = document.getElementById("vpDesde");
   const hastaInput = document.getElementById("vpHasta");
 
-  // Default the date pickers to a sensible range on first load (last 30 days)
   if (desdeInput && !desdeInput.value) {
     const hace30 = new Date();
     hace30.setDate(hace30.getDate() - 30);
@@ -850,7 +849,15 @@ async function cargarVentasPOSHistorial() {
     hastaInput.value = new Date().toISOString().slice(0, 10);
   }
 
-  tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-3">Cargando ventas...</td></tr>`;
+  const cacheKey = "ventasPOS_" + (desdeInput?.value || "") + "_" + (hastaInput?.value || "");
+  const cached = cacheGet("ventasPOS");
+  if (cached && cached.data?.key === cacheKey) {
+    ventasPOSHistorialGlobal = cached.data.ventas;
+    renderVentasPOSHistorial(ventasPOSHistorialGlobal);
+    if (!cached.stale) return;
+  } else {
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-3">Cargando ventas...</td></tr>`;
+  }
 
   try {
     const params = new URLSearchParams({ action: "ventasPOSHistorial" });
@@ -861,11 +868,12 @@ async function cargarVentasPOSHistorial() {
     const data = await response.json();
 
     ventasPOSHistorialGlobal = data.ventas || [];
+    cacheSet("ventasPOS", { key: cacheKey, ventas: ventasPOSHistorialGlobal });
     renderVentasPOSHistorial(ventasPOSHistorialGlobal);
 
   } catch (error) {
     console.error("Error al cargar historial de ventas POS:", error);
-    tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-3">Error al cargar el historial</td></tr>`;
+    if (!cached) tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-3">Error al cargar el historial</td></tr>`;
   }
 }
 
@@ -1034,7 +1042,7 @@ function filtrarVentasPOSHistorial() {
 // El timer de 15s de arriba sigue refrescando la sección activa con
 // normalidad; esto solo evita pedidos duplicados al navegar.
 const ULTIMA_CARGA_SECCION = {};
-const VENCIMIENTO_CACHE_MS = 10000; // 10 s
+const VENCIMIENTO_CACHE_MS = 3 * 60 * 1000; // 3 minutos
 
 function cargarSiVencido(clave, fn) {
   const ahora = Date.now();
@@ -1088,12 +1096,53 @@ function mostrarSeccion(id) {
 
 /* ===================== PEDIDOS ===================== */
 
+/* =========================================================
+   CACHÉ LOCALSTORAGE GENÉRICO — stale-while-revalidate
+   Muestra datos cacheados al instante mientras actualiza
+   en segundo plano. TTL configurable por sección.
+========================================================= */
+const CACHE_TTL_SECCIONES = {
+  pedidos:   5 * 60 * 1000,  // 5 min
+  clientes:  5 * 60 * 1000,  // 5 min
+  ventasPOS: 3 * 60 * 1000,  // 3 min
+};
+
+function invalidarCache(...claves) {
+  claves.forEach(c => {
+    try { localStorage.removeItem("vpos_cache_" + c); } catch(e) {}
+    delete ULTIMA_CARGA_SECCION[c];
+  });
+}
+
+function cacheGet(clave) {
+  try {
+    const raw = localStorage.getItem("vpos_cache_" + clave);
+    if (!raw) return null;
+    const { ts, data } = JSON.parse(raw);
+    return { data, stale: Date.now() - ts > (CACHE_TTL_SECCIONES[clave] || 5 * 60 * 1000) };
+  } catch(e) { return null; }
+}
+
+function cacheSet(clave, data) {
+  try {
+    localStorage.setItem("vpos_cache_" + clave, JSON.stringify({ ts: Date.now(), data }));
+  } catch(e) {}
+}
+
 async function cargarPedidos() {
+  // Mostrar caché al instante si existe
+  const cached = cacheGet("pedidos");
+  if (cached) {
+    pedidosGlobal = cached.data;
+    renderPedidos(pedidosGlobal);
+    if (!cached.stale) return; // fresco, no hace falta recargar
+  }
   try {
     const response = await fetch(API_URL + "?action=pedidos");
     const data = await response.json();
-    pedidosGlobal = data.pedidos || [];
     if (!data.pedidos) return;
+    pedidosGlobal = data.pedidos;
+    cacheSet("pedidos", pedidosGlobal);
     renderPedidos(pedidosGlobal);
   } catch (error) {
     console.error("Error pedidos:", error);
@@ -2041,11 +2090,18 @@ async function actualizarClientesForm() {
 }
 
 async function cargarClientesDesdeBackend() {
+  const cached = cacheGet("clientes");
+  if (cached) {
+    clientesGlobal = cached.data;
+    filtrarClientes();
+    if (!cached.stale) return;
+  }
   try {
     const response = await fetch(API_URL + "?action=clientesConCredito");
     const data = await response.json();
     if (!data.clientes) return;
     clientesGlobal = data.clientes;
+    cacheSet("clientes", clientesGlobal);
     filtrarClientes();
   } catch (error) {
     console.error("Error clientes:", error);
