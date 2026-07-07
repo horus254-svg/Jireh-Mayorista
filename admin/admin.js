@@ -5289,8 +5289,25 @@ function elegirTipoMovimientoCaja(el, tipo) {
 
 /** Loads today's manual cash movements and the running totals */
 async function cargarMovimientosCajaHoy() {
+  // Leer fecha del selector — default hoy
+  const selector = document.getElementById("mcFechaSelector");
+  if (selector && !selector.value) {
+    const hoy = new Date().toISOString().slice(0, 10);
+    selector.value = hoy;
+  }
+  const fecha = selector ? selector.value : new Date().toISOString().slice(0, 10);
+
+  // Actualizar labels de resumen con la fecha seleccionada
+  const fechaLabel = fecha === new Date().toISOString().slice(0, 10)
+    ? "hoy"
+    : new Date(fecha + "T12:00:00").toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" });
+  const li = document.getElementById("mcLabelIngresos");
+  const le = document.getElementById("mcLabelEgresos");
+  if (li) li.textContent = `Ingresos — ${fechaLabel}`;
+  if (le) le.textContent = `Egresos — ${fechaLabel}`;
+
   try {
-    const response = await fetch(API_URL + "?action=movimientosCajaHoy");
+    const response = await fetch(API_URL + "?action=movimientosCajaHoy&fecha=" + encodeURIComponent(fecha));
     const data = await response.json();
 
     if (!data.success) {

@@ -801,18 +801,21 @@
   <!-- ===== MOVIMIENTOS DE CAJA (ingresos / egresos manuales) ===== -->
   <div id="movimientosCaja" class="seccion">
     <div class="page-header">
-      <div><h1>💸 Movimientos de Caja</h1><div class="sub">Ingresos y egresos manuales de hoy — retiros, gastos chicos, aportes</div></div>
-      <button class="btn btn-outline-secondary btn-sm" onclick="cargarMovimientosCajaHoy()">↻ Actualizar</button>
+      <div><h1>💸 Movimientos de Caja</h1><div class="sub">Ingresos y egresos manuales — retiros, gastos chicos, aportes</div></div>
+      <div class="d-flex align-items-center gap-2">
+        <input type="date" id="mcFechaSelector" class="form-control form-control-sm" style="max-width:160px;" onchange="cargarMovimientosCajaHoy()">
+        <button class="btn btn-outline-secondary btn-sm" onclick="cargarMovimientosCajaHoy()">↻ Actualizar</button>
+      </div>
     </div>
 
     <!-- Resumen del día -->
     <div class="mc-summary-row">
       <div class="card p-3 mc-summary-card">
-        <div class="ps-label">Ingresos de hoy</div>
+        <div class="ps-label" id="mcLabelIngresos">Ingresos de hoy</div>
         <div class="mc-summary-value mc-ingreso" id="mcTotalIngresos">$0</div>
       </div>
       <div class="card p-3 mc-summary-card">
-        <div class="ps-label">Egresos de hoy</div>
+        <div class="ps-label" id="mcLabelEgresos">Egresos de hoy</div>
         <div class="mc-summary-value mc-egreso" id="mcTotalEgresos">$0</div>
       </div>
       <div class="card p-3 mc-summary-card">
