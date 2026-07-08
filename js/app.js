@@ -1063,6 +1063,9 @@ function aplicarBeneficios(cfg){
     configurarChipBeneficio("beneficio-texto2-wrap", !!texto2);
 
     aplicarBannerTop(cfg.bannerTopMensajes);
+
+    // Popup promocional — se muestra si está activo y tiene imagen
+    cargarPopupPromo(cfg);
 }
 
 /**
@@ -1563,3 +1566,31 @@ document.addEventListener("DOMContentLoaded", () => {
     if (el) el.addEventListener("keydown", e => { if (e.key === "Enter") ejecutarConsultaPedido(); });
   });
 });
+
+/* =========================================================
+   POPUP PROMOCIONAL
+========================================================= */
+
+function mostrarPopupPromo(url) {
+  if (!url) return;
+  const popup = document.getElementById("popupPromo");
+  const img = document.getElementById("popupPromoImg");
+  if (!popup || !img) return;
+  img.src = url;
+  popup.style.display = "flex";
+  document.body.style.overflow = "hidden";
+}
+
+function cerrarPopupPromo() {
+  const popup = document.getElementById("popupPromo");
+  if (popup) popup.style.display = "none";
+  document.body.style.overflow = "";
+}
+
+// Cargar popup si está activo — se llama desde aplicarApariencia
+function cargarPopupPromo(config) {
+  if (config && config.popupActivo && config.popupImagen) {
+    // Pequeña espera para que el catálogo cargue primero
+    setTimeout(() => mostrarPopupPromo(config.popupImagen), 800);
+  }
+}

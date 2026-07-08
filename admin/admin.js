@@ -528,6 +528,96 @@ function cargarAparienciaForm(cfg) {
   document.getElementById("cfgBannerSubtitulo").value = cfg.bannerSubtitulo ?? APARIENCIA_DEFAULT.bannerSubtitulo;
   document.getElementById("cfgBannerImagen").value    = cfg.bannerImagen   ?? APARIENCIA_DEFAULT.bannerImagen;
   document.getElementById("cfgTema").value            = cfg.tema           || APARIENCIA_DEFAULT.tema;
+
+  // Popup promocional
+  const popupActivo = document.getElementById("cfgPopupActivo");
+  const popupImagen = document.getElementById("cfgPopupImagen");
+  if (popupActivo) popupActivo.checked = !!cfg.popupActivo;
+  if (popupImagen) popupImagen.value = cfg.popupImagen || "";
+  // Mostrar preview si ya hay imagen guardada
+  const popupPreviewEl = document.getElementById("popupImagenPreview");
+  if (popupPreviewEl && cfg.popupImagen) {
+    popupPreviewEl.innerHTML = `<img src="${cfg.popupImagen}" alt="" style="width:100%;height:100%;object-fit:contain;">`;
+  }
+}
+
+function previsualizarPopup() {}  // legacy — ya no se usa
+
+function quitarImagenPopup() {
+  document.getElementById("cfgPopupImagen").value = "";
+  const preview = document.getElementById("popupImagenPreview");
+  if (preview) preview.innerHTML = `<span class="pm-image-placeholder">Sin imagen</span>`;
+  const status = document.getElementById("popupImagenStatus");
+  if (status) { status.className = "pm-image-status"; status.textContent = ""; }
+}
+
+async function onSeleccionarImagenPopup(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+
+  const statusEl = document.getElementById("popupImagenStatus");
+  const previewEl = document.getElementById("popupImagenPreview");
+
+  if (!file.type.startsWith("image/")) {
+    if (statusEl) { statusEl.className = "pm-image-status error"; statusEl.textContent = "Elegí un archivo de imagen (jpg, png, webp)."; }
+    event.target.value = "";
+    return;
+  }
+
+  // Preview local inmediata
+  const localUrl = URL.createObjectURL(file);
+  if (previewEl) previewEl.innerHTML = `<img src="${localUrl}" alt="" style="width:100%;height:100%;object-fit:contain;">`;
+  if (statusEl) { statusEl.className = "pm-image-status uploading"; statusEl.textContent = "⏳ Optimizando imagen..."; }
+
+  try {
+    const { base64, tipoMime } = await comprimirImagenProducto(file);
+    const pesoKB = Math.round((base64.length * 0.75) / 1024);
+
+    if (statusEl) { statusEl.className = "pm-image-status uploading"; statusEl.textContent = `⏳ Subiendo a Drive... (${pesoKB}KB)`; }
+
+    const response = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action: "subirImagenProducto", imagenBase64: base64, tipoMime, codigoProducto: "POPUP_PROMO" })
+    });
+    const data = await response.json();
+
+    if (!data.success) {
+      if (statusEl) { statusEl.className = "pm-image-status error"; statusEl.textContent = "⚠️ " + (data.message || "No se pudo subir la imagen."); }
+      return;
+    }
+
+    document.getElementById("cfgPopupImagen").value = data.url;
+    if (statusEl) { statusEl.className = "pm-image-status success"; statusEl.textContent = `✓ Imagen subida (${pesoKB}KB)`; }
+
+  } catch (err) {
+    console.error("Error al subir imagen popup:", err);
+    if (statusEl) { statusEl.className = "pm-image-status error"; statusEl.textContent = "⚠️ Error de conexión."; }
+  } finally {
+    URL.revokeObjectURL(localUrl);
+  }
+}
+
+async function subirImagenPopup() {}  // legacy
+
+async function guardarPopupPromoForm() {
+  const activo = document.getElementById("cfgPopupActivo")?.checked ? "SI" : "NO";
+  const imagen = (document.getElementById("cfgPopupImagen")?.value || "").trim();
+  try {
+    const params = new URLSearchParams({ action: "guardarConfiguracionNegocio", popupImagen: imagen, popupActivo: activo });
+    const res = await fetch(API_URL + "?" + params.toString());
+    const data = await res.json();
+    if (data.success) toast("Popup guardado correctamente", "success");
+    else toast(data.message || "Error al guardar", "error");
+  } catch (err) {
+    toast("Error de conexión", "error");
+  }
+}
+
+async function quitarPopupPromo() {
+  quitarImagenPopup();
+  document.getElementById("cfgPopupActivo").checked = false;
+  await guardarPopupPromoForm();
 }
 
 /**
@@ -4492,24 +4582,30 @@ function _ejecutarImpresion(ventaId, items, total, formaPago, fecha, descuento) 
 }
 
 /** Falls back to the regular browser print dialog (used when USB printing is off, unsupported, or fails) */
-function _imprimirConDialogo(html) {
+async function _imprimirConDialogo(html) {
   const frame = document.getElementById("thermalPrintFrame");
   if (!frame) { toast("Error: frame de impresión no encontrado", "error"); return; }
 
-  // Si antes se generaron etiquetas de código de barras o QR, ese
-  // contenedor pudo haber quedado con contenido — y como el CSS de
-  // impresión decide qué mostrar según cuál de los dos NO esté vacío,
-  // hay que vaciarlo siempre antes de imprimir un ticket, o la
-  // impresión podría mostrar las etiquetas viejas en vez del ticket.
   const etiquetasArea = document.getElementById("etiquetasPrintArea");
   if (etiquetasArea) etiquetasArea.innerHTML = "";
 
   frame.innerHTML = html;
 
-  // Small delay to let the DOM paint before triggering print dialog
-  setTimeout(() => {
-    window.print();
-  }, 120);
+  // En Electron: impresión silenciosa sin diálogo del sistema
+  if (typeof window.posOffline !== "undefined" && window.posOffline.imprimirSilencioso) {
+    // Pequeña espera para que el DOM pinte el HTML del ticket antes de imprimir
+    await new Promise(r => setTimeout(r, 120));
+    const result = await window.posOffline.imprimirSilencioso();
+    if (result && !result.success) {
+      console.warn("Impresión silenciosa falló:", result.errorType);
+      // Fallback al diálogo del sistema si falla
+      window.print();
+    }
+    return;
+  }
+
+  // En el navegador web: diálogo normal
+  setTimeout(() => { window.print(); }, 120);
 }
 
 /* =====================================================
