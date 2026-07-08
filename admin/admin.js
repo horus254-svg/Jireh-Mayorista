@@ -4926,6 +4926,7 @@ async function cargarResumenCierreCaja(fecha) {
 
     actualizarElemento("ccFechaLabel", formatearFechaCierre(data.fecha));
     actualizarElemento("ccCantidadVentas", data.cantidadVentas + (data.cantidadVentas === 1 ? " venta" : " ventas"));
+    actualizarElemento("ccTotalVentas", "$" + Number(data.totalVentas || 0).toLocaleString("es-AR"));
 
     actualizarElemento("ccEfectivoEsperado",      "$" + Number(data.esperado.EFECTIVO).toLocaleString("es-AR"));
     actualizarElemento("ccTransferenciaEsperado", "$" + Number(data.esperado.TRANSFERENCIA).toLocaleString("es-AR"));

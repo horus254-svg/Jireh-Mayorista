@@ -700,9 +700,15 @@
           <input type="date" id="ccFechaSelector" class="form-control form-control-sm" style="max-width:160px;"
             onchange="cargarResumenCierreCaja(this.value)">
         </div>
-        <div class="text-end">
-          <div class="sub" style="margin:0;">Ventas registradas</div>
-          <h5 style="margin:0;" id="ccCantidadVentas">0 ventas</h5>
+        <div class="text-end d-flex gap-4 align-items-center">
+          <div class="text-end">
+            <div class="sub" style="margin:0;">Total ventas</div>
+            <h5 style="margin:0;color:var(--green-600);" id="ccTotalVentas">$0</h5>
+          </div>
+          <div class="text-end">
+            <div class="sub" style="margin:0;">Cantidad</div>
+            <h5 style="margin:0;" id="ccCantidadVentas">0 ventas</h5>
+          </div>
         </div>
       </div>
       <div class="cc-estado" id="cierreCajaEstado"></div>
