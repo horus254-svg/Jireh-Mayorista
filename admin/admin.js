@@ -1149,6 +1149,19 @@ async function cargarPedidos() {
   }
 }
 
+/** Fuerza recarga de pedidos borrando el caché primero */
+function recargarPedidos() {
+  invalidarCache("pedidos");
+  delete ULTIMA_CARGA_SECCION["pedidos"];
+  cargarPedidos();
+}
+
+function recargarVentasPOSHistorial() {
+  invalidarCache("ventasPOS");
+  delete ULTIMA_CARGA_SECCION["ventasPOS"];
+  cargarVentasPOSHistorial();
+}
+
 async function cambiarEstado(pedidoId, estado) {
   try {
     const response = await fetch(
@@ -1159,6 +1172,9 @@ async function cambiarEstado(pedidoId, estado) {
     );
     const data = await response.json();
     if (!data.success) { toast("No se pudo actualizar el pedido", "error"); return; }
+    // Actualizar en memoria sin recargar todo
+    const p = pedidosGlobal.find(x => x.PEDIDO_ID === pedidoId);
+    if (p) { p.ESTADO = estado; invalidarCache("pedidos"); renderPedidos(pedidosGlobal); }
     toast("Estado actualizado", "success");
   } catch (error) {
     console.error(error);
@@ -1217,17 +1233,25 @@ async function aplicarCobroPedido(pedidoId, cobrado, formaPago) {
 
     if (!data.success) {
       toast(data.message || "No se pudo actualizar el cobro del pedido", "error");
-      cargarPedidos(); // revierte cualquier cambio visual a lo que diga el backend
       return;
     }
 
-    toast(cobrado ? "Pedido marcado como cobrado — ya suma al cierre de caja de hoy" : "Pedido desmarcado — ya no suma al cierre de caja", "success");
-    cargarPedidos();
+    // Actualizar en memoria para respuesta inmediata
+    const p = pedidosGlobal.find(x => x.PEDIDO_ID === pedidoId);
+    if (p) {
+      p.COBRADO = cobrado ? "SI" : "NO";
+      p.FORMA_PAGO_COBRO = formaPago || "";
+      invalidarCache("pedidos");
+      renderPedidos(pedidosGlobal);
+    }
+
+    toast(cobrado
+      ? `Pedido cobrado con ${formaPago} — ya suma al cierre de caja`
+      : "Pedido desmarcado — ya no suma al cierre de caja", "success");
 
   } catch (error) {
     console.error("Error al marcar el pedido como cobrado:", error);
-    toast("Error de conexión al actualizar el cobro", "error");
-    cargarPedidos();
+    toast("Error de conexión al actualizar el pedido", "error");
   }
 }
 
@@ -1494,24 +1518,19 @@ function renderPedidos(lista) {
       ? `<span class="pedido-cobrado-badge">✓ Cobrado <span class="pedido-cobrado-forma">${formaPagoActual}</span></span>`
       : "";
 
-    const selectCobrado = `
-      <div class="d-flex align-items-center gap-2">
-        <div class="form-check mb-0">
-          <input class="form-check-input" type="checkbox" id="cobrado-${p.PEDIDO_ID}"
-            ${estaCobrado ? "checked" : ""}
-            onchange="cambiarCobradoPedido('${p.PEDIDO_ID}', this.checked)">
-          <label class="form-check-label" for="cobrado-${p.PEDIDO_ID}" style="font-size:12.5px;">Cobrado</label>
-        </div>
-        <select class="form-select form-select-sm" style="max-width:145px;"
-          id="formaPago-${p.PEDIDO_ID}"
-          ${estaCobrado ? "" : "disabled"}
-          onchange="cambiarFormaPagoPedido('${p.PEDIDO_ID}', this.value)">
-          <option value="">Forma de pago...</option>
-          <option value="EFECTIVO"      ${formaPagoActual==="EFECTIVO"?"selected":""}>Efectivo</option>
-          <option value="TRANSFERENCIA" ${formaPagoActual==="TRANSFERENCIA"?"selected":""}>Transferencia</option>
-          <option value="TARJETA"       ${formaPagoActual==="TARJETA"?"selected":""}>Tarjeta</option>
-        </select>
-      </div>`;
+    const selectCobrado = estaCobrado
+      ? `<div class="pedido-cobrado-controles">
+           <span class="pedido-cobrado-badge">✓ Cobrado</span>
+           <span class="pedido-cobrado-forma">${formaPagoActual}</span>
+           <button class="btn btn-outline-danger btn-sm" style="font-size:11px;padding:2px 8px;"
+             onclick="aplicarCobroPedido('${p.PEDIDO_ID}', false, '')">Desmarcar</button>
+         </div>`
+      : `<div class="pedido-pago-btns">
+           <span style="font-size:11px;font-weight:600;color:var(--slate-500);">Cobrar con:</span>
+           <button class="pedido-pago-btn" onclick="aplicarCobroPedido('${p.PEDIDO_ID}', true, 'EFECTIVO')">💵 Efectivo</button>
+           <button class="pedido-pago-btn" onclick="aplicarCobroPedido('${p.PEDIDO_ID}', true, 'TRANSFERENCIA')">📲 Transfer.</button>
+           <button class="pedido-pago-btn" onclick="aplicarCobroPedido('${p.PEDIDO_ID}', true, 'TARJETA')">💳 Tarjeta</button>
+         </div>`;
 
     return `
     <div class="pedido-card estado-${claseEstado}">
@@ -3563,7 +3582,6 @@ function mfvCalcularCambio() {
 }
 
 async function confirmarFinalizarVenta() {
-  // Aplicar descuento del modal al estado real del POS antes de finalizar
   const valDescuento = document.getElementById("mfvDescuentoValor").value;
   const motivoDescuento = document.getElementById("mfvDescuentoMotivo").value;
   if (valDescuento && Number(valDescuento) > 0) {
@@ -3577,35 +3595,57 @@ async function confirmarFinalizarVenta() {
     resetearDescuentoPOS();
   }
 
-  // Aplicar forma de pago
   const btnPago = document.querySelector(`#mfvPayMethods .pay-method-btn[data-val="${mfvFormaPago}"]`);
   if (btnPago) elegirFormaPago(btnPago, mfvFormaPago);
 
-  // Guardar recibido para el ticket
   const recibido = Number(document.getElementById("mfvRecibido").value) || 0;
   const inputRec = document.getElementById("inputRecibido");
   if (inputRec) inputRec.value = recibido || "";
   if (recibido) calcularCambio();
 
-  const btn = document.getElementById("btnConfirmarVenta");
-  btn.disabled = true;
-  btn.textContent = "Procesando...";
-
   cerrarModalFinalizarVenta();
-  await finalizarVentaPOS();
-}
 
-async function finalizarVentaPOS() {
-  if (ticketPOS.length === 0) { toast("El ticket está vacío", "error"); return; }
-
+  // ── OPTIMISTIC: calcular todo localmente y mostrar el recibo al instante ──
   const subtotal = ticketPOS.reduce((acc, item) => acc + (item.PRECIO * item.cantidad), 0);
   const { montoDescuento, total } = calcularDescuentoPOS(subtotal);
   const etiquetaDescuento = obtenerEtiquetaDescuentoPOS(subtotal);
+  const itemsSnapshot = [...ticketPOS];
+  const fechaVenta = new Date();
+  const ventaIdTemp = "VEN-" + Date.now().toString().slice(-6);
+
+  // Guardar para impresión
+  ultimaVentaImprimible = {
+    ventaId: ventaIdTemp,
+    items: itemsSnapshot,
+    total, subtotal,
+    descuento: montoDescuento,
+    descuentoEtiqueta: etiquetaDescuento,
+    formaPago: formaPagoPOS,
+    fecha: fechaVenta
+  };
+
+  // Mostrar recibo y limpiar ticket INMEDIATAMENTE
+  mostrarRecibo(ventaIdTemp, itemsSnapshot, total, subtotal, montoDescuento);
+  ticketPOS = [];
+  resetearDescuentoPOS();
+  if (inputRec) inputRec.value = "";
+  const cambioEl = document.getElementById("cambioValor");
+  if (cambioEl) { cambioEl.textContent = "—"; cambioEl.classList.remove("negativo"); }
+  renderTicketPOS();
+  ultimoCodigoAgregadoPOS = null;
+  posTileFocusIdx = -1;
+
+  // Actualizar stock optimistamente en el grid
+  itemsSnapshot.forEach(item => {
+    const p = productosPOS.find(x => String(x.CODIGO) === String(item.CODIGO));
+    if (p && p.STOCK !== undefined) p.STOCK = Math.max(0, Number(p.STOCK) - item.cantidad);
+  });
+  renderPosGrid();
 
   const btn = document.getElementById("btnFinalizarVenta");
-  const textoOriginal = btn ? btn.innerHTML : "";
-  if (btn) { btn.disabled = true; btn.innerHTML = "Procesando..."; }
+  if (btn) btn.disabled = false;
 
+  // ── GUARDAR en el backend en segundo plano ──
   try {
     const response = await fetch(
       API_URL +
@@ -3613,51 +3653,31 @@ async function finalizarVentaPOS() {
       "&total="         + encodeURIComponent(total) +
       "&formaPago="     + encodeURIComponent(formaPagoPOS) +
       "&observaciones=" + encodeURIComponent(etiquetaDescuento ? "Descuento: " + etiquetaDescuento : "") +
-      "&carrito="       + encodeURIComponent(JSON.stringify(ticketPOS))
+      "&carrito="       + encodeURIComponent(JSON.stringify(itemsSnapshot))
     );
     const data = await response.json();
 
-    if (!data.success) {
-      toast(data.message || "No se pudo registrar la venta", "error");
-      if (btn) { btn.disabled = false; btn.innerHTML = textoOriginal; }
-      return;
+    if (data.success && data.ventaId && data.ventaId !== ventaIdTemp) {
+      // Actualizar el ID real en el recibo imprimible
+      ultimaVentaImprimible.ventaId = data.ventaId;
+      // Actualizar el ID visible en el modal de recibo si sigue abierto
+      const idEl = document.getElementById("reciboVentaId");
+      if (idEl) idEl.textContent = data.ventaId;
+    } else if (!data.success) {
+      toast("⚠️ La venta se mostró pero no se guardó en el servidor. Reintentá.", "error");
     }
-
-    // Save a copy for thermal printing from receipt modal
-    ultimaVentaImprimible = {
-      ventaId:    data.ventaId,
-      items:      [...ticketPOS],
-      total:      total,
-      subtotal:   subtotal,
-      descuento:  montoDescuento,
-      descuentoEtiqueta: etiquetaDescuento,
-      formaPago:  formaPagoPOS,
-      fecha:      new Date()
-    };
-
-    mostrarRecibo(data.ventaId, ticketPOS, total, subtotal, montoDescuento);
-    ticketPOS = [];
-    resetearDescuentoPOS();
-    const inputRec = document.getElementById("inputRecibido");
-    const cambioEl = document.getElementById("cambioValor");
-    if (inputRec) inputRec.value = "";
-    if (cambioEl) { cambioEl.textContent = "—"; cambioEl.classList.remove("negativo"); }
-    renderTicketPOS();
-
-    ultimoCodigoAgregadoPOS = null;
-    posTileFocusIdx = -1;
-    productosPOS = [];
-    await asegurarProductosPOS();
-    renderPosGrid();
-    cargarMetricas();
-    cargarVentasPOS();
-
-  } catch (error) {
-    console.error("Error al finalizar venta:", error);
-    toast("Error de conexión al registrar la venta", "error");
-  } finally {
-    if (btn) { btn.disabled = ticketPOS.length === 0; btn.innerHTML = textoOriginal; }
+  } catch (err) {
+    console.error("Error al guardar venta en backend:", err);
+    toast("⚠️ Sin conexión — la venta no se guardó. Verificá el servidor.", "error");
   }
+
+  // Métricas en segundo plano
+  setTimeout(() => { cargarMetricas(); invalidarCache("ventasPOS"); }, 500);
+}
+
+async function finalizarVentaPOS() {
+  // Si se llama directo (sin modal), abre el modal
+  abrirModalFinalizarVenta();
 }
 
 /* ---- generar pedido desde el POS (no es una venta, no descuenta stock) ---- */
@@ -3736,6 +3756,36 @@ function paLimpiarCliente() {
   });
   const monedaWrap = document.getElementById("paMonedaWrap");
   if (monedaWrap) monedaWrap.style.display = "none";
+  // Limpiar también el ajuste de crédito
+  const creditoEl = document.getElementById("paCreditoPct");
+  if (creditoEl) creditoEl.value = "";
+  const infoEl = document.getElementById("paCreditoInfo");
+  if (infoEl) infoEl.style.display = "none";
+}
+
+/** Recalcula el total del pedido aplicando el % de crédito/recargo */
+function paActualizarTotalConCredito() {
+  const subtotal = ticketPOS.reduce((acc, item) => acc + (item.PRECIO * item.cantidad), 0);
+  const { total: totalBase } = calcularDescuentoPOS(subtotal);
+
+  const pct = Number(document.getElementById("paCreditoPct")?.value) || 0;
+  const ajuste = Math.round(totalBase * pct / 100);
+  const totalFinal = totalBase + ajuste;
+
+  document.getElementById("paTotal").textContent = "$" + totalFinal.toLocaleString("es-AR");
+
+  const info = document.getElementById("paCreditoInfo");
+  if (info) {
+    if (pct !== 0) {
+      const signo = ajuste >= 0 ? "+" : "";
+      const tipo = pct > 0 ? "Recargo" : "Descuento";
+      info.textContent = `${tipo} ${Math.abs(pct)}%: ${signo}$${ajuste.toLocaleString("es-AR")} → Total: $${totalFinal.toLocaleString("es-AR")}`;
+      info.style.color = pct > 0 ? "var(--red-500)" : "var(--green-600)";
+      info.style.display = "block";
+    } else {
+      info.style.display = "none";
+    }
+  }
 }
 
 function cerrarModalPedidoAdmin() {
@@ -3805,7 +3855,12 @@ async function confirmarPedidoAdmin() {
   }
 
   const subtotal = ticketPOS.reduce((acc, item) => acc + (item.PRECIO * item.cantidad), 0);
-  const { total } = calcularDescuentoPOS(subtotal);
+  const { total: totalBase } = calcularDescuentoPOS(subtotal);
+
+  // Aplicar ajuste de crédito si fue ingresado
+  const creditoPct = Number(document.getElementById("paCreditoPct")?.value) || 0;
+  const ajusteCredito = Math.round(totalBase * creditoPct / 100);
+  const total = totalBase + ajusteCredito;
 
   const btn = document.getElementById("btnConfirmarPedidoAdmin");
   const textoOriginal = btn.innerHTML;

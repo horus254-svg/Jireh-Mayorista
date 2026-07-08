@@ -1657,3 +1657,18 @@ kbd{
   font-size:12px; font-weight:700; color:var(--slate-600);
   text-transform:uppercase; letter-spacing:.04em; margin-bottom:6px;
 }
+
+/* ===================== PEDIDOS — COBRADO UI ===================== */
+.pedido-pago-btns{
+  display:flex; align-items:center; gap:5px; flex-wrap:wrap;
+}
+.pedido-pago-btn{
+  padding:4px 10px; border-radius:7px; border:1.5px solid var(--slate-200);
+  background:#fff; font-size:12px; font-weight:600; color:var(--slate-600);
+  cursor:pointer; transition:.15s; white-space:nowrap;
+}
+.pedido-pago-btn:hover{ background:var(--navy-900); color:#fff; border-color:var(--navy-900); }
+
+.pedido-cobrado-controles{
+  display:flex; align-items:center; gap:6px; flex-wrap:wrap;
+}
