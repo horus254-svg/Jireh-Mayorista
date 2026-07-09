@@ -1128,6 +1128,20 @@
     </div>
 
     <div class="card p-3 mt-3">
+      <h6 style="margin-bottom:6px;">🛒 Catálogo online — pedido mínimo</h6>
+      <p class="text-muted" style="font-size:12.5px; margin-top:-2px; margin-bottom:14px;">
+        El cliente no puede enviar el pedido si el total no llega a este monto. Se aplica al instante en el catálogo.
+      </p>
+      <div class="mb-3">
+        <label class="form-label">Monto mínimo ($)</label>
+        <input type="number" class="form-control" id="cfgPedidoMinimo" min="0" step="1000" placeholder="Ej: 100000">
+      </div>
+      <div class="d-flex justify-content-end">
+        <button class="btn btn-success" id="btnGuardarPedidoMinimo" onclick="guardarPedidoMinimoForm()">💾 Guardar pedido mínimo</button>
+      </div>
+    </div>
+
+    <div class="card p-3 mt-3">
       <h6 style="margin-bottom:14px;">🔑 Acceso al panel</h6>
       <p class="text-muted" style="font-size:12.5px; margin-top:-8px; margin-bottom:14px;">
         Usuario y contraseña para entrar al panel admin. Por seguridad, necesitás escribir la contraseña actual para poder cambiarlos.

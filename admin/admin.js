@@ -21,12 +21,39 @@ if (sessionStorage.getItem("admin") !== "true") {
   window.location.href = "login.html";
 }
 
+function iniciarPollingSecciones() {
+  const offsetInicial = Math.floor(Math.random() * 4000);
+
+  setTimeout(() => {
+    ejecutarPollingSecciones();
+    setInterval(ejecutarPollingSecciones, 15000); // 15 s — near real-time without hammering the API
+  }, offsetInicial);
+}
+
+function ejecutarPollingSecciones() {
+  if (document.hidden) return; // pestaña en segundo plano: no consultar
+
+  const dashboardVisible = document.getElementById("dashboard").style.display === "block";
+  const pedidosVisible   = document.getElementById("pedidos").style.display === "block";
+  const clientesVisible  = document.getElementById("clientes").style.display === "block";
+
+  // Antes esto llamaba a cargarMetricas() siempre, aunque el cajero
+  // estuviera en Productos o en el POS vendiendo — son llamadas al
+  // backend (Apps Script + Sheets) que no hacían falta y competían
+  // con lo que el cajero estaba haciendo en ese momento. Ahora solo
+  // se actualiza la pantalla que efectivamente está en uso.
+  if (dashboardVisible) { cargarMetricas(); cargarVentasPOS(); }
+  if (pedidosVisible)   cargarPedidos();
+  if (clientesVisible)  cargarClientes();
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   mostrarSeccion("dashboard");
   cargarConfigNegocioDesdeBackend();
   reconectarImpresoraUSBSiPosible();
   await cargarMetricas();
   cargarVentasPOS();
+  iniciarPollingSecciones();
 
   // Ocultar el loading cat una vez que el dashboard cargó
   const cat = document.getElementById("loadingCat");
@@ -529,6 +556,10 @@ function cargarAparienciaForm(cfg) {
   document.getElementById("cfgBannerImagen").value    = cfg.bannerImagen   ?? APARIENCIA_DEFAULT.bannerImagen;
   document.getElementById("cfgTema").value            = cfg.tema           || APARIENCIA_DEFAULT.tema;
 
+  // Pedido mínimo
+  const cfgPedidoMinimoEl = document.getElementById("cfgPedidoMinimo");
+  if (cfgPedidoMinimoEl && cfg.pedidoMinimo !== undefined) cfgPedidoMinimoEl.value = cfg.pedidoMinimo;
+
   // Popup promocional
   const popupActivo = document.getElementById("cfgPopupActivo");
   const popupImagen = document.getElementById("cfgPopupImagen");
@@ -538,6 +569,45 @@ function cargarAparienciaForm(cfg) {
   const popupPreviewEl = document.getElementById("popupImagenPreview");
   if (popupPreviewEl && cfg.popupImagen) {
     popupPreviewEl.innerHTML = `<img src="${cfg.popupImagen}" alt="" style="width:100%;height:100%;object-fit:contain;">`;
+  }
+}
+
+async function guardarPedidoMinimoForm() {
+  const input = document.getElementById("cfgPedidoMinimo");
+  if (!input) return;
+
+  const valor = Number(input.value);
+
+  if (isNaN(valor) || valor < 0) {
+    toast("Ingresá un monto válido para el pedido mínimo", "error");
+    return;
+  }
+
+  const btn = document.getElementById("btnGuardarPedidoMinimo");
+  const textoOriginal = btn ? btn.innerHTML : "";
+  if (btn) { btn.disabled = true; btn.innerHTML = "Guardando..."; }
+
+  try {
+    const params = new URLSearchParams({
+      action: "guardarConfiguracionNegocio",
+      pedidoMinimo: valor
+    });
+    const response = await fetchConReintento(API_URL + "?" + params.toString());
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo guardar el pedido mínimo", "error");
+      return;
+    }
+
+    configNegocioCache = { ...configNegocioCache, pedidoMinimo: valor };
+    toast(`Pedido mínimo actualizado a $${valor.toLocaleString("es-AR")}`, "success");
+
+  } catch (error) {
+    console.error("Error al guardar el pedido mínimo:", error);
+    toast("Error de conexión al guardar el pedido mínimo", "error");
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = textoOriginal; }
   }
 }
 
@@ -828,6 +898,27 @@ function toast(mensaje, tipo) {
 }
 
 /* ===================== METRICAS ===================== */
+
+async function fetchConReintento(url, opciones, intentos) {
+  intentos = intentos || 3;
+  let ultimoError = null;
+
+  for (let intento = 1; intento <= intentos; intento++) {
+    try {
+      const response = await fetch(url, opciones);
+      if (!response.ok) throw new Error("HTTP " + response.status);
+      return response;
+    } catch (error) {
+      ultimoError = error;
+      if (intento < intentos) {
+        // Espera creciente: 600ms, 1200ms, 1800ms... da tiempo a que
+        // se libere la ejecución concurrente de las otras cajas.
+        await new Promise(r => setTimeout(r, 600 * intento));
+      }
+    }
+  }
+  throw ultimoError;
+}
 
 async function cargarMetricas() {
   try {

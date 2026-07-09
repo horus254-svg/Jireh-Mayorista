@@ -2,6 +2,9 @@
    CONFIG
 ========================================================= */
 
+// Monto mínimo para poder enviar un pedido (configurable desde el panel admin)
+let pedidoMinimo = 100000;
+
 const API_URL = "https://script.google.com/macros/s/AKfycbw1eY_mXImG503rU0Cqddx1WBuGIOhxaW_SXGoIMsug_CjsSC-HLsb2XzYwrovaGBU/exec";
 
 const PLACEHOLDER_IMG = "data:image/svg+xml;base64," + btoa(
@@ -667,8 +670,13 @@ function abrirCarrito(){
 
     const avisoMinimo = document.getElementById("cart-minimo-aviso");
     if(avisoMinimo){
-        if(total > 0 && total < 100000) avisoMinimo.classList.remove("d-none");
-        else avisoMinimo.classList.add("d-none");
+        if(total > 0 && total < pedidoMinimo){
+            const falta = pedidoMinimo - total;
+            avisoMinimo.textContent = `⚠️ Te faltan $${formatearPrecio(falta)} para el pedido mínimo de $${formatearPrecio(pedidoMinimo)}`;
+            avisoMinimo.classList.remove("d-none");
+        }else{
+            avisoMinimo.classList.add("d-none");
+        }
     }
 
     const btnCheckout = document.getElementById("btn-checkout");
@@ -772,7 +780,8 @@ async function checkoutWhatsapp(){
     estado.carrito.forEach(item => { total += item.PRECIO * item.cantidad; });
 
     if(total < 100000){
-        mostrarToast("El pedido mínimo es $100.000. Agregá más productos para continuar.", "error");
+        const falta2 = pedidoMinimo - total;
+        mostrarToast(`Te faltan $${formatearPrecio(falta2)} para llegar al pedido mínimo de $${formatearPrecio(pedidoMinimo)}.`, "error");
         desactivarCargaCheckout();
         return;
     }
@@ -1063,6 +1072,12 @@ function aplicarBeneficios(cfg){
     configurarChipBeneficio("beneficio-texto2-wrap", !!texto2);
 
     aplicarBannerTop(cfg.bannerTopMensajes);
+
+    // Pedido mínimo configurable
+    const minimoConfigurado = Number(cfg.pedidoMinimo);
+    if(!isNaN(minimoConfigurado) && minimoConfigurado >= 0){
+        pedidoMinimo = minimoConfigurado;
+    }
 
     // Popup promocional — se muestra si está activo y tiene imagen
     cargarPopupPromo(cfg);
