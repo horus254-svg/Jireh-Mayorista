@@ -543,6 +543,41 @@ function cargarAparienciaForm(cfg) {
 
 function previsualizarPopup() {}  // legacy — ya no se usa
 
+/** Lista las impresoras disponibles en Electron y las carga en el selector */
+async function cargarListaImpresoras() {
+  const sel = document.getElementById("cfgImpresoraSelector");
+  if (!sel) return;
+  if (typeof window.posOffline === "undefined" || !window.posOffline.listarImpresoras) {
+    sel.innerHTML = '<option value="">Solo disponible en la app de escritorio</option>';
+    return;
+  }
+  sel.innerHTML = '<option value="">Cargando...</option>';
+  try {
+    const impresoras = await window.posOffline.listarImpresoras();
+    const guardada = localStorage.getItem("veekpos_impresora") || "";
+    sel.innerHTML = '<option value="">— Predeterminada del sistema —</option>';
+    impresoras.forEach(p => {
+      const opt = document.createElement("option");
+      opt.value = p.name;
+      opt.textContent = p.name + (p.isDefault ? " ★" : "");
+      if (p.name === guardada) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    if (!guardada) sel.value = "";
+  } catch (e) {
+    sel.innerHTML = '<option value="">Error al listar impresoras</option>';
+  }
+}
+
+function guardarImpresoraSeleccionada() {
+  const sel = document.getElementById("cfgImpresoraSelector");
+  const nombre = sel ? sel.value : "";
+  localStorage.setItem("veekpos_impresora", nombre);
+  const actual = document.getElementById("cfgImpresoraActual");
+  if (actual) actual.textContent = nombre ? `Impresora guardada: ${nombre}` : "Se usará la predeterminada del sistema.";
+  toast(nombre ? `Impresora "${nombre}" guardada` : "Se usará la impresora predeterminada", "success");
+}
+
 function quitarImagenPopup() {
   document.getElementById("cfgPopupImagen").value = "";
   const preview = document.getElementById("popupImagenPreview");
@@ -1657,16 +1692,48 @@ function renderPedidos(lista) {
 /* ===================== PRODUCTOS (tabla admin) ===================== */
 
 async function cargarProductos() {
+  // 1. Mostrar desde caché instantáneamente si existe y es fresco
+  const CACHE_KEY = "vpos_cache_productosAdmin";
+  const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (raw) {
+      const { ts, data } = JSON.parse(raw);
+      if (data && data.length > 0) {
+        productosAdminGlobal = data;
+        poblarFiltroCategoriasProductos();
+        filtrarProductos();
+        // Si el caché es fresco, no recargar del server
+        if (Date.now() - ts < CACHE_TTL) return;
+        // Si está vencido, actualizar en segundo plano sin bloquear
+        _actualizarProductosAdminEnBackground(CACHE_KEY);
+        return;
+      }
+    }
+  } catch(e) {}
+
+  // 2. Sin caché: mostrar skeleton y cargar del server
+  const tbody = document.getElementById("tablaProductos");
+  if (tbody) tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-4">Cargando productos...</td></tr>`;
+  await _actualizarProductosAdminEnBackground(CACHE_KEY);
+}
+
+async function actualizarCatalogoProductosManual() {
+  try { localStorage.removeItem("vpos_cache_productosAdmin"); } catch(e) {}
+  productosAdminGlobal = [];
+  toast("Actualizando productos...", "success");
+  await cargarProductos();
+}
+
+async function _actualizarProductosAdminEnBackground(cacheKey) {
   try {
     const response = await fetch(API_URL + "?action=productosAdmin");
     const data = await response.json();
     if (!data.productos) return;
-
     productosAdminGlobal = data.productos;
-
+    try { localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), data: data.productos })); } catch(e) {}
     poblarFiltroCategoriasProductos();
     filtrarProductos();
-
   } catch (error) {
     console.error("Error productos:", error);
   }
@@ -1681,46 +1748,61 @@ function renderTablaProductos(lista) {
     return;
   }
 
-  let html = "";
-  lista.forEach(p => {
-    const publicado = String(p.PUBLICADO || "").toUpperCase() === "SI";
-    const stock = Number(p.STOCK || 0);
-    const stockBadge = stock === 0
-      ? `<span class="tile-stock out">Sin stock</span>`
-      : (stock <= 5 ? `<span class="tile-stock low">${stock}</span>` : stock);
+  // Renderizar en chunks para no bloquear el hilo principal
+  // con 829 productos generando DOM de golpe
+  const CHUNK = 80;
+  let idx = 0;
+  tbody.innerHTML = "";
 
-    const imagenUrl = p.IMAGEN ? String(p.IMAGEN).trim() : "";
-    const fotoHtml = imagenUrl
-      ? `<img src="${escapeHtml(imagenUrl)}" alt="" loading="lazy" onerror="this.parentElement.innerHTML='🛒';">`
-      : "🛒";
+  const renderChunk = () => {
+    const frag = document.createDocumentFragment();
+    const fin = Math.min(idx + CHUNK, lista.length);
 
-    html += `
-    <tr>
-      <td><input type="checkbox" class="check-producto-etiqueta" value="${escapeHtml(p.CODIGO)}" onchange="actualizarSeleccionEtiquetas()"></td>
-      <td><div class="tabla-producto-thumb">${fotoHtml}</div></td>
-      <td class="mono">${escapeHtml(p.CODIGO)}</td>
-      <td>${escapeHtml(p.PRODUCTO)}</td>
-      <td>${escapeHtml(p.CATEGORIA || "—")}</td>
-      <td class="money">$${Number(p.PRECIO || 0).toLocaleString("es-AR")}</td>
-      <td>${stockBadge}</td>
-      <td>
-        <span class="badge ${publicado ? "bg-success" : "bg-secondary"}">${publicado ? "Publicado" : "Oculto"}</span>
-      </td>
-      <td>
-        <button class="btn btn-outline-success btn-sm btn-accion-producto" onclick="abrirModalStock('${escapeHtml(p.CODIGO)}')" title="Sumar stock">📦 Stock</button>
-        <button class="btn btn-primary btn-sm btn-accion-producto ms-2" onclick="editarProducto('${escapeHtml(p.CODIGO)}')">Editar</button>
-        <button class="btn btn-danger btn-sm btn-accion-producto ms-2" onclick="eliminarProducto('${escapeHtml(p.CODIGO)}')">Eliminar</button>
-      </td>
-    </tr>`;
-  });
-  tbody.innerHTML = html;
+    for (; idx < fin; idx++) {
+      const p = lista[idx];
+      const publicado = String(p.PUBLICADO || "").toUpperCase() === "SI";
+      const stock = Number(p.STOCK || 0);
+      const stockBadge = stock === 0
+        ? `<span class="tile-stock out">Sin stock</span>`
+        : (stock <= 5 ? `<span class="tile-stock low">${stock}</span>` : stock);
 
-  // El checkbox "seleccionar todos" no sobrevive a un re-render de la
-  // tabla (filtro, búsqueda, etc.) — se resetea para evitar que quede
-  // marcado mientras la tabla ya no refleja esa selección completa.
-  const checkTodos = document.getElementById("checkTodosProductos");
-  if (checkTodos) checkTodos.checked = false;
-  actualizarSeleccionEtiquetas();
+      const imagenUrl = p.IMAGEN ? String(p.IMAGEN).trim() : "";
+      const fotoHtml = imagenUrl
+        ? `<img src="${escapeHtml(imagenUrl)}" alt="" loading="lazy" onerror="this.parentElement.innerHTML='🛒';">`
+        : "🛒";
+
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td><input type="checkbox" class="check-producto-etiqueta" value="${escapeHtml(p.CODIGO)}" onchange="actualizarSeleccionEtiquetas()"></td>
+        <td><div class="tabla-producto-thumb">${fotoHtml}</div></td>
+        <td class="mono">${escapeHtml(p.CODIGO)}</td>
+        <td>${escapeHtml(p.PRODUCTO)}</td>
+        <td>${escapeHtml(p.CATEGORIA || "—")}</td>
+        <td class="money">$${Number(p.PRECIO || 0).toLocaleString("es-AR")}</td>
+        <td>${stockBadge}</td>
+        <td><span class="badge ${publicado ? "bg-success" : "bg-secondary"}">${publicado ? "Publicado" : "Oculto"}</span></td>
+        <td>
+          <button class="btn btn-outline-success btn-sm btn-accion-producto" onclick="abrirModalStock('${escapeHtml(p.CODIGO)}')" title="Sumar stock">📦 Stock</button>
+          <button class="btn btn-primary btn-sm btn-accion-producto ms-2" onclick="editarProducto('${escapeHtml(p.CODIGO)}')">Editar</button>
+          <button class="btn btn-danger btn-sm btn-accion-producto ms-2" onclick="eliminarProducto('${escapeHtml(p.CODIGO)}')">Eliminar</button>
+        </td>`;
+      frag.appendChild(tr);
+    }
+
+    tbody.appendChild(frag);
+
+    if (idx < lista.length) {
+      // Ceder control al browser entre chunks para que no congele la UI
+      requestAnimationFrame(renderChunk);
+    } else {
+      // Fin del render — actualizar estado de checkboxes
+      const checkTodos = document.getElementById("checkTodosProductos");
+      if (checkTodos) checkTodos.checked = false;
+      actualizarSeleccionEtiquetas();
+    }
+  };
+
+  requestAnimationFrame(renderChunk);
 }
 
 /** Fills the category <select> filter with the distinct categories currently in use */
@@ -3715,7 +3797,7 @@ async function confirmarFinalizarVenta() {
   };
 
   // Mostrar recibo y limpiar ticket INMEDIATAMENTE
-  mostrarRecibo(ventaIdTemp, itemsSnapshot, total, subtotal, montoDescuento);
+  mostrarRecibo(ventaIdTemp, itemsSnapshot, total, subtotal, montoDescuento, recibido);
   ticketPOS = [];
   resetearDescuentoPOS();
   if (inputRec) inputRec.value = "";
@@ -3998,7 +4080,7 @@ async function confirmarPedidoAdmin() {
 
 /* ---- receipt modal ---- */
 
-function mostrarRecibo(ventaId, items, total, subtotal, montoDescuento) {
+function mostrarRecibo(ventaId, items, total, subtotal, montoDescuento, recibido) {
   document.getElementById("receiptId").innerText = "#" + (ventaId || "—");
 
   let html = "";
@@ -4025,6 +4107,18 @@ function mostrarRecibo(ventaId, items, total, subtotal, montoDescuento) {
 
   document.getElementById("receiptItems").innerHTML = html;
   document.getElementById("receiptTotal").innerText = "$" + total.toLocaleString("es-AR");
+
+  // Mostrar cambio si se ingresó efectivo
+  const cambioWrap = document.getElementById("receiptCambioWrap");
+  const cambioEl = document.getElementById("receiptCambio");
+  if (cambioWrap && cambioEl && recibido > 0) {
+    const cambio = recibido - total;
+    cambioEl.textContent = "$" + Math.max(0, cambio).toLocaleString("es-AR");
+    cambioWrap.style.display = cambio >= 0 ? "flex" : "none";
+  } else if (cambioWrap) {
+    cambioWrap.style.display = "none";
+  }
+
   document.getElementById("receiptBackdrop").classList.add("show");
   toast("Venta registrada con éxito", "success");
 }
@@ -4595,7 +4689,8 @@ async function _imprimirConDialogo(html) {
   if (typeof window.posOffline !== "undefined" && window.posOffline.imprimirSilencioso) {
     // Pequeña espera para que el DOM pinte el HTML del ticket antes de imprimir
     await new Promise(r => setTimeout(r, 120));
-    const result = await window.posOffline.imprimirSilencioso();
+    const deviceName = localStorage.getItem("veekpos_impresora") || "";
+    const result = await window.posOffline.imprimirSilencioso({ deviceName });
     if (result && !result.success) {
       console.warn("Impresión silenciosa falló:", result.errorType);
       // Fallback al diálogo del sistema si falla
@@ -4772,6 +4867,20 @@ const SCAN_KEY_THRESHOLD_MS = 40;
 
 function setupScannerListener() {
   document.addEventListener("keydown", (e) => {
+    // ---- Enter/Esc en modal de finalizar venta ----
+    const modalFinalizar = document.getElementById("modalFinalizarVentaBackdrop");
+    if (modalFinalizar && modalFinalizar.classList.contains("show")) {
+      if (e.key === "Enter") { e.preventDefault(); confirmarFinalizarVenta(); return; }
+      if (e.key === "Escape") { e.preventDefault(); cerrarModalFinalizarVenta(); return; }
+    }
+
+    // ---- Enter/Esc en modal de recibo ----
+    const recibo = document.getElementById("receiptBackdrop");
+    if (recibo && recibo.classList.contains("show")) {
+      if (e.key === "Enter") { e.preventDefault(); imprimirUltimoRecibo(); return; }
+      if (e.key === "Escape") { e.preventDefault(); cerrarRecibo(); return; }
+    }
+
     const posSection = document.getElementById("pos");
     const posVisible = posSection && posSection.style.display === "block";
     if (!posVisible) return;

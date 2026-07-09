@@ -1368,9 +1368,12 @@
       <table><tbody id="receiptItems"></tbody></table>
     </div>
     <div class="receipt-total-line"><span>Total</span><span class="money" id="receiptTotal">$0</span></div>
+    <div class="receipt-total-line" id="receiptCambioWrap" style="display:none;color:var(--green-600);">
+      <span>Cambio</span><span class="money" id="receiptCambio">$0</span>
+    </div>
     <div class="receipt-actions">
-      <button class="btn btn-outline-primary" onclick="cerrarRecibo()">Cerrar</button>
-      <button class="btn btn-outline-secondary" onclick="imprimirUltimoRecibo()">🖨️ Imprimir</button>
+      <button class="btn btn-outline-primary" id="btnCerrarRecibo" onclick="cerrarRecibo()">Esc — Cerrar</button>
+      <button class="btn btn-outline-secondary" id="btnImprimirRecibo" onclick="imprimirUltimoRecibo()">Enter — Imprimir</button>
       <button class="btn btn-success" onclick="nuevaVentaPOS()">Nueva venta</button>
     </div>
   </div>
