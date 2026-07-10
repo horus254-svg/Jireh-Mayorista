@@ -5862,32 +5862,81 @@ function renderTablaMovimientosCaja(lista) {
   if (!tbody) return;
 
   if (lista.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-3">Todavía no hay movimientos registrados hoy</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-3">Todavía no hay movimientos registrados</td></tr>`;
     return;
   }
+
+  const iconoFormaPago = { EFECTIVO: "💵", TRANSFERENCIA: "📲", TARJETA: "💳" };
 
   let html = "";
   lista.forEach(m => {
     const esIngreso = String(m.TIPO).toUpperCase() === "INGRESO";
-    const hora = m.FECHA_REGISTRO ? new Date(m.FECHA_REGISTRO).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }) : "—";
+    const hora = m.FECHA_REGISTRO
+      ? new Date(m.FECHA_REGISTRO).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })
+      : "—";
+    const fp = String(m.FORMA_PAGO || "EFECTIVO").toUpperCase();
+    const fpIcon = iconoFormaPago[fp] || "💵";
+    const fpLabel = fp.charAt(0) + fp.slice(1).toLowerCase();
 
     html += `
     <tr>
       <td>${hora}</td>
       <td><span class="mc-tag ${esIngreso ? "mc-ingreso" : "mc-egreso"}">${esIngreso ? "⬆️ Ingreso" : "⬇️ Egreso"}</span></td>
       <td>${escapeHtml(m.MOTIVO || "—")}</td>
+      <td><span style="font-size:12.5px;">${fpIcon} ${fpLabel}</span></td>
       <td class="money" style="color:${esIngreso ? "var(--green-600)" : "var(--red-500)"};">
         ${esIngreso ? "+" : "-"}$${Number(m.MONTO || 0).toLocaleString("es-AR")}
       </td>
       <td>${escapeHtml(m.VENDEDOR || "—")}</td>
-      <td><button class="btn btn-outline-danger btn-sm" onclick="eliminarMovimientoCajaForm('${escapeHtml(m.MOVIMIENTO_ID)}')">Eliminar</button></td>
+      <td><button class="btn btn-outline-danger btn-sm"
+        onclick="confirmarEliminarMovimiento('${escapeHtml(m.MOVIMIENTO_ID)}', '${escapeHtml(m.MOTIVO || "")}')">✕</button></td>
     </tr>`;
   });
 
   tbody.innerHTML = html;
 }
 
-/** Saves a new manual income/expense movement */
+/** Pide confirmación con modal propio (confirm() bloquea el input en Electron) */
+function confirmarEliminarMovimiento(movimientoId, motivo) {
+  // Guardar ID en variable global para usar al confirmar
+  window._movimientoParaEliminar = movimientoId;
+
+  const backdrop = document.getElementById("modalEliminarMovBackdrop");
+  const texto = document.getElementById("modalEliminarMovTexto");
+  if (texto) texto.textContent = motivo
+    ? `¿Eliminar el movimiento "${motivo}"? Esta acción no se puede deshacer.`
+    : "¿Eliminar este movimiento? Esta acción no se puede deshacer.";
+  if (backdrop) backdrop.classList.add("show");
+}
+
+function cerrarModalEliminarMov() {
+  const backdrop = document.getElementById("modalEliminarMovBackdrop");
+  if (backdrop) backdrop.classList.remove("show");
+  window._movimientoParaEliminar = null;
+}
+
+async function eliminarMovimientoCajaForm(movimientoId) {
+  const id = movimientoId || window._movimientoParaEliminar;
+  cerrarModalEliminarMov();
+  if (!id) return;
+
+  try {
+    const response = await fetch(API_URL + "?action=eliminarMovimientoCaja&movimientoId=" + encodeURIComponent(id));
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo eliminar el movimiento", "error");
+      return;
+    }
+
+    toast("Movimiento eliminado", "success");
+    cargarMovimientosCajaHoy();
+
+  } catch (error) {
+    console.error("Error al eliminar movimiento de caja:", error);
+    toast("Error de conexión al eliminar el movimiento", "error");
+  }
+}
 async function guardarMovimientoCajaForm() {
   const monto = document.getElementById("mcMonto").value;
   const motivo = document.getElementById("mcMotivo").value.trim();

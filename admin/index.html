@@ -1644,6 +1644,25 @@
 
 </div><!-- .content -->
 
+<!-- ===== MODAL ELIMINAR MOVIMIENTO CAJA ===== -->
+<div class="product-modal-backdrop" id="modalEliminarMovBackdrop">
+  <div class="product-modal" style="max-width:400px;">
+    <div class="product-modal-header">
+      <h6>🗑️ Eliminar movimiento</h6>
+      <button onclick="cerrarModalEliminarMov()">✕</button>
+    </div>
+    <div class="product-modal-body">
+      <p id="modalEliminarMovTexto" style="font-size:13.5px; color:var(--slate-700);">
+        ¿Eliminar este movimiento? Esta acción no se puede deshacer.
+      </p>
+    </div>
+    <div class="product-modal-actions">
+      <button class="btn btn-outline-secondary" onclick="cerrarModalEliminarMov()">Cancelar</button>
+      <button class="btn btn-danger" onclick="eliminarMovimientoCajaForm()">Eliminar</button>
+    </div>
+  </div>
+</div>
+
 <!-- ===== TOASTS ===== -->
 <div class="toast-stack" id="toastStack"></div>
 
