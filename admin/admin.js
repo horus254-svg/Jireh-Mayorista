@@ -6,8 +6,23 @@
    • Responsive mobile nav sync added
 =================================================================== */
 
-const API_URL =
+// API_URL dinámica — se carga desde config.json al iniciar.
+// Permite instalar el mismo código para distintos clientes
+// sin modificar nada manualmente.
+let API_URL =
   "https://script.google.com/macros/s/AKfycbw1eY_mXImG503rU0Cqddx1WBuGIOhxaW_SXGoIMsug_CjsSC-HLsb2XzYwrovaGBU/exec";
+
+async function cargarConfigCliente() {
+  try {
+    const res = await fetch("../config.json?_=" + Date.now(), { cache: "no-store" });
+    if (res.ok) {
+      const cfg = await res.json();
+      if (cfg.apiUrl) API_URL = cfg.apiUrl;
+    }
+  } catch(e) {
+    console.log("config.json no encontrado, usando URL por defecto");
+  }
+}
 
 let pedidosGlobal = [];
 
@@ -48,6 +63,11 @@ function ejecutarPollingSecciones() {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
+  await cargarConfigCliente();
+
+  // Verificar licencia (solo en Electron con window.veekpos disponible)
+  aplicarEstadoLicencia();
+
   mostrarSeccion("dashboard");
   cargarConfigNegocioDesdeBackend();
   reconectarImpresoraUSBSiPosible();
@@ -6205,3 +6225,469 @@ function imprimirQROffline() {
   }, 200);
 }
 
+
+/* =========================================================
+   SISTEMA DE LICENCIAS
+   Usa window.veekpos (preload.js) → main.js → license-client.js → Apps Script
+========================================================= */
+
+let estadoLicenciaActual = { activada: false, modoLimitado: true };
+
+async function aplicarEstadoLicencia() {
+  if (typeof window.veekpos === "undefined" || !window.veekpos.obtenerEstadoLicencia) return;
+  try {
+    estadoLicenciaActual = await window.veekpos.obtenerEstadoLicencia();
+  } catch (error) { console.error("Error licencia:", error); return; }
+
+  const pantallaActivacion = document.getElementById("licenseScreenBackdrop");
+  const banner = document.getElementById("licenseLimitedBanner");
+  const bannerTexto = document.getElementById("licenseLimitedBannerText");
+
+  if (!estadoLicenciaActual.activada) {
+    if (pantallaActivacion) pantallaActivacion.classList.add("show");
+    if (banner) banner.style.display = "none";
+    const urlGuardada = await window.veekpos.obtenerUrlServidorLicencia?.() || "";
+    const inputUrl = document.getElementById("licenseScreenUrlServidor");
+    if (inputUrl && urlGuardada && !inputUrl.value) inputUrl.value = urlGuardada;
+    return;
+  }
+
+  if (pantallaActivacion) pantallaActivacion.classList.remove("show");
+
+  if (estadoLicenciaActual.modoLimitado) {
+    if (banner) {
+      banner.style.display = "flex";
+      if (bannerTexto) bannerTexto.textContent = "⚠️ " + (estadoLicenciaActual.motivo || "Licencia no vigente") + " — no se pueden registrar ventas ni editar productos.";
+    }
+  } else {
+    if (banner) banner.style.display = "none";
+  }
+  actualizarBloqueosPorLicencia();
+  const configVisible = document.getElementById("configuracion")?.style.display === "block";
+  if (configVisible) mostrarEstadoLicenciaEnConfig();
+}
+
+function actualizarBloqueosPorLicencia() {
+  const bloqueado = estadoLicenciaActual.modoLimitado;
+  const btnFinalizar = document.getElementById("btnFinalizarVenta");
+  if (btnFinalizar) btnFinalizar.disabled = bloqueado || ticketPOS.length === 0;
+  document.querySelectorAll(".btn-accion-producto").forEach(btn => { btn.disabled = bloqueado; });
+}
+
+async function activarLicenciaForm() {
+  const urlServidor = document.getElementById("licenseScreenUrlServidor").value.trim();
+  const email = document.getElementById("licenseScreenEmail").value.trim();
+  const pin = document.getElementById("licenseScreenPin").value.trim();
+  const errorBox = document.getElementById("licenseScreenError");
+  if (errorBox) errorBox.style.display = "none";
+  if (!urlServidor || !email || !pin) {
+    if (errorBox) { errorBox.style.display = "block"; errorBox.textContent = "Completá la URL, el email y el PIN."; }
+    return;
+  }
+  const btn = document.getElementById("licenseScreenBtn");
+  const textoOriginal = btn.innerHTML;
+  btn.disabled = true; btn.innerHTML = "Activando...";
+  try {
+    await window.veekpos.fijarUrlServidorLicencia(urlServidor);
+    const resultado = await window.veekpos.activarLicencia(email, pin);
+    if (!resultado.success) {
+      if (errorBox) { errorBox.style.display = "block"; errorBox.textContent = resultado.message || "No se pudo activar la licencia"; }
+      return;
+    }
+    toast("Licencia activada correctamente", "success");
+    await aplicarEstadoLicencia();
+  } catch (error) {
+    if (errorBox) { errorBox.style.display = "block"; errorBox.textContent = "Error: " + String(error.message || error); }
+  } finally { btn.disabled = false; btn.innerHTML = textoOriginal; }
+}
+
+async function guardarUrlServidorLicencia() {
+  const url = (document.getElementById("cfgLicenciaUrlServidor")?.value || "").trim();
+  if (!url) { toast("Ingresá la URL del servidor", "error"); return; }
+  try { await window.veekpos?.fijarUrlServidorLicencia?.(url); toast("URL guardada", "success"); }
+  catch (e) { toast("Error al guardar", "error"); }
+}
+
+async function validarLicenciaAhoraBtn() {
+  const btn = event?.target;
+  const orig = btn ? btn.innerHTML : "";
+  if (btn) { btn.disabled = true; btn.innerHTML = "Validando..."; }
+  try {
+    estadoLicenciaActual = await window.veekpos?.validarLicenciaAhora?.() || estadoLicenciaActual;
+    await aplicarEstadoLicencia();
+    toast(estadoLicenciaActual.modoLimitado ? "No vigente: " + (estadoLicenciaActual.motivo||"") : "Licencia válida", estadoLicenciaActual.modoLimitado ? "error" : "success");
+  } catch(e) { toast("Error al validar", "error"); }
+  finally { if (btn) { btn.disabled = false; btn.innerHTML = orig; } }
+}
+
+async function mostrarEstadoLicenciaEnConfig() {
+  const box = document.getElementById("licenciaEstadoBox");
+  const inputUrl = document.getElementById("cfgLicenciaUrlServidor");
+  if (inputUrl && !inputUrl.value) inputUrl.value = await window.veekpos?.obtenerUrlServidorLicencia?.() || "";
+  if (!box) return;
+  const e = estadoLicenciaActual;
+  if (!e.activada) { box.innerHTML = `<span style="color:var(--red-500)">⚠️ Sin licencia activada.</span>`; return; }
+  if (e.modoLimitado) { box.innerHTML = `<div style="color:var(--red-500);font-weight:600">⚠️ Modo limitado — ${escapeHtml(e.motivo||"")}</div>`; return; }
+  box.innerHTML = `<div style="color:var(--green-600);font-weight:600">✓ Licencia activa</div>
+    <div class="text-muted" style="font-size:12.5px">Email: ${escapeHtml(e.email||"—")} · Vence: ${escapeHtml(e.fechaVencimiento||"—")}</div>`;
+}
+
+/* =========================================================
+   INSTALADOR / GENERADOR DE CLIENTE
+   Genera Code.gs, config.json y ZIPs listos para instalar
+========================================================= */
+
+function instObtenerDatos() {
+  return {
+    empresa:       (document.getElementById("instEmpresa")?.value || "").trim(),
+    spreadsheetId: (document.getElementById("instSpreadsheetId")?.value || "").trim(),
+    apiUrl:        (document.getElementById("instApiUrl")?.value || "").trim(),
+    whatsapp:      (document.getElementById("instWhatsapp")?.value || "").trim(),
+    direccion:     (document.getElementById("instDireccion")?.value || "").trim(),
+    moneda:        (document.getElementById("instMoneda")?.value || "ARS"),
+    fecha:         new Date().toISOString().slice(0, 10),
+    version:       "1.0"
+  };
+}
+
+function instValidar() {
+  const d = instObtenerDatos();
+  if (!d.empresa) { toast("Ingresá el nombre de la empresa", "error"); return null; }
+  if (!d.spreadsheetId) { toast("Ingresá el ID de la planilla de Google Sheets", "error"); return null; }
+  return d;
+}
+
+/** Descarga un archivo de texto desde el browser */
+function descargarArchivo(nombre, contenido, tipo = "text/plain") {
+  const blob = new Blob([contenido], { type: tipo });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = nombre;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/** Paso 2: Genera y descarga el Code.gs con los datos del cliente */
+async function generarCodeGs() {
+  const d = instValidar();
+  if (!d) return;
+
+  const status = document.getElementById("instStatus");
+  if (status) status.innerHTML = `<div class="text-muted">⏳ Cargando template...</div>`;
+
+  try {
+    // Cargar el template desde el servidor
+    const res = await fetch("../code.gs.template?_=" + Date.now(), { cache: "no-store" });
+    if (!res.ok) throw new Error("No se encontró el template code.gs.template");
+    let template = await res.text();
+
+    // Reemplazar placeholders
+    template = template
+      .replace(/\{\{SPREADSHEET_ID\}\}/g, d.spreadsheetId)
+      .replace(/\{\{EMPRESA\}\}/g, d.empresa)
+      .replace(/\{\{FECHA\}\}/g, d.fecha)
+      .replace(/\{\{VERSION\}\}/g, d.version);
+
+    const nombreArchivo = `Code_${d.empresa.replace(/\s+/g, "_")}.gs`;
+    descargarArchivo(nombreArchivo, template, "text/plain");
+
+    if (status) status.innerHTML = `<div class="text-success">✓ ${nombreArchivo} descargado — seguí las instrucciones del Paso 2</div>`;
+    toast("Code.gs generado y descargado", "success");
+
+  } catch (err) {
+    console.error(err);
+    toast("Error al generar Code.gs: " + err.message, "error");
+    if (status) status.innerHTML = `<div class="text-danger">⚠️ ${err.message}</div>`;
+  }
+}
+
+/** Paso 3a: Genera y descarga config.json */
+function generarConfigJson() {
+  const d = instValidar();
+  if (!d) return;
+
+  const config = {
+    empresa:    d.empresa,
+    apiUrl:     d.apiUrl || "PEGAR_URL_API_AQUI",
+    moneda:     d.moneda,
+    whatsapp:   d.whatsapp,
+    direccion:  d.direccion,
+    version:    d.version,
+    generadoEn: d.fecha
+  };
+
+  const json = JSON.stringify(config, null, 2);
+  descargarArchivo("config.json", json, "application/json");
+  toast("config.json descargado — colocalo en la raíz del catálogo y del panel admin", "success");
+}
+
+/** Paso 3b: Genera ZIP del catálogo web completo con config del cliente */
+async function generarCatalogoZip() {
+  const d = instValidar();
+  if (!d) return;
+  if (!d.apiUrl) { toast("Ingresá la API URL antes de generar el catálogo", "error"); return; }
+
+  const status = document.getElementById("instStatus");
+  if (status) status.innerHTML = `<div class="text-muted">⏳ Generando catálogo web...</div>`;
+
+  try {
+    // Cargar JSZip dinámicamente si no está disponible
+    if (typeof JSZip === "undefined") {
+      await new Promise((res, rej) => {
+        const s = document.createElement("script");
+        s.src = "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";
+        s.onload = res; s.onerror = () => rej(new Error("No se pudo cargar JSZip"));
+        document.head.appendChild(s);
+      });
+    }
+
+    const zip = new JSZip();
+
+    // Insertar config.json del cliente en el ZIP
+    const config = {
+      empresa:    d.empresa,
+      apiUrl:     d.apiUrl,
+      moneda:     d.moneda,
+      whatsapp:   d.whatsapp,
+      direccion:  d.direccion,
+      version:    d.version,
+      generadoEn: d.fecha
+    };
+    zip.file("config.json", JSON.stringify(config, null, 2));
+
+    // Lista de archivos del catálogo (viven en veekPOS/catalogo/)
+    const archivosTexto = [
+      "index.html",
+      "js/app.js",
+      "css/style.css",
+      "service-worker.js",
+      "manifest.json",
+      "manifest-catalogo.json",
+      "robots.txt",
+      "lector.html",
+      "precio.html",
+    ];
+    const archivosBinarios = ["icon-192.png", "icon-512.png", "favicon.ico"];
+
+    const base = "../catalogo/";
+    let cargados = 0;
+
+    // Cargar archivos de texto
+    await Promise.all(archivosTexto.map(async (archivo) => {
+      try {
+        const res = await fetch(base + archivo + "?_=" + Date.now(), { cache: "no-store" });
+        if (!res.ok) return;
+        zip.file(archivo, await res.text());
+        cargados++;
+        if (status) status.innerHTML = `<div class="text-muted">⏳ Cargando archivos... (${cargados})</div>`;
+      } catch(e) { console.warn("Omitido:", archivo); }
+    }));
+
+    // Cargar binarios
+    await Promise.all(archivosBinarios.map(async (img) => {
+      try {
+        const res = await fetch(base + img + "?_=" + Date.now(), { cache: "no-store" });
+        if (res.ok) { zip.file(img, await res.arrayBuffer()); cargados++; }
+      } catch(e) {}
+    }));
+
+    // Generar y descargar ZIP
+    if (status) status.innerHTML = `<div class="text-muted">⏳ Comprimiendo...</div>`;
+    const blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Catalogo_${d.empresa.replace(/\s+/g, "_")}_${d.fecha}.zip`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    if (status) status.innerHTML = `
+      <div class="alert alert-success mt-2" style="font-size:13px;">
+        ✓ <strong>Catálogo descargado (${cargados} archivos)</strong><br>
+        Subí el contenido del ZIP a tu hosting (Netlify, GitHub Pages, etc.).<br>
+        El <code>config.json</code> ya tiene la API URL y los datos del cliente.
+      </div>`;
+    toast("Catálogo web generado", "success");
+
+  } catch (err) {
+    console.error(err);
+    toast("Error al generar el catálogo: " + err.message, "error");
+    if (status) status.innerHTML = `<div class="text-danger mt-2">⚠️ ${err.message}</div>`;
+  }
+}
+
+/** Paso 4: Verifica que la API URL responda correctamente */
+async function verificarConexionInstalador() {
+  const apiUrl = (document.getElementById("instApiUrl")?.value || "").trim();
+  const status = document.getElementById("instConexionStatus");
+
+  if (!apiUrl) {
+    toast("Ingresá la API URL primero", "error");
+    return;
+  }
+
+  if (status) status.innerHTML = `<span class="text-muted">⏳ Probando conexión...</span>`;
+
+  try {
+    const res = await fetch(apiUrl + "?action=productos", { signal: AbortSignal.timeout(10000) });
+    const data = await res.json();
+    if (data.productos !== undefined || data.success !== undefined) {
+      if (status) status.innerHTML = `<span class="text-success">✅ Conexión exitosa — la API responde correctamente</span>`;
+      toast("Conexión verificada", "success");
+    } else {
+      if (status) status.innerHTML = `<span class="text-warning">⚠️ La API responde pero el formato es inesperado</span>`;
+    }
+  } catch (err) {
+    if (status) status.innerHTML = `<span class="text-danger">❌ No se pudo conectar: ${err.message}</span>`;
+    toast("Error de conexión: " + err.message, "error");
+  }
+}
+
+/** Guarda la API URL desde el formulario de configuración (tarjeta Electron) */
+async function guardarApiUrlDesdeConfig() {
+  const input = document.getElementById("conexionNegocioUrl");
+  const url = (input ? input.value : "").trim();
+  if (!url) { toast("Ingresá la URL de la API", "error"); return; }
+
+  // Guardar con el método disponible (veekpos o posOffline)
+  const bridge = window.veekpos || window.posOffline;
+  if (bridge) {
+    if (bridge.fijarConfigLocal) await bridge.fijarConfigLocal("api_url", url);
+    else if (bridge.guardarApiUrl) await bridge.guardarApiUrl(url);
+    API_URL = url;
+    const actual = document.getElementById("conexionNegocioUrlActual");
+    if (actual) actual.textContent = "Conectada a: " + url;
+    toast("URL guardada correctamente", "success");
+  }
+}
+
+/* =========================================================
+   SISTEMA DE LICENCIAS
+   Verifica la licencia al iniciar el panel.
+   Si no hay conexión, permite continuar por 7 días offline.
+========================================================= */
+
+const LICENCIAS_URL_KEY = "veekpos_licencias_url";
+const LICENCIA_KEY      = "veekpos_licencia";
+const LICENCIA_TS_KEY   = "veekpos_licencia_ts";
+const LICENCIA_OFFLINE_DIAS = 7;
+
+async function verificarLicenciaAlIniciar() {
+  // Si no hay URL de servidor de licencias configurada, saltar verificación
+  const servidorUrl = localStorage.getItem(LICENCIAS_URL_KEY);
+  if (!servidorUrl) return; // sin servidor configurado → sin restricción
+
+  const codigoGuardado = localStorage.getItem(LICENCIA_KEY);
+  const tsGuardado     = Number(localStorage.getItem(LICENCIA_TS_KEY) || 0);
+  const diasDesdeUltima = (Date.now() - tsGuardado) / 86400000;
+
+  // Si verificó recientemente (< 24h), no verificar de nuevo
+  if (codigoGuardado && diasDesdeUltima < 1) return;
+
+  if (!codigoGuardado) {
+    // Primera vez — pedir código de licencia
+    mostrarPantallaActivacion();
+    return;
+  }
+
+  // Verificar en línea
+  try {
+    const res = await fetch(`${servidorUrl}?action=validarLicencia&licencia=${codigoGuardado}`,
+      { signal: AbortSignal.timeout(8000) });
+    const data = await res.json();
+
+    if (!data.valida) {
+      mostrarPantallaActivacion(data.mensaje || "Licencia inválida o vencida");
+      return;
+    }
+
+    // Guardar resultado
+    localStorage.setItem(LICENCIA_TS_KEY, Date.now());
+    console.log(`✓ Licencia válida — ${data.empresa} (${data.plan})`);
+
+  } catch(err) {
+    // Sin conexión al servidor de licencias
+    if (diasDesdeUltima > LICENCIA_OFFLINE_DIAS) {
+      mostrarPantallaActivacion(
+        `Sin conexión al servidor de licencias por ${Math.round(diasDesdeUltima)} días. ` +
+        `Conectate a internet para continuar.`
+      );
+    }
+    // Si es menos de 7 días offline, continuar normalmente
+  }
+}
+
+function mostrarPantallaActivacion(mensaje = "") {
+  // Crear overlay de activación si no existe
+  if (document.getElementById("licenciaOverlay")) return;
+
+  const overlay = document.createElement("div");
+  overlay.id = "licenciaOverlay";
+  overlay.style.cssText = `
+    position:fixed; inset:0; z-index:99999;
+    background:#0b1633; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:16px;
+  `;
+  overlay.innerHTML = `
+    <div style="color:#fff; font-size:28px;">🔑</div>
+    <div style="color:#fff; font-size:20px; font-weight:700;">Activación de licencia</div>
+    ${mensaje ? `<div style="color:#f87171; font-size:13px; max-width:340px; text-align:center;">${mensaje}</div>` : ""}
+    <div style="background:#fff; padding:24px; border-radius:12px; width:340px;">
+      <label style="font-size:13px; font-weight:600; display:block; margin-bottom:8px;">Código de licencia</label>
+      <input type="text" id="inputCodigoLicencia" class="form-control"
+        placeholder="Ej: VPK-ABC123" style="text-transform:uppercase; letter-spacing:.1em;">
+      <div id="licenciaError" style="color:#ef4444; font-size:12px; margin-top:6px; display:none;"></div>
+      <button onclick="activarLicencia()" class="btn btn-success w-100 mt-3">
+        Activar
+      </button>
+    </div>
+    <div style="color:#64748b; font-size:12px;">VeekPOS — Sistema de Punto de Venta</div>
+  `;
+  document.body.appendChild(overlay);
+  setTimeout(() => document.getElementById("inputCodigoLicencia")?.focus(), 100);
+}
+
+async function activarLicencia() {
+  const input = document.getElementById("inputCodigoLicencia");
+  const errorEl = document.getElementById("licenciaError");
+  const codigo = (input?.value || "").trim().toUpperCase();
+
+  if (!codigo) {
+    if (errorEl) { errorEl.textContent = "Ingresá el código de licencia"; errorEl.style.display = "block"; }
+    return;
+  }
+
+  const servidorUrl = localStorage.getItem(LICENCIAS_URL_KEY);
+  if (!servidorUrl) {
+    // Sin servidor configurado → aceptar cualquier código localmente
+    localStorage.setItem(LICENCIA_KEY, codigo);
+    localStorage.setItem(LICENCIA_TS_KEY, Date.now());
+    document.getElementById("licenciaOverlay")?.remove();
+    return;
+  }
+
+  const btn = document.querySelector("#licenciaOverlay button");
+  if (btn) { btn.disabled = true; btn.textContent = "Verificando..."; }
+
+  try {
+    const res = await fetch(`${servidorUrl}?action=validarLicencia&licencia=${codigo}`,
+      { signal: AbortSignal.timeout(10000) });
+    const data = await res.json();
+
+    if (!data.valida) {
+      if (errorEl) { errorEl.textContent = data.mensaje || "Licencia inválida"; errorEl.style.display = "block"; }
+      if (btn) { btn.disabled = false; btn.textContent = "Activar"; }
+      return;
+    }
+
+    localStorage.setItem(LICENCIA_KEY, codigo);
+    localStorage.setItem(LICENCIA_TS_KEY, Date.now());
+    document.getElementById("licenciaOverlay")?.remove();
+    toast(`✓ Licencia activada — ${data.empresa} (${data.plan})`, "success");
+
+  } catch(err) {
+    if (errorEl) { errorEl.textContent = "Error de conexión: " + err.message; errorEl.style.display = "block"; }
+    if (btn) { btn.disabled = false; btn.textContent = "Activar"; }
+  }
+}

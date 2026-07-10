@@ -1672,3 +1672,36 @@ kbd{
 .pedido-cobrado-controles{
   display:flex; align-items:center; gap:6px; flex-wrap:wrap;
 }
+
+/* ===================== PANTALLA DE LICENCIA ===================== */
+.license-screen-backdrop{
+  position:fixed; inset:0; z-index:9999;
+  display:none; align-items:center; justify-content:center;
+  background:linear-gradient(160deg, var(--navy-950) 0%, var(--navy-800) 100%);
+  padding:24px;
+}
+.license-screen-backdrop.show{ display:flex; }
+.license-screen-card{
+  width:100%; max-width:380px;
+  background:#fff; border-radius:18px;
+  padding:32px 28px 28px;
+  box-shadow:0 24px 60px rgba(0,0,0,.3);
+  text-align:center;
+}
+.license-screen-icon{ font-size:36px; margin-bottom:6px; }
+.license-screen-card h4{ font-weight:700; color:var(--navy-900); margin-bottom:4px; }
+.license-screen-card .form-label{ text-align:left; display:block; font-size:12.5px; font-weight:600; color:var(--slate-600); }
+.license-screen-error{
+  background:var(--red-50); color:var(--red-500);
+  font-size:13px; font-weight:600;
+  border-radius:10px; padding:10px 12px;
+  margin-bottom:14px; text-align:left;
+}
+.license-limited-banner{
+  position:sticky; top:0; z-index:500;
+  display:flex; align-items:center; gap:8px;
+  background:var(--red-500); color:#fff;
+  font-size:13px; font-weight:600;
+  padding:10px 18px;
+}
+.license-limited-banner .ic{ font-size:15px; }

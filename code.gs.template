@@ -1,0 +1,4850 @@
+/* ================================================================
+   CODE.GS — Generado por VeekPOS Installer
+   Cliente: {{EMPRESA}}
+   Generado: {{FECHA}}
+
+   INSTRUCCIONES:
+   1. Abrí https://script.google.com
+   2. Creá un nuevo proyecto
+   3. Pegá este código completo
+   4. Guardá (Ctrl+S)
+   5. Click en "Implementar" → "Nueva implementación"
+   6. Tipo: "Aplicación web"
+   7. Ejecutar como: "Yo"
+   8. Quién tiene acceso: "Cualquier persona"
+   9. Click "Implementar" y copiá la URL
+================================================================ */
+
+// ── Configuración del cliente ──────────────────────────────────
+const CLIENTE_CONFIG = {
+  empresa:    "{{EMPRESA}}",
+  version:    "{{VERSION}}",
+  instaladoEn: "{{FECHA}}"
+};
+// ─────────────────────────────────────────────────────────────
+
+const SPREADSHEET_ID = "{{SPREADSHEET_ID}}";
+const SHEET_NAME = "PRODUCTOS";
+
+function doGet(e) {
+  if (e.parameter.action === "metricas") {
+
+  return ContentService
+    .createTextOutput(
+      JSON.stringify(
+        obtenerMetricas()
+      )
+    )
+    .setMimeType(
+      ContentService.MimeType.JSON
+    );
+
+}
+if (e.parameter.action === "guardarPedido") {
+
+  const data = {
+    nombre: e.parameter.nombre,
+    empresa: e.parameter.empresa,
+    direccion: e.parameter.direccion,
+    telefono: e.parameter.telefono,
+    dni: e.parameter.dni,
+    total: e.parameter.total,
+    codigoPostal: e.parameter.codigoPostal,
+    localidad: e.parameter.localidad,
+    provincia: e.parameter.provincia,
+    carrito: JSON.parse(e.parameter.carrito || "[]")
+  };
+
+  return guardarPedido(data);
+}
+  const action = e.parameter.action || "productos";
+
+  switch (action) {
+    case "pedidos":
+  return getPedidos();
+
+  case "login":
+return login(e);
+
+case "dashboard":
+return dashboard();
+
+case "masVendidos":
+  return getMasVendidos();
+
+case "guardarVenta":
+  return guardarVenta(e);
+
+case "guardarPedidoAdmin":
+  return guardarPedidoAdmin(e);
+
+case "ventasPOS":
+  return getVentasPOS();
+
+case "ventasPOSHistorial":
+  return getVentasPOSHistorial(e);
+
+case "eliminarVenta":
+  return eliminarVenta(e);
+
+case "cierreCajaResumen":
+  return getCierreCajaResumen(e);
+
+case "guardarCierreCaja":
+  return guardarCierreCaja(e);
+
+case "historialCierres":
+  return getHistorialCierres();
+
+case "movimientosCajaHoy":
+  return getMovimientosCajaHoy(e);
+
+case "guardarMovimientoCaja":
+  return guardarMovimientoCaja(e);
+
+case "eliminarMovimientoCaja":
+  return eliminarMovimientoCaja(e);
+
+case "clientes":
+  return getClientes();
+
+case "todosClientes":
+  return getTodosClientes();
+
+case "clientesConCredito":
+  return getClientesConCredito();
+
+case "consultarClienteCreditoPorDni":
+  return consultarClienteCreditoPorDni(e.parameter.dni);
+
+case "detalleClienteCredito":
+  return getDetalleClienteCredito(e.parameter.clienteId);
+
+case "agotados":
+  return getAgotados();
+
+case "stockBajo":
+  return getStockBajo();
+
+case "actualizarEstado":
+return actualizarEstado(e);
+
+case "marcarPedidoCobrado":
+  return marcarPedidoCobrado(e);
+
+case "getDetallePedido":
+  return getDetallePedido(e);
+
+case "consultarPedido":
+  return consultarPedido(e);
+
+case "guardarProducto":
+  return guardarProducto(e);
+
+case "actualizarProducto":
+  return actualizarProducto(e);
+
+case "sumarStockProducto":
+  return sumarStockProducto(e);
+
+case "eliminarProducto":
+  return eliminarProductoPorCodigo(e);
+
+case "configuracionNegocio":
+  return getConfiguracionNegocio();
+
+case "guardarConfiguracionNegocio":
+  return guardarConfiguracionNegocio(e);
+
+case "guardarCredencialesAdmin":
+  return guardarCredencialesAdmin(e);
+
+case "reporteVentasPeriodo":
+  return getReporteVentasPeriodo(e);
+
+case "reporteProductosVendidos":
+  return getReporteProductosVendidos(e);
+
+case "reporteVentasPorCategoria":
+  return getReporteVentasPorCategoria(e);
+
+case "reporteFormasPago":
+  return getReporteFormasPago(e);
+
+case "reporteCierresCaja":
+  return getReporteCierresCaja(e);
+
+case "reporteClientes":
+  return getReporteClientes(e);
+
+
+    case "productos":
+      return getProductos();
+
+    case "productosAdmin":
+      return getProductosAdmin();
+
+    case "producto":
+      return getProducto(e.parameter.codigo);
+
+    case "categorias":
+      return getCategorias();
+
+    case "destacados":
+      return getDestacados();
+
+    case "ofertas":
+      return getOfertas();
+
+    case "imagenProxy":
+      return getImagenProxy(e);
+
+    default:
+      return jsonResponse({
+        success: false,
+        message: "Acción no válida"
+      });
+  }
+}
+function doPost(e) {
+
+try {
+
+
+const data = JSON.parse(e.postData.contents);
+
+if (data.action === "guardarPedido") {
+  return guardarPedido(data);
+}
+
+if (data.action === "subirImagenProducto") {
+  return subirImagenProducto(data);
+}
+
+if (data.action === "crearCliente") {
+  return crearCliente(data);
+}
+
+if (data.action === "editarCliente") {
+  return editarCliente(data);
+}
+
+if (data.action === "eliminarCliente") {
+  return eliminarCliente(data);
+}
+
+if (data.action === "actualizarCreditoCliente") {
+  return actualizarCreditoCliente(data);
+}
+
+if (data.action === "crearClienteDesdeHistorialYMarcarCredito") {
+  return crearClienteDesdeHistorialYMarcarCredito(data);
+}
+
+if (data.action === "registrarPagoCredito") {
+  return registrarPagoCredito(data);
+}
+
+if (data.action === "crearDeudaExtra") {
+  return crearDeudaExtra(data);
+}
+
+return jsonResponse({
+  success: false,
+  message: "Acción POST no válida"
+});
+
+
+} catch(error){
+
+return jsonResponse({
+  success:false,
+  error:error.toString()
+});
+
+
+}
+
+}
+
+function getSheet() {
+  return SpreadsheetApp
+    .openById(SPREADSHEET_ID)
+    .getSheetByName(SHEET_NAME);
+}
+
+function rowsToObjects(data) {
+
+  const headers = data.shift();
+
+  return data.map(row => {
+
+    let obj = {};
+
+    headers.forEach((h, i) => {
+      obj[h] = row[i];
+    });
+
+    return obj;
+
+  });
+}
+
+function getProductos() {
+
+  const data = getSheet()
+    .getDataRange()
+    .getValues();
+
+  const productos = rowsToObjects(data);
+
+  const publicados = productos.filter(
+    p => String(p.PUBLICADO).toUpperCase() === "SI"
+  );
+
+  return jsonResponse({
+    success: true,
+    total: publicados.length,
+    productos: publicados
+  });
+}
+
+/**
+ * Devuelve TODOS los productos (publicados o no), para la tabla de
+ * administración en el panel — ahí el admin necesita ver y editar
+ * también los productos que no están publicados en el catálogo/POS.
+ */
+function getProductosAdmin() {
+
+  const data = getSheet()
+    .getDataRange()
+    .getValues();
+
+  const productos = rowsToObjects(data)
+    // El rango de la hoja a veces incluye filas vacías de más (por
+    // formato aplicado más allá de los datos reales, por ejemplo) —
+    // se descartan las filas sin código, porque no son productos
+    // reales y rompían el guardado de la caché local del panel
+    // (CODIGO es clave única ahí, y dos filas vacías chocan entre sí).
+    .filter(p => String(p.CODIGO || "").trim() !== "");
+
+  return jsonResponse({
+    success: true,
+    total: productos.length,
+    productos: productos
+  });
+}
+
+function getProducto(codigo) {
+
+  const data = getSheet()
+    .getDataRange()
+    .getValues();
+
+  const productos = rowsToObjects(data);
+
+  const producto = productos.find(
+    p => String(p.CODIGO) === String(codigo)
+  );
+
+  return jsonResponse({
+    success: !!producto,
+    producto
+  });
+}
+
+function getCategorias() {
+
+  const data = getSheet()
+    .getDataRange()
+    .getValues();
+
+  data.shift();
+
+  const categorias = [
+    ...new Set(data.map(row => row[2]))
+  ];
+
+  return jsonResponse({
+    success: true,
+    categorias
+  });
+}
+
+function getDestacados() {
+
+  const data = getSheet()
+    .getDataRange()
+    .getValues();
+
+  const productos = rowsToObjects(data);
+
+  const destacados = productos.filter(
+    p => String(p.DESTACADO).toUpperCase() === "SI"
+  );
+
+  return jsonResponse({
+    success: true,
+    productos: destacados
+  });
+}
+
+function getOfertas() {
+
+  const data = getSheet()
+    .getDataRange()
+    .getValues();
+
+  const productos = rowsToObjects(data);
+
+  const ofertas = productos.filter(
+    p => String(p.OFERTA).toUpperCase() === "SI"
+  );
+
+  return jsonResponse({
+    success: true,
+    productos: ofertas
+  });
+}
+
+/* =====================================================================
+   PRODUCTOS — ALTA (formulario "Nuevo Producto" en el panel)
+   Lee los encabezados reales de la hoja PRODUCTOS y arma la fila
+   por nombre de columna, así no rompe nada si la hoja tiene columnas
+   en otro orden o adicionales (ej: DESCRIPCION, IMAGEN, MARCA, etc.).
+   Cualquier encabezado no provisto por el formulario queda vacío.
+===================================================================== */
+
+function guardarProducto(e){
+
+  const sheet = getSheet();
+
+  if(!sheet){
+    return jsonResponse({
+      success:false,
+      message:"No se encontró la hoja 'PRODUCTOS'."
+    });
+  }
+
+  const params = (e && e.parameter) || {};
+
+  const headerRow =
+    sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+
+  // Validaciones mínimas
+  const nombre = (params.PRODUCTO || params.producto || "").toString().trim();
+  if(!nombre){
+    return jsonResponse({
+      success:false,
+      message:"El nombre del producto es obligatorio."
+    });
+  }
+
+  // CODIGO: si no lo manda el formulario, se genera uno
+  let codigo = (params.CODIGO || params.codigo || "").toString().trim();
+  if(!codigo){
+    codigo = "PRD-" + new Date().getTime();
+  } else {
+    // Evitar códigos duplicados
+    const existentes = sheet.getDataRange().getValues();
+    existentes.shift();
+    const yaExiste = existentes.some(row => String(row[0]).trim() === codigo);
+    if(yaExiste){
+      return jsonResponse({
+        success:false,
+        message:"Ya existe un producto con el código '" + codigo + "'."
+      });
+    }
+  }
+
+  // Valores recibidos del formulario, normalizados por nombre de columna.
+  // Las claves de este objeto deben coincidir EXACTAMENTE con los
+  // encabezados de la hoja PRODUCTOS.
+  const valoresPorColumna = {
+    CODIGO:     codigo,
+    PRODUCTO:   nombre,
+    CATEGORIA:  (params.CATEGORIA || "").toString().trim(),
+    PRECIO:     Number(params.PRECIO || 0),
+    STOCK:      Number(params.STOCK || 0),
+    PUBLICADO:  (params.PUBLICADO || "SI").toString().toUpperCase(),
+    DESTACADO:  (params.DESTACADO || "NO").toString().toUpperCase(),
+    OFERTA:     (params.OFERTA || "NO").toString().toUpperCase(),
+    DESCRIPCION:(params.DESCRIPCION || "").toString(),
+    IMAGEN:     (params.IMAGEN || "").toString().trim()
+  };
+
+  // Armar la fila en el MISMO ORDEN que los encabezados reales de la hoja.
+  const fila = headerRow.map(header => {
+    const key = String(header || "").trim();
+    return valoresPorColumna.hasOwnProperty(key)
+      ? valoresPorColumna[key]
+      : ""; // columna desconocida -> se deja vacía
+  });
+
+  sheet.appendRow(fila);
+
+  return jsonResponse({
+    success:true,
+    codigo: codigo
+  });
+
+}
+
+/**
+ * Actualiza un producto existente (identificado por su CODIGO original,
+ * que puede venir distinto si el admin también cambia el código).
+ */
+function actualizarProducto(e){
+
+  const sheet = getSheet();
+
+  if(!sheet){
+    return jsonResponse({
+      success:false,
+      message:"No se encontró la hoja 'PRODUCTOS'."
+    });
+  }
+
+  const params = (e && e.parameter) || {};
+
+  const codigoOriginal = (params.codigoOriginal || "").toString().trim();
+
+  if(!codigoOriginal){
+    return jsonResponse({
+      success:false,
+      message:"Falta el código original del producto a actualizar."
+    });
+  }
+
+  const nombre = (params.PRODUCTO || params.producto || "").toString().trim();
+  if(!nombre){
+    return jsonResponse({
+      success:false,
+      message:"El nombre del producto es obligatorio."
+    });
+  }
+
+  const data = sheet.getDataRange().getValues();
+  const headerRow = data[0];
+
+  let filaIndex = -1;
+  for(let i = 1; i < data.length; i++){
+    if(String(data[i][0]).trim() === codigoOriginal){
+      filaIndex = i;
+      break;
+    }
+  }
+
+  if(filaIndex === -1){
+    return jsonResponse({
+      success:false,
+      message:"No se encontró un producto con el código '" + codigoOriginal + "'."
+    });
+  }
+
+  let nuevoCodigo = (params.CODIGO || params.codigo || codigoOriginal).toString().trim();
+  if(!nuevoCodigo) nuevoCodigo = codigoOriginal;
+
+  // Si cambiaron el código, verificar que no choque con otro producto existente
+  if(nuevoCodigo !== codigoOriginal){
+    for(let i = 1; i < data.length; i++){
+      if(i !== filaIndex && String(data[i][0]).trim() === nuevoCodigo){
+        return jsonResponse({
+          success:false,
+          message:"Ya existe otro producto con el código '" + nuevoCodigo + "'."
+        });
+      }
+    }
+  }
+
+  const valoresPorColumna = {
+    CODIGO:     nuevoCodigo,
+    PRODUCTO:   nombre,
+    CATEGORIA:  (params.CATEGORIA || "").toString().trim(),
+    PRECIO:     Number(params.PRECIO || 0),
+    STOCK:      Number(params.STOCK || 0),
+    PUBLICADO:  (params.PUBLICADO || "SI").toString().toUpperCase(),
+    DESTACADO:  (params.DESTACADO || "NO").toString().toUpperCase(),
+    OFERTA:     (params.OFERTA || "NO").toString().toUpperCase(),
+    DESCRIPCION:(params.DESCRIPCION || "").toString(),
+    IMAGEN:     (params.IMAGEN || "").toString().trim()
+  };
+
+  const filaActual = data[filaIndex];
+
+  const filaNueva = headerRow.map((header, idx) => {
+    const key = String(header || "").trim();
+    return valoresPorColumna.hasOwnProperty(key)
+      ? valoresPorColumna[key]
+      : filaActual[idx]; // columna desconocida -> conserva el valor que ya tenía
+  });
+
+  sheet.getRange(filaIndex + 1, 1, 1, filaNueva.length).setValues([filaNueva]);
+
+  return jsonResponse({
+    success:true,
+    codigo: nuevoCodigo
+  });
+
+}
+
+/**
+ * Suma una cantidad al stock ya cargado de un producto (entrada de
+ * mercadería). A diferencia de actualizarProducto (que reemplaza el
+ * número de stock), esto SUMA a lo que ya había — y usa LockService
+ * por la misma razón que descontarStockPorVenta: si dos personas
+ * cargan mercadería del mismo producto casi al mismo tiempo, no se
+ * puede perder ninguna de las dos sumas.
+ *
+ * Parámetros esperados: codigo, cantidad (siempre positiva)
+ */
+function sumarStockProducto(e){
+
+  const params = (e && e.parameter) || {};
+
+  const codigo = (params.codigo || "").toString().trim();
+  if(!codigo){
+    return jsonResponse({ success:false, message:"Falta el código del producto." });
+  }
+
+  const cantidad = Number(params.cantidad || 0);
+  if(!cantidad || cantidad <= 0){
+    return jsonResponse({ success:false, message:"Ingresá una cantidad válida, mayor a 0." });
+  }
+
+  const lock = LockService.getScriptLock();
+  const obtuvoLock = lock.tryLock(10000);
+
+  if(!obtuvoLock){
+    return jsonResponse({
+      success:false,
+      message:"El sistema está ocupado actualizando stock en este momento. Probá de nuevo en unos segundos."
+    });
+  }
+
+  try{
+
+    const sheet = getSheet();
+    if(!sheet){
+      return jsonResponse({ success:false, message:"No se encontró la hoja 'PRODUCTOS'." });
+    }
+
+    const data = sheet.getDataRange().getValues();
+    const headerRow = data[0];
+
+    const idxCodigo = headerRow.indexOf("CODIGO");
+    const idxStock  = headerRow.indexOf("STOCK");
+
+    if(idxCodigo === -1 || idxStock === -1){
+      return jsonResponse({ success:false, message:"La hoja 'PRODUCTOS' no tiene las columnas CODIGO/STOCK esperadas." });
+    }
+
+    let filaIndex = -1;
+    for(let i = 1; i < data.length; i++){
+      if(String(data[i][idxCodigo]).trim() === codigo){
+        filaIndex = i;
+        break;
+      }
+    }
+
+    if(filaIndex === -1){
+      return jsonResponse({ success:false, message:"No se encontró un producto con el código '" + codigo + "'." });
+    }
+
+    const stockActual = Number(data[filaIndex][idxStock] || 0);
+    const stockNuevo = stockActual + cantidad;
+
+    sheet.getRange(filaIndex + 1, idxStock + 1).setValue(stockNuevo);
+
+    return jsonResponse({
+      success: true,
+      codigo: codigo,
+      stockAnterior: stockActual,
+      stockNuevo: stockNuevo
+    });
+
+  } finally {
+    lock.releaseLock();
+  }
+
+}
+
+/**
+ * Elimina un producto de la hoja PRODUCTOS por código.
+ */
+function eliminarProductoPorCodigo(e){
+
+  const sheet = getSheet();
+
+  if(!sheet){
+    return jsonResponse({
+      success:false,
+      message:"No se encontró la hoja 'PRODUCTOS'."
+    });
+  }
+
+  const codigo = ((e && e.parameter && e.parameter.codigo) || "").toString().trim();
+
+  if(!codigo){
+    return jsonResponse({
+      success:false,
+      message:"Falta el código del producto a eliminar."
+    });
+  }
+
+  const data = sheet.getDataRange().getValues();
+
+  for(let i = 1; i < data.length; i++){
+    if(String(data[i][0]).trim() === codigo){
+      sheet.deleteRow(i + 1); // +1: getRange/deleteRow son 1-based
+      return jsonResponse({
+        success:true,
+        codigo: codigo
+      });
+    }
+  }
+
+  return jsonResponse({
+    success:false,
+    message:"No se encontró un producto con el código '" + codigo + "'."
+  });
+
+}
+
+/* =====================================================================
+   CONFIGURACIÓN DEL NEGOCIO (encabezado del ticket térmico)
+   Se guarda en una hoja "CONFIGURACION" con formato clave/valor:
+   CLAVE | VALOR
+   Si la hoja no existe, se crea automáticamente con los valores
+   originales (JIREH) la primera vez que se pide la configuración.
+===================================================================== */
+
+const CONFIG_NEGOCIO_DEFAULTS = {
+  NOMBRE:     "JIREH",
+  SUBTITULO:  "Punto de Venta",
+  DIRECCION:  "",
+  TELEFONO1:  "",
+  TELEFONO2:  "",
+  PIE:        "¡Gracias por su compra!",
+
+  // ---- Popup promocional del catálogo web ----
+  // POPUP_IMAGEN: URL de la imagen (Drive o externa). Vacío = sin popup.
+  // POPUP_ACTIVO: "SI" para mostrar, "NO" para ocultar sin borrar la imagen.
+  POPUP_IMAGEN:  "",
+  POPUP_ACTIVO:  "NO",
+  PEDIDO_MINIMO: 100000,
+
+  // ---- Banner y tema del catálogo web (sección "Apariencia") ----
+  BANNER_TITULO:    "Mayorista Jireh",
+  BANNER_SUBTITULO: "Catálogo Mayorista Online",
+  BANNER_IMAGEN:    "",
+  TEMA:             "navy",
+  NAVBAR_TEXTO:     "Jireh Mayorista",
+
+  // ---- Sección "Beneficios" del catálogo web (los 4 chips bajo el banner) ----
+  // Son independientes de DIRECCION/TELEFONO1/TELEFONO2 de arriba, que son
+  // los del encabezado del ticket impreso — esto es lo que ve el cliente
+  // en la página pública.
+  BENEFICIO_WHATSAPP_NUMERO:  "5491140975795",
+  BENEFICIO_INSTAGRAM_URL:    "",
+  BENEFICIO_TELEFONO1:        "",
+  BENEFICIO_TELEFONO2:        "",
+  BENEFICIO_DIRECCION:        "",
+  BENEFICIO_TEXTO_LIBRE1:     "",
+  BENEFICIO_TEXTO_LIBRE2:     "",
+
+  // ---- Franja superior de mensajes rotativos (arriba de todo, sobre
+  // el navbar) — un mensaje por línea, separados por salto de línea ----
+  BANNER_TOP_MENSAJES: "🚚 Envíos a todo el país\n✅ Stock actualizado\n💳 Aceptamos todos los medios de pago",
+
+  // ---- Apariencia del panel admin (letra/ícono y nombre del sidebar) ----
+  SIDEBAR_MARK:   "J",
+  SIDEBAR_TEXTO:  "JIREH",
+
+  // ---- Carpeta de Drive donde se guardan las fotos subidas desde "Nuevo Producto" ----
+  DRIVE_CARPETA_PRODUCTOS_ID: "",
+
+  // ---- Carpeta de Drive donde se guardan los PDF generados de cada pedido ----
+  DRIVE_CARPETA_PEDIDOS_ID: "1T4k00L3LIIyq0jId0A5mf6YOAWYngWmo",
+
+  // ---- Textos del PDF de pedidos (el título y el WhatsApp del pie
+  // toman directamente NOMBRE y BENEFICIO_WHATSAPP_NUMERO de arriba,
+  // no duplican esos datos acá) ----
+  PEDIDO_PDF_SUBTITULO: "Distribuidora Mayorista",
+  PEDIDO_PDF_PIE:       "Gracias por su compra.",
+
+  // ---- URL pública del catálogo online (sin / al final). Se usa para
+  // armar el link de los QR de "consultar precio" desde las etiquetas
+  // del panel admin (apunta a precio.html en esa misma carpeta) ----
+  URL_CATALOGO: "https://horus254-svg.github.io/Jireh-Mayorista"
+};
+
+// Temas de color válidos para el catálogo web. Si en la hoja se guarda
+// un valor que no está en esta lista, el front-end usa "navy" (default).
+const TEMAS_VALIDOS = ["navy", "azul", "verde", "rojo"];
+
+/** Returns the CONFIGURACION sheet, creating it with default values if it doesn't exist yet */
+function getOrCrearHojaConfiguracion(){
+
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  let sheet = ss.getSheetByName("CONFIGURACION");
+
+  if(!sheet){
+    sheet = ss.insertSheet("CONFIGURACION");
+    sheet.appendRow(["CLAVE", "VALOR"]);
+    Object.keys(CONFIG_NEGOCIO_DEFAULTS).forEach(clave => {
+      sheet.appendRow([clave, CONFIG_NEGOCIO_DEFAULTS[clave]]);
+    });
+  }
+
+  return sheet;
+
+}
+
+/**
+ * Extrae el ID de carpeta de Drive a partir de lo que el usuario pegó en
+ * Configuración: puede ser el ID solo, o el link completo de la carpeta
+ * (https://drive.google.com/drive/folders/XXXXX...). Así no hay que
+ * explicarle a nadie cómo "sacar el ID", alcanza con copiar el link.
+ */
+function extraerIdCarpetaDrive(valor){
+  const texto = String(valor || "").trim();
+  if(!texto) return "";
+
+  const match = texto.match(/folders\/([a-zA-Z0-9_-]+)/);
+  if(match) return match[1];
+
+  // Si no es un link reconocible, asumimos que ya es el ID directamente
+  return texto;
+}
+
+/**
+ * Lee el valor de una clave puntual de la hoja CONFIGURACION, sin pasar
+ * por getConfiguracionNegocio() (que devuelve una respuesta HTTP
+ * completa). Útil cuando una función de backend solo necesita un dato
+ * suelto (ej. el ID de una carpeta de Drive) antes de hacer su trabajo.
+ */
+function leerClaveConfiguracion(clave, valorPorDefecto){
+
+  const sheet = getOrCrearHojaConfiguracion();
+  const filas = sheet.getDataRange().getValues();
+  filas.shift(); // encabezados CLAVE | VALOR
+
+  let valor = "";
+  filas.forEach(row => {
+    if(String(row[0] || "").trim().toUpperCase() === clave.toUpperCase()){
+      valor = row[1] === undefined || row[1] === null ? "" : String(row[1]);
+    }
+  });
+
+  return valor || (valorPorDefecto || "");
+}
+
+/**
+ * Escribe (o actualiza) una clave puntual de CONFIGURACION, sin tocar
+ * las demás filas — a diferencia de guardarConfiguracionNegocio, que
+ * reescribe varias claves juntas a la vez con su propio formulario.
+ * Si la clave no existe todavía, se agrega como fila nueva.
+ */
+function fijarClaveConfiguracion(clave, valor){
+
+  const sheet = getOrCrearHojaConfiguracion();
+  const filas = sheet.getDataRange().getValues();
+
+  for(let i = 1; i < filas.length; i++){
+    if(String(filas[i][0] || "").trim().toUpperCase() === clave.toUpperCase()){
+      sheet.getRange(i + 1, 2).setValue(valor);
+      return;
+    }
+  }
+
+  sheet.appendRow([clave, valor]);
+}
+
+/**
+ * Recibe una imagen en base64 (data.imagenBase64), la guarda en la
+ * carpeta de Drive configurada en CONFIGURACION (clave
+ * DRIVE_CARPETA_PRODUCTOS_ID), la hace pública por link, y devuelve la
+ * URL pública lista para guardar en la columna IMAGEN de PRODUCTOS.
+ *
+ * data esperado: { action, imagenBase64, nombreArchivo, tipoMime, codigoProducto }
+ */
+function subirImagenProducto(data){
+
+  const carpetaId = extraerIdCarpetaDrive(leerClaveConfiguracion("DRIVE_CARPETA_PRODUCTOS_ID"));
+
+  if(!carpetaId){
+    return jsonResponse({
+      success:false,
+      message:"Todavía no configuraste la carpeta de Drive para fotos de productos. Entrá a Configuración → Imágenes de productos y pegá el link de la carpeta."
+    });
+  }
+
+  let carpeta;
+  try{
+    carpeta = DriveApp.getFolderById(carpetaId);
+  }catch(error){
+    return jsonResponse({
+      success:false,
+      message:"No se pudo abrir la carpeta de Drive configurada. Revisá que el link/ID en Configuración sea correcto y que esta cuenta tenga acceso."
+    });
+  }
+
+  const base64Limpio = String(data.imagenBase64 || "").replace(/^data:[^,]+,/, "");
+  if(!base64Limpio){
+    return jsonResponse({ success:false, message:"No llegó ninguna imagen para subir." });
+  }
+
+  const tipoMime = data.tipoMime || "image/jpeg";
+  const nombreBase = (data.codigoProducto ? String(data.codigoProducto).trim() + "_" : "") + "producto";
+  const extension = tipoMime.indexOf("png") !== -1 ? "png" : (tipoMime.indexOf("webp") !== -1 ? "webp" : "jpg");
+  const nombreArchivo = nombreBase + "_" + new Date().getTime() + "." + extension;
+
+  try{
+
+    const bytes = Utilities.base64Decode(base64Limpio);
+    const blob = Utilities.newBlob(bytes, tipoMime, nombreArchivo);
+
+    const archivo = carpeta.createFile(blob);
+
+    // Hace el archivo accesible por link para cualquiera (solo lectura)
+    archivo.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+    const urlPublica = "https://lh3.googleusercontent.com/d/" + archivo.getId();
+
+    return jsonResponse({
+      success: true,
+      url: urlPublica,
+      archivoId: archivo.getId()
+    });
+
+  }catch(error){
+    return jsonResponse({
+      success:false,
+      message:"Error al subir la imagen a Drive: " + error.toString()
+    });
+  }
+}
+
+/**
+ * Descarga una imagen del lado del servidor (Apps Script, no del
+ * navegador del cliente) y la devuelve en base64. Existe porque el
+ * catálogo público necesita insertar las fotos de los productos en un
+ * PDF generado en el navegador (jsPDF), y eso requiere leer los
+ * píxeles de la imagen — algo que el navegador bloquea si el servidor
+ * de la imagen (Drive) no responde con headers CORS, o si el
+ * navegador ya cacheó esa misma imagen sin esos headers (porque la
+ * mostró antes en una tarjeta normal). Acá no hay ese problema: Apps
+ * Script no es un navegador, no aplica CORS.
+ *
+ * Parámetro esperado: ?action=imagenProxy&url=<URL de la imagen>
+ */
+function getImagenProxy(e){
+
+  const url = (e && e.parameter && e.parameter.url || "").toString().trim();
+
+  if(!url){
+    return jsonResponse({ success:false, message:"Falta la URL de la imagen." });
+  }
+
+  try{
+
+    const response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+
+    if(response.getResponseCode() !== 200){
+      return jsonResponse({ success:false, message:"No se pudo descargar la imagen (código " + response.getResponseCode() + ")." });
+    }
+
+    const blob = response.getBlob();
+    let tipoMime = blob.getContentType() || "image/jpeg";
+
+    // Algunos servidores devuelven el content-type con parámetros extra
+    // (ej. "image/jpeg; charset=utf-8"), que rompen el formato de un
+    // data URL válido si se los deja tal cual. Se queda solo con el
+    // tipo MIME limpio (ej. "image/jpeg").
+    tipoMime = tipoMime.split(";")[0].trim();
+    if(!tipoMime.startsWith("image/")) tipoMime = "image/jpeg";
+
+    const base64 = Utilities.base64Encode(blob.getBytes());
+
+    return jsonResponse({
+      success: true,
+      dataUrl: "data:" + tipoMime + ";base64," + base64
+    });
+
+  }catch(error){
+    return jsonResponse({
+      success:false,
+      message:"Error al descargar la imagen: " + error.toString()
+    });
+  }
+}
+
+/**
+ * Devuelve la configuración del negocio (nombre, subtítulo, dirección,
+ * teléfonos, pie de página) leída de la hoja CONFIGURACION. Cualquier
+ * clave que falte en la hoja se completa con su valor por defecto.
+ */
+function getConfiguracionNegocio(){
+
+  const sheet = getOrCrearHojaConfiguracion();
+  const data = sheet.getDataRange().getValues();
+  data.shift(); // encabezados CLAVE | VALOR
+
+  const config = { ...CONFIG_NEGOCIO_DEFAULTS };
+
+  data.forEach(row => {
+    const clave = String(row[0] || "").trim().toUpperCase();
+    if(clave && config.hasOwnProperty(clave)){
+      config[clave] = row[1] === undefined || row[1] === null ? "" : String(row[1]);
+    }
+  });
+
+  // El tema se valida: si lo que está guardado en la hoja no es uno
+  // de los temas conocidos, se usa "navy" para no romper el front-end.
+  const temaGuardado = String(config.TEMA || "").trim().toLowerCase();
+  const temaFinal = TEMAS_VALIDOS.indexOf(temaGuardado) !== -1
+    ? temaGuardado
+    : "navy";
+
+  return jsonResponse({
+    success:true,
+    config: {
+      nombre:    config.NOMBRE,
+      subtitulo: config.SUBTITULO,
+      direccion: config.DIRECCION,
+      telefono1: config.TELEFONO1,
+      telefono2: config.TELEFONO2,
+      pie:       config.PIE,
+
+      bannerTitulo:    config.BANNER_TITULO,
+      bannerSubtitulo: config.BANNER_SUBTITULO,
+      bannerImagen:    config.BANNER_IMAGEN,
+      tema:            temaFinal,
+      temasDisponibles: TEMAS_VALIDOS,
+      navbarTexto:     config.NAVBAR_TEXTO,
+
+      popupImagen:     config.POPUP_IMAGEN,
+      popupActivo:     String(config.POPUP_ACTIVO || "NO").toUpperCase() === "SI",
+      pedidoMinimo:    Number(config.PEDIDO_MINIMO) || 100000,
+
+      beneficioWhatsappNumero: config.BENEFICIO_WHATSAPP_NUMERO,
+      beneficioInstagramUrl:   config.BENEFICIO_INSTAGRAM_URL,
+      beneficioTelefono1:      config.BENEFICIO_TELEFONO1,
+      beneficioTelefono2:      config.BENEFICIO_TELEFONO2,
+      beneficioDireccion:      config.BENEFICIO_DIRECCION,
+      beneficioTextoLibre1:    config.BENEFICIO_TEXTO_LIBRE1,
+      beneficioTextoLibre2:    config.BENEFICIO_TEXTO_LIBRE2,
+
+      bannerTopMensajes: config.BANNER_TOP_MENSAJES,
+
+      sidebarMark:  config.SIDEBAR_MARK,
+      sidebarTexto: config.SIDEBAR_TEXTO,
+
+      driveCarpetaProductosId: config.DRIVE_CARPETA_PRODUCTOS_ID,
+      driveCarpetaPedidosId:   config.DRIVE_CARPETA_PEDIDOS_ID,
+
+      pedidoPdfSubtitulo: config.PEDIDO_PDF_SUBTITULO,
+      pedidoPdfPie:       config.PEDIDO_PDF_PIE,
+
+      urlCatalogo: config.URL_CATALOGO
+    }
+  });
+
+}
+
+/**
+ * Guarda la configuración del negocio en la hoja CONFIGURACION.
+ * Actualiza las filas existentes por clave; si una clave no existe
+ * todavía en la hoja, la agrega.
+ */
+function guardarConfiguracionNegocio(e){
+
+  const params = (e && e.parameter) || {};
+
+  // Cargar config actual primero para poder usar valores guardados como fallback
+  const sheetActual = getOrCrearHojaConfiguracion();
+  const dataActual = sheetActual.getDataRange().getValues();
+  dataActual.shift();
+
+  const configGuardada = {};
+  dataActual.forEach(row => {
+    const clave = String(row[0] || "").trim().toUpperCase();
+    if(clave) configGuardada[clave] = row[1] === undefined || row[1] === null ? "" : String(row[1]);
+  });
+
+  const nombre = (params.nombre || configGuardada.NOMBRE || "").toString().trim();
+  if(!nombre){
+    return jsonResponse({
+      success:false,
+      message:"El nombre del local es obligatorio."
+    });
+  }
+
+  /**
+   * Devuelve el valor nuevo para `claveParam` (nombre del parámetro que
+   * manda el formulario): si vino en la request (aunque sea vacío), se
+   * usa ese; si no vino (undefined), se conserva el valor ya guardado.
+   */
+  function valorOPreservado(claveParam, claveSheet, porDefecto){
+    if(params[claveParam] !== undefined){
+      return params[claveParam].toString().trim();
+    }
+    return configGuardada.hasOwnProperty(claveSheet)
+      ? configGuardada[claveSheet]
+      : (porDefecto || "");
+  }
+
+  // Tema: si llega y es válido, se usa. Si llega inválido o no llega,
+  // se mantiene el que ya estaba guardado (nunca se guarda un tema inválido).
+  let temaNuevo = (params.tema || "").toString().trim().toLowerCase();
+  if(TEMAS_VALIDOS.indexOf(temaNuevo) === -1){
+    temaNuevo = configGuardada.TEMA || "navy";
+    if(TEMAS_VALIDOS.indexOf(temaNuevo) === -1){
+      temaNuevo = "navy";
+    }
+  }
+
+  const nuevosValores = {
+    NOMBRE:    nombre,
+    SUBTITULO: valorOPreservado("subtitulo", "SUBTITULO"),
+    DIRECCION: valorOPreservado("direccion", "DIRECCION"),
+    TELEFONO1: valorOPreservado("telefono1", "TELEFONO1"),
+    TELEFONO2: valorOPreservado("telefono2", "TELEFONO2"),
+    PIE:       valorOPreservado("pie", "PIE"),
+
+    BANNER_TITULO:    valorOPreservado("bannerTitulo", "BANNER_TITULO"),
+    BANNER_SUBTITULO: valorOPreservado("bannerSubtitulo", "BANNER_SUBTITULO"),
+    BANNER_IMAGEN:    valorOPreservado("bannerImagen", "BANNER_IMAGEN"),
+    TEMA:             temaNuevo,
+    NAVBAR_TEXTO:     valorOPreservado("navbarTexto", "NAVBAR_TEXTO", "Jireh Mayorista"),
+
+    BENEFICIO_WHATSAPP_NUMERO: valorOPreservado("beneficioWhatsappNumero", "BENEFICIO_WHATSAPP_NUMERO", "5491140975795"),
+    BENEFICIO_INSTAGRAM_URL:   valorOPreservado("beneficioInstagramUrl", "BENEFICIO_INSTAGRAM_URL"),
+    BENEFICIO_TELEFONO1:       valorOPreservado("beneficioTelefono1", "BENEFICIO_TELEFONO1"),
+    BENEFICIO_TELEFONO2:       valorOPreservado("beneficioTelefono2", "BENEFICIO_TELEFONO2"),
+    BENEFICIO_DIRECCION:       valorOPreservado("beneficioDireccion", "BENEFICIO_DIRECCION"),
+    BENEFICIO_TEXTO_LIBRE1:    valorOPreservado("beneficioTextoLibre1", "BENEFICIO_TEXTO_LIBRE1"),
+    BENEFICIO_TEXTO_LIBRE2:    valorOPreservado("beneficioTextoLibre2", "BENEFICIO_TEXTO_LIBRE2"),
+
+    BANNER_TOP_MENSAJES: valorOPreservado("bannerTopMensajes", "BANNER_TOP_MENSAJES"),
+
+    SIDEBAR_MARK:  valorOPreservado("sidebarMark", "SIDEBAR_MARK", "J"),
+    SIDEBAR_TEXTO: valorOPreservado("sidebarTexto", "SIDEBAR_TEXTO", "JIREH"),
+
+    DRIVE_CARPETA_PRODUCTOS_ID: valorOPreservado("driveCarpetaProductosId", "DRIVE_CARPETA_PRODUCTOS_ID"),
+    DRIVE_CARPETA_PEDIDOS_ID:   valorOPreservado("driveCarpetaPedidosId", "DRIVE_CARPETA_PEDIDOS_ID", "1T4k00L3LIIyq0jId0A5mf6YOAWYngWmo"),
+
+    PEDIDO_PDF_SUBTITULO: valorOPreservado("pedidoPdfSubtitulo", "PEDIDO_PDF_SUBTITULO", "Distribuidora Mayorista"),
+    PEDIDO_PDF_PIE:       valorOPreservado("pedidoPdfPie", "PEDIDO_PDF_PIE", "Gracias por su compra."),
+
+    URL_CATALOGO: valorOPreservado("urlCatalogo", "URL_CATALOGO", "https://horus254-svg.github.io/Jireh-Mayorista"),
+
+    POPUP_IMAGEN: valorOPreservado("popupImagen", "POPUP_IMAGEN", ""),
+    POPUP_ACTIVO: valorOPreservado("popupActivo", "POPUP_ACTIVO", "NO"),
+    PEDIDO_MINIMO: valorOPreservado("pedidoMinimo", "PEDIDO_MINIMO", "100000")
+  };
+
+
+  const clavesEncontradas = {};
+
+  for(let i = 0; i < dataActual.length; i++){
+    const clave = String(dataActual[i][0] || "").trim().toUpperCase();
+    if(nuevosValores.hasOwnProperty(clave)){
+      // +2: +1 porque dataActual ya tiene el header descartado (shift), +1 por ser 1-based
+      sheetActual.getRange(i + 2, 2).setValue(nuevosValores[clave]);
+      clavesEncontradas[clave] = true;
+    }
+  }
+
+  // Cualquier clave que no estuviera todavía en la hoja se agrega al final
+  Object.keys(nuevosValores).forEach(clave => {
+    if(!clavesEncontradas[clave]){
+      sheetActual.appendRow([clave, nuevosValores[clave]]);
+    }
+  });
+
+  return jsonResponse({
+    success:true
+  });
+
+}
+
+/**
+ * Genera un ID corto del tipo "PREFIJO-123456" (6 dígitos numéricos),
+ * verificando que no choque con ningún ID ya existente en la columna
+ * indicada de la hoja (por defecto la columna 1 / A).
+ */
+function generarIdCorto(prefijo, sheet, columnaId){
+
+  columnaId = columnaId || 1;
+
+  let existentes = [];
+  if(sheet){
+    const data = sheet.getDataRange().getValues();
+    existentes = data.map(row => String(row[columnaId - 1] || ""));
+  }
+
+  let id;
+  let intentos = 0;
+  do {
+    const numero = Math.floor(100000 + Math.random() * 900000); // 6 dígitos: 100000–999999
+    id = prefijo + "-" + numero;
+    intentos++;
+  } while(existentes.indexOf(id) !== -1 && intentos < 50);
+
+  return id;
+
+}
+
+function jsonResponse(obj) {
+
+  return ContentService
+    .createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+function guardarPedido(data){
+
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+
+  const pedidosSheet =
+    ss.getSheetByName("PEDIDOS");
+
+  const detalleSheet =
+    ss.getSheetByName("DETALLE_PEDIDOS");
+
+  const pedidoId =
+    generarIdCorto("PED", pedidosSheet);
+
+  const fecha = new Date();
+
+  // GUARDA PEDIDO
+
+  pedidosSheet.appendRow([
+    pedidoId,
+    fecha,
+    data.nombre,
+    data.empresa,
+    data.direccion,
+    data.telefono,
+    data.dni,
+    data.total,
+    "NUEVO",
+    "",
+    data.codigoPostal || "",
+    data.localidad || "",
+    data.provincia || "",
+    "NO", // columna 14: STOCK_DESCONTADO
+    (data.moneda || "ARS").toString().toUpperCase(),
+    data.moneda === "USD" ? Number(data.tipoCambio || 0) : "",
+    Number(data.subtotal || data.total || 0),       // columna 17: SUBTOTAL (antes de descuento)
+    Number(data.descuento || 0),                    // columna 18: DESCUENTO (monto)
+    data.descuentoEtiqueta || ""                    // columna 19: DESCUENTO_ETIQUETA (ej: "10% (-$500)")
+  ]);
+
+  // GUARDA DETALLE EN BLOQUE (MUCHO MÁS RÁPIDO)
+
+  if(data.carrito && data.carrito.length > 0){
+
+    const filas = data.carrito.map(item => [
+
+      pedidoId,
+
+      item.CODIGO,
+
+      item.PRODUCTO,
+
+      item.cantidad,
+
+      item.PRECIO,
+
+      item.PRECIO * item.cantidad
+
+    ]);
+
+    detalleSheet
+      .getRange(
+        detalleSheet.getLastRow() + 1,
+        1,
+        filas.length,
+        filas[0].length
+      )
+      .setValues(filas);
+
+  }
+
+  // REGISTRA AL CLIENTE EN LA HOJA CLIENTES (si su DNI todavía no existe)
+  // Los pedidos del catálogo web ya traen todos los datos necesarios,
+  // así que los aprovechamos para crear la ficha automáticamente.
+  // A_CREDITO queda en "NO" — eso solo lo activa el admin a mano.
+  try {
+    const dniNormalizado = normalizarDni(data.dni);
+    if (dniNormalizado) {
+      const clientesSheet = getOrCrearHojaClientes();
+      const filas = clientesSheet.getDataRange().getValues();
+      const colDni = 3; // columna D = DNI (índice 3, base 0)
+      const yaExiste = filas.slice(1).some(
+        fila => normalizarDni(fila[colDni]) === dniNormalizado
+      );
+      if (!yaExiste) {
+        const clienteId = generarIdCorto("CLI", clientesSheet);
+        clientesSheet.appendRow([
+          clienteId,
+          String(data.nombre || "").trim(),
+          "",                                      // ALIAS — vacío, el admin lo puede completar
+          dniNormalizado,
+          String(data.telefono || "").trim(),
+          String(data.direccion || "").trim(),
+          String(data.empresa || "").trim(),
+          "NO",                                    // A_CREDITO — solo el admin lo activa
+          new Date()                               // FECHA_ALTA
+        ]);
+      }
+    }
+  } catch(errCliente) {
+    // No cortamos el flujo si esto falla — el pedido ya se guardó correctamente
+    Logger.log("guardarPedido: no se pudo registrar cliente automático: " + errCliente.toString());
+  }
+
+  return jsonResponse({
+    success: true,
+    pedidoId: pedidoId
+  });
+
+}
+
+/**
+ * Crea un pedido desde el panel admin (POS en "modo pedido"), con el
+ * mismo formato de carrito que ya usa el POS para ventas normales:
+ * [{ CODIGO, PRODUCTO, PRECIO, cantidad }, ...].
+ *
+ * A propósito, NO descuenta stock — un pedido es una promesa de venta
+ * futura, no una venta concretada. El stock se ajusta más adelante,
+ * cuando el pedido se entrega (a mano, o desde una venta real si en
+ * el futuro se conecta ese flujo).
+ *
+ * Reutiliza guardarPedido() para no duplicar la lógica de guardado en
+ * PEDIDOS/DETALLE_PEDIDOS — solo adapta el formato de carrito del POS
+ * (cantidad en minúscula, igual que el que ya usa guardarVenta) al
+ * que espera esa función (que es el mismo formato, así que no hace
+ * falta transformar nada).
+ */
+function guardarPedidoAdmin(e){
+
+  const params = (e && e.parameter) || {};
+
+  const nombre = (params.nombre || "").toString().trim();
+  if(!nombre){
+    return jsonResponse({ success:false, message:"El nombre del cliente es obligatorio." });
+  }
+
+  const direccion = (params.direccion || "").toString().trim();
+  if(!direccion){
+    return jsonResponse({ success:false, message:"La dirección es obligatoria." });
+  }
+
+  const localidad = (params.localidad || "").toString().trim();
+  if(!localidad){
+    return jsonResponse({ success:false, message:"La localidad es obligatoria." });
+  }
+
+  const provincia = (params.provincia || "").toString().trim();
+  if(!provincia){
+    return jsonResponse({ success:false, message:"La provincia es obligatoria." });
+  }
+
+  const carrito = JSON.parse(params.carrito || "[]");
+  if(carrito.length === 0){
+    return jsonResponse({ success:false, message:"El pedido no tiene productos." });
+  }
+
+  const total = Number(params.total || 0);
+
+  const data = {
+    nombre: nombre,
+    empresa: (params.empresa || "").toString().trim(),
+    direccion: direccion,
+    telefono: (params.telefono || "").toString().trim(),
+    dni: (params.dni || "").toString().trim(),
+    total: total,
+    subtotal: Number(params.subtotal || total),
+    descuento: Number(params.descuento || 0),
+    descuentoEtiqueta: (params.descuentoEtiqueta || "").toString().trim(),
+    codigoPostal: (params.codigoPostal || "").toString().trim(),
+    localidad: localidad,
+    provincia: provincia,
+    carrito: carrito,
+    moneda: (params.moneda || "ARS").toString().toUpperCase(),
+    tipoCambio: Number(params.tipoCambio || 0)
+  };
+
+  return guardarPedido(data);
+}
+
+function testGuardarPedido() {
+
+const data = {
+nombre: "Victor",
+empresa: "Jireh",
+direccion: "Rivadavia 2555",
+dni: "12345678",
+total: 10000,
+carrito: [
+{
+CODIGO: "TEST001",
+PRODUCTO: "Producto Test",
+cantidad: 2,
+PRECIO: 5000
+}
+]
+};
+
+const resultado = guardarPedido(data);
+
+Logger.log(resultado.getContent());
+
+}
+function generarPDFPedido(
+  pedidoId,
+  fecha,
+  data
+){
+
+  // La carpeta es configurable desde Configuración → Imágenes de
+  // productos (clave DRIVE_CARPETA_PEDIDOS_ID). Si nunca se tocó esa
+  // configuración, leerClaveConfiguracion devuelve el ID original que
+  // siempre usó el sistema, así que esto nunca rompe instalaciones
+  // existentes por no haber configurado nada todavía.
+  const carpetaId = extraerIdCarpetaDrive(
+    leerClaveConfiguracion("DRIVE_CARPETA_PEDIDOS_ID", "1T4k00L3LIIyq0jId0A5mf6YOAWYngWmo")
+  );
+
+  // El encabezado y pie del PDF de pedidos toman el nombre del negocio
+  // y el WhatsApp ya configurados en otras partes del panel (no se
+  // duplican esos datos en una clave aparte), y dos textos propios de
+  // este PDF que sí son editables desde Configuración → PDF de pedidos.
+  const nombreNegocio    = leerClaveConfiguracion("NOMBRE", "JIREH MAYORISTA");
+  const whatsappNegocio  = leerClaveConfiguracion("BENEFICIO_WHATSAPP_NUMERO", "5491140975795");
+  const subtituloPdf     = leerClaveConfiguracion("PEDIDO_PDF_SUBTITULO", "Distribuidora Mayorista");
+  const piePdf           = leerClaveConfiguracion("PEDIDO_PDF_PIE", "Gracias por su compra.");
+
+  const doc = DocumentApp.create(
+    "Pedido " + pedidoId
+  );
+
+  const body = doc.getBody();
+
+  // ENCABEZADO
+
+  const titulo =
+  body.appendParagraph(
+    nombreNegocio
+  );
+
+  titulo
+    .setHeading(
+      DocumentApp.ParagraphHeading.HEADING1
+    )
+    .setAlignment(
+      DocumentApp.HorizontalAlignment.CENTER
+    );
+
+  body.appendParagraph(
+    subtituloPdf
+  )
+  .setAlignment(
+    DocumentApp.HorizontalAlignment.CENTER
+  );
+
+  body.appendParagraph(
+    "WhatsApp: " + whatsappNegocio
+  )
+  .setAlignment(
+    DocumentApp.HorizontalAlignment.CENTER
+  );
+
+  body.appendHorizontalRule();
+
+  // DATOS DEL PEDIDO
+
+  body.appendParagraph(
+    "PEDIDO"
+  )
+  .setBold(true);
+
+  body.appendParagraph(
+    "Número: " + pedidoId
+  );
+
+  body.appendParagraph(
+    "Fecha: " +
+    Utilities.formatDate(
+      fecha,
+      Session.getScriptTimeZone(),
+      "dd/MM/yyyy HH:mm"
+    )
+  );
+
+  body.appendHorizontalRule();
+
+  // CLIENTE
+
+  body.appendParagraph(
+    "DATOS DEL CLIENTE"
+  )
+  .setBold(true);
+
+  body.appendParagraph(
+    "Cliente: " + data.nombre
+  );
+
+  body.appendParagraph(
+    "Transporte: " +
+    (data.empresa || "-")
+  );
+
+  body.appendParagraph(
+    "Dirección: " +
+    data.direccion
+  );
+
+  body.appendParagraph(
+    "Localidad: " +
+    (data.localidad || "-") +
+    "  -  Provincia: " +
+    (data.provincia || "-") +
+    (data.codigoPostal ? "  -  CP: " + data.codigoPostal : "")
+  );
+
+  body.appendParagraph(
+    "Teléfono: " +
+    (data.telefono || "-")
+  );
+
+  body.appendParagraph(
+    "DNI: " +
+    data.dni
+  );
+
+  body.appendHorizontalRule();
+
+  // TABLA
+
+const tabla = [
+  [
+    "Producto",
+    "Cant",
+    "$",
+    "Subt"
+  ]
+];
+
+data.carrito.forEach(item => {
+
+  const subtotal =
+  item.PRECIO * item.cantidad;
+
+ tabla.push([
+  item.PRODUCTO,
+  String(parseInt(item.cantidad)),
+  "$" + Number(item.PRECIO)
+          .toLocaleString("es-AR"),
+  "$" + Number(subtotal)
+          .toLocaleString("es-AR")
+]);
+});
+
+const table =
+body.appendTable(tabla);
+
+table.setBorderWidth(0);
+
+// Ancho de columnas
+
+try {
+
+  table.getRow(0)
+       .getCell(0)
+       .setWidth(320);
+
+  table.getRow(0)
+       .getCell(1)
+       .setWidth(45);
+
+  table.getRow(0)
+       .getCell(2)
+       .setWidth(70);
+
+  table.getRow(0)
+       .getCell(3)
+       .setWidth(80);
+
+} catch(err) {
+  Logger.log(err);
+}
+
+// Fuente: encabezado compacto, productos más legibles
+
+for (let r = 0; r < table.getNumRows(); r++) {
+
+  const row = table.getRow(r);
+  const size = r === 0 ? 7 : 10; // encabezado 7pt, filas de producto 10pt
+
+  for (let c = 0; c < row.getNumCells(); c++) {
+
+    row.getCell(c)
+       .editAsText()
+       .setFontSize(size);
+
+  }
+
+}
+
+// Encabezados en negrita
+
+for (let c = 0; c < 4; c++) {
+
+  table.getRow(0)
+       .getCell(c)
+       .editAsText()
+       .setBold(true);
+
+}
+  // TOTAL
+
+  body.appendParagraph("TOTAL DEL PEDIDO").setBold(true);
+
+  if(Number(data.descuento || 0) > 0){
+
+    body.appendParagraph(
+      "Subtotal: $" + Number(data.subtotal || data.total).toLocaleString("es-AR")
+    ).setAlignment(DocumentApp.HorizontalAlignment.RIGHT);
+
+    const etiqueta = data.descuentoEtiqueta
+      ? " (" + data.descuentoEtiqueta + ")"
+      : "";
+
+    body.appendParagraph(
+      "Descuento" + etiqueta + ": -$" + Number(data.descuento).toLocaleString("es-AR")
+    ).setAlignment(DocumentApp.HorizontalAlignment.RIGHT);
+
+  }
+
+  body.appendParagraph(
+    "TOTAL: $" + Number(data.total).toLocaleString("es-AR")
+  )
+  .setBold(true)
+  .setAlignment(DocumentApp.HorizontalAlignment.RIGHT);
+
+  body.appendParagraph("");
+
+  body.appendParagraph("");
+
+  body.appendHorizontalRule();
+
+  // PIE
+
+  body.appendParagraph(
+    piePdf
+  )
+  .setAlignment(
+    DocumentApp.HorizontalAlignment.CENTER
+  );
+
+  body.appendParagraph(
+    nombreNegocio
+  )
+  .setBold(true)
+  .setAlignment(
+    DocumentApp.HorizontalAlignment.CENTER
+  );
+
+  doc.saveAndClose();
+
+  // PDF
+
+  const pdfBlob =
+  DriveApp
+    .getFileById(doc.getId())
+    .getAs(MimeType.PDF);
+
+  pdfBlob.setName(
+    pedidoId + ".pdf"
+  );
+
+  const carpeta =
+  DriveApp.getFolderById(
+    carpetaId
+  );
+
+  const pdfFile =
+  carpeta.createFile(
+    pdfBlob
+  );
+
+  DriveApp
+    .getFileById(doc.getId())
+    .setTrashed(true);
+
+  return pdfFile.getUrl();
+
+}
+function getPedidos(){
+
+const ss =
+SpreadsheetApp.openById(SPREADSHEET_ID);
+
+const sheet =
+ss.getSheetByName("PEDIDOS");
+
+const data =
+sheet.getDataRange().getValues();
+
+const headers =
+data.shift();
+
+const pedidos =
+data.map(row => {
+
+
+let obj = {};
+
+headers.forEach((h,i)=>{
+  obj[h] = row[i];
+});
+
+return obj;
+
+
+});
+
+return jsonResponse({
+success:true,
+pedidos:pedidos
+});
+
+}
+
+function testPDF(){
+  generarPDFPedido(
+    "TEST-001",
+    new Date(),
+    {
+      nombre:"Victor",
+      empresa:"Jireh",
+      direccion:"Prueba",
+      telefono:"123456",
+      dni:"12345678",
+      total:10000,
+      carrito:[
+        {
+          CODIGO:"A001",
+          PRODUCTO:"Producto Test",
+          cantidad:2,
+          PRECIO:5000
+        }
+      ]
+    }
+  );
+}
+/* =====================================================================
+   CREDENCIALES DE ACCESO AL ADMIN
+   Hoja separada "ADMIN_CREDENCIALES" (NO la hoja CONFIGURACION, que es
+   pública de lectura para el catálogo web). Esta hoja nunca se expone
+   completa: login() solo devuelve true/false, y guardarCredencialesAdmin()
+   exige conocer la contraseña actual antes de poder cambiarla.
+===================================================================== */
+
+const CREDENCIALES_DEFAULT = {
+  USUARIO: "admin",
+  PASSWORD: "Jireh2026"
+};
+
+function getOrCrearHojaCredenciales(){
+
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  let sheet = ss.getSheetByName("ADMIN_CREDENCIALES");
+
+  if(!sheet){
+    sheet = ss.insertSheet("ADMIN_CREDENCIALES");
+    sheet.appendRow(["CLAVE", "VALOR"]);
+    sheet.appendRow(["USUARIO", CREDENCIALES_DEFAULT.USUARIO]);
+    sheet.appendRow(["PASSWORD", CREDENCIALES_DEFAULT.PASSWORD]);
+    // La hoja de credenciales no necesita estar visible para operar el
+    // negocio día a día; se oculta para que no se edite por error desde
+    // la planilla. Se puede mostrar de nuevo desde Sheets si hace falta.
+    sheet.hideSheet();
+  }
+
+  return sheet;
+}
+
+function leerCredencialesAdmin(){
+
+  const sheet = getOrCrearHojaCredenciales();
+  const data = sheet.getDataRange().getValues();
+  data.shift(); // encabezados CLAVE | VALOR
+
+  const creds = { ...CREDENCIALES_DEFAULT };
+
+  data.forEach(row => {
+    const clave = String(row[0] || "").trim().toUpperCase();
+    if(clave && creds.hasOwnProperty(clave)){
+      creds[clave] = row[1] === undefined || row[1] === null ? "" : String(row[1]);
+    }
+  });
+
+  return creds;
+}
+
+function login(e){
+
+  const usuario = e.parameter.usuario;
+  const password = e.parameter.password;
+
+  const creds = leerCredencialesAdmin();
+
+  const ok =
+    usuario === creds.USUARIO &&
+    password === creds.PASSWORD;
+
+  return ContentService
+    .createTextOutput(
+      JSON.stringify({
+        success: ok
+      })
+    )
+    .setMimeType(ContentService.MimeType.JSON);
+
+}
+
+/**
+ * Cambia usuario y/o contraseña del admin. Exige la contraseña ACTUAL
+ * para autorizar el cambio (igual que cualquier cambio de credenciales
+ * serio) — así, conocer la URL del backend no alcanza para resetear el
+ * acceso sin saber la clave vigente.
+ */
+function guardarCredencialesAdmin(e){
+
+  const params = (e && e.parameter) || {};
+
+  const passwordActual = (params.passwordActual || "").toString();
+  const creds = leerCredencialesAdmin();
+
+  if(passwordActual !== creds.PASSWORD){
+    return jsonResponse({
+      success:false,
+      message:"La contraseña actual no es correcta."
+    });
+  }
+
+  const nuevoUsuario = (params.nuevoUsuario || "").toString().trim();
+  const nuevaPassword = (params.nuevaPassword || "").toString();
+
+  if(!nuevoUsuario){
+    return jsonResponse({
+      success:false,
+      message:"El usuario no puede quedar vacío."
+    });
+  }
+
+  if(!nuevaPassword || nuevaPassword.length < 4){
+    return jsonResponse({
+      success:false,
+      message:"La contraseña debe tener al menos 4 caracteres."
+    });
+  }
+
+  const sheet = getOrCrearHojaCredenciales();
+  const data = sheet.getDataRange().getValues();
+
+  for(let i = 1; i < data.length; i++){
+    const clave = String(data[i][0] || "").trim().toUpperCase();
+    if(clave === "USUARIO")  sheet.getRange(i + 1, 2).setValue(nuevoUsuario);
+    if(clave === "PASSWORD") sheet.getRange(i + 1, 2).setValue(nuevaPassword);
+  }
+
+  return jsonResponse({
+    success:true
+  });
+
+}
+
+function dashboard(){
+
+const ss =
+SpreadsheetApp.openById(SPREADSHEET_ID);
+
+const sheet =
+ss.getSheetByName("PEDIDOS");
+
+const data =
+sheet.getDataRange().getValues();
+
+data.shift();
+
+const hoy =
+Utilities.formatDate(
+new Date(),
+Session.getScriptTimeZone(),
+"yyyyMMdd"
+);
+
+let ventasHoy = 0;
+let pedidosHoy = 0;
+let pendientes = 0;
+
+data.forEach(row => {
+
+const fecha = row[1];
+const total = Number(row[7]) || 0;
+const estado = String(row[8] || "");
+
+const fechaPedido =
+Utilities.formatDate(
+  new Date(fecha),
+  Session.getScriptTimeZone(),
+  "yyyyMMdd"
+);
+
+if(fechaPedido === hoy){
+  pedidosHoy++;
+  ventasHoy += total;
+}
+
+if(
+  estado === "NUEVO" ||
+  estado === "PENDIENTE"
+){
+  pendientes++;
+}
+
+});
+
+return jsonResponse({
+success:true,
+ventasHoy,
+pedidosHoy,
+pendientes
+});
+
+}
+
+function actualizarEstado(e){
+
+const pedidoId =
+e.parameter.pedidoId;
+
+const estado =
+e.parameter.estado;
+
+const ss =
+SpreadsheetApp.openById(SPREADSHEET_ID);
+
+const sheet =
+ss.getSheetByName("PEDIDOS");
+
+const data =
+sheet.getDataRange().getValues();
+
+for(let i=1;i<data.length;i++){
+
+if(String(data[i][0]) === String(pedidoId)){
+
+  sheet
+  .getRange(i + 1, 9)
+  .setValue(estado);
+
+  const yaDescontado = String(data[i][13] || "").toUpperCase() === "SI";
+
+  // Al pasar a PREPARANDO por primera vez, se descuenta el stock de
+  // los productos del pedido — es el momento en que la mercadería
+  // efectivamente sale del depósito, no antes (un pedido NUEVO es
+  // solo una promesa de venta). La columna STOCK_DESCONTADO (índice
+  // 13) evita descontar dos veces si el pedido pasa por PREPARANDO
+  // más de una vez (ej. NUEVO → PREPARANDO → NUEVO → PREPARANDO).
+  if(String(estado).toUpperCase() === "PREPARANDO" && !yaDescontado){
+    descontarStockPorPedido(pedidoId);
+    sheet.getRange(i + 1, 14).setValue("SI");
+  }
+
+  // Si se cancela un pedido que ya tenía el stock descontado (porque
+  // pasó por PREPARANDO antes de cancelarse), esa mercadería nunca
+  // llegó a salir de verdad — se devuelve al stock, y se desmarca
+  // STOCK_DESCONTADO para que si en algún momento se reabre el pedido
+  // y vuelve a PREPARANDO, se pueda descontar de nuevo correctamente.
+  if(String(estado).toUpperCase() === "CANCELADO" && yaDescontado){
+    devolverStockPorPedido(pedidoId);
+    sheet.getRange(i + 1, 14).setValue("NO");
+  }
+
+  return jsonResponse({
+    success:true
+  });
+
+}
+
+}
+
+return jsonResponse({
+success:false,
+message:"Pedido no encontrado"
+});
+
+}
+
+/**
+ * Consulta pública de pedido: el cliente ingresa su número de pedido
+ * y su DNI para ver el estado, resumen y datos de envío.
+ * Solo devuelve datos si el DNI coincide exactamente con el del pedido
+ * — nunca expone datos de otro cliente.
+ * Parámetros GET: pedidoId, dni
+ */
+function consultarPedido(e){
+  const pedidoId = String(e.parameter.pedidoId || "").trim();
+  const dniIngresado = normalizarDni(String(e.parameter.dni || "").trim());
+
+  if(!pedidoId || !dniIngresado){
+    return jsonResponse({ success:false, message:"Ingresá el número de pedido y tu DNI." });
+  }
+
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const pedidosSheet = ss.getSheetByName("PEDIDOS");
+  const pedidosData = rowsToObjects(pedidosSheet.getDataRange().getValues());
+  const pedido = pedidosData.find(p => String(p.PEDIDO_ID) === pedidoId);
+
+  if(!pedido){
+    return jsonResponse({ success:false, message:"No encontramos ningún pedido con ese número." });
+  }
+
+  const dniPedido = normalizarDni(String(pedido.DNI || ""));
+  if(dniPedido !== dniIngresado){
+    return jsonResponse({ success:false, message:"El DNI no coincide con el pedido. Verificá los datos ingresados." });
+  }
+
+  // Items del pedido
+  const detalleSheet = ss.getSheetByName("DETALLE_PEDIDOS");
+  const items = detalleSheet
+    ? rowsToObjects(detalleSheet.getDataRange().getValues())
+        .filter(d => String(d.PEDIDO_ID) === pedidoId)
+        .map(d => ({
+          PRODUCTO: d.PRODUCTO || "",
+          cantidad: Number(d.CANTIDAD) || 0,
+          subtotal: Number(d.SUBTOTAL) || 0
+        }))
+    : [];
+
+  return jsonResponse({
+    success: true,
+    pedido: {
+      PEDIDO_ID: pedido.PEDIDO_ID,
+      FECHA:     pedido.FECHA,
+      NOMBRE:    pedido.CLIENTE,
+      ESTADO:    pedido.ESTADO,
+      TOTAL:     pedido.TOTAL,
+      EMPRESA:   pedido.EMPRESA || "",  // transporte
+      DIRECCION: pedido.DIRECCION || "",
+      LOCALIDAD: pedido.LOCALIDAD || "",
+      PROVINCIA: pedido.PROVINCIA || "",
+      MONEDA:    pedido.MONEDA || "ARS"
+    },
+    items
+  });
+}
+
+
+/**
+ * (desde DETALLE_PEDIDOS). Se usa para el modal de detalle en el panel.
+ * Parámetros GET: pedidoId
+ */
+function getDetallePedido(e){
+  const pedidoId = String(e.parameter.pedidoId || "").trim();
+  if(!pedidoId) return jsonResponse({ success:false, message:"Falta el pedidoId." });
+
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+
+  // Encabezado del pedido
+  const pedidosSheet = ss.getSheetByName("PEDIDOS");
+  const pedidosData = rowsToObjects(pedidosSheet.getDataRange().getValues());
+  const pedido = pedidosData.find(p => String(p.PEDIDO_ID) === pedidoId);
+  if(!pedido) return jsonResponse({ success:false, message:"Pedido no encontrado." });
+
+  // Items del pedido
+  const detalleSheet = ss.getSheetByName("DETALLE_PEDIDOS");
+  const detalle = detalleSheet
+    ? rowsToObjects(detalleSheet.getDataRange().getValues())
+        .filter(d => String(d.PEDIDO_ID) === pedidoId)
+        .map(d => ({
+          CODIGO:   d.CODIGO   || "",
+          PRODUCTO: d.PRODUCTO || "",
+          cantidad: Number(d.CANTIDAD) || 0,
+          PRECIO:   Number(d.PRECIO)   || 0,
+          subtotal: Number(d.SUBTOTAL) || 0
+        }))
+    : [];
+
+  return jsonResponse({ success:true, pedido, detalle });
+}
+
+
+/**
+ * caja", y lo refleja en VENTAS_LOCAL para que el cierre de caja del
+ * día en que se cobró lo tenga en cuenta — sin tocar el stock (eso ya
+ * se descontó al pasar el pedido a PREPARANDO, no debe descontarse
+ * de nuevo acá).
+ *
+ * Columnas nuevas en PEDIDOS (se agregan al final de la hoja):
+ *   COBRADO            -> "SI" / "NO"
+ *   FORMA_PAGO_COBRO    -> "EFECTIVO" / "TRANSFERENCIA" / "TARJETA"
+ *   VENTA_ID_VINCULADA  -> ID de la fila que se creó en VENTAS_LOCAL,
+ *                          para poder borrarla limpio si se desmarca
+ *                          o si se cambia la forma de pago.
+ *
+ * Parámetros esperados (GET):
+ *   pedidoId   (obligatorio)
+ *   cobrado    "SI" o "NO"
+ *   formaPago  "EFECTIVO" / "TRANSFERENCIA" / "TARJETA" — obligatorio si cobrado="SI"
+ */
+function marcarPedidoCobrado(e){
+
+  const pedidoId = String(e.parameter.pedidoId || "").trim();
+  const cobrado = String(e.parameter.cobrado || "NO").toUpperCase() === "SI";
+  const formaPago = String(e.parameter.formaPago || "").toUpperCase().trim();
+
+  if(!pedidoId){
+    return jsonResponse({ success:false, message:"Falta el ID del pedido." });
+  }
+  if(cobrado && METODOS_PAGO_CIERRE.indexOf(formaPago) === -1){
+    return jsonResponse({ success:false, message:"Elegí una forma de pago válida (efectivo, transferencia o tarjeta)." });
+  }
+
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const pedidosSheet = ss.getSheetByName("PEDIDOS");
+  const ventasSheet = ss.getSheetByName("VENTAS_LOCAL");
+
+  if(!ventasSheet){
+    return jsonResponse({ success:false, message:"Falta la hoja 'VENTAS_LOCAL' en la planilla." });
+  }
+
+  // Asegura que existan las 4 columnas nuevas al final del encabezado
+  // (solo la primera vez que se usa esta función en esta planilla).
+  const headerRange = pedidosSheet.getRange(1, 1, 1, pedidosSheet.getLastColumn());
+  const headers = headerRange.getValues()[0];
+  let colCobrado = headers.indexOf("COBRADO");
+  let colFormaPago = headers.indexOf("FORMA_PAGO_COBRO");
+  let colVentaId = headers.indexOf("VENTA_ID_VINCULADA");
+  let colFechaCobro = headers.indexOf("FECHA_COBRO");
+
+  if(colCobrado === -1){
+    const proxima = pedidosSheet.getLastColumn() + 1;
+    pedidosSheet.getRange(1, proxima, 1, 4).setValues([["COBRADO", "FORMA_PAGO_COBRO", "VENTA_ID_VINCULADA", "FECHA_COBRO"]]);
+    colCobrado = proxima - 1;
+    colFormaPago = proxima;
+    colVentaId = proxima + 1;
+    colFechaCobro = proxima + 2;
+  }
+
+  const data = pedidosSheet.getDataRange().getValues();
+
+  for(let i = 1; i < data.length; i++){
+
+    if(String(data[i][0]) !== pedidoId) continue;
+
+    const fila = i + 1;
+    const ventaIdExistente = String(data[i][colVentaId] || "").trim();
+
+    // Si ya había una venta vinculada de una marcación anterior (por
+    // ejemplo, se desmarca, o se vuelve a marcar con otra forma de
+    // pago), se borra primero para no duplicar el total en el cierre.
+    if(ventaIdExistente){
+      eliminarVentaLocalPorId(ventasSheet, ventaIdExistente);
+    }
+
+    if(!cobrado){
+      pedidosSheet.getRange(fila, colCobrado + 1, 1, 4).setValues([["NO", "", "", ""]]);
+      return jsonResponse({ success:true, cobrado:false });
+    }
+
+    // Vuelve a crear la fila en VENTAS_LOCAL con la fecha de HOY (el
+    // día real en que se cobró, no el día en que se hizo el pedido).
+    const total = Number(data[i][7] || 0); // columna 8: TOTAL del pedido
+    const cliente = String(data[i][2] || ""); // columna 3: CLIENTE
+    const nuevoVentaId = generarIdCorto("VEN", ventasSheet);
+    const fechaCobro = new Date();
+
+    ventasSheet.appendRow([
+      nuevoVentaId,
+      fechaCobro,
+      total,
+      formaPago,
+      "PEDIDO WEB",
+      "Cobro de pedido " + pedidoId + " — " + cliente
+    ]);
+
+    pedidosSheet.getRange(fila, colCobrado + 1, 1, 4).setValues([["SI", formaPago, nuevoVentaId, fechaCobro]]);
+
+    // Si el cliente es a crédito, registrar el pago también en PAGOS_CREDITO
+    // para que el saldo de su cuenta corriente se actualice automáticamente.
+    try {
+      const dniPedido = normalizarDni(String(data[i][6] || "")); // columna 7: DNI
+      if(dniPedido){
+        const clientesSheet = getOrCrearHojaClientes();
+        const clientesData = rowsToObjects(clientesSheet.getDataRange().getValues());
+        const clienteObj = clientesData.find(c =>
+          normalizarDni(String(c.DNI || "")) === dniPedido);
+        if(clienteObj && String(clienteObj.A_CREDITO || "").toUpperCase() === "SI"){
+          const pagosSheet = getOrCrearHojaPagosCredito();
+          const pagoId = generarIdCorto("PAGO", pagosSheet);
+          pagosSheet.appendRow([
+            pagoId,
+            fechaCobro,
+            clienteObj.CLIENTE_ID,
+            "ARS",           // moneda del pago
+            total,           // monto
+            "",              // tipo de cambio (no aplica en ARS)
+            "ARS",           // prioridad
+            total,           // montoAplicadoArs
+            0,               // montoAplicadoUsd
+            formaPago,       // forma de pago
+            "Cobro automático — pedido " + pedidoId
+          ]);
+        }
+      }
+    } catch(errPago){
+      Logger.log("marcarPedidoCobrado: no se pudo registrar pago en crédito: " + errPago);
+      // El cobro del pedido ya quedó registrado igual — esto es solo un extra
+    }
+
+    return jsonResponse({ success:true, cobrado:true, ventaId:nuevoVentaId });
+  }
+
+  return jsonResponse({ success:false, message:"Pedido no encontrado." });
+}
+
+/**
+ * Borra de VENTAS_LOCAL la fila con el VENTA_ID dado. Se usa al
+ * desmarcar un pedido como cobrado, o al cambiar su forma de pago,
+ * para que el cierre de caja no cuente dos veces el mismo dinero.
+ */
+function eliminarVentaLocalPorId(ventasSheet, ventaId){
+  const data = ventasSheet.getDataRange().getValues();
+  for(let i = data.length - 1; i >= 1; i--){
+    if(String(data[i][0]) === String(ventaId)){
+      ventasSheet.deleteRow(i + 1);
+      // No hace falta borrar de DETALLE_VENTAS — estas ventas
+      // "vinculadas a un pedido" no tienen detalle de productos ahí,
+      // el detalle real ya vive en DETALLE_PEDIDOS.
+      return;
+    }
+  }
+}
+
+/**
+ * Resta del stock de PRODUCTOS las cantidades de un pedido, leyendo su
+ * detalle desde DETALLE_PEDIDOS. Reutiliza el mismo mecanismo de
+ * descontarStockPorVenta (incluyendo el LockService) armando un
+ * carrito en el mismo formato {CODIGO, cantidad} que esa función
+ * espera, a partir de las filas de DETALLE_PEDIDOS para este pedido.
+ */
+function descontarStockPorPedido(pedidoId){
+
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const detalleSheet = ss.getSheetByName("DETALLE_PEDIDOS");
+  if(!detalleSheet) return;
+
+  const detalles = detalleSheet.getDataRange().getValues();
+  detalles.shift(); // encabezados
+
+  const carrito = detalles
+    .filter(row => String(row[0]) === String(pedidoId))
+    .map(row => ({ CODIGO: row[1], cantidad: Number(row[3] || 0) }));
+
+  descontarStockPorVenta(carrito);
+}
+
+/**
+ * Inverso de descontarStockPorPedido: suma de vuelta al stock las
+ * cantidades de un pedido cancelado que ya había descontado stock.
+ * Reutiliza descontarStockPorVenta pasándole cantidades negativas —
+ * esa función simplemente resta lo que recibe, así que cantidades
+ * negativas terminan sumando, sin duplicar el LockService ni la
+ * lógica de búsqueda de fila por código.
+ */
+function devolverStockPorPedido(pedidoId){
+
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const detalleSheet = ss.getSheetByName("DETALLE_PEDIDOS");
+  if(!detalleSheet) return;
+
+  const detalles = detalleSheet.getDataRange().getValues();
+  detalles.shift(); // encabezados
+
+  const carrito = detalles
+    .filter(row => String(row[0]) === String(pedidoId))
+    .map(row => ({ CODIGO: row[1], cantidad: -Number(row[3] || 0) }));
+
+  descontarStockPorVenta(carrito);
+}
+function obtenerMetricas() {
+
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+
+  const hoy = new Date();
+
+  /* =========================================================
+     PEDIDOS (ventas online / por encargo — hoja "PEDIDOS")
+  ========================================================= */
+
+  const hojaPedidos =
+    ss.getSheetByName("PEDIDOS");
+
+  const pedidos =
+    hojaPedidos
+      ? hojaPedidos.getDataRange().getValues()
+      : [];
+
+  let pedidosNuevos      = 0;
+  let ventasPedidosHoy   = 0;
+  let ventasPedidosMes   = 0;
+  let totalPedidos       = 0;
+
+  const clientes = new Set();
+
+  // Las columnas COBRADO y FECHA_COBRO se agregan dinámicamente al
+  // final de PEDIDOS (ver marcarPedidoCobrado) la primera vez que se
+  // marca un pedido como cobrado en caja — por eso se busca su
+  // posición por nombre de encabezado en vez de asumir un índice fijo.
+  const headerPedidos = pedidos.length > 0 ? pedidos[0] : [];
+  const headerIndexCobrado = headerPedidos.indexOf("COBRADO");
+  const headerIndexFechaCobro = headerPedidos.indexOf("FECHA_COBRO");
+
+  for(let i = 1; i < pedidos.length; i++){
+
+    const cliente =
+      pedidos[i][2];
+
+    const total =
+      Number(pedidos[i][7]) || 0;
+
+    const estado =
+      String(pedidos[i][8] || "")
+      .toLowerCase();
+
+    // "Ventas Pedidos" mide plata REAL que entró por pedidos del
+    // catálogo web — eso solo pasa cuando el pedido se marca como
+    // cobrado en caja (ver marcarPedidoCobrado). Un pedido sin cobrar
+    // todavía es solo una promesa de venta, no entra en esta métrica.
+    // Se usa la fecha real del cobro (FECHA_COBRO), no la fecha en
+    // que se hizo el pedido, para que coincida con el día real en que
+    // entró el dinero — igual criterio que los reportes.
+    const yaCobrado =
+      String(pedidos[i][headerIndexCobrado] || "").toUpperCase() === "SI";
+
+    totalPedidos++;
+
+    clientes.add(cliente);
+
+    if(yaCobrado){
+
+      const fechaCobro =
+        headerIndexFechaCobro !== -1 && pedidos[i][headerIndexFechaCobro]
+          ? new Date(pedidos[i][headerIndexFechaCobro])
+          : new Date(pedidos[i][1]); // respaldo: fecha del pedido, por si faltara FECHA_COBRO
+
+      if(
+        fechaCobro.getDate() === hoy.getDate() &&
+        fechaCobro.getMonth() === hoy.getMonth() &&
+        fechaCobro.getFullYear() === hoy.getFullYear()
+      ){
+        ventasPedidosHoy += total;
+      }
+
+      if(
+        fechaCobro.getMonth() === hoy.getMonth() &&
+        fechaCobro.getFullYear() === hoy.getFullYear()
+      ){
+        ventasPedidosMes += total;
+      }
+
+    }
+
+    if(estado === "nuevo"){
+      pedidosNuevos++;
+    }
+
+  }
+
+  /* =========================================================
+     VENTAS POS (mostrador — hoja "VENTAS_LOCAL")
+  ========================================================= */
+
+  const hojaVentasPOS =
+    ss.getSheetByName("VENTAS_LOCAL");
+
+  const ventasLocal =
+    hojaVentasPOS
+      ? hojaVentasPOS.getDataRange().getValues()
+      : [];
+
+  let ventasPOSHoy    = 0;
+  let ventasPOSMes    = 0;
+  let totalVentasPOS  = 0;
+
+  const idxAnuladaPOS = ventasLocal.length > 0 ? ventasLocal[0].indexOf("ANULADA") : -1;
+
+  for(let i = 1; i < ventasLocal.length; i++){
+
+    const esPedidoCobrado =
+      String(ventasLocal[i][4] || "").toUpperCase() === "PEDIDO WEB";
+    if(esPedidoCobrado) continue;
+
+    // Excluir ventas anuladas del dashboard
+    const esAnulada = idxAnuladaPOS !== -1 &&
+      String(ventasLocal[i][idxAnuladaPOS] || "").toUpperCase() === "SI";
+    if(esAnulada) continue;
+
+    const fecha =
+      new Date(ventasLocal[i][1]);
+
+    const total =
+      Number(ventasLocal[i][2]) || 0;
+
+    totalVentasPOS++;
+
+    if(
+      fecha.getDate() === hoy.getDate() &&
+      fecha.getMonth() === hoy.getMonth() &&
+      fecha.getFullYear() === hoy.getFullYear()
+    ){
+      ventasPOSHoy += total;
+    }
+
+    if(
+      fecha.getMonth() === hoy.getMonth() &&
+      fecha.getFullYear() === hoy.getFullYear()
+    ){
+      ventasPOSMes += total;
+    }
+
+  }
+
+  /* =========================================================
+     PRODUCTOS (hoja "PRODUCTOS")
+  ========================================================= */
+
+  const hojaProductos =
+    ss.getSheetByName("PRODUCTOS");
+
+  const productos =
+    hojaProductos
+      ? hojaProductos.getDataRange().getValues()
+      : [];
+
+  let productosActivos = 0;
+  let stockBajo = 0;
+  let agotados = 0;
+
+  for(let i = 1; i < productos.length; i++){
+
+    const publicado =
+      String(productos[i][4] || "")
+      .toLowerCase();
+
+    const stock =
+      Number(productos[i][7]) || 0;
+
+    if(publicado === "si"){
+      productosActivos++;
+    }
+
+    if(stock === 0){
+      agotados++;
+    }
+
+    if(stock > 0 && stock <= 5){
+      stockBajo++;
+    }
+
+  }
+
+  /* =========================================================
+     MAS VENDIDOS (top 1 — combina PEDIDOS + POS)
+     Solo se necesita el ranking #1 y su cantidad para la
+     tarjeta del dashboard; el ranking completo lo sirve
+     getMasVendidos().
+  ========================================================= */
+
+  const topVendido = obtenerTopVendidoCombinado(ss);
+
+  /* =========================================================
+     TOTALES COMBINADOS (POS + Pedidos)
+  ========================================================= */
+
+  const ventasHoyTotal = ventasPOSHoy + ventasPedidosHoy;
+  const ventasMesTotal = ventasPOSMes + ventasPedidosMes;
+  const totalOperaciones = totalVentasPOS + totalPedidos;
+
+  return {
+
+    // Pedidos
+    pedidosNuevos,
+    totalPedidos,
+
+    // Ventas — Pedidos
+    ventasPedidosHoy,
+    ventasPedidosMes,
+
+    // Ventas — POS (mostrador)
+    ventasPOSHoy,
+    ventasPOSMes,
+    totalVentasPOS,
+
+    // Ventas combinadas (compatibilidad con tarjetas genéricas)
+    ventasHoy: ventasHoyTotal,
+    ventasMes: ventasMesTotal,
+
+    clientesUnicos:
+      clientes.size,
+
+    ticketPromedio:
+      totalOperaciones > 0
+        ? ventasMesTotal / totalOperaciones
+        : 0,
+
+    productosActivos,
+    stockBajo,
+    agotados,
+
+    masVendidoNombre:    topVendido.nombre,
+    masVendidoCantidad:  topVendido.cantidad
+
+  };
+
+}
+
+/**
+ * Calcula el producto #1 más vendido combinando las unidades
+ * vendidas por Pedidos (DETALLE_PEDIDOS) y por POS (DETALLE_VENTAS).
+ * Devuelve solo el ganador, para la tarjeta resumen del dashboard.
+ */
+function obtenerTopVendidoCombinado(ss){
+
+  const acumulado = {}; // codigo -> {nombre, cantidad}
+
+  function sumar(sheetName, idxCodigo, idxNombre, idxCantidad){
+
+    const hoja = ss.getSheetByName(sheetName);
+    if(!hoja) return;
+
+    const data = hoja.getDataRange().getValues();
+    data.shift(); // encabezados
+
+    data.forEach(row => {
+
+      const codigo   = row[idxCodigo];
+      const nombre    = row[idxNombre];
+      const cantidad = Number(row[idxCantidad]) || 0;
+
+      if(!codigo) return;
+
+      if(!acumulado[codigo]){
+        acumulado[codigo] = { nombre: nombre, cantidad: 0 };
+      }
+
+      acumulado[codigo].cantidad += cantidad;
+
+    });
+
+  }
+
+  // DETALLE_PEDIDOS: [PEDIDO_ID, CODIGO, PRODUCTO, CANTIDAD, ...]
+  sumar("DETALLE_PEDIDOS", 1, 2, 3);
+
+  // DETALLE_VENTAS: [VENTA_ID, CODIGO, PRODUCTO, CANTIDAD, PRECIO, SUBTOTAL]
+  sumar("DETALLE_VENTAS", 1, 2, 3);
+
+  let top = { nombre: "—", cantidad: 0 };
+
+  Object.keys(acumulado).forEach(codigo => {
+    if(acumulado[codigo].cantidad > top.cantidad){
+      top = acumulado[codigo];
+    }
+  });
+
+  return top;
+
+}
+/** Returns the CLIENTES sheet, creating it (with headers) the first time it's needed */
+function getOrCrearHojaClientes(){
+
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  let sheet = ss.getSheetByName("CLIENTES");
+
+  if(!sheet){
+    sheet = ss.insertSheet("CLIENTES");
+    sheet.appendRow(["CLIENTE_ID", "NOMBRE", "ALIAS", "DNI", "TELEFONO", "DIRECCION", "EMPRESA", "A_CREDITO", "FECHA_ALTA"]);
+  }
+
+  return sheet;
+}
+
+/** Returns the PAGOS_CREDITO sheet, creating it (with headers) the first time it's needed */
+function getOrCrearHojaPagosCredito(){
+
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  let sheet = ss.getSheetByName("PAGOS_CREDITO");
+
+  const encabezadosNuevos = ["PAGO_ID", "FECHA", "CLIENTE_ID", "MONEDA_PAGO", "MONTO_PAGO", "TIPO_CAMBIO", "PRIORIDAD", "MONTO_APLICADO_ARS", "MONTO_APLICADO_USD", "FORMA_PAGO", "OBSERVACIONES"];
+
+  if(!sheet){
+    sheet = ss.insertSheet("PAGOS_CREDITO");
+    sheet.appendRow(encabezadosNuevos);
+    return sheet;
+  }
+
+  // Si la hoja ya existía con el esquema viejo (sin soporte de moneda,
+  // de antes de que se agregara el crédito en dólares), todavía no
+  // hay pagos reales registrados — se confirmó con el usuario — así
+  // que es seguro reescribir los encabezados sin migrar filas.
+  const encabezadosActuales = sheet.getRange(1, 1, 1, sheet.getLastColumn() || 1).getValues()[0];
+  if(String(encabezadosActuales[3] || "") !== "MONEDA_PAGO"){
+    sheet.clear();
+    sheet.appendRow(encabezadosNuevos);
+  }
+
+  return sheet;
+}
+
+/**
+ * Deja solo los dígitos de un DNI/CUIT, para poder comparar
+ * "20.123.456-7" contra "20123456-7" sin que el formato (puntos,
+ * guiones, espacios) rompa la coincidencia. Es el mismo criterio que
+ * usa toda esta sección para vincular pedidos con clientes.
+ */
+function normalizarDni(valor){
+  return String(valor || "").replace(/\D/g, "");
+}
+
+/**
+ * Devuelve la lista de clientes de la hoja CLIENTES (no de PEDIDOS),
+ * con su alias, si están marcados a crédito, y — solo para los que
+ * sí lo están — el saldo pendiente real: suma de sus pedidos (de
+ * PEDIDOS, vinculados por DNI normalizado) menos la suma de sus pagos
+ * registrados (de PAGOS_CREDITO, vinculados por CLIENTE_ID).
+ *
+ * Esta es la fuente de datos de la sección Clientes del panel — a
+ * diferencia de getClientes() (más vieja, sigue existiendo por si
+ * algo más la usa), que solo deriva clientes de PEDIDOS y no sabe
+ * nada de alias ni de crédito.
+ */
+/**
+ * Consulta rápida: dado un DNI (de cualquier formato), devuelve si
+ * existe un cliente con ese DNI marcado a crédito — la usa el modal
+ * de "Generar Pedido" del POS, para saber si mostrar el selector de
+ * moneda al tipear el DNI del cliente.
+ *
+ * Parámetro esperado: dni
+ */
+function consultarClienteCreditoPorDni(dni){
+
+  const dniNorm = normalizarDni(dni);
+  if(!dniNorm){
+    return jsonResponse({ success:true, esCredito:false });
+  }
+
+  const clientesSheet = getOrCrearHojaClientes();
+  const clientesData = rowsToObjects(clientesSheet.getDataRange().getValues());
+  const cliente = clientesData.find(c => normalizarDni(c.DNI) === dniNorm);
+
+  if(!cliente || String(cliente.A_CREDITO || "").toUpperCase() !== "SI"){
+    return jsonResponse({ success:true, esCredito:false });
+  }
+
+  return jsonResponse({ success:true, esCredito:true, clienteId: cliente.CLIENTE_ID, nombre: cliente.NOMBRE });
+}
+
+function getClientesConCredito(){
+
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+
+  const clientesSheet = getOrCrearHojaClientes();
+  const clientesData = rowsToObjects(clientesSheet.getDataRange().getValues());
+
+  const pedidosSheet = ss.getSheetByName("PEDIDOS");
+  const pedidosData = pedidosSheet ? rowsToObjects(pedidosSheet.getDataRange().getValues()) : [];
+
+  // Total pedido (en cualquier moneda, solo para la columna informativa
+  // "Total Comprado" de la tabla general) y cantidad de pedidos,
+  // agrupado por DNI normalizado.
+  const totalPorDni = {};
+  const cantidadPorDni = {};
+  pedidosData.forEach(p => {
+    const dniNorm = normalizarDni(p.DNI);
+    if(!dniNorm) return;
+    totalPorDni[dniNorm] = (totalPorDni[dniNorm] || 0) + Number(p.TOTAL || 0);
+    cantidadPorDni[dniNorm] = (cantidadPorDni[dniNorm] || 0) + 1;
+  });
+
+  const clientes = clientesData.map(c => {
+    const dniNorm = normalizarDni(c.DNI);
+    const esCredito = String(c.A_CREDITO || "").toUpperCase() === "SI";
+    const totalComprado = totalPorDni[dniNorm] || 0;
+
+    // calcularSaldosCliente separa por moneda y mira PAGOS_CREDITO real
+    // — solo se calcula para clientes a crédito, ya que para los demás
+    // no representa una deuda real (es solo informativo).
+    const saldos = esCredito ? calcularSaldosCliente(c.CLIENTE_ID, dniNorm) : null;
+
+    return {
+      CLIENTE_ID: c.CLIENTE_ID,
+      NOMBRE: c.NOMBRE,
+      ALIAS: c.ALIAS,
+      DNI: c.DNI,
+      TELEFONO: c.TELEFONO,
+      DIRECCION: c.DIRECCION,
+      EMPRESA: c.EMPRESA,
+      A_CREDITO: c.A_CREDITO,
+      PEDIDOS: cantidadPorDni[dniNorm] || 0,
+      TOTAL_COMPRADO: totalComprado,
+      SALDO_PENDIENTE_ARS: saldos ? saldos.saldoArs : 0,
+      SALDO_PENDIENTE_USD: saldos ? saldos.saldoUsd : 0
+    };
+  });
+
+  return jsonResponse({ success:true, clientes: clientes });
+}
+
+/**
+ * Crea un cliente nuevo en la hoja CLIENTES — para clientes viejos
+ * que todavía no hicieron ningún pedido con el catálogo nuevo, pero a
+ * los que ya se les quiere empezar a llevar la cuenta.
+ *
+ * Parámetros esperados: nombre, alias (opcional), dni, telefono
+ * (opcional), direccion (opcional), empresa (opcional), aCredito
+ * ("SI"/"NO", default "NO")
+ */
+function crearCliente(data){
+
+  const nombre = String(data.nombre || "").trim();
+  if(!nombre){
+    return jsonResponse({ success:false, message:"Falta el nombre del cliente." });
+  }
+
+  const sheet = getOrCrearHojaClientes();
+  const clienteId = generarIdCorto("CLI", sheet);
+
+  sheet.appendRow([
+    clienteId,
+    nombre,
+    String(data.alias || "").trim(),
+    String(data.dni || "").trim(),
+    String(data.telefono || "").trim(),
+    String(data.direccion || "").trim(),
+    String(data.empresa || "").trim(),
+    String(data.aCredito || "NO").toUpperCase() === "SI" ? "SI" : "NO",
+    new Date()
+  ]);
+
+  return jsonResponse({ success:true, clienteId: clienteId });
+}
+
+/**
+ * Edita los datos de un cliente existente, incluyendo si es a
+ * crédito o no (columna A_CREDITO) — no toca FECHA_ALTA.
+ *
+ * Parámetros esperados: clienteId, nombre, alias, dni, telefono,
+ * direccion, empresa, aCredito ("SI"/"NO" — si no se manda, se
+ * conserva el valor que el cliente ya tenía, por compatibilidad con
+ * cualquier llamador viejo que no lo incluya)
+ */
+function editarCliente(data){
+
+  const clienteId = String(data.clienteId || "").trim();
+  const nombre = String(data.nombre || "").trim();
+
+  if(!clienteId){
+    return jsonResponse({ success:false, message:"Falta el ID del cliente." });
+  }
+  if(!nombre){
+    return jsonResponse({ success:false, message:"Falta el nombre del cliente." });
+  }
+
+  const sheet = getOrCrearHojaClientes();
+  const filas = sheet.getDataRange().getValues();
+
+  for(let i = 1; i < filas.length; i++){
+    if(String(filas[i][0]) === clienteId){
+
+      const aCreditoActual = String(filas[i][7] || "NO").toUpperCase() === "SI" ? "SI" : "NO";
+      const aCreditoNuevo = data.aCredito === undefined
+        ? aCreditoActual
+        : (String(data.aCredito || "NO").toUpperCase() === "SI" ? "SI" : "NO");
+
+      sheet.getRange(i + 1, 2, 1, 7).setValues([[
+        nombre,
+        String(data.alias || "").trim(),
+        String(data.dni || "").trim(),
+        String(data.telefono || "").trim(),
+        String(data.direccion || "").trim(),
+        String(data.empresa || "").trim(),
+        aCreditoNuevo
+      ]]);
+      return jsonResponse({ success:true });
+    }
+  }
+
+  return jsonResponse({ success:false, message:"No se encontró el cliente '" + clienteId + "'." });
+}
+
+/**
+ * Elimina un cliente de la hoja CLIENTES. NO borra sus pedidos
+ * (siguen en PEDIDOS, vinculados solo por DNI, no por CLIENTE_ID) ni
+ * sus pagos (quedan en PAGOS_CREDITO) — esto es a propósito, para no
+ * perder el historial real de ventas/cobros del negocio solo porque
+ * se borra la ficha. Si el cliente tenía saldo pendiente, se pide
+ * confirmación extra antes de borrar (ver el frontend).
+ *
+ * Parámetro esperado: clienteId
+ */
+function eliminarCliente(data){
+
+  const clienteId = String(data.clienteId || "").trim();
+  if(!clienteId){
+    return jsonResponse({ success:false, message:"Falta el ID del cliente." });
+  }
+
+  const sheet = getOrCrearHojaClientes();
+  const filas = sheet.getDataRange().getValues();
+
+  for(let i = 1; i < filas.length; i++){
+    if(String(filas[i][0]) === clienteId){
+      sheet.deleteRow(i + 1);
+      return jsonResponse({ success:true });
+    }
+  }
+
+  return jsonResponse({ success:false, message:"No se encontró el cliente '" + clienteId + "'." });
+}
+
+/**
+ * Marca o desmarca a un cliente como "a crédito" — la única forma de
+ * activar el crédito de alguien es desde este botón en el panel, a
+ * propósito (un cliente nunca puede pedirlo solo desde el catálogo).
+ *
+ * Parámetros esperados: clienteId, aCredito ("SI"/"NO")
+ */
+function actualizarCreditoCliente(data){
+
+  const clienteId = String(data.clienteId || "").trim();
+  if(!clienteId){
+    return jsonResponse({ success:false, message:"Falta el ID del cliente." });
+  }
+
+  const sheet = getOrCrearHojaClientes();
+  const filas = sheet.getDataRange().getValues();
+
+  for(let i = 1; i < filas.length; i++){
+    if(String(filas[i][0]) === clienteId){
+      sheet.getRange(i + 1, 8).setValue(String(data.aCredito || "NO").toUpperCase() === "SI" ? "SI" : "NO"); // columna 8 = A_CREDITO
+      return jsonResponse({ success:true });
+    }
+  }
+
+  return jsonResponse({ success:false, message:"No se encontró el cliente '" + clienteId + "'." });
+}
+
+/**
+ * Crea un cliente nuevo a partir de uno que ya existe en PEDIDOS pero
+ * todavía no en CLIENTES — toma sus datos del pedido más reciente que
+ * tenga ese DNI, y lo marca a crédito de una. Es el camino que usa el
+ * botón "Marcar a crédito" cuando se aplica sobre alguien que viene
+ * del ranking derivado de pedidos, no de la hoja CLIENTES.
+ *
+ * Parámetros esperados: dni
+ */
+function crearClienteDesdeHistorialYMarcarCredito(data){
+
+  const dniBuscado = normalizarDni(data.dni);
+  if(!dniBuscado){
+    return jsonResponse({ success:false, message:"Falta el DNI del cliente." });
+  }
+
+  const clientesSheet = getOrCrearHojaClientes();
+  const clientesExistentes = rowsToObjects(clientesSheet.getDataRange().getValues());
+
+  const yaExiste = clientesExistentes.some(c => normalizarDni(c.DNI) === dniBuscado);
+  if(yaExiste){
+    return jsonResponse({ success:false, message:"Ese cliente ya existe en la lista — usá 'Marcar a crédito' directo desde su fila." });
+  }
+
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const pedidosSheet = ss.getSheetByName("PEDIDOS");
+  const pedidosData = pedidosSheet ? rowsToObjects(pedidosSheet.getDataRange().getValues()) : [];
+
+  const pedidoDelCliente = pedidosData.reverse().find(p => normalizarDni(p.DNI) === dniBuscado);
+  if(!pedidoDelCliente){
+    return jsonResponse({ success:false, message:"No se encontró ningún pedido con ese DNI." });
+  }
+
+  const clienteId = generarIdCorto("CLI", clientesSheet);
+
+  clientesSheet.appendRow([
+    clienteId,
+    pedidoDelCliente.CLIENTE || "",
+    "",
+    pedidoDelCliente.DNI || "",
+    pedidoDelCliente.TELEFONO || "",
+    pedidoDelCliente.DIRECCION || "",
+    pedidoDelCliente.EMPRESA || "",
+    "SI",
+    new Date()
+  ]);
+
+  return jsonResponse({ success:true, clienteId: clienteId });
+}
+
+/**
+ * Calcula los saldos pendientes de un cliente en ambas monedas, sin
+ * armar toda la respuesta JSON — la usan tanto getDetalleClienteCredito
+ * (para mostrar) como registrarPagoCredito (para saber cuánto hay que
+ * descontar de cada deuda antes de repartir un pago nuevo).
+ */
+function calcularSaldosCliente(clienteId, dniNorm){
+
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+
+  const pedidosSheet = ss.getSheetByName("PEDIDOS");
+  const pedidosData = pedidosSheet ? rowsToObjects(pedidosSheet.getDataRange().getValues()) : [];
+  const pedidosDelCliente = pedidosData.filter(p => normalizarDni(p.DNI) === dniNorm);
+
+  const pagosSheet = getOrCrearHojaPagosCredito();
+  const pagosData = rowsToObjects(pagosSheet.getDataRange().getValues());
+  const pagosDelCliente = pagosData.filter(pago => String(pago.CLIENTE_ID) === String(clienteId));
+
+  let compradoArs = 0, compradoUsd = 0;
+  pedidosDelCliente.forEach(p => {
+    if(String(p.MONEDA || "ARS").toUpperCase() === "USD") compradoUsd += Number(p.TOTAL || 0);
+    else compradoArs += Number(p.TOTAL || 0);
+  });
+
+  // Deudas extra (cobros fuera de pedidos y POS)
+  const deudasSheet = ss.getSheetByName("DEUDAS_EXTRA");
+  if(deudasSheet){
+    const deudasData = rowsToObjects(deudasSheet.getDataRange().getValues());
+    deudasData
+      .filter(d => String(d.CLIENTE_ID) === String(clienteId))
+      .forEach(d => {
+        if(String(d.MONEDA || "ARS").toUpperCase() === "USD") compradoUsd += Number(d.MONTO || 0);
+        else compradoArs += Number(d.MONTO || 0);
+      });
+  }
+
+  let pagadoArs = 0, pagadoUsd = 0;
+  pagosDelCliente.forEach(pago => {
+    pagadoArs += Number(pago.MONTO_APLICADO_ARS || 0);
+    pagadoUsd += Number(pago.MONTO_APLICADO_USD || 0);
+  });
+
+  return {
+    compradoArs, compradoUsd, pagadoArs, pagadoUsd,
+    saldoArs: Math.max(0, compradoArs - pagadoArs),
+    saldoUsd: Math.max(0, compradoUsd - pagadoUsd)
+  };
+}
+
+/**
+ * Registra un pago (parcial o total) de un cliente a crédito, y lo
+ * reparte entre la deuda en ARS y la deuda en USD según la prioridad
+ * elegida — ver el ejemplo completo más abajo.
+ *
+ * El pago siempre se hace en UNA moneda (moneda). Si "prioridad" pide
+ * cancelar primero la deuda de la OTRA moneda, se necesita un tipo de
+ * cambio para convertir — con eso se calcula cuánto de esa deuda se
+ * cancela, y el sobrante (si lo hay) se aplica directo a la deuda de
+ * la moneda del pago, sin necesitar conversión para esa segunda parte
+ * (ya está en su propia moneda). Si el pago no alcanza para cubrir
+ * completa la deuda priorizada, se aplica entero ahí y la otra deuda
+ * no se toca para nada — así se confirmó con el usuario.
+ *
+ * Ejemplo real: cliente debe $100.000 ARS y USD 2000. Pago de
+ * $3.050.000 ARS, prioridad USD, tipo de cambio 1500.
+ *   - Deuda USD (2000) convertida a ARS al TC 1500 = $3.000.000
+ *   - Pago $3.050.000 - $3.000.000 = sobran $50.000
+ *   - Esos $50.000 (ya en ARS, la moneda del pago) se aplican directo
+ *     a la deuda en ARS, sin necesitar otra conversión.
+ *   - Resultado: USD queda en 0, ARS pasa de $100.000 a $50.000.
+ *
+ * Parámetros esperados: clienteId, monto, monedaPago ("ARS"/"USD"),
+ * prioridad ("ARS"/"USD" — a cuál deuda aplicar primero),
+ * tipoCambio (obligatorio solo si monedaPago !== prioridad),
+ * formaPago (opcional), observaciones (opcional)
+ */
+function registrarPagoCredito(data){
+
+  const clienteId = String(data.clienteId || "").trim();
+  const monto = Number(data.monto || 0);
+  const monedaPago = String(data.monedaPago || "ARS").toUpperCase();
+  const prioridad = String(data.prioridad || monedaPago).toUpperCase();
+  const tipoCambio = Number(data.tipoCambio || 0);
+
+  if(!clienteId){
+    return jsonResponse({ success:false, message:"Falta el cliente." });
+  }
+  if(!monto || monto <= 0){
+    return jsonResponse({ success:false, message:"Ingresá un monto válido, mayor a 0." });
+  }
+  if(monedaPago !== prioridad && tipoCambio <= 0){
+    return jsonResponse({ success:false, message:"Ingresá el tipo de cambio para convertir entre pesos y dólares." });
+  }
+
+  const clientesSheet = getOrCrearHojaClientes();
+  const clientesData = rowsToObjects(clientesSheet.getDataRange().getValues());
+  const cliente = clientesData.find(c => String(c.CLIENTE_ID) === clienteId);
+  if(!cliente){
+    return jsonResponse({ success:false, message:"No se encontró el cliente." });
+  }
+
+  const dniNorm = normalizarDni(cliente.DNI);
+  const saldos = calcularSaldosCliente(clienteId, dniNorm);
+
+  let montoAplicadoArs = 0;
+  let montoAplicadoUsd = 0;
+
+  if(monedaPago === prioridad){
+    // No hace falta convertir nada — el pago entero se intenta
+    // aplicar directo a la deuda de su propia moneda. Si sobra, ese
+    // sobrante SÍ necesita convertirse para aplicarse a la otra deuda
+    // (y para eso hace falta el tipo de cambio, aunque monedaPago ==
+    // prioridad — por eso más abajo se exige tipoCambio>0 igual si
+    // hay sobrante real).
+    if(prioridad === "ARS"){
+      montoAplicadoArs = Math.min(monto, saldos.saldoArs);
+      const sobranteArs = monto - montoAplicadoArs;
+      if(sobranteArs > 0){
+        if(tipoCambio <= 0){
+          return jsonResponse({ success:false, message:"El pago cubre toda la deuda en pesos — para aplicar el sobrante a la deuda en dólares, ingresá el tipo de cambio." });
+        }
+        montoAplicadoUsd = Math.min(sobranteArs / tipoCambio, saldos.saldoUsd);
+      }
+    }else{
+      montoAplicadoUsd = Math.min(monto, saldos.saldoUsd);
+      const sobranteUsd = monto - montoAplicadoUsd;
+      if(sobranteUsd > 0){
+        if(tipoCambio <= 0){
+          return jsonResponse({ success:false, message:"El pago cubre toda la deuda en dólares — para aplicar el sobrante a la deuda en pesos, ingresá el tipo de cambio." });
+        }
+        montoAplicadoArs = Math.min(sobranteUsd * tipoCambio, saldos.saldoArs);
+      }
+    }
+  }else{
+    // El pago es en una moneda distinta a la deuda priorizada — se
+    // convierte el pago entero a la moneda de esa deuda primero.
+    if(prioridad === "ARS"){
+      // Pago en USD, prioridad ARS: el pago (en USD) se convierte a pesos.
+      const pagoEnArs = monto * tipoCambio;
+      montoAplicadoArs = Math.min(pagoEnArs, saldos.saldoArs);
+      const sobranteArs = pagoEnArs - montoAplicadoArs;
+      // El sobrante ya está expresado en ARS — para aplicarlo a la
+      // deuda en USD hay que reconvertirlo con el mismo tipo de cambio.
+      montoAplicadoUsd = sobranteArs > 0 ? Math.min(sobranteArs / tipoCambio, saldos.saldoUsd) : 0;
+    }else{
+      // Pago en ARS, prioridad USD: el pago (en ARS) se convierte a dólares.
+      const pagoEnUsd = monto / tipoCambio;
+      montoAplicadoUsd = Math.min(pagoEnUsd, saldos.saldoUsd);
+      const sobranteUsd = pagoEnUsd - montoAplicadoUsd;
+      montoAplicadoArs = sobranteUsd > 0 ? Math.min(sobranteUsd * tipoCambio, saldos.saldoArs) : 0;
+    }
+  }
+
+  const sheet = getOrCrearHojaPagosCredito();
+  const pagoId = generarIdCorto("PAGO", sheet);
+
+  sheet.appendRow([
+    pagoId,
+    new Date(),
+    clienteId,
+    monedaPago,
+    monto,
+    tipoCambio || "",
+    prioridad,
+    montoAplicadoArs,
+    montoAplicadoUsd,
+    String(data.formaPago || "EFECTIVO").toUpperCase(),
+    String(data.observaciones || "")
+  ]);
+
+  return jsonResponse({
+    success: true,
+    pagoId: pagoId,
+    montoAplicadoArs: montoAplicadoArs,
+    montoAplicadoUsd: montoAplicadoUsd
+  });
+}
+
+/**
+ * Devuelve el detalle completo de un cliente a crédito: sus datos,
+ * todos sus pedidos (de PEDIDOS, vinculados por DNI normalizado, más
+ * recientes primero), y todos sus pagos (de PAGOS_CREDITO, más
+ * recientes primero) — para la pantalla de detalle/pago del panel.
+ *
+ * Parámetros esperados: clienteId
+ */
+function getDetalleClienteCredito(clienteId){
+
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+
+  const clientesSheet = getOrCrearHojaClientes();
+  const clientesData = rowsToObjects(clientesSheet.getDataRange().getValues());
+  const cliente = clientesData.find(c => String(c.CLIENTE_ID) === String(clienteId));
+
+  if(!cliente){
+    return jsonResponse({ success:false, message:"No se encontró el cliente." });
+  }
+
+  const dniNorm = normalizarDni(cliente.DNI);
+
+  const pedidosSheet = ss.getSheetByName("PEDIDOS");
+  const pedidosData = pedidosSheet ? rowsToObjects(pedidosSheet.getDataRange().getValues()) : [];
+  const pedidosDelCliente = pedidosData
+    .filter(p => normalizarDni(p.DNI) === dniNorm)
+    .reverse();
+
+  const pagosSheet = getOrCrearHojaPagosCredito();
+  const pagosData = rowsToObjects(pagosSheet.getDataRange().getValues());
+  const pagosDelCliente = pagosData
+    .filter(pago => String(pago.CLIENTE_ID) === String(clienteId))
+    .reverse();
+
+  const ss2 = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const deudasSheet = ss2.getSheetByName("DEUDAS_EXTRA");
+  const deudasDelCliente = deudasSheet
+    ? rowsToObjects(deudasSheet.getDataRange().getValues())
+        .filter(d => String(d.CLIENTE_ID) === String(clienteId))
+        .reverse()
+    : [];
+
+  const esCredito = String(cliente.A_CREDITO || "").toUpperCase() === "SI";
+
+  // El saldo pendiente solo es una deuda REAL para clientes marcados
+  // a crédito. Para los demás (compra al contado, incluso si llegaron
+  // automáticamente desde un pedido del catálogo web), el total de
+  // sus pedidos es solo informativo — no representa plata que deban,
+  // así que el saldo siempre es $0, sin importar cuántos pedidos tenga.
+  const saldos = esCredito
+    ? calcularSaldosCliente(clienteId, dniNorm)
+    : { compradoArs: 0, compradoUsd: 0, pagadoArs: 0, pagadoUsd: 0, saldoArs: 0, saldoUsd: 0 };
+
+  return jsonResponse({
+    success: true,
+    cliente: cliente,
+    pedidos: pedidosDelCliente,
+    pagos: pagosDelCliente,
+    deudasExtra: deudasDelCliente,
+    totalCompradoArs: saldos.compradoArs,
+    totalCompradoUsd: saldos.compradoUsd,
+    totalPagadoArs: saldos.pagadoArs,
+    totalPagadoUsd: saldos.pagadoUsd,
+    saldoPendienteArs: saldos.saldoArs,
+    saldoPendienteUsd: saldos.saldoUsd
+  });
+}
+
+/**
+ * Devuelve todos los clientes de la hoja CLIENTES sin filtrar por
+ * A_CREDITO — se usa para el selector de cliente al generar pedidos
+ * desde el POS, donde todos los clientes son válidos.
+ */
+function getTodosClientes(){
+  const sheet = getOrCrearHojaClientes();
+  const data = rowsToObjects(sheet.getDataRange().getValues());
+  const clientes = data
+    .filter(c => c.CLIENTE_ID && c.NOMBRE)
+    .map(c => ({
+      CLIENTE_ID: c.CLIENTE_ID,
+      NOMBRE:     c.NOMBRE,
+      ALIAS:      c.ALIAS     || "",
+      DNI:        c.DNI       || "",
+      TELEFONO:   c.TELEFONO  || "",
+      DIRECCION:  c.DIRECCION || "",
+      EMPRESA:    c.EMPRESA   || "",
+      LOCALIDAD:  c.LOCALIDAD || "",
+      PROVINCIA:  c.PROVINCIA || "",
+      CODIGO_POSTAL: c.CODIGO_POSTAL || "",
+      A_CREDITO:  c.A_CREDITO || "NO"
+    }));
+  return jsonResponse({ success: true, clientes });
+}
+
+function getClientes(){
+
+const sheet =
+SpreadsheetApp
+.openById(SPREADSHEET_ID)
+.getSheetByName("PEDIDOS");
+
+const data =
+rowsToObjects(
+  sheet.getDataRange().getValues()
+);
+
+const clientes = {};
+
+data.forEach(p => {
+
+const dni = p.DNI;
+
+if(!clientes[dni]){
+
+  clientes[dni] = {
+
+    CLIENTE: p.CLIENTE,
+    EMPRESA: p.EMPRESA,
+    DIRECCION: p.DIRECCION,
+    TELEFONO: p.TELEFONO,
+    DNI: p.DNI,
+    PEDIDOS: 0,
+    TOTAL: 0
+
+  };
+
+}
+
+clientes[dni].PEDIDOS++;
+clientes[dni].TOTAL +=
+Number(p.TOTAL || 0);
+
+});
+
+return jsonResponse({
+success:true,
+clientes:Object.values(clientes)
+});
+
+}
+function getAgotados(){
+
+const data =
+getSheet()
+.getDataRange()
+.getValues();
+
+const productos =
+rowsToObjects(data);
+
+const agotados =
+productos.filter(p => {
+
+return Number(
+p.STOCK || 0
+) === 0;
+
+});
+
+return jsonResponse({
+success:true,
+productos:agotados
+});
+
+}
+function getStockBajo(){
+
+const data =
+getSheet()
+.getDataRange()
+.getValues();
+
+const productos =
+rowsToObjects(data);
+
+const stockBajo =
+productos.filter(p => {
+
+const stock =
+Number(p.STOCK || 0);
+
+return stock > 0 && stock <= 5;
+
+});
+
+return jsonResponse({
+success:true,
+productos:stockBajo
+});
+
+}
+function getMasVendidos(){
+
+const ss =
+SpreadsheetApp.openById(SPREADSHEET_ID);
+
+const productos = {};
+
+function acumular(sheetName, idxCodigo, idxNombre, idxCantidad){
+
+  const sheet = ss.getSheetByName(sheetName);
+  if(!sheet) return;
+
+  const data = sheet.getDataRange().getValues();
+  data.shift();
+
+  data.forEach(row => {
+
+    const codigo   = row[idxCodigo];
+    const producto = row[idxNombre];
+    const cantidad = Number(row[idxCantidad]) || 0;
+
+    if(!codigo) return;
+
+    if(!productos[codigo]){
+      productos[codigo] = {
+        CODIGO: codigo,
+        PRODUCTO: producto,
+        VENDIDOS: 0
+      };
+    }
+
+    productos[codigo].VENDIDOS += cantidad;
+
+  });
+
+}
+
+// Ventas por Pedidos: [PEDIDO_ID, CODIGO, PRODUCTO, CANTIDAD, ...]
+acumular("DETALLE_PEDIDOS", 1, 2, 3);
+
+// Ventas por POS: [VENTA_ID, CODIGO, PRODUCTO, CANTIDAD, PRECIO, SUBTOTAL]
+acumular("DETALLE_VENTAS", 1, 2, 3);
+
+const ranking =
+Object.values(productos)
+.sort((a,b) => b.VENDIDOS - a.VENDIDOS)
+.slice(0,20);
+
+return jsonResponse({
+success:true,
+productos: ranking
+});
+
+}
+function generarPDFPendientes(){
+
+const ss =
+SpreadsheetApp.openById(SPREADSHEET_ID);
+
+const pedidosSheet =
+ss.getSheetByName("PEDIDOS");
+
+const detalleSheet =
+ss.getSheetByName("DETALLE_PEDIDOS");
+
+const pedidos =
+pedidosSheet.getDataRange().getValues();
+
+const detalles =
+detalleSheet.getDataRange().getValues();
+
+for(let i=1;i<pedidos.length;i++){
+
+  if(pedidos[i][9]){
+    continue;
+  }
+
+  const pedidoId = pedidos[i][0];
+
+  const data = {
+
+    nombre: pedidos[i][2],
+    empresa: pedidos[i][3],
+    direccion: pedidos[i][4],
+    telefono: pedidos[i][5],
+    dni: pedidos[i][6],
+    total: pedidos[i][7],
+    codigoPostal: pedidos[i][10],
+    localidad: pedidos[i][11],
+    provincia: pedidos[i][12],
+    // Columnas 17-19: subtotal, descuento y etiqueta (agregadas cuando
+    // el pedido viene del POS con descuento aplicado — pueden estar
+    // vacías en pedidos del catálogo web o en pedidos viejos).
+    subtotal: Number(pedidos[i][16] || pedidos[i][7] || 0),
+    descuento: Number(pedidos[i][17] || 0),
+    descuentoEtiqueta: String(pedidos[i][18] || ""),
+
+    carrito: []
+
+  };
+
+  for(let j=1;j<detalles.length;j++){
+
+    if(detalles[j][0] === pedidoId){
+
+      data.carrito.push({
+
+        CODIGO: detalles[j][1],
+        PRODUCTO: detalles[j][2],
+        cantidad: detalles[j][3],
+        PRECIO: detalles[j][4]
+
+      });
+
+    }
+
+  }
+
+  try{
+
+    const pdfUrl =
+    generarPDFPedido(
+      pedidoId,
+      pedidos[i][1],
+      data
+    );
+
+    pedidosSheet
+      .getRange(i + 1, 10)
+      .setValue(pdfUrl);
+
+  }catch(error){
+
+    Logger.log(error);
+
+  }
+
+}
+
+}
+function guardarVenta(e){
+
+  const ss =
+  SpreadsheetApp.openById(SPREADSHEET_ID);
+
+  const ventasSheet =
+  ss.getSheetByName("VENTAS_LOCAL");
+
+  const detalleSheet =
+  ss.getSheetByName("DETALLE_VENTAS");
+
+  if(!ventasSheet || !detalleSheet){
+
+    return jsonResponse({
+      success:false,
+      message:"Faltan las hojas 'VENTAS_LOCAL' y/o 'DETALLE_VENTAS' en la planilla. Creálas antes de usar el Punto de Venta."
+    });
+
+  }
+
+  const ventaId =
+  generarIdCorto("VEN", ventasSheet);
+
+  const fecha =
+  new Date();
+
+  const total =
+  Number(e.parameter.total || 0);
+
+  const formaPago =
+  e.parameter.formaPago || "EFECTIVO";
+
+  const vendedor =
+  e.parameter.vendedor || "ADMIN";
+
+  const observaciones =
+  e.parameter.observaciones || "";
+
+  const carrito =
+  JSON.parse(
+    e.parameter.carrito || "[]"
+  );
+
+  ventasSheet.appendRow([
+    ventaId,
+    fecha,
+    total,
+    formaPago,
+    vendedor,
+    observaciones
+  ]);
+
+  carrito.forEach(item => {
+
+    detalleSheet.appendRow([
+      ventaId,
+      item.CODIGO,
+      item.PRODUCTO,
+      item.cantidad,
+      item.PRECIO,
+      item.PRECIO * item.cantidad
+    ]);
+
+  });
+
+  descontarStockPorVenta(carrito);
+
+  return jsonResponse({
+    success:true,
+    ventaId:ventaId
+  });
+
+}
+
+/**
+ * Resta del stock de PRODUCTOS las cantidades vendidas. Usa LockService
+ * para evitar que dos ventas casi simultáneas (ej. dos cajas a la vez)
+ * lean el mismo stock viejo y una de las restas se pierda.
+ *
+ * Si un producto del carrito ya no existe en PRODUCTOS (se borró
+ * después de cargarse el catálogo en el POS), simplemente se lo
+ * ignora — la venta ya quedó registrada igual, no se interrumpe nada
+ * por esto.
+ *
+ * El stock puede quedar en negativo si se vendió más de lo que había
+ * cargado — es intencional: no se bloquean ventas por esto, se
+ * corrige el número a mano después si hace falta.
+ */
+function descontarStockPorVenta(carrito){
+
+  if(!carrito || carrito.length === 0) return;
+
+  const lock = LockService.getScriptLock();
+  const obtuvoLock = lock.tryLock(10000); // espera hasta 10s si otra venta está actualizando stock
+
+  if(!obtuvoLock){
+    // No se pudo descontar a tiempo (alta concurrencia). La venta ya
+    // está guardada; el stock va a quedar desactualizado para este
+    // carrito puntual y hay que corregirlo a mano. Se loguea para
+    // poder diagnosticarlo si pasa seguido.
+    console.error("No se pudo obtener el lock para descontar stock. Carrito: " + JSON.stringify(carrito));
+    return;
+  }
+
+  try{
+
+    const sheet = getSheet();
+    if(!sheet) return;
+
+    const data = sheet.getDataRange().getValues();
+    const headerRow = data[0];
+
+    const idxCodigo = headerRow.indexOf("CODIGO");
+    const idxStock  = headerRow.indexOf("STOCK");
+    if(idxCodigo === -1 || idxStock === -1) return; // hoja sin esas columnas, no hay nada para hacer
+
+    // Cantidad total vendida por código (por si el mismo producto
+    // aparece más de una vez en el carrito, aunque hoy el POS no lo hace)
+    const cantidadesPorCodigo = {};
+    carrito.forEach(item => {
+      const codigo = String(item.CODIGO || "").trim();
+      if(!codigo) return;
+      cantidadesPorCodigo[codigo] = (cantidadesPorCodigo[codigo] || 0) + Number(item.cantidad || 0);
+    });
+
+    for(let fila = 1; fila < data.length; fila++){
+      const codigoFila = String(data[fila][idxCodigo] || "").trim();
+      if(cantidadesPorCodigo.hasOwnProperty(codigoFila)){
+        const stockActual = Number(data[fila][idxStock] || 0);
+        const stockNuevo = stockActual - cantidadesPorCodigo[codigoFila];
+        sheet.getRange(fila + 1, idxStock + 1).setValue(stockNuevo);
+      }
+    }
+
+  } finally {
+    lock.releaseLock();
+  }
+
+}
+
+/* =====================================================================
+   POS — VENTAS DEL DIA (para dashboard en tiempo real)
+===================================================================== */
+
+function getVentasPOS(){
+  // El dashboard solo muestra ventas activas — las anuladas no cuentan
+  return getVentasPOSPorRango(null, null, true);
+}
+
+/**
+ * Devuelve el historial de ventas POS, opcionalmente filtrado por
+ * rango de fechas. Usado por la sección "Ventas POS" del panel.
+ * Parámetros (todos opcionales):
+ *   desde  — "yyyy-MM-dd"
+ *   hasta  — "yyyy-MM-dd"
+ * Si no se pasa ninguno, devuelve los últimos 60 días.
+ */
+function getVentasPOSHistorial(e){
+
+  const zona = Session.getScriptTimeZone();
+  const params = (e && e.parameter) || {};
+
+  let desde = params.desde || null;
+  let hasta = params.hasta || null;
+
+  if(!desde && !hasta){
+    const hoy = new Date();
+    const haceSesentaDias = new Date();
+    haceSesentaDias.setDate(hoy.getDate() - 60);
+    desde = Utilities.formatDate(haceSesentaDias, zona, "yyyy-MM-dd");
+    hasta = Utilities.formatDate(hoy, zona, "yyyy-MM-dd");
+  }
+
+  return getVentasPOSPorRango(desde, hasta);
+
+}
+
+/**
+ * Lógica compartida: lee VENTAS_LOCAL + DETALLE_VENTAS y devuelve
+ * las ventas dentro del rango [desde, hasta] (inclusive, formato
+ * "yyyy-MM-dd"). Si ambos son null, devuelve solo las ventas de hoy
+ * (comportamiento original de getVentasPOS, usado por el dashboard).
+ */
+function getVentasPOSPorRango(desde, hasta, excluirAnuladas){
+
+  const ss =
+  SpreadsheetApp.openById(SPREADSHEET_ID);
+
+  const ventasSheet =
+  ss.getSheetByName("VENTAS_LOCAL");
+
+  if(!ventasSheet){
+    return jsonResponse({
+      success:true,
+      ventas:[]
+    });
+  }
+
+  const detalleSheet =
+  ss.getSheetByName("DETALLE_VENTAS");
+
+  const dataRaw = ventasSheet.getDataRange().getValues();
+  const headers = dataRaw.shift(); // VENTA_ID, FECHA, TOTAL, FORMA_PAGO, VENDEDOR, OBSERVACIONES [, ANULADA, MOTIVO_ANULACION]
+
+  const idxAnulada = headers.indexOf("ANULADA");
+  const idxMotivo  = headers.indexOf("MOTIVO_ANULACION");
+
+  const data = dataRaw;
+
+  const detalles =
+  detalleSheet
+    ? detalleSheet.getDataRange().getValues()
+    : [];
+
+  if(detalles.length) detalles.shift();
+
+  const zona = Session.getScriptTimeZone();
+  const hoy = new Date();
+  const hoyStr = Utilities.formatDate(hoy, zona, "yyyy-MM-dd");
+
+  const filtrarPorRango = !!(desde || hasta);
+
+  const ventas = [];
+
+  for(let i = data.length - 1; i >= 0; i--){
+
+    const row = data[i];
+
+    const ventaId = row[0];
+    const fecha   = new Date(row[1]);
+    const fechaStr = Utilities.formatDate(fecha, zona, "yyyy-MM-dd");
+
+    if(filtrarPorRango){
+      if(desde && fechaStr < desde) continue;
+      if(hasta && fechaStr > hasta) continue;
+    } else {
+      // Sin rango: comportamiento original — solo hoy
+      if(fechaStr !== hoyStr) continue;
+    }
+
+    // Excluir anuladas cuando se pide (dashboard) — el historial las incluye igual
+    if(excluirAnuladas){
+      const esAnulada = idxAnulada !== -1 &&
+        String(row[idxAnulada] || "").toUpperCase() === "SI";
+      if(esAnulada) continue;
+    }
+
+    // Armar el resumen de items para esta venta
+    const carrito = [];
+    let itemsResumen = [];
+
+    for(let j = 0; j < detalles.length; j++){
+      if(String(detalles[j][0]) === String(ventaId)){
+        carrito.push({
+          CODIGO: detalles[j][1],
+          PRODUCTO: detalles[j][2],
+          cantidad: detalles[j][3],
+          PRECIO: detalles[j][4]
+        });
+        itemsResumen.push(detalles[j][3] + "x " + detalles[j][2]);
+      }
+    }
+
+    ventas.push({
+      VENTA_ID: ventaId,
+      ID: ventaId,
+      FECHA: fecha,
+      TOTAL: Number(row[2]) || 0,
+      FORMA_PAGO: row[3],
+      VENDEDOR: row[4],
+      OBSERVACIONES: row[5],
+      ANULADA: idxAnulada !== -1 ? String(row[idxAnulada] || "") : "",
+      MOTIVO_ANULACION: idxMotivo !== -1 ? String(row[idxMotivo] || "") : "",
+      ITEMS: itemsResumen.join(", "),
+      CARRITO: JSON.stringify(carrito)
+    });
+
+  }
+
+  return jsonResponse({
+    success:true,
+    ventas: ventas
+  });
+
+}
+
+/**
+ * Elimina una venta del POS: borra la fila de VENTAS_LOCAL, borra las
+ * filas correspondientes de DETALLE_VENTAS, y devuelve el stock de
+ * los productos vendidos (como si la venta nunca hubiera pasado).
+ *
+ * El carrito de la venta se recibe directo del frontend (que ya lo
+ * tiene en memoria, en el campo CARRITO que devuelve
+ * getVentasPOSPorRango) — evita una lectura extra de DETALLE_VENTAS
+ * solo para reconstruirlo, ya que el propio borrado de esas filas
+ * pasa por código de todas formas.
+ *
+ * Parámetros esperados: ventaId, carrito (JSON con [{CODIGO, cantidad}, ...])
+ */
+function eliminarVenta(e){
+
+  const params = (e && e.parameter) || {};
+
+  const ventaId = (params.ventaId || "").toString().trim();
+  const motivo  = (params.motivo  || "Sin motivo").toString().trim();
+
+  if(!ventaId){
+    return jsonResponse({ success:false, message:"Falta el ID de la venta a eliminar." });
+  }
+
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const ventasSheet = ss.getSheetByName("VENTAS_LOCAL");
+
+  if(!ventasSheet){
+    return jsonResponse({ success:false, message:"No se encontró la hoja VENTAS_LOCAL." });
+  }
+
+  // Asegura que existan las columnas ANULADA y MOTIVO_ANULACION al final.
+  // Solo la primera vez — si ya existen, las reutiliza.
+  const headerRange = ventasSheet.getRange(1, 1, 1, ventasSheet.getLastColumn());
+  const headers = headerRange.getValues()[0];
+  let colAnulada = headers.indexOf("ANULADA");
+  let colMotivo  = headers.indexOf("MOTIVO_ANULACION");
+
+  if(colAnulada === -1){
+    const proxima = ventasSheet.getLastColumn() + 1;
+    ventasSheet.getRange(1, proxima, 1, 2).setValues([["ANULADA", "MOTIVO_ANULACION"]]);
+    colAnulada = proxima - 1;
+    colMotivo  = proxima;
+  }
+
+  // Marcar la venta como anulada (no se borra, sigue visible en historial)
+  const dataVentas = ventasSheet.getDataRange().getValues();
+
+  for(let i = 1; i < dataVentas.length; i++){
+    if(String(dataVentas[i][0]) === ventaId){
+      const fila = i + 1;
+      ventasSheet.getRange(fila, colAnulada + 1, 1, 2).setValues([["SI", motivo]]);
+
+      // Devuelve el stock igual que antes
+      try{
+        const detalleSheet = ss.getSheetByName("DETALLE_VENTAS");
+        const carrito = JSON.parse(params.carrito || "[]");
+        if(carrito.length > 0){
+          const carritoInvertido = carrito.map(item => ({
+            ...item,
+            cantidad: -(Math.abs(Number(item.cantidad) || 1))
+          }));
+          descontarStockPorVenta(carritoInvertido);
+        } else if(detalleSheet){
+          // Intentar reconstruir desde DETALLE_VENTAS si no vino carrito
+          const detalleData = detalleSheet.getDataRange().getValues();
+          const itemsDeLaVenta = [];
+          for(let j = 1; j < detalleData.length; j++){
+            if(String(detalleData[j][0]) === ventaId){
+              itemsDeLaVenta.push({ CODIGO: detalleData[j][1], cantidad: -(Math.abs(Number(detalleData[j][3]) || 1)) });
+            }
+          }
+          if(itemsDeLaVenta.length > 0) descontarStockPorVenta(itemsDeLaVenta);
+        }
+      }catch(errStock){
+        Logger.log("anularVenta: no se pudo devolver stock: " + errStock);
+      }
+
+      return jsonResponse({ success:true, anulada:true });
+    }
+  }
+
+  return jsonResponse({ success:false, message:"No se encontró la venta '" + ventaId + "'." });
+}
+/* =====================================================================
+   CIERRE DE CAJA (RECONCILIACION DIARIA)
+   Hoja requerida: "CIERRES_CAJA"
+   Columnas (fila 1, encabezados exactos):
+   CIERRE_ID | FECHA | EFECTIVO_ESPERADO | EFECTIVO_CONTADO | EFECTIVO_DIFERENCIA |
+   TRANSFERENCIA_ESPERADO | TRANSFERENCIA_CONTADO | TRANSFERENCIA_DIFERENCIA |
+   TARJETA_ESPERADO | TARJETA_CONTADO | TARJETA_DIFERENCIA |
+   TOTAL_ESPERADO | TOTAL_CONTADO | TOTAL_DIFERENCIA |
+   VENDEDOR | OBSERVACIONES | FECHA_CIERRE
+===================================================================== */
+
+const METODOS_PAGO_CIERRE = ["EFECTIVO", "TRANSFERENCIA", "TARJETA"];
+
+/**
+ * Calcula lo esperado por forma de pago a partir de VENTAS_LOCAL,
+ * para una fecha dada (por defecto, hoy). Usado para precargar el
+ * formulario de cierre de caja antes de que el usuario cuente el efectivo.
+ */
+function getCierreCajaResumen(e){
+
+  const fechaParam = e.parameter.fecha; // "yyyy-MM-dd", opcional
+
+  const ss =
+  SpreadsheetApp.openById(SPREADSHEET_ID);
+
+  const ventasSheet =
+  ss.getSheetByName("VENTAS_LOCAL");
+
+  if(!ventasSheet){
+    return jsonResponse({
+      success:false,
+      message:"Falta la hoja 'VENTAS_LOCAL'."
+    });
+  }
+
+  const data =
+  ventasSheet.getDataRange().getValues();
+
+  const idxAnulada = data.length > 0 ? data[0].indexOf("ANULADA") : -1;
+
+  data.shift();
+
+  const zona = Session.getScriptTimeZone();
+
+  const fechaObjetivo =
+    fechaParam
+      ? fechaParam
+      : Utilities.formatDate(new Date(), zona, "yyyy-MM-dd");
+
+  const totales = {
+    EFECTIVO: 0,
+    TRANSFERENCIA: 0,
+    TARJETA: 0
+  };
+
+  let cantidadVentas = 0;
+
+  data.forEach(row => {
+
+    // Las ventas anuladas no cuentan para el cierre de caja
+    const anulada = idxAnulada !== -1 && String(row[idxAnulada] || "").toUpperCase() === "SI";
+    if(anulada) return;
+
+    const fechaVenta = new Date(row[1]);
+
+    const fechaVentaStr =
+      Utilities.formatDate(fechaVenta, zona, "yyyy-MM-dd");
+
+    if(fechaVentaStr !== fechaObjetivo) return;
+
+    const total = Number(row[2]) || 0;
+
+    let formaPago =
+      String(row[3] || "EFECTIVO").toUpperCase().trim();
+
+    if(METODOS_PAGO_CIERRE.indexOf(formaPago) === -1){
+      formaPago = "EFECTIVO";
+    }
+
+    totales[formaPago] += total;
+    cantidadVentas++;
+
+  });
+
+  const totalEsperado =
+    totales.EFECTIVO + totales.TRANSFERENCIA + totales.TARJETA;
+
+  // Ingresos/egresos manuales de caja (retiros, gastos chicos, aportes):
+  // se asumen siempre en efectivo, así que ajustan el efectivo esperado
+  // en el cajón, no el total general de ventas.
+  const movimientosDelDia = getMovimientosCajaDelDia(fechaObjetivo);
+
+  let movimientosIngresos = 0;
+  let movimientosEgresos = 0;
+  movimientosDelDia.forEach(m => {
+    if(String(m.TIPO).toUpperCase() === "INGRESO") movimientosIngresos += m.MONTO;
+    else movimientosEgresos += m.MONTO;
+  });
+
+  const efectivoEsperadoAjustado =
+    totales.EFECTIVO + movimientosIngresos - movimientosEgresos;
+
+  const totalEsperadoAjustado =
+    efectivoEsperadoAjustado + totales.TRANSFERENCIA + totales.TARJETA;
+
+  // Verifica si ya existe un cierre guardado para esa fecha
+  const cierreExistente = buscarCierrePorFecha(fechaObjetivo);
+
+  return jsonResponse({
+    success: true,
+    fecha: fechaObjetivo,
+    cantidadVentas: cantidadVentas,
+    totalVentas: totalEsperado,  // total de ventas del día sin anuladas ni movimientos
+    esperado: {
+      EFECTIVO: efectivoEsperadoAjustado,
+      TRANSFERENCIA: totales.TRANSFERENCIA,
+      TARJETA: totales.TARJETA,
+      TOTAL: totalEsperadoAjustado
+    },
+    ventasEfectivo: totales.EFECTIVO,
+    movimientosCaja: {
+      ingresos: movimientosIngresos,
+      egresos: movimientosEgresos,
+      neto: movimientosIngresos - movimientosEgresos,
+      detalle: movimientosDelDia
+    },
+    yaCerrado: !!cierreExistente,
+    cierreExistente: cierreExistente || null
+  });
+
+}
+
+function buscarCierrePorFecha(fechaStr){
+
+  const ss =
+  SpreadsheetApp.openById(SPREADSHEET_ID);
+
+  const sheet =
+  ss.getSheetByName("CIERRES_CAJA");
+
+  if(!sheet) return null;
+
+  const data =
+  sheet.getDataRange().getValues();
+
+  if(data.length < 2) return null;
+
+  const headers = data[0];
+  const zona = Session.getScriptTimeZone();
+
+  for(let i = 1; i < data.length; i++){
+
+    const filaFecha =
+      Utilities.formatDate(new Date(data[i][1]), zona, "yyyy-MM-dd");
+
+    if(filaFecha === fechaStr){
+
+      const obj = {};
+      headers.forEach((h, idx) => { obj[h] = data[i][idx]; });
+      return obj;
+
+    }
+
+  }
+
+  return null;
+
+}
+
+/**
+ * Guarda el cierre de caja del día: lo esperado (según VENTAS_LOCAL)
+ * vs. lo contado físicamente, por cada forma de pago, con su diferencia.
+ * Si ya existe un cierre para esa fecha, lo actualiza (sobrescribe la fila)
+ * en lugar de duplicarlo.
+ */
+function guardarCierreCaja(e){
+
+  const ss =
+  SpreadsheetApp.openById(SPREADSHEET_ID);
+
+  const sheet =
+  ss.getSheetByName("CIERRES_CAJA");
+
+  if(!sheet){
+    return jsonResponse({
+      success:false,
+      message:"Falta la hoja 'CIERRES_CAJA' en la planilla. Creála con los encabezados: CIERRE_ID, FECHA, EFECTIVO_ESPERADO, EFECTIVO_CONTADO, EFECTIVO_DIFERENCIA, TRANSFERENCIA_ESPERADO, TRANSFERENCIA_CONTADO, TRANSFERENCIA_DIFERENCIA, TARJETA_ESPERADO, TARJETA_CONTADO, TARJETA_DIFERENCIA, TOTAL_ESPERADO, TOTAL_CONTADO, TOTAL_DIFERENCIA, VENDEDOR, OBSERVACIONES, FECHA_CIERRE"
+    });
+  }
+
+  const zona = Session.getScriptTimeZone();
+
+  const fecha =
+    e.parameter.fecha ||
+    Utilities.formatDate(new Date(), zona, "yyyy-MM-dd");
+
+  const efectivoEsperado      = Number(e.parameter.efectivoEsperado || 0);
+  const efectivoContado       = Number(e.parameter.efectivoContado || 0);
+  const transferenciaEsperado = Number(e.parameter.transferenciaEsperado || 0);
+  const transferenciaContado  = Number(e.parameter.transferenciaContado || 0);
+  const tarjetaEsperado       = Number(e.parameter.tarjetaEsperado || 0);
+  const tarjetaContado        = Number(e.parameter.tarjetaContado || 0);
+
+  const vendedor      = e.parameter.vendedor || "ADMIN";
+  const observaciones = e.parameter.observaciones || "";
+
+  const efectivoDiferencia      = efectivoContado - efectivoEsperado;
+  const transferenciaDiferencia = transferenciaContado - transferenciaEsperado;
+  const tarjetaDiferencia       = tarjetaContado - tarjetaEsperado;
+
+  const totalEsperado  = efectivoEsperado + transferenciaEsperado + tarjetaEsperado;
+  const totalContado   = efectivoContado + transferenciaContado + tarjetaContado;
+  const totalDiferencia = totalContado - totalEsperado;
+
+  const data = sheet.getDataRange().getValues();
+
+  let filaExistente = -1;
+
+  for(let i = 1; i < data.length; i++){
+    const filaFecha =
+      Utilities.formatDate(new Date(data[i][1]), zona, "yyyy-MM-dd");
+    if(filaFecha === fecha){
+      filaExistente = i + 1; // +1: índice de hoja (1-based) y +1 por encabezado ya incluido en i
+      break;
+    }
+  }
+
+  const cierreId =
+    filaExistente > 0
+      ? data[filaExistente - 1][0]
+      : "CIERRE-" + new Date().getTime();
+
+  const filaValores = [
+    cierreId,
+    fecha,
+    efectivoEsperado,
+    efectivoContado,
+    efectivoDiferencia,
+    transferenciaEsperado,
+    transferenciaContado,
+    transferenciaDiferencia,
+    tarjetaEsperado,
+    tarjetaContado,
+    tarjetaDiferencia,
+    totalEsperado,
+    totalContado,
+    totalDiferencia,
+    vendedor,
+    observaciones,
+    new Date()
+  ];
+
+  if(filaExistente > 0){
+    sheet
+      .getRange(filaExistente, 1, 1, filaValores.length)
+      .setValues([filaValores]);
+  } else {
+    sheet.appendRow(filaValores);
+  }
+
+  return jsonResponse({
+    success: true,
+    cierreId: cierreId,
+    actualizado: filaExistente > 0,
+    resumen: {
+      EFECTIVO:       { esperado: efectivoEsperado,      contado: efectivoContado,      diferencia: efectivoDiferencia },
+      TRANSFERENCIA:  { esperado: transferenciaEsperado, contado: transferenciaContado, diferencia: transferenciaDiferencia },
+      TARJETA:        { esperado: tarjetaEsperado,        contado: tarjetaContado,        diferencia: tarjetaDiferencia },
+      TOTAL:          { esperado: totalEsperado,          contado: totalContado,          diferencia: totalDiferencia }
+    }
+  });
+
+}
+
+function getHistorialCierres(){
+
+  const ss =
+  SpreadsheetApp.openById(SPREADSHEET_ID);
+
+  const sheet =
+  ss.getSheetByName("CIERRES_CAJA");
+
+  if(!sheet){
+    return jsonResponse({
+      success:true,
+      cierres:[]
+    });
+  }
+
+  const data =
+  sheet.getDataRange().getValues();
+
+  const cierres = rowsToObjects(data);
+
+  cierres.sort((a, b) => new Date(b.FECHA) - new Date(a.FECHA));
+
+  return jsonResponse({
+    success:true,
+    cierres: cierres.slice(0, 30)
+  });
+
+}
+
+/* =====================================================================
+   REPORTES (sección "Reportes" del panel admin)
+   Todas las funciones de abajo aceptan desde/hasta opcionales en
+   e.parameter (formato "yyyy-MM-dd"). Si no vienen, se usa el mes
+   en curso por defecto. Devuelven también el rango efectivamente
+   usado, para que el front-end lo muestre en el encabezado del PDF.
+===================================================================== */
+
+/** Resuelve desde/hasta: si no vienen, devuelve el 1° del mes en curso hasta hoy. */
+function resolverRangoReporte(e){
+
+  const zona = Session.getScriptTimeZone();
+  const hoy = new Date();
+
+  let desde = (e.parameter && e.parameter.desde) || "";
+  let hasta = (e.parameter && e.parameter.hasta) || "";
+
+  if(!desde && !hasta){
+    const primerDiaMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+    desde = Utilities.formatDate(primerDiaMes, zona, "yyyy-MM-dd");
+    hasta = Utilities.formatDate(hoy, zona, "yyyy-MM-dd");
+  } else if(!hasta){
+    hasta = Utilities.formatDate(hoy, zona, "yyyy-MM-dd");
+  } else if(!desde){
+    desde = hasta;
+  }
+
+  return { desde, hasta };
+}
+
+/**
+ * Lee VENTAS_LOCAL (POS) + PEDIDOS (online) dentro de [desde, hasta] y
+ * devuelve una lista plana de ventas con origen, fecha, total y forma
+ * de pago. Es la base que reutilizan varios reportes de esta sección.
+ */
+function obtenerVentasCombinadasPorRango(desde, hasta){
+
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const zona = Session.getScriptTimeZone();
+
+  const ventas = [];
+
+  // ---- POS: hoja VENTAS_LOCAL: [VENTA_ID, FECHA, TOTAL, FORMA_PAGO, VENDEDOR, OBSERVACIONES]
+  // Esta hoja ya contiene TANTO las ventas reales de mostrador COMO los
+  // pedidos del catálogo web marcados como "cobrado en caja" (ver
+  // marcarPedidoCobrado, que les pone VENDEDOR="PEDIDO WEB") — se
+  // distinguen por esa columna para que el reporte 1 pueda seguir
+  // mostrando "POS" y "Pedidos" por separado, aunque ambos sumen al
+  // mismo total general sin duplicar nada.
+  const hojaPOS = ss.getSheetByName("VENTAS_LOCAL");
+  if(hojaPOS){
+    const dataPOS = hojaPOS.getDataRange().getValues();
+    dataPOS.shift();
+
+    dataPOS.forEach(row => {
+      const fecha = new Date(row[1]);
+      const fechaStr = Utilities.formatDate(fecha, zona, "yyyy-MM-dd");
+      if(fechaStr < desde || fechaStr > hasta) return;
+
+      const esPedidoCobrado = String(row[4] || "").toUpperCase() === "PEDIDO WEB";
+
+      ventas.push({
+        ORIGEN: esPedidoCobrado ? "PEDIDO" : "POS",
+        ID: row[0],
+        FECHA: fecha,
+        FECHA_STR: fechaStr,
+        TOTAL: Number(row[2]) || 0,
+        FORMA_PAGO: String(row[3] || "EFECTIVO").toUpperCase()
+      });
+    });
+  }
+
+  // NOTA IMPORTANTE: esta función ya NO lee la hoja PEDIDOS por
+  // separado. Un pedido marcado como "cobrado en caja" (ver
+  // marcarPedidoCobrado) genera su propia fila en VENTAS_LOCAL con la
+  // fecha real del cobro — así que VENTAS_LOCAL ya contiene TANTO las
+  // ventas de mostrador COMO los pedidos cobrados, sin necesitar
+  // sumarlos de nuevo acá. Sumar PEDIDOS de nuevo duplicaría ese
+  // mismo dinero. Los pedidos sin cobrar simplemente no están en
+  // ningún lado de esto — son solo una promesa de venta, no plata real.
+
+  return ventas;
+}
+
+/**
+ * REPORTE 1 — Ventas por período.
+ * Devuelve el total día por día (POS y Pedidos por separado, más el
+ * combinado), para graficar la evolución de ventas en el rango.
+ */
+function getReporteVentasPeriodo(e){
+
+  const { desde, hasta } = resolverRangoReporte(e);
+  const ventas = obtenerVentasCombinadasPorRango(desde, hasta);
+
+  const porDia = {}; // "yyyy-MM-dd" -> { pos, pedidos, total }
+
+  ventas.forEach(v => {
+    if(!porDia[v.FECHA_STR]){
+      porDia[v.FECHA_STR] = { fecha: v.FECHA_STR, pos: 0, pedidos: 0, total: 0 };
+    }
+    if(v.ORIGEN === "POS") porDia[v.FECHA_STR].pos += v.TOTAL;
+    else porDia[v.FECHA_STR].pedidos += v.TOTAL;
+    porDia[v.FECHA_STR].total += v.TOTAL;
+  });
+
+  const dias = Object.values(porDia).sort((a,b) => a.fecha.localeCompare(b.fecha));
+
+  const totalPOS = dias.reduce((s,d) => s + d.pos, 0);
+  const totalPedidos = dias.reduce((s,d) => s + d.pedidos, 0);
+  const totalGeneral = totalPOS + totalPedidos;
+  const cantidadVentas = ventas.length;
+
+  return jsonResponse({
+    success:true,
+    desde, hasta,
+    dias,
+    resumen:{
+      totalPOS,
+      totalPedidos,
+      totalGeneral,
+      cantidadVentas,
+      ticketPromedio: cantidadVentas ? Math.round(totalGeneral / cantidadVentas) : 0
+    }
+  });
+}
+
+/**
+ * REPORTE 2 — Productos más vendidos, con filtro de fecha (a diferencia
+ * de getMasVendidos(), que siempre usa el histórico completo para la
+ * tarjeta resumen del dashboard).
+ */
+function getReporteProductosVendidos(e){
+
+  const { desde, hasta } = resolverRangoReporte(e);
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const zona = Session.getScriptTimeZone();
+
+  const productos = {}; // codigo -> {CODIGO, PRODUCTO, VENDIDOS, INGRESOS}
+
+  function acumular(idsEnRango, sheetNameDetalle){
+    const hojaDetalle = ss.getSheetByName(sheetNameDetalle);
+    if(!hojaDetalle) return;
+
+    const dataDetalle = hojaDetalle.getDataRange().getValues();
+    dataDetalle.shift();
+
+    dataDetalle.forEach(row => {
+      const idVenta = String(row[0]);
+      if(!idsEnRango.has(idVenta)) return;
+
+      const codigo = row[1];
+      const nombre = row[2];
+      const cantidad = Number(row[3]) || 0;
+      const precio = Number(row[4]) || 0;
+
+      if(!codigo) return;
+
+      if(!productos[codigo]){
+        productos[codigo] = { CODIGO: codigo, PRODUCTO: nombre, VENDIDOS: 0, INGRESOS: 0 };
+      }
+      productos[codigo].VENDIDOS += cantidad;
+      productos[codigo].INGRESOS += cantidad * precio;
+    });
+  }
+
+  // ---- POS: VENTAS_LOCAL (incluye ventas de mostrador reales)
+  const idsPOSEnRango = new Set();
+  const hojaPOS = ss.getSheetByName("VENTAS_LOCAL");
+  if(hojaPOS){
+    const dataPOS = hojaPOS.getDataRange().getValues();
+    dataPOS.shift();
+    dataPOS.forEach(row => {
+      // Las filas creadas por un pedido cobrado (VENDEDOR="PEDIDO WEB")
+      // no tienen detalle en DETALLE_VENTAS — su detalle real está en
+      // DETALLE_PEDIDOS, así que se excluyen de este set para no
+      // buscarlas en la hoja equivocada.
+      const esPedidoCobrado = String(row[4] || "").toUpperCase() === "PEDIDO WEB";
+      if(esPedidoCobrado) return;
+
+      const fecha = new Date(row[1]);
+      const fechaStr = Utilities.formatDate(fecha, zona, "yyyy-MM-dd");
+      if(fechaStr >= desde && fechaStr <= hasta) idsPOSEnRango.add(String(row[0]));
+    });
+  }
+  acumular(idsPOSEnRango, "DETALLE_VENTAS");
+
+  // ---- Pedidos cobrados: PEDIDOS (filtrados por COBRADO=SI, con la
+  // fecha real de cobro) + su detalle real en DETALLE_PEDIDOS.
+  const idsPedidosCobradosEnRango = new Set();
+  const hojaPedidos = ss.getSheetByName("PEDIDOS");
+  if(hojaPedidos){
+    const dataPedidos = rowsToObjects(hojaPedidos.getDataRange().getValues());
+    dataPedidos.forEach(p => {
+      const yaCobrado = String(p.COBRADO || "").toUpperCase() === "SI";
+      if(!yaCobrado) return;
+
+      const fecha = new Date(p.FECHA_COBRO || p.FECHA);
+      const fechaStr = Utilities.formatDate(fecha, zona, "yyyy-MM-dd");
+      if(fechaStr >= desde && fechaStr <= hasta) idsPedidosCobradosEnRango.add(String(p.PEDIDO_ID));
+    });
+  }
+  acumular(idsPedidosCobradosEnRango, "DETALLE_PEDIDOS");
+
+  const ranking = Object.values(productos).sort((a,b) => b.VENDIDOS - a.VENDIDOS);
+
+  return jsonResponse({
+    success:true,
+    desde, hasta,
+    productos: ranking
+  });
+}
+
+/**
+ * REPORTE 3 — Ventas por categoría (solo POS, que es donde se conoce
+ * el precio real cobrado; cruza DETALLE_VENTAS con la hoja PRODUCTOS
+ * para obtener la categoría de cada código vendido).
+ */
+function getReporteVentasPorCategoria(e){
+
+  const { desde, hasta } = resolverRangoReporte(e);
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const zona = Session.getScriptTimeZone();
+
+  // Mapa CODIGO -> CATEGORIA, usando la hoja de productos por nombre de columna
+  const productos = rowsToObjects(ss.getSheetByName(SHEET_NAME).getDataRange().getValues());
+  const categoriaPorCodigo = {};
+  productos.forEach(p => {
+    categoriaPorCodigo[p.CODIGO] = (p.CATEGORIA || "Sin categoría").toString().trim() || "Sin categoría";
+  });
+
+  const porCategoria = {}; // categoria -> { categoria, cantidad, ingresos }
+
+  function acumular(idsEnRango, sheetNameDetalle){
+    const hojaDetalle = ss.getSheetByName(sheetNameDetalle);
+    if(!hojaDetalle) return;
+
+    const dataDetalle = hojaDetalle.getDataRange().getValues();
+    dataDetalle.shift();
+
+    dataDetalle.forEach(row => {
+      const idVenta = String(row[0]);
+      if(!idsEnRango.has(idVenta)) return;
+
+      const codigo = row[1];
+      const cantidad = Number(row[3]) || 0;
+      const precio = Number(row[4]) || 0;
+      const categoria = categoriaPorCodigo[codigo] || "Sin categoría";
+
+      if(!porCategoria[categoria]){
+        porCategoria[categoria] = { categoria, cantidad: 0, ingresos: 0 };
+      }
+      porCategoria[categoria].cantidad += cantidad;
+      porCategoria[categoria].ingresos += cantidad * precio;
+    });
+  }
+
+  // ---- POS: VENTAS_LOCAL (excluye las filas de pedidos cobrados,
+  // cuyo detalle real vive en DETALLE_PEDIDOS, no en DETALLE_VENTAS)
+  const idsPOSEnRango = new Set();
+  const hojaPOS = ss.getSheetByName("VENTAS_LOCAL");
+  if(hojaPOS){
+    const dataPOS = hojaPOS.getDataRange().getValues();
+    dataPOS.shift();
+    dataPOS.forEach(row => {
+      const esPedidoCobrado = String(row[4] || "").toUpperCase() === "PEDIDO WEB";
+      if(esPedidoCobrado) return;
+
+      const fecha = new Date(row[1]);
+      const fechaStr = Utilities.formatDate(fecha, zona, "yyyy-MM-dd");
+      if(fechaStr >= desde && fechaStr <= hasta) idsPOSEnRango.add(String(row[0]));
+    });
+  }
+  acumular(idsPOSEnRango, "DETALLE_VENTAS");
+
+  // ---- Pedidos cobrados: PEDIDOS (filtrados por COBRADO=SI, con la
+  // fecha real de cobro) + su detalle real en DETALLE_PEDIDOS.
+  const idsPedidosCobradosEnRango = new Set();
+  const hojaPedidos = ss.getSheetByName("PEDIDOS");
+  if(hojaPedidos){
+    const dataPedidos = rowsToObjects(hojaPedidos.getDataRange().getValues());
+    dataPedidos.forEach(p => {
+      const yaCobrado = String(p.COBRADO || "").toUpperCase() === "SI";
+      if(!yaCobrado) return;
+
+      const fecha = new Date(p.FECHA_COBRO || p.FECHA);
+      const fechaStr = Utilities.formatDate(fecha, zona, "yyyy-MM-dd");
+      if(fechaStr >= desde && fechaStr <= hasta) idsPedidosCobradosEnRango.add(String(p.PEDIDO_ID));
+    });
+  }
+  acumular(idsPedidosCobradosEnRango, "DETALLE_PEDIDOS");
+
+  const ranking = Object.values(porCategoria).sort((a,b) => b.ingresos - a.ingresos);
+
+  return jsonResponse({
+    success:true,
+    desde, hasta,
+    categorias: ranking
+  });
+}
+
+/**
+ * REPORTE 4 — Comparativo de formas de pago (solo POS, que es donde
+ * se registra la forma de pago; los pedidos online se muestran
+ * agrupados aparte porque hoy no tienen ese dato).
+ */
+function getReporteFormasPago(e){
+
+  const { desde, hasta } = resolverRangoReporte(e);
+  const ventas = obtenerVentasCombinadasPorRango(desde, hasta);
+
+  const porForma = {}; // forma -> { forma, cantidad, total }
+
+  ventas.forEach(v => {
+    if(!porForma[v.FORMA_PAGO]){
+      porForma[v.FORMA_PAGO] = { forma: v.FORMA_PAGO, cantidad: 0, total: 0 };
+    }
+    porForma[v.FORMA_PAGO].cantidad++;
+    porForma[v.FORMA_PAGO].total += v.TOTAL;
+  });
+
+  const ranking = Object.values(porForma).sort((a,b) => b.total - a.total);
+
+  return jsonResponse({
+    success:true,
+    desde, hasta,
+    formas: ranking
+  });
+}
+
+/**
+ * REPORTE 5 — Historial de cierres de caja con diferencias, filtrado
+ * por rango de fechas (a diferencia de getHistorialCierres(), que
+ * siempre devuelve los últimos 30 sin filtro, para uso interno del POS).
+ */
+function getReporteCierresCaja(e){
+
+  const { desde, hasta } = resolverRangoReporte(e);
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const zona = Session.getScriptTimeZone();
+
+  const sheet = ss.getSheetByName("CIERRES_CAJA");
+  if(!sheet){
+    return jsonResponse({ success:true, desde, hasta, cierres: [] });
+  }
+
+  const cierres = rowsToObjects(sheet.getDataRange().getValues());
+
+  const filtrados = cierres.filter(c => {
+    const fecha = new Date(c.FECHA);
+    const fechaStr = Utilities.formatDate(fecha, zona, "yyyy-MM-dd");
+    return fechaStr >= desde && fechaStr <= hasta;
+  });
+
+  filtrados.sort((a, b) => new Date(b.FECHA) - new Date(a.FECHA));
+
+  return jsonResponse({
+    success:true,
+    desde, hasta,
+    cierres: filtrados
+  });
+}
+
+/**
+ * REPORTE 6 — Clientes que más compran, filtrado por rango de fechas
+ * (a diferencia de getClientes(), que siempre devuelve el histórico
+ * completo para la sección Clientes del admin).
+ */
+function getReporteClientes(e){
+
+  const { desde, hasta } = resolverRangoReporte(e);
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const zona = Session.getScriptTimeZone();
+
+  const hojaPedidos = ss.getSheetByName("PEDIDOS");
+  if(!hojaPedidos){
+    return jsonResponse({ success:true, desde, hasta, clientes: [] });
+  }
+
+  const pedidos = rowsToObjects(hojaPedidos.getDataRange().getValues());
+
+  const clientes = {}; // dni -> { CLIENTE, EMPRESA, DNI, PEDIDOS, TOTAL }
+
+  pedidos.forEach(p => {
+    // Solo cuentan los pedidos efectivamente cobrados — un pedido sin
+    // cobrar todavía no es una compra real, es una promesa de venta.
+    const yaCobrado = String(p.COBRADO || "").toUpperCase() === "SI";
+    if(!yaCobrado) return;
+
+    const fecha = new Date(p.FECHA_COBRO || p.FECHA);
+    const fechaStr = Utilities.formatDate(fecha, zona, "yyyy-MM-dd");
+    if(fechaStr < desde || fechaStr > hasta) return;
+
+    const dni = p.DNI;
+    if(!clientes[dni]){
+      clientes[dni] = {
+        CLIENTE: p.CLIENTE,
+        EMPRESA: p.EMPRESA,
+        DNI: p.DNI,
+        PEDIDOS: 0,
+        TOTAL: 0
+      };
+    }
+    clientes[dni].PEDIDOS++;
+    clientes[dni].TOTAL += Number(p.TOTAL || 0);
+  });
+
+  const ranking = Object.values(clientes).sort((a,b) => b.TOTAL - a.TOTAL);
+
+  return jsonResponse({
+    success:true,
+    desde, hasta,
+    clientes: ranking
+  });
+}
+
+
+/* =====================================================================
+   MOVIMIENTOS DE CAJA — ingresos y egresos manuales (no son ventas)
+   Hoja requerida: "MOVIMIENTOS_CAJA" con encabezados:
+   MOVIMIENTO_ID, FECHA, TIPO, MONTO, MOTIVO, VENDEDOR, FECHA_REGISTRO
+
+   TIPO es "INGRESO" o "EGRESO". Se usan junto con las ventas del día
+   para calcular el efectivo esperado real en Cierre de Caja (ya que un
+   retiro de caja o un gasto chico en efectivo no es una venta, pero sí
+   afecta cuánto efectivo debería quedar en el cajón).
+===================================================================== */
+
+function getMovimientosCajaDelDia(fecha){
+
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName("MOVIMIENTOS_CAJA");
+
+  if(!sheet){
+    return []; // si no existe la hoja todavía, simplemente no hay movimientos que sumar
+  }
+
+  const zona = Session.getScriptTimeZone();
+  const data = sheet.getDataRange().getValues();
+  data.shift(); // encabezados
+
+  return data
+    .filter(row => {
+      const filaFecha = Utilities.formatDate(new Date(row[1]), zona, "yyyy-MM-dd");
+      return filaFecha === fecha;
+    })
+    .map(row => ({
+      MOVIMIENTO_ID: row[0],
+      FECHA: Utilities.formatDate(new Date(row[1]), zona, "yyyy-MM-dd"),
+      TIPO: row[2],
+      MONTO: Number(row[3] || 0),
+      MOTIVO: row[4],
+      VENDEDOR: row[5],
+      FECHA_REGISTRO: row[6]
+    }));
+}
+
+/** GET ?action=movimientosCajaHoy[&fecha=YYYY-MM-DD] — lista del día, más el saldo neto */
+function getMovimientosCajaHoy(e){
+
+  const zona = Session.getScriptTimeZone();
+  const fecha = (e && e.parameter && e.parameter.fecha) ||
+    Utilities.formatDate(new Date(), zona, "yyyy-MM-dd");
+
+  const movimientos = getMovimientosCajaDelDia(fecha)
+    .sort((a, b) => new Date(b.FECHA_REGISTRO) - new Date(a.FECHA_REGISTRO));
+
+  let totalIngresos = 0;
+  let totalEgresos = 0;
+
+  movimientos.forEach(m => {
+    if(String(m.TIPO).toUpperCase() === "INGRESO") totalIngresos += m.MONTO;
+    else totalEgresos += m.MONTO;
+  });
+
+  return jsonResponse({
+    success: true,
+    fecha: fecha,
+    movimientos: movimientos,
+    totalIngresos: totalIngresos,
+    totalEgresos: totalEgresos,
+    neto: totalIngresos - totalEgresos
+  });
+}
+
+/** GET ?action=guardarMovimientoCaja&tipo=INGRESO|EGRESO&monto=...&motivo=... */
+function guardarMovimientoCaja(e){
+
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName("MOVIMIENTOS_CAJA");
+
+  if(!sheet){
+    return jsonResponse({
+      success:false,
+      message:"Falta la hoja 'MOVIMIENTOS_CAJA' en la planilla. Creála con los encabezados: MOVIMIENTO_ID, FECHA, TIPO, MONTO, MOTIVO, VENDEDOR, FECHA_REGISTRO"
+    });
+  }
+
+  const params = (e && e.parameter) || {};
+
+  const tipo = String(params.tipo || "").toUpperCase().trim();
+  if(tipo !== "INGRESO" && tipo !== "EGRESO"){
+    return jsonResponse({
+      success:false,
+      message:"El tipo de movimiento debe ser INGRESO o EGRESO."
+    });
+  }
+
+  const monto = Number(params.monto || 0);
+  if(!monto || monto <= 0){
+    return jsonResponse({
+      success:false,
+      message:"Ingresá un monto válido, mayor a 0."
+    });
+  }
+
+  const motivo = (params.motivo || "").toString().trim();
+  if(!motivo){
+    return jsonResponse({
+      success:false,
+      message:"El motivo del movimiento es obligatorio (ej: 'Compra de bolsas', 'Retiro para el banco')."
+    });
+  }
+
+  const formaPago = ["EFECTIVO","TRANSFERENCIA","TARJETA"].includes(
+    String(params.formaPago || "").toUpperCase().trim()
+  ) ? String(params.formaPago).toUpperCase().trim() : "EFECTIVO";
+
+  const vendedor = (params.vendedor || "ADMIN").toString();
+  const zona = Session.getScriptTimeZone();
+  const ahora = new Date();
+
+  const movimientoId = "MOV-" + ahora.getTime();
+
+  sheet.appendRow([
+    movimientoId,
+    Utilities.formatDate(ahora, zona, "yyyy-MM-dd"),
+    tipo,
+    monto,
+    motivo,
+    vendedor,
+    ahora,
+    formaPago
+  ]);
+
+  return jsonResponse({
+    success: true,
+    movimientoId: movimientoId
+  });
+}
+
+/** GET ?action=eliminarMovimientoCaja&movimientoId=... */
+function eliminarMovimientoCaja(e){
+
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName("MOVIMIENTOS_CAJA");
+
+  if(!sheet){
+    return jsonResponse({
+      success:false,
+      message:"Falta la hoja 'MOVIMIENTOS_CAJA' en la planilla."
+    });
+  }
+
+  const movimientoId = (e && e.parameter && e.parameter.movimientoId || "").toString().trim();
+  if(!movimientoId){
+    return jsonResponse({ success:false, message:"Falta el ID del movimiento a eliminar." });
+  }
+
+  const data = sheet.getDataRange().getValues();
+  for(let i = 1; i < data.length; i++){
+    if(String(data[i][0]).trim() === movimientoId){
+      sheet.deleteRow(i + 1);
+      return jsonResponse({ success:true });
+    }
+  }
+
+  return jsonResponse({ success:false, message:"No se encontró el movimiento '" + movimientoId + "'." });
+}
+
+/**
+ * HERRAMIENTA DE DIAGNÓSTICO — se mantiene a propósito en el sistema.
+ *
+ * Sirve para forzar el popup de autorización de Google cuando se
+ * agrega al código una función nueva que usa un servicio que el
+ * proyecto nunca usó antes (ej. UrlFetchApp, MailApp, CalendarApp,
+ * etc.). Google solo pide autorización para un permiso cuando una
+ * ejecución llega de verdad a la línea que lo necesita — ejecutar
+ * manualmente la función real (ej. getImagenProxy) sin sus parámetros
+ * normales puede "completarse" sin pedir nada, sin haber autorizado
+ * en realidad nada nuevo, lo cual confunde mucho a la hora de
+ * diagnosticar errores de permisos.
+ *
+ * Cómo usarla: en el editor de Apps Script, elegí esta función en el
+ * desplegable de "Ejecutar" y tocá ▶️. Si aparece el popup de
+ * autorización, completalo (Revisar permisos → tu cuenta → Avanzado
+ * → Ir al proyecto → Permitir). Si no aparece nada y el "Registro de
+ * ejecución" muestra "Código de respuesta: 200", el permiso de
+ * UrlFetchApp ya estaba autorizado de antes.
+ *
+ * Después de autorizar, siempre hay que volver a publicar el script
+ * (Implementar → Administrar implementaciones → Nueva versión) para
+ * que la implementación Web App use la autorización nueva.
+ */
+function testAutorizacionUrlFetch(){
+  const response = UrlFetchApp.fetch("https://www.google.com", { muteHttpExceptions: true });
+  Logger.log("Código de respuesta: " + response.getResponseCode());
+}
+
+/**
+ * MIGRACIÓN — ejecutar UNA SOLA VEZ desde el editor de Apps Script.
+ *
+ * Recorre todos los pedidos de la hoja PEDIDOS y crea en CLIENTES
+ * una ficha para cada DNI que todavía no tenga una. Toma los datos
+ * del pedido más reciente de ese DNI (nombre, teléfono, dirección,
+ * empresa). Los clientes que ya existen no se tocan.
+ *
+ * Cómo usarla:
+ *   1. En el editor de Apps Script, elegí "migrarClientesDesdePedidos"
+ *      en el desplegable de funciones y tocá ▶️.
+ *   2. Revisá el "Registro de ejecución" — va a mostrar cuántas fichas
+ *      se crearon y cuáles DNI se saltó porque ya existían.
+ *   3. Listo. No hace falta volver a ejecutarla.
+ */
+function migrarClientesDesdePedidos() {
+
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const pedidosSheet = ss.getSheetByName("PEDIDOS");
+
+  if (!pedidosSheet) {
+    Logger.log("No se encontró la hoja PEDIDOS.");
+    return;
+  }
+
+  const clientesSheet = getOrCrearHojaClientes();
+
+  // Construir mapa de DNIs que ya están en CLIENTES
+  const clientesData = clientesSheet.getDataRange().getValues();
+  const colDni = 3; // columna D = DNI (índice base 0)
+  const dniExistentes = new Set(
+    clientesData.slice(1)
+      .map(fila => normalizarDni(fila[colDni]))
+      .filter(dni => dni !== "")
+  );
+
+  // Leer todos los pedidos y quedarse con el más reciente por DNI
+  const pedidosData = pedidosSheet.getDataRange().getValues();
+  const headers = pedidosData[0];
+
+  // Detectar columnas por encabezado (robusto ante cambios de orden)
+  const idx = {};
+  ["PEDIDO_ID","FECHA","CLIENTE","EMPRESA","DIRECCION","TELEFONO","DNI"].forEach(h => {
+    idx[h] = headers.indexOf(h);
+  });
+
+  // Agrupar por DNI, quedándose con el pedido de fecha más reciente
+  const porDni = {};
+  pedidosData.slice(1).forEach(fila => {
+    const dni = normalizarDni(fila[idx["DNI"]]);
+    if (!dni) return;
+    const fecha = new Date(fila[idx["FECHA"]]);
+    if (!porDni[dni] || fecha > porDni[dni].fecha) {
+      porDni[dni] = {
+        fecha,
+        nombre:    String(fila[idx["CLIENTE"]]   || "").trim(),
+        empresa:   String(fila[idx["EMPRESA"]]   || "").trim(),
+        direccion: String(fila[idx["DIRECCION"]] || "").trim(),
+        telefono:  String(fila[idx["TELEFONO"]]  || "").trim(),
+        dni
+      };
+    }
+  });
+
+  let creados = 0;
+  let saltados = 0;
+
+  Object.values(porDni).forEach(c => {
+    if (dniExistentes.has(c.dni)) {
+      Logger.log("Ya existe: " + c.dni + " (" + c.nombre + ")");
+      saltados++;
+      return;
+    }
+    const clienteId = generarIdCorto("CLI", clientesSheet);
+    clientesSheet.appendRow([
+      clienteId,
+      c.nombre,
+      "",          // ALIAS
+      c.dni,
+      c.telefono,
+      c.direccion,
+      c.empresa,
+      "NO",        // A_CREDITO — el admin lo activa a mano
+      new Date()   // FECHA_ALTA
+    ]);
+    dniExistentes.add(c.dni);
+    Logger.log("Creado: " + c.dni + " — " + c.nombre);
+    creados++;
+  });
+
+  Logger.log("=== Migración finalizada: " + creados + " fichas creadas, " + saltados + " ya existían. ===");
+}
+
+/* =====================================================================
+   DEUDAS EXTRA — cobros fuera de pedidos y POS
+   Hoja requerida: "DEUDAS_EXTRA" con encabezados:
+   DEUDA_ID, FECHA, CLIENTE_ID, MONEDA, MONTO, CONCEPTO
+===================================================================== */
+
+function getOrCrearHojaDeudasExtra(){
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  let sheet = ss.getSheetByName("DEUDAS_EXTRA");
+  if(!sheet){
+    sheet = ss.insertSheet("DEUDAS_EXTRA");
+    sheet.appendRow(["DEUDA_ID","FECHA","CLIENTE_ID","MONEDA","MONTO","CONCEPTO"]);
+  }
+  return sheet;
+}
+
+/**
+ * Registra una deuda extra para un cliente (cobro fuera de pedidos/POS).
+ * Parámetros esperados: clienteId, moneda ("ARS"/"USD"), monto, concepto
+ */
+function crearDeudaExtra(data){
+
+  const clienteId = String(data.clienteId || "").trim();
+  const monto = Number(data.monto || 0);
+  const moneda = String(data.moneda || "ARS").toUpperCase();
+  const concepto = String(data.concepto || "").trim();
+
+  if(!clienteId){
+    return jsonResponse({ success:false, message:"Falta el cliente." });
+  }
+  if(!monto || monto <= 0){
+    return jsonResponse({ success:false, message:"Ingresá un monto válido, mayor a 0." });
+  }
+  if(moneda !== "ARS" && moneda !== "USD"){
+    return jsonResponse({ success:false, message:"La moneda debe ser ARS o USD." });
+  }
+  if(!concepto){
+    return jsonResponse({ success:false, message:"El concepto es obligatorio." });
+  }
+
+  // Verificar que el cliente existe
+  const clientesSheet = getOrCrearHojaClientes();
+  const clientesData = rowsToObjects(clientesSheet.getDataRange().getValues());
+  const cliente = clientesData.find(c => String(c.CLIENTE_ID) === clienteId);
+  if(!cliente){
+    return jsonResponse({ success:false, message:"No se encontró el cliente." });
+  }
+
+  const sheet = getOrCrearHojaDeudasExtra();
+  const deudaId = generarIdCorto("DEU", sheet);
+
+  sheet.appendRow([
+    deudaId,
+    new Date(),
+    clienteId,
+    moneda,
+    monto,
+    concepto
+  ]);
+
+  return jsonResponse({ success:true, deudaId:deudaId });
+}

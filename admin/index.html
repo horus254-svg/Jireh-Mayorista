@@ -7,6 +7,57 @@
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="admin.css">
 </head>
+<!-- ===== POPUP PROMOCIONAL ===== -->
+<div id="popupPromo" style="
+  display:none; position:fixed; inset:0; z-index:8000;
+  background:rgba(0,0,0,.75);
+  align-items:center; justify-content:center;
+  animation:fadeInPopup .3s ease;
+" onclick="if(event.target===this) cerrarPopupPromo()">
+  <div style="position:relative; max-width:min(560px,92vw); max-height:90vh;">
+    <button onclick="cerrarPopupPromo()" style="
+      position:absolute; top:-14px; right:-14px; z-index:1;
+      width:34px; height:34px; border-radius:50%;
+      background:#fff; border:none; font-size:18px;
+      cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.3);
+      display:flex; align-items:center; justify-content:center;
+    ">✕</button>
+    <img id="popupPromoImg" src="" alt="Promoción"
+      style="width:100%; border-radius:12px; display:block;
+      max-height:90vh; object-fit:contain; box-shadow:0 8px 32px rgba(0,0,0,.4);">
+  </div>
+</div>
+<style>@keyframes fadeInPopup{ from{opacity:0;transform:scale(.95)} to{opacity:1;transform:scale(1)} }</style>
+
+<!-- ===== PANTALLA DE ACTIVACIÓN DE LICENCIA — tapa todo si no hay licencia activada ===== -->
+<div class="license-screen-backdrop" id="licenseScreenBackdrop">
+  <div class="license-screen-card">
+    <div class="license-screen-icon">🔑</div>
+    <h4>Activar VeekPOS</h4>
+    <p class="text-muted" style="font-size:13.5px;">Ingresá el email y el PIN que te dieron al comprar la licencia.</p>
+    <div class="license-screen-error" id="licenseScreenError" style="display:none;"></div>
+    <div class="mb-2">
+      <label class="form-label">URL del servidor de licencias</label>
+      <input type="text" class="form-control" id="licenseScreenUrlServidor" placeholder="https://script.google.com/macros/s/.../exec">
+    </div>
+    <div class="mb-2">
+      <label class="form-label">Email</label>
+      <input type="text" class="form-control" id="licenseScreenEmail" placeholder="tu@email.com">
+    </div>
+    <div class="mb-3">
+      <label class="form-label">PIN</label>
+      <input type="text" class="form-control" id="licenseScreenPin" placeholder="123456" maxlength="6" inputmode="numeric">
+    </div>
+    <button class="btn btn-success w-100" id="licenseScreenBtn" onclick="activarLicenciaForm()">Activar</button>
+  </div>
+</div>
+
+<!-- ===== BANNER DE MODO LIMITADO ===== -->
+<div class="license-limited-banner" id="licenseLimitedBanner" style="display:none;">
+  <span class="ic">⚠️</span>
+  <span id="licenseLimitedBannerText">Licencia vencida — modo limitado.</span>
+</div>
+
 <body>
   <!-- ===== LOADING CAT — Whisky ===== -->
   <div id="loadingCat" style="
@@ -245,6 +296,7 @@
     <a href="#" data-target="clientes"         onclick="mostrarSeccion('clientes'); cargarClientes();"><span class="ic">👥</span> Clientes</a>
     <a href="#" data-target="reportes"         onclick="mostrarSeccion('reportes')"><span class="ic">📈</span> Reportes</a>
     <a href="#" data-target="configuracion"    onclick="mostrarSeccion('configuracion')"><span class="ic">⚙️</span> Configuración</a>
+    <a href="#" data-target="instalador"       onclick="mostrarSeccion('instalador')"><span class="ic">🛠️</span> Instalador</a>
   </nav>
   <button class="logout-btn" onclick="logout()">⏻ Cerrar sesión</button>
 </div>
@@ -479,7 +531,10 @@
   <div id="productos" class="seccion">
     <div class="page-header">
       <div><h1>Productos</h1><div class="sub">Catálogo e inventario</div></div>
-      <button class="btn btn-success" onclick="nuevoProducto()">+ Nuevo Producto</button>
+      <div class="d-flex gap-2">
+        <button class="btn btn-outline-secondary btn-sm" onclick="actualizarCatalogoProductosManual()">↻ Actualizar</button>
+        <button class="btn btn-success" onclick="nuevoProducto()">+ Nuevo Producto</button>
+      </div>
     </div>
 
     <div style="position:sticky; top:-26px; z-index:10; background:var(--slate-50); padding:8px 0 6px; margin:-26px -30px 0; padding-left:30px; padding-right:30px;">
@@ -1141,6 +1196,83 @@
       </div>
     </div>
 
+    <!-- ===== LICENCIA ===== -->
+    <div class="card p-3 mb-3" id="cardLicencia">
+      <h6 style="margin-bottom:14px;">🔑 Licencia</h6>
+      <div id="licenciaEstadoBox" class="config-preview-hint">Cargando estado de la licencia...</div>
+      <div class="mt-3">
+        <label class="form-label">URL del servidor de licencias <span class="text-muted" style="font-size:11px;">(te la pasa quien te vendió VeekPOS)</span></label>
+        <input type="text" class="form-control" id="cfgLicenciaUrlServidor" placeholder="https://script.google.com/macros/s/.../exec">
+      </div>
+      <div class="d-flex justify-content-end gap-2 mt-3">
+        <button class="btn btn-outline-secondary btn-sm" onclick="validarLicenciaAhoraBtn()">↻ Validar ahora</button>
+        <button class="btn btn-success btn-sm" id="btnGuardarLicenciaUrl" onclick="guardarUrlServidorLicencia()">💾 Guardar URL</button>
+      </div>
+    </div>
+
+    <!-- Tarjeta API URL — solo visible en Electron -->
+    <div class="card p-3 mt-3" id="cardConexionNegocio" style="display:none;">
+      <h6 style="margin-bottom:6px;">🔗 Conexión con tu Google Sheets</h6>
+      <p class="text-muted" style="font-size:12.5px; margin-top:-4px; margin-bottom:10px;">
+        URL de la API que conecta el VeekPOS con tu planilla de Google Sheets.
+      </p>
+      <div class="mb-2">
+        <label class="form-label">URL de la API</label>
+        <input type="url" class="form-control" id="conexionNegocioUrl"
+          placeholder="https://script.google.com/macros/s/.../exec">
+      </div>
+      <div id="conexionNegocioUrlActual" class="text-muted mb-2" style="font-size:12px;"></div>
+      <button class="btn btn-success btn-sm" onclick="guardarApiUrlDesdeConfig()">💾 Guardar URL</button>
+    </div>
+
+    <!-- Tarjeta red local multicaja — solo visible en Electron -->
+    <div class="card p-3 mt-3" id="cardMultiCajaRed" style="display:none;">
+      <h6 style="margin-bottom:6px;">🌐 Red local (multi-caja)</h6>
+      <p class="text-muted" style="font-size:12.5px; margin-top:-4px; margin-bottom:10px;">
+        Configurá este equipo como servidor o cliente en una red local.
+      </p>
+      <div class="mb-2">
+        <label class="form-label">Rol en la red</label>
+        <select class="form-select" id="cfgRolRed" onchange="actualizarVisibilidadCampoNombreCaja(this.value)">
+          <option value="">Sin red local</option>
+          <option value="servidor">Servidor (caja principal)</option>
+          <option value="cliente">Cliente (caja secundaria)</option>
+        </select>
+      </div>
+      <div id="campoNombreCaja" style="display:none;" class="mb-2">
+        <label class="form-label">Nombre de esta caja</label>
+        <input type="text" class="form-control" id="cfgNombreCaja" placeholder="Ej: Caja 1, Caja Mostrador">
+      </div>
+      <div id="estadoRedLocal" class="text-muted mb-2" style="font-size:12px;"></div>
+      <button class="btn btn-success btn-sm" onclick="guardarConfigRed()">💾 Guardar configuración de red</button>
+    </div>
+
+    <!-- Tarjeta Mercado Pago — solo visible en Electron -->
+    <div class="card p-3 mt-3" id="cardMercadoPago" style="display:none;">
+      <h6 style="margin-bottom:6px;">💳 Mercado Pago</h6>
+      <p class="text-muted" style="font-size:12.5px; margin-top:-4px; margin-bottom:10px;">
+        Integrá Mercado Pago para cobros con QR en el POS.
+      </p>
+      <div id="estadoMercadoPago" class="text-muted mb-2" style="font-size:12px;">No configurado</div>
+      <button class="btn btn-outline-primary btn-sm" onclick="configurarMercadoPago()">⚙️ Configurar Mercado Pago</button>
+    </div>
+
+    <!-- Tarjeta impresora — solo visible en Electron (pos-offline.js la muestra) -->
+    <div class="card p-3 mt-3" id="cardImpresoraPOS" style="display:none;">
+      <h6 style="margin-bottom:6px;">🖨️ Impresora para tickets</h6>
+      <p class="text-muted" style="font-size:12.5px; margin-top:-4px; margin-bottom:14px;">
+        Seleccioná la impresora de tickets para que imprima sin mostrar el diálogo del sistema.
+      </p>
+      <div class="d-flex gap-2 align-items-center">
+        <select class="form-select" id="cfgImpresoraSelector" style="max-width:340px;">
+          <option value="">Cargando impresoras...</option>
+        </select>
+        <button class="btn btn-outline-secondary btn-sm" onclick="cargarListaImpresoras()">↻</button>
+        <button class="btn btn-success btn-sm" onclick="guardarImpresoraSeleccionada()">💾 Guardar</button>
+      </div>
+      <div id="cfgImpresoraActual" class="text-muted mt-2" style="font-size:12px;"></div>
+    </div>
+
     <div class="card p-3 mt-3">
       <h6 style="margin-bottom:14px;">🔑 Acceso al panel</h6>
       <p class="text-muted" style="font-size:12.5px; margin-top:-8px; margin-bottom:14px;">
@@ -1348,6 +1480,110 @@
             <span>Usar impresión directa en vez del cartel de impresión</span>
           </label>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== INSTALADOR / GENERADOR ===== -->
+  <div id="instalador" class="seccion">
+    <div class="page-header">
+      <div>
+        <h1>🛠️ Instalador</h1>
+        <div class="sub">Generá el código y los archivos para una nueva instalación</div>
+      </div>
+    </div>
+
+    <!-- Paso 1: Datos del cliente -->
+    <div class="card p-4 mb-3">
+      <h6 class="mb-3">📋 Paso 1 — Datos del cliente</h6>
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Nombre de la empresa *</label>
+          <input type="text" class="form-control" id="instEmpresa" placeholder="Ej: Distribuidora García">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">ID de la planilla Google Sheets *</label>
+          <input type="text" class="form-control" id="instSpreadsheetId"
+            placeholder="El ID largo de la URL de Google Sheets">
+          <div class="form-text">La parte larga de la URL: docs.google.com/spreadsheets/d/<strong>ESTE_ID</strong>/edit</div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">WhatsApp (con código de país)</label>
+          <input type="text" class="form-control" id="instWhatsapp" placeholder="Ej: 5491112345678">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Dirección</label>
+          <input type="text" class="form-control" id="instDireccion" placeholder="Ej: Av. Corrientes 1234, CABA">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Moneda</label>
+          <select class="form-select" id="instMoneda">
+            <option value="ARS">ARS — Peso argentino</option>
+            <option value="USD">USD — Dólar</option>
+            <option value="CLP">CLP — Peso chileno</option>
+            <option value="PEN">PEN — Sol peruano</option>
+            <option value="MXN">MXN — Peso mexicano</option>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">API URL (completar después de publicar)</label>
+          <input type="url" class="form-control" id="instApiUrl"
+            placeholder="https://script.google.com/macros/s/.../exec">
+        </div>
+      </div>
+    </div>
+
+    <!-- Paso 2: Generar Code.gs -->
+    <div class="card p-4 mb-3">
+      <h6 class="mb-1">📄 Paso 2 — Generar Code.gs</h6>
+      <p class="text-muted mb-3" style="font-size:13px;">
+        Descargá el archivo Code.gs con los datos del cliente ya insertados.
+        Luego creá un proyecto en <a href="https://script.google.com" target="_blank">script.google.com</a>,
+        pegá el contenido y publicalo como Web App.
+      </p>
+      <div class="alert alert-info" style="font-size:13px;">
+        <strong>Instrucciones después de descargar:</strong><br>
+        1. Abrí script.google.com → Nuevo proyecto<br>
+        2. Borrá el código de ejemplo y pegá el contenido del archivo descargado<br>
+        3. Guardá (Ctrl+S), poné un nombre al proyecto<br>
+        4. Click en <strong>Implementar → Nueva implementación</strong><br>
+        5. Tipo: Aplicación web · Ejecutar como: Yo · Acceso: Cualquier persona<br>
+        6. Copiá la URL y pegala en el campo API URL de arriba
+      </div>
+      <button class="btn btn-primary" onclick="generarCodeGs()">
+        📥 Descargar Code.gs generado
+      </button>
+    </div>
+
+    <!-- Paso 3: Generar config.json -->
+    <div class="card p-4 mb-3">
+      <h6 class="mb-1">📦 Paso 3 — Generar archivos del cliente</h6>
+      <p class="text-muted mb-3" style="font-size:13px;">
+        Generá el <code>config.json</code> con los datos del cliente, o el
+        <strong>ZIP completo del catálogo web</strong> listo para subir al hosting.
+      </p>
+      <div class="d-flex gap-2 flex-wrap">
+        <button class="btn btn-outline-secondary" onclick="generarConfigJson()">
+          ⚙️ Solo config.json
+        </button>
+        <button class="btn btn-success" onclick="generarCatalogoZip()">
+          🌐 Descargar Catálogo Web (.zip)
+        </button>
+      </div>
+      <div id="instStatus" class="mt-3"></div>
+    </div>
+
+    <!-- Paso 4: Verificar conexión -->
+    <div class="card p-4">
+      <h6 class="mb-1">✅ Paso 4 — Verificar conexión</h6>
+      <p class="text-muted mb-3" style="font-size:13px;">
+        Una vez publicado el Code.gs y pegada la API URL, verificá que la conexión funcione.
+      </p>
+      <div class="d-flex gap-3 align-items-center flex-wrap">
+        <button class="btn btn-outline-success" onclick="verificarConexionInstalador()">
+          🔌 Probar conexión con la API
+        </button>
+        <span id="instConexionStatus" style="font-size:13px;"></span>
       </div>
     </div>
   </div>

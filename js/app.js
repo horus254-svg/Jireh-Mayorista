@@ -5,7 +5,23 @@
 // Monto mínimo para poder enviar un pedido (configurable desde el panel admin)
 let pedidoMinimo = 100000;
 
-const API_URL = "https://script.google.com/macros/s/AKfycbw1eY_mXImG503rU0Cqddx1WBuGIOhxaW_SXGoIMsug_CjsSC-HLsb2XzYwrovaGBU/exec";
+// API_URL se carga desde config.json para permitir instalaciones
+// multi-cliente sin modificar el código fuente.
+// Si config.json no existe o falla, usa la URL de respaldo.
+let API_URL = "https://script.google.com/macros/s/AKfycbw1eY_mXImG503rU0Cqddx1WBuGIOhxaW_SXGoIMsug_CjsSC-HLsb2XzYwrovaGBU/exec";
+
+async function cargarConfigCliente() {
+  try {
+    const res = await fetch("../config.json?_=" + Date.now(), { cache: "no-store" });
+    if (res.ok) {
+      const cfg = await res.json();
+      if (cfg.apiUrl) API_URL = cfg.apiUrl;
+    }
+  } catch(e) {
+    // config.json no disponible — usar URL por defecto
+    console.log("config.json no encontrado, usando URL por defecto");
+  }
+}
 
 const PLACEHOLDER_IMG = "data:image/svg+xml;base64," + btoa(
     "<svg xmlns='http://www.w3.org/2000/svg' width='400' height='400'>" +
@@ -1462,9 +1478,14 @@ async function descargarCatalogoPDF(){
    INICIO
 ========================================================= */
 
-apariencaCargadaPromise = aplicarApariencia();
-actualizarContador();
-cargarProductos();
+// Inicialización asíncrona: primero cargar config del cliente,
+// luego apariencia y productos para que API_URL ya esté lista.
+(async () => {
+  await cargarConfigCliente();
+  apariencaCargadaPromise = aplicarApariencia();
+  actualizarContador();
+  cargarProductos();
+})();
 
 /* =========================================================
    SEGUIMIENTO DE PEDIDO
