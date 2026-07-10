@@ -452,7 +452,7 @@
     <div class="card p-3 mb-3">
       <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
         <input type="text" id="buscarCliente" class="form-control" style="max-width:300px"
-          placeholder="Buscar por nombre, alias, transporte o DNI..." onkeyup="filtrarClientes()">
+          placeholder="Buscar por nombre, alias, transporte o DNI..." oninput="filtrarClientes()">
         <div class="form-check">
           <input class="form-check-input" type="checkbox" id="filtroSoloCredito" onchange="filtrarClientes()">
           <label class="form-check-label" for="filtroSoloCredito" style="font-size:13px;">Mostrar solo clientes a crédito</label>
@@ -512,7 +512,7 @@
     </div>
     <div class="card p-3">
       <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
-        <input type="text" id="buscarPedido" class="form-control" style="max-width:320px" placeholder="🔍 Buscar por pedido, cliente o DNI..." onkeyup="filtrarPedidos()">
+        <input type="text" id="buscarPedido" class="form-control" style="max-width:320px" placeholder="🔍 Buscar por pedido, cliente o DNI..." oninput="filtrarPedidos()">
         <div class="d-flex gap-2 ms-auto flex-wrap">
           <select class="form-select form-select-sm" id="filtroPedidoEstado" style="max-width:160px;" onchange="filtrarPedidos()">
             <option value="">Todos los estados</option>
@@ -541,7 +541,7 @@
       <div class="card p-2">
         <div class="d-flex align-items-center gap-2 flex-wrap">
           <input type="text" id="buscarProducto" class="form-control form-control-sm" style="max-width:260px"
-            placeholder="Buscar por código o nombre..." onkeyup="filtrarProductosConDemora()">
+            placeholder="Buscar por código o nombre..." oninput="filtrarProductosConDemora()">
           <select id="filtroCategoriaProductos" class="form-select form-select-sm" style="max-width:180px" onchange="filtrarProductos()">
             <option value="">Todas las categorías</option>
           </select>
@@ -588,7 +588,10 @@
   <div id="pos" class="seccion">
     <div class="page-header">
       <div><h1>Punto de Venta</h1><div class="sub">Escaneá, buscá o tocá un producto para agregarlo al ticket</div></div>
-      <button class="btn-shortcuts-help" id="btnShortcutsHelp" onclick="toggleShortcutsHelp()" title="Atajos de teclado">⌨️ Atajos</button>
+      <div class="d-flex gap-2">
+        <button class="btn-shortcuts-help" id="btnActualizarCatalogo" onclick="actualizarCatalogoPOSManual()" title="Volver a pedir el catálogo">🔄 Actualizar catálogo</button>
+        <button class="btn-shortcuts-help" id="btnShortcutsHelp" onclick="toggleShortcutsHelp()" title="Atajos de teclado">⌨️ Atajos</button>
+      </div>
     </div>
 
     <div class="pos-wrap">
@@ -600,7 +603,7 @@
             type="text" id="posBusqueda" autocomplete="off"
             inputmode="text"
             placeholder="Escaneá o escribí para buscar... (Ctrl+K)"
-            onkeyup="onPosInputKeyup(event)">
+            oninput="onPosInput(event)" onkeyup="onPosInputKeyup(event)">
           <span id="scannerStatus" class="scanner-status idle"><span class="dot"></span> Listo</span>
           <button class="btn-camera-scan" id="btnCameraScan" onclick="abrirCamaraScan()" title="Escanear con cámara">📷</button>
         </div>
@@ -694,7 +697,7 @@
         <div>
           <label class="form-label" style="font-size:11px;margin-bottom:2px;">Buscar</label>
           <input type="text" id="vpBuscar" class="form-control form-control-sm" style="max-width:200px"
-            placeholder="# venta..." onkeyup="filtrarVentasPOSHistorial()">
+            placeholder="# venta..." oninput="filtrarVentasPOSHistorial()">
         </div>
         <div>
           <label class="form-label" style="font-size:11px;margin-bottom:2px;">Forma de pago</label>
@@ -1249,12 +1252,63 @@
 
     <!-- Tarjeta Mercado Pago — solo visible en Electron -->
     <div class="card p-3 mt-3" id="cardMercadoPago" style="display:none;">
-      <h6 style="margin-bottom:6px;">💳 Mercado Pago</h6>
-      <p class="text-muted" style="font-size:12.5px; margin-top:-4px; margin-bottom:10px;">
-        Integrá Mercado Pago para cobros con QR en el POS.
+      <h6 style="margin-bottom:6px;">📲 Mercado Pago — Cobro con QR</h6>
+      <p class="text-muted" style="font-size:13px; margin-bottom:14px;">
+        Opcional. Si lo configurás, el botón "Transferencia" del POS muestra un QR de Mercado Pago y confirma el cobro automáticamente cuando se acredita.
       </p>
-      <div id="estadoMercadoPago" class="text-muted mb-2" style="font-size:12px;">No configurado</div>
-      <button class="btn btn-outline-primary btn-sm" onclick="configurarMercadoPago()">⚙️ Configurar Mercado Pago</button>
+      <div id="mpEstadoBox" class="config-preview-hint mb-3">Cargando estado...</div>
+      <div id="mpFormularioWrap">
+        <div class="mb-2">
+          <label class="form-label">Access Token de Mercado Pago <span class="text-muted" style="font-size:11px;">(Tus integraciones → tu app → Credenciales de producción)</span></label>
+          <input type="password" class="form-control" id="cfgMpAccessToken" placeholder="APP_USR-...">
+        </div>
+        <div class="mb-2 mt-3">
+          <label class="form-label" style="margin-bottom:2px;">Dirección del negocio <span class="text-muted" style="font-size:11px;">(Mercado Pago la exige para crear la tienda)</span></label>
+        </div>
+        <div class="row g-2 mb-2">
+          <div class="col-8"><input type="text" class="form-control form-control-sm" id="cfgMpCalle" placeholder="Calle"></div>
+          <div class="col-4"><input type="text" class="form-control form-control-sm" id="cfgMpNumero" placeholder="Número"></div>
+        </div>
+        <div class="row g-2 mb-2">
+          <div class="col-6"><input type="text" class="form-control form-control-sm" id="cfgMpCiudad" placeholder="Ciudad"></div>
+          <div class="col-6">
+            <select class="form-select form-select-sm" id="cfgMpProvincia">
+              <option value="">Provincia...</option>
+              <option value="Capital Federal">Ciudad Autónoma de Buenos Aires</option>
+              <option value="Buenos Aires">Buenos Aires</option>
+              <option value="Catamarca">Catamarca</option>
+              <option value="Chaco">Chaco</option>
+              <option value="Chubut">Chubut</option>
+              <option value="Cordoba">Córdoba</option>
+              <option value="Corrientes">Corrientes</option>
+              <option value="Entre Rios">Entre Ríos</option>
+              <option value="Formosa">Formosa</option>
+              <option value="Jujuy">Jujuy</option>
+              <option value="La Pampa">La Pampa</option>
+              <option value="La Rioja">La Rioja</option>
+              <option value="Mendoza">Mendoza</option>
+              <option value="Misiones">Misiones</option>
+              <option value="Neuquen">Neuquén</option>
+              <option value="Rio Negro">Río Negro</option>
+              <option value="Salta">Salta</option>
+              <option value="San Juan">San Juan</option>
+              <option value="San Luis">San Luis</option>
+              <option value="Santa Cruz">Santa Cruz</option>
+              <option value="Santa Fe">Santa Fe</option>
+              <option value="Santiago del Estero">Santiago del Estero</option>
+              <option value="Tierra del Fuego">Tierra del Fuego</option>
+              <option value="Tucuman">Tucumán</option>
+            </select>
+          </div>
+        </div>
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-3">
+          <button class="btn btn-outline-danger btn-sm" id="btnQuitarMercadoPago" onclick="quitarConfigMercadoPago()" style="display:none;">Quitar configuración</button>
+          <div class="d-flex gap-2">
+            <button class="btn btn-outline-secondary btn-sm" onclick="probarCredencialesMercadoPagoBtn()">🧪 Probar conexión</button>
+            <button class="btn btn-success btn-sm" id="btnGuardarMercadoPago" onclick="guardarConfigMercadoPagoForm()">💾 Guardar y configurar</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Tarjeta impresora — solo visible en Electron (pos-offline.js la muestra) -->
@@ -1605,6 +1659,27 @@
       <div class="scan-reticle"></div>
     </div>
     <div class="scan-modal-hint">Centrá el código de barras dentro del recuadro</div>
+  </div>
+</div>
+
+<!-- ===== MODAL QR MERCADO PAGO ===== -->
+<div class="receipt-backdrop" id="mpQrBackdrop">
+  <div class="receipt-modal" style="max-width:360px;">
+    <h4 style="margin-bottom:4px;">📲 Cobrar con Mercado Pago</h4>
+    <div class="text-muted" style="font-size:13px; margin-bottom:14px;" id="mpQrMontoLabel">$0</div>
+    <div id="mpQrEsperando">
+      <img id="mpQrImagen" src="" alt="QR de cobro" style="width:240px; height:240px; display:block; margin:0 auto 14px; border-radius:12px; border:1px solid var(--slate-200);">
+      <div class="d-flex align-items-center justify-content-center gap-2" style="font-size:13.5px; color:var(--slate-500);">
+        <span class="scanner-status idle" style="position:static;"><span class="dot"></span></span>
+        Esperando el pago del cliente...
+      </div>
+    </div>
+    <div id="mpQrError" style="display:none;">
+      <div class="license-screen-error" id="mpQrErrorTexto" style="display:block;"></div>
+    </div>
+    <div class="receipt-actions mt-3">
+      <button class="btn btn-outline-danger" onclick="cancelarCobroMercadoPago()">Cancelar</button>
+    </div>
   </div>
 </div>
 

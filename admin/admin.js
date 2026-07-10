@@ -637,13 +637,16 @@ function previsualizarPopup() {}  // legacy — ya no se usa
 async function cargarListaImpresoras() {
   const sel = document.getElementById("cfgImpresoraSelector");
   if (!sel) return;
-  if (typeof window.posOffline === "undefined" || !window.posOffline.listarImpresoras) {
+
+  const bridge = window.veekpos || window.posOffline;
+  if (!bridge || typeof bridge.listarImpresoras !== "function") {
     sel.innerHTML = '<option value="">Solo disponible en la app de escritorio</option>';
     return;
   }
+
   sel.innerHTML = '<option value="">Cargando...</option>';
   try {
-    const impresoras = await window.posOffline.listarImpresoras();
+    const impresoras = await bridge.listarImpresoras();
     const guardada = localStorage.getItem("veekpos_impresora") || "";
     sel.innerHTML = '<option value="">— Predeterminada del sistema —</option>';
     impresoras.forEach(p => {
@@ -1307,7 +1310,47 @@ function mostrarSeccion(id) {
   if (id === "pedidos")   cargarSiVencido("pedidos", cargarPedidos);
   if (id === "productos") cargarSiVencido("productos", cargarProductos);
   if (id === "ventasPOS") cargarSiVencido("ventasPOS", cargarVentasPOSHistorial);
-  if (id === "configuracion") { cargarConfigNegocioForm(); actualizarEstadoUSBPrint(); }
+  if (id === "configuracion") {
+    cargarConfigNegocioForm();
+    actualizarEstadoUSBPrint();
+    // En Electron: mostrar tarjetas específicas de escritorio
+    if (typeof window.veekpos !== "undefined" || typeof window.posOffline !== "undefined") {
+      const bridge = window.veekpos || window.posOffline;
+      // Tarjeta impresora
+      const tImpresora = document.getElementById("cardImpresoraPOS");
+      if (tImpresora) {
+        tImpresora.style.display = "block";
+        if (typeof cargarListaImpresoras === "function") cargarListaImpresoras();
+        const guardada = localStorage.getItem("veekpos_impresora") || "";
+        const actual = document.getElementById("cfgImpresoraActual");
+        if (actual) actual.textContent = guardada
+          ? `Impresora guardada: ${guardada}`
+          : "Sin impresora guardada — se usará la predeterminada del sistema.";
+      }
+      // Tarjeta conexión API
+      const tConexion = document.getElementById("cardConexionNegocio");
+      if (tConexion) {
+        tConexion.style.display = "block";
+        bridge.obtenerApiUrl?.().then(url => {
+          const el = document.getElementById("conexionNegocioUrlActual");
+          if (el) el.textContent = url ? "Conectada a: " + url : "No hay URL configurada.";
+          const input = document.getElementById("conexionNegocioUrl");
+          if (input && url) input.value = url;
+        }).catch(() => {});
+      }
+      // Tarjeta licencia
+      if (typeof mostrarEstadoLicenciaEnConfig === "function") mostrarEstadoLicenciaEnConfig();
+      // Tarjeta multicaja
+      const tRed = document.getElementById("cardMultiCajaRed");
+      if (tRed) tRed.style.display = "block";
+      // Tarjeta MercadoPago
+      const tMp = document.getElementById("cardMercadoPago");
+      if (tMp) {
+        tMp.style.display = "block";
+        if (typeof mostrarEstadoMercadoPagoEnConfig === "function") mostrarEstadoMercadoPagoEnConfig();
+      }
+    }
+  }
 
   if (id === "pos") {
     asegurarProductosPOS().then(renderPosGrid);
@@ -1939,7 +1982,11 @@ function filtrarProductos() {
   const selectCategoria = document.getElementById("filtroCategoriaProductos");
   const selectEstado = document.getElementById("filtroEstadoProducto");
 
-  const termino = (inputBuscar ? inputBuscar.value : "").toLowerCase().trim();
+  // Normalizar: minúsculas + sin acentos para búsqueda más precisa
+  const normalizar = t => String(t || "").toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+
+  const termino = normalizar(inputBuscar ? inputBuscar.value : "");
   const categoria = selectCategoria ? selectCategoria.value : "";
   const estado = selectEstado ? selectEstado.value : "";
 
@@ -1947,9 +1994,10 @@ function filtrarProductos() {
 
   if (termino) {
     filtrados = filtrados.filter(p => {
-      const codigo = String(p.CODIGO || "").toLowerCase();
-      const nombre = String(p.PRODUCTO || "").toLowerCase();
-      return codigo.includes(termino) || nombre.includes(termino);
+      const codigo = normalizar(p.CODIGO);
+      const nombre = normalizar(p.PRODUCTO);
+      const cat    = normalizar(p.CATEGORIA);
+      return codigo.includes(termino) || nombre.includes(termino) || cat.includes(termino);
     });
   }
 
@@ -3323,10 +3371,13 @@ function renderPosGrid(filtroTexto) {
     lista = lista.filter(p => String(p.CATEGORIA || "").trim() === categoriaActivaPOS);
   }
   if (filtroTexto) {
-    const texto = filtroTexto.toLowerCase();
+    const normalizar = t => String(t || "").toLowerCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const texto = normalizar(filtroTexto);
     lista = lista.filter(p =>
-      String(p.CODIGO).toLowerCase().includes(texto) ||
-      String(p.PRODUCTO).toLowerCase().includes(texto)
+      normalizar(p.CODIGO).includes(texto) ||
+      normalizar(p.PRODUCTO).includes(texto) ||
+      normalizar(p.CATEGORIA).includes(texto)
     );
   }
 
@@ -3391,6 +3442,12 @@ function renderPosGrid(filtroTexto) {
   });
 }
 
+/** Filtra la grilla del POS en tiempo real mientras se escribe (oninput) */
+function onPosInput(e) {
+  posTileFocusIdx = -1;
+  renderPosGridConDemora(e.target.value.trim());
+}
+
 function onPosInputKeyup(e) {
   const input = e.target;
   if (e.key === "Enter") {
@@ -3402,13 +3459,12 @@ function onPosInputKeyup(e) {
     }
     return;
   }
-  posTileFocusIdx = -1;
-  // El redibujado de la grilla (hasta 60 tarjetas, cada una con su
-  // imagen y badges) se demora un poco para no reconstruirla en cada
-  // tecla mientras se escribe rápido — el Enter de arriba, en cambio,
-  // sigue siendo instantáneo, porque ahí la respuesta inmediata
-  // importa de verdad (escaneo de código de barras).
-  renderPosGridConDemora(input.value.trim());
+  // Las teclas no-Enter ya las maneja onPosInput (oninput)
+  // Solo actualizamos el índice de foco por si se usaron flechas
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    posTileFocusIdx = -1;
+    renderPosGridConDemora(input.value.trim());
+  }
 }
 
 const renderPosGridConDemora = debounce(renderPosGrid, 150);
@@ -3864,7 +3920,15 @@ function mfvCalcularCambio() {
   if (cambio < 0) cambioEl.textContent = "-$" + Math.abs(cambio).toLocaleString("es-AR");
 }
 
+let _ventaEnProceso = false; // evita doble confirmación por clic rápido
+
 async function confirmarFinalizarVenta() {
+  if (_ventaEnProceso) return; // ya hay una venta en curso
+  _ventaEnProceso = true;
+  const btnConfirmar = document.getElementById("btnConfirmarVenta");
+  if (btnConfirmar) { btnConfirmar.disabled = true; btnConfirmar.textContent = "Procesando..."; }
+
+  try {
   const valDescuento = document.getElementById("mfvDescuentoValor").value;
   const motivoDescuento = document.getElementById("mfvDescuentoMotivo").value;
   if (valDescuento && Number(valDescuento) > 0) {
@@ -3887,6 +3951,18 @@ async function confirmarFinalizarVenta() {
   if (recibido) calcularCambio();
 
   cerrarModalFinalizarVenta();
+
+  // Si es TRANSFERENCIA y MercadoPago está configurado → mostrar QR antes de registrar
+  if (mfvFormaPago === "TRANSFERENCIA") {
+    const bridge = window.veekpos || window.posOffline;
+    if (bridge && typeof bridge.mercadoPagoDisponible === "function") {
+      const mpDisponible = await bridge.mercadoPagoDisponible().catch(() => false);
+      if (mpDisponible) {
+        await iniciarCobroMercadoPago(total);
+        return; // iniciarCobroMercadoPago maneja el resto del flujo
+      }
+    }
+  }
 
   // ── OPTIMISTIC: calcular todo localmente y mostrar el recibo al instante ──
   const subtotal = ticketPOS.reduce((acc, item) => acc + (item.PRECIO * item.cantidad), 0);
@@ -3956,6 +4032,14 @@ async function confirmarFinalizarVenta() {
 
   // Métricas en segundo plano
   setTimeout(() => { cargarMetricas(); invalidarCache("ventasPOS"); }, 500);
+
+  } catch(err) {
+    console.error("Error en confirmarFinalizarVenta:", err);
+    toast("Error al finalizar la venta", "error");
+  } finally {
+    _ventaEnProceso = false;
+    if (btnConfirmar) { btnConfirmar.disabled = false; btnConfirmar.textContent = "✅ Confirmar venta"; }
+  }
 }
 
 async function finalizarVentaPOS() {
@@ -4796,22 +4880,35 @@ async function _imprimirConDialogo(html) {
 
   frame.innerHTML = html;
 
+  // Esperar a que el contenido del frame esté completamente pintado
+  // Primero un requestAnimationFrame para que el DOM procese el innerHTML,
+  // luego verificar si hay imágenes pendientes de cargar
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+  const imagenes = frame.querySelectorAll("img");
+  if (imagenes.length > 0) {
+    await Promise.all(Array.from(imagenes).map(img =>
+      img.complete ? Promise.resolve() : new Promise(r => {
+        img.onload = r; img.onerror = r;
+        setTimeout(r, 2000); // máximo 2s de espera por imagen
+      })
+    ));
+  }
+
   // En Electron: impresión silenciosa sin diálogo del sistema
-  if (typeof window.posOffline !== "undefined" && window.posOffline.imprimirSilencioso) {
-    // Pequeña espera para que el DOM pinte el HTML del ticket antes de imprimir
-    await new Promise(r => setTimeout(r, 120));
+  const bridge = window.veekpos || window.posOffline;
+  if (bridge && typeof bridge.imprimirSilencioso === "function") {
     const deviceName = localStorage.getItem("veekpos_impresora") || "";
-    const result = await window.posOffline.imprimirSilencioso({ deviceName });
+    const result = await bridge.imprimirSilencioso({ deviceName });
     if (result && !result.success) {
       console.warn("Impresión silenciosa falló:", result.errorType);
-      // Fallback al diálogo del sistema si falla
       window.print();
     }
     return;
   }
 
   // En el navegador web: diálogo normal
-  setTimeout(() => { window.print(); }, 120);
+  window.print();
 }
 
 /* =====================================================
@@ -6690,4 +6787,271 @@ async function activarLicencia() {
     if (errorEl) { errorEl.textContent = "Error de conexión: " + err.message; errorEl.style.display = "block"; }
     if (btn) { btn.disabled = false; btn.textContent = "Activar"; }
   }
+}
+
+
+/* =========================================================
+   MERCADO PAGO — Cobro con QR (integrado desde pos-offline)
+========================================================= */
+
+async function mostrarEstadoMercadoPagoEnConfig() {
+  const box = document.getElementById("mpEstadoBox");
+  const formularioWrap = document.getElementById("mpFormularioWrap");
+  if (!box) return;
+
+  try {
+    const cfg = await window.veekpos.obtenerConfigMercadoPago();
+    const btnQuitar = document.getElementById("btnQuitarMercadoPago");
+
+    if (cfg.esCliente) {
+      // El Access Token se configura una sola vez, en la caja
+      // servidor — esta caja no tiene nada propio para editar, solo
+      // muestra si el servidor ya lo tiene listo.
+      if (formularioWrap) formularioWrap.style.display = "none";
+      box.innerHTML = cfg.configurado
+        ? `<div style="color:var(--green-600); font-weight:600;">✓ Configurado en la caja servidor</div><div class="text-muted" style="font-size:12.5px; margin-top:2px;">El cobro con QR se gestiona desde el servidor — no hace falta configurar nada en esta caja.</div>`
+        : `<span class="text-muted">No configurado en la caja servidor. La configuración de Mercado Pago se hace una sola vez, ahí.</span>`;
+      return;
+    }
+
+    if (formularioWrap) formularioWrap.style.display = "block";
+
+    if (cfg.configurado) {
+      box.innerHTML = `<div style="color:var(--green-600); font-weight:600;">✓ Configurado</div><div class="text-muted" style="font-size:12.5px; margin-top:2px;">Token guardado: ${escapeHtml(cfg.tokenParcial)}</div>`;
+      if (btnQuitar) btnQuitar.style.display = "inline-block";
+    } else if (cfg.hayToken) {
+      box.innerHTML = `<span style="color:var(--red-500);">⚠️ Hay un token guardado pero falta terminar de configurar (probá guardarlo de nuevo).</span>`;
+      if (btnQuitar) btnQuitar.style.display = "inline-block";
+    } else {
+      box.innerHTML = `<span class="text-muted">No configurado — "Transferencia" funciona en modo manual.</span>`;
+      if (btnQuitar) btnQuitar.style.display = "none";
+    }
+
+    // Pre-completa los campos de dirección si ya se habían guardado antes (no pisa lo que el usuario esté escribiendo ahora)
+    if (cfg.direccion) {
+      const campoCalle = document.getElementById("cfgMpCalle");
+      const campoNumero = document.getElementById("cfgMpNumero");
+      const campoCiudad = document.getElementById("cfgMpCiudad");
+      const campoProvincia = document.getElementById("cfgMpProvincia");
+      if (campoCalle && !campoCalle.value) campoCalle.value = cfg.direccion.calle || "";
+      if (campoNumero && !campoNumero.value) campoNumero.value = cfg.direccion.numero || "";
+      if (campoCiudad && !campoCiudad.value) campoCiudad.value = cfg.direccion.ciudad || "";
+      if (campoProvincia && !campoProvincia.value) campoProvincia.value = cfg.direccion.provincia || "";
+    }
+
+  } catch (error) {
+    console.error("Error al consultar estado de Mercado Pago:", error);
+    box.innerHTML = `<span class="text-muted">No se pudo consultar el estado.</span>`;
+  }
+}
+
+async function guardarConfigMercadoPagoForm() {
+  const input = document.getElementById("cfgMpAccessToken");
+  const accessToken = input.value.trim();
+
+  const direccion = {
+    calle: document.getElementById("cfgMpCalle").value.trim(),
+    numero: document.getElementById("cfgMpNumero").value.trim(),
+    ciudad: document.getElementById("cfgMpCiudad").value.trim(),
+    provincia: document.getElementById("cfgMpProvincia").value.trim()
+  };
+
+  if (!accessToken) { toast("Ingresá el Access Token", "error"); return; }
+  if (!direccion.calle || !direccion.numero || !direccion.ciudad || !direccion.provincia) {
+    toast("Completá la dirección del negocio — Mercado Pago la exige para crear la tienda", "error");
+    return;
+  }
+
+  const btn = document.getElementById("btnGuardarMercadoPago");
+  const textoOriginal = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = "Configurando...";
+
+  try {
+    const nombreNegocio = (configNegocioCache && configNegocioCache.nombre) || "VeekPOS";
+    const resultado = await window.veekpos.guardarYConfigurarMercadoPago(accessToken, nombreNegocio, direccion);
+
+    if (!resultado.success) {
+      toast(resultado.message || "No se pudo configurar Mercado Pago", "error");
+      return;
+    }
+
+    toast("Mercado Pago configurado correctamente" + (resultado.nombre ? " (" + resultado.nombre + ")" : ""), "success");
+    input.value = "";
+    mostrarEstadoMercadoPagoEnConfig();
+
+  } catch (error) {
+    console.error("Error al configurar Mercado Pago:", error);
+    toast("Error al configurar Mercado Pago", "error");
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = textoOriginal;
+  }
+}
+
+async function probarCredencialesMercadoPagoBtn() {
+  const input = document.getElementById("cfgMpAccessToken");
+  const accessToken = input.value.trim();
+
+  if (!accessToken) { toast("Ingresá un Access Token para probar", "error"); return; }
+
+  try {
+    const resultado = await window.veekpos.probarCredencialesMercadoPago(accessToken);
+    if (resultado.success) {
+      toast("Conexión correcta" + (resultado.nombre ? " — cuenta: " + resultado.nombre : ""), "success");
+    } else {
+      toast(resultado.message || "No se pudo conectar con ese token", "error");
+    }
+  } catch (error) {
+    console.error("Error al probar credenciales de Mercado Pago:", error);
+    toast("Error al probar la conexión", "error");
+  }
+}
+
+async function quitarConfigMercadoPago() {
+  if (!await confirmarAccion("¿Quitar la configuración de Mercado Pago? \"Transferencia\" va a volver a funcionar en modo manual.", { textoBoton: "Quitar" })) return;
+
+  try {
+    await window.veekpos.borrarConfigMercadoPago();
+    toast("Configuración de Mercado Pago eliminada", "success");
+    mostrarEstadoMercadoPagoEnConfig();
+  } catch (error) {
+    console.error("Error al quitar configuración de Mercado Pago:", error);
+    toast("Error al quitar la configuración", "error");
+  }
+}
+
+/* ===================== RED LOCAL MULTI-CAJA (Configuración) ===================== */
+
+async function iniciarCobroMercadoPago(total) {
+  document.getElementById("mpQrMontoLabel").textContent = "$" + Number(total).toLocaleString("es-AR");
+  document.getElementById("mpQrError").style.display = "none";
+  document.getElementById("mpQrEsperando").style.display = "block";
+  document.getElementById("mpQrImagen").src = "";
+  document.getElementById("mpQrBackdrop").classList.add("show");
+
+  const subtotal = ticketPOS.reduce((acc, item) => acc + (item.PRECIO * item.cantidad), 0);
+  const itemsSnapshot = [...ticketPOS]; // snapshot antes de limpiar
+  const recibido = Number(document.getElementById("mfvRecibido")?.value) || 0;
+  mpVentaEnCurso = { subtotal, total, itemsSnapshot, recibido };
+
+  try {
+    const referencia = "veekpos" + Date.now();
+    const bridge = window.veekpos || window.posOffline;
+    const resultado = await bridge.crearCobroQR(total, referencia);
+
+    if (!resultado.success) {
+      mostrarErrorCobroMercadoPago(resultado.message || "No se pudo generar el QR de cobro");
+      return;
+    }
+
+    mpReferenciaActual = referencia;
+    document.getElementById("mpQrImagen").src = resultado.qrImagenDataUrl;
+    mpPollingIntervalId = setInterval(consultarCobroMercadoPagoPolling, 3000);
+
+  } catch (error) {
+    console.error("Error al generar cobro con Mercado Pago:", error);
+    mostrarErrorCobroMercadoPago("Error al generar el QR de cobro");
+  }
+}
+
+
+/* =========================================================
+   MERCADO PAGO — Polling y modal QR
+========================================================= */
+
+let mpPollingIntervalId = null;
+let mpReferenciaActual  = null;
+let mpVentaEnCurso      = null; // { subtotal, total, itemsSnapshot, recibido }
+
+async function consultarCobroMercadoPagoPolling() {
+  if (!mpReferenciaActual) return;
+  try {
+    const bridge = window.veekpos || window.posOffline;
+    const resultado = await bridge.consultarCobroQR(mpReferenciaActual);
+    if (resultado.success && resultado.pagada) {
+      detenerPollingMercadoPago();
+      document.getElementById("mpQrBackdrop").classList.remove("show");
+      toast("Pago de Mercado Pago confirmado ✓", "success");
+
+      if (mpVentaEnCurso) {
+        const { subtotal, total, itemsSnapshot, recibido } = mpVentaEnCurso;
+        const etiquetaDescuento = obtenerEtiquetaDescuentoPOS(subtotal);
+
+        // Guardar en backend — recién ahora que el pago está confirmado
+        let ventaId = "VEN-" + Date.now().toString().slice(-6);
+        try {
+          const res = await fetch(
+            API_URL +
+            "?action=guardarVenta" +
+            "&total="         + encodeURIComponent(total) +
+            "&formaPago=TRANSFERENCIA" +
+            "&observaciones=" + encodeURIComponent(etiquetaDescuento ? "Descuento: " + etiquetaDescuento : "") +
+            "&carrito="       + encodeURIComponent(JSON.stringify(itemsSnapshot))
+          );
+          const data = await res.json();
+          if (data.success && data.ventaId) ventaId = data.ventaId;
+        } catch(e) {
+          console.error("Error guardando venta MP en backend:", e);
+          toast("⚠️ Pago confirmado pero no se pudo guardar en el servidor", "error");
+        }
+
+        // Mostrar recibo con el ID real
+        ultimaVentaImprimible = {
+          ventaId, items: itemsSnapshot, total, subtotal,
+          descuento: subtotal - total,
+          descuentoEtiqueta: etiquetaDescuento,
+          formaPago: "TRANSFERENCIA", fecha: new Date()
+        };
+
+        mostrarRecibo(ventaId, itemsSnapshot, total, subtotal, subtotal - total, recibido);
+
+        // Limpiar ticket y actualizar UI
+        ticketPOS = [];
+        resetearDescuentoPOS();
+        const inputRec = document.getElementById("inputRecibido");
+        const cambioEl = document.getElementById("cambioValor");
+        if (inputRec) inputRec.value = "";
+        if (cambioEl) { cambioEl.textContent = "—"; cambioEl.classList.remove("negativo"); }
+        renderTicketPOS();
+        ultimoCodigoAgregadoPOS = null;
+        posTileFocusIdx = -1;
+
+        // Stock optimista
+        itemsSnapshot.forEach(item => {
+          const p = productosPOS.find(x => String(x.CODIGO) === String(item.CODIGO));
+          if (p) p.STOCK = Math.max(0, Number(p.STOCK) - item.cantidad);
+        });
+        renderPosGrid();
+
+        setTimeout(() => { cargarMetricas(); invalidarCache("ventasPOS"); }, 500);
+        mpVentaEnCurso = null;
+      }
+    }
+  } catch (error) {
+    console.warn("Error consultando estado del cobro MP (se reintenta):", error);
+  }
+}
+
+function mostrarErrorCobroMercadoPago(mensaje) {
+  detenerPollingMercadoPago();
+  const el = document.getElementById("mpQrEsperando");
+  const err = document.getElementById("mpQrError");
+  const txt = document.getElementById("mpQrErrorTexto");
+  if (el) el.style.display = "none";
+  if (err) err.style.display = "block";
+  if (txt) txt.textContent = mensaje;
+}
+
+function detenerPollingMercadoPago() {
+  if (mpPollingIntervalId) { clearInterval(mpPollingIntervalId); mpPollingIntervalId = null; }
+}
+
+function cancelarCobroMercadoPago() {
+  detenerPollingMercadoPago();
+  const backdrop = document.getElementById("mpQrBackdrop");
+  if (backdrop) backdrop.classList.remove("show");
+  mpReferenciaActual = null;
+  mpVentaEnCurso = null;
+  toast("Cobro cancelado — el ticket sigue abierto", "info");
 }
