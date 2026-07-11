@@ -2495,6 +2495,7 @@ async function actualizarClientesForm() {
   btn.innerHTML = "Actualizando...";
 
   try {
+    invalidarCache("clientes"); // forzar datos frescos, no la copia cacheada
     await cargarClientesDesdeBackend();
     toast("Clientes actualizados", "success");
   } catch (error) {
@@ -2759,6 +2760,7 @@ async function guardarNuevoCliente() {
 
     toast(editando ? "Cliente actualizado" : "Cliente creado", "success");
     cerrarModalNuevoCliente();
+    invalidarCache("clientes"); // si no, la caché de 5 min sigue mostrando el dato viejo
     await cargarClientesDesdeBackend();
 
   } catch (error) {
@@ -2789,6 +2791,7 @@ async function marcarClienteDesdeHistorialACredito(dni) {
     }
 
     toast("Cliente marcado a crédito", "success");
+    invalidarCache("clientes");
     cargarClientesDesdeBackend();
 
   } catch (error) {
@@ -2822,6 +2825,7 @@ async function eliminarClienteForm(clienteId, nombre) {
     }
 
     toast("Cliente eliminado", "success");
+    invalidarCache("clientes");
     cargarClientesDesdeBackend();
 
   } catch (error) {
@@ -3005,6 +3009,7 @@ async function registrarDeudaExtraForm() {
     }
     toast("Deuda registrada correctamente", "success");
     cerrarModalDeudaExtra();
+    invalidarCache("clientes");
     cargarClientesDesdeBackend();
   } catch (error) {
     console.error("Error al registrar deuda extra:", error);
@@ -3071,11 +3076,13 @@ async function registrarPagoCreditoForm() {
     }
 
     toast("Pago registrado", "success");
-    // Invalidar caché para que cierre de caja y movimientos muestren datos frescos
+    // Invalidar caché para que cierre de caja, movimientos y la lista
+    // de clientes (saldo actualizado) muestren datos frescos
     const hoy = new Date().toISOString().slice(0, 10);
     try { localStorage.removeItem("vpos_cache_movimientos_" + hoy); } catch(e) {}
     try { localStorage.removeItem("vpos_cache_cierre_" + hoy); } catch(e) {}
     try { localStorage.removeItem("vpos_cache_cierre_ayer"); } catch(e) {}
+    invalidarCache("clientes");
     abrirModalDetalleCliente(detalleClienteIdActual);
     cargarClientesDesdeBackend();
 
