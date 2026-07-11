@@ -657,6 +657,17 @@ async function cargarListaImpresoras() {
       sel.appendChild(opt);
     });
     if (!guardada) sel.value = "";
+
+    // Si había un nombre guardado pero ya no aparece en la lista actual
+    // de impresoras, es la causa más común de que la impresión "en
+    // teoría configurada" siga mostrando el diálogo — el sistema ya no
+    // reconoce ese nombre exacto. Avisar para que el usuario la
+    // vuelva a seleccionar.
+    const actual = document.getElementById("cfgImpresoraActual");
+    if (actual && guardada && !impresoras.some(p => p.name === guardada)) {
+      actual.innerHTML = `⚠️ La impresora guardada ("${escapeHtml(guardada)}") ya no aparece en el sistema — volvé a seleccionarla y guardar.`;
+      actual.style.color = "var(--red-600, #dc2626)";
+    }
   } catch (e) {
     sel.innerHTML = '<option value="">Error al listar impresoras</option>';
   }
@@ -3342,7 +3353,7 @@ async function asegurarProductosPOS() {
       if (Date.now() - ts < CACHE_TTL && productos.length > 0) {
         productosPOS = productos;
         construirCategoriasPOS();
-        renderPOSGrid();
+        renderPosGrid();
         _actualizarCacheProductosPOS(CACHE_KEY);
         return;
       }
@@ -3362,7 +3373,7 @@ async function _actualizarCacheProductosPOS(cacheKey) {
         JSON.stringify(productosPOS.map(p => p.CODIGO + p.STOCK))) {
       productosPOS = productos;
       construirCategoriasPOS();
-      renderPOSGrid();
+      renderPosGrid();
     } else {
       productosPOS = productos;
     }
@@ -4624,6 +4635,26 @@ function buildThermalCierreESCPOS(resumen) {
   b.text("Vendedor: " + String(resumen.vendedor || "—")); b.feed(1);
   b.sep();
 
+  b.bold(); b.text("VENTAS DEL DÍA"); b.feed(1); b.boldOff();
+  b.row("Total ventas", "$" + money(resumen.totalVentas));
+  b.row("  Efectivo", "$" + money(resumen.ventasEfectivo));
+  b.row("  Transferencia", "$" + money(resumen.ventasTransferencia));
+  b.row("  Tarjeta", "$" + money(resumen.ventasTarjeta));
+
+  const egresos = resumen.egresosPorFormaPago || { EFECTIVO: 0, TRANSFERENCIA: 0, TARJETA: 0 };
+  const filasEgresos = [
+    ["  Efectivo", egresos.EFECTIVO],
+    ["  Transferencia", egresos.TRANSFERENCIA],
+    ["  Tarjeta", egresos.TARJETA]
+  ].filter(([, monto]) => Number(monto) > 0);
+
+  if (filasEgresos.length) {
+    b.feed(1);
+    b.bold(); b.text("EGRESOS DEL DÍA"); b.feed(1); b.boldOff();
+    filasEgresos.forEach(([etiqueta, monto]) => b.row(etiqueta, "-$" + money(monto)));
+  }
+  b.sep();
+
   filaMetodo("EFECTIVO", resumen.efectivo); b.feed(1);
   filaMetodo("TRANSFERENCIA", resumen.transferencia); b.feed(1);
   filaMetodo("TARJETA", resumen.tarjeta);
@@ -4763,9 +4794,24 @@ async function enviarBytesAImpresoraUSB(bytes) {
   }
   const writer = puertoImpresoraUSB.writable.getWriter();
   try {
-    await writer.write(bytes);
+    // Si la impresora está trabada, sin papel, o el cable se desconectó
+    // a medias, writer.write() puede quedar esperando para siempre sin
+    // resolver ni rechazar — el botón "parece" no responder porque en
+    // realidad está esperando una escritura que nunca va a terminar.
+    // Con este límite de tiempo, a los 4s se corta y se cae al diálogo
+    // de impresión normal en vez de quedar colgado.
+    const TIMEOUT_MS = 4000;
+    let timeoutId;
+    const timeout = new Promise((_, reject) => {
+      timeoutId = setTimeout(() => reject(new Error("Tiempo de espera agotado al escribir en la impresora USB")), TIMEOUT_MS);
+    });
+    try {
+      await Promise.race([writer.write(bytes), timeout]);
+    } finally {
+      clearTimeout(timeoutId);
+    }
   } finally {
-    writer.releaseLock();
+    try { writer.releaseLock(); } catch(e) { /* puede fallar si la escritura seguía pendiente tras el timeout; no es crítico */ }
   }
 }
 
@@ -4843,8 +4889,11 @@ function actualizarEstadoUSBPrint() {
 }
 
 /** Print the current (unsaved) ticket as a pre-sale receipt */
+let _imprimiendoTicket = false; // evita disparar impresiones superpuestas si tocan el botón varias veces
+
 function imprimirTicketThermal() {
   if (ticketPOS.length === 0) { toast("El ticket está vacío", "error"); return; }
+  if (_imprimiendoTicket) return; // ya hay una impresión en curso — ignorar toques repetidos
   const subtotal = ticketPOS.reduce((acc, i) => acc + i.PRECIO * i.cantidad, 0);
   const { montoDescuento, total } = calcularDescuentoPOS(subtotal);
   const etiqueta = obtenerEtiquetaDescuentoPOS(subtotal);
@@ -4903,17 +4952,36 @@ function imprimirVentaDesdeData(ventaObj) {
 function _ejecutarImpresion(ventaId, items, total, formaPago, fecha, descuento) {
   const cambioData = obtenerDatosCambio();
 
+  const btn = document.getElementById("btnImprimirTicket");
+  const textoOriginalBtn = btn ? btn.innerHTML : null;
+  _imprimiendoTicket = true;
+  if (btn) { btn.disabled = true; btn.innerHTML = "⏳"; }
+
+  const liberar = () => {
+    _imprimiendoTicket = false;
+    if (btn) {
+      btn.innerHTML = textoOriginalBtn;
+      // El disabled real (según si el ticket tiene items) lo recalcula
+      // renderTicketPOS/actualizarBotonesTicketPOS en su próximo render;
+      // acá solo se saca el bloqueo temporal de "imprimiendo".
+      btn.disabled = ticketPOS.length === 0;
+    }
+  };
+
   if (usbPrintHabilitado() && puertoImpresoraUSB) {
     const bytes = buildThermalESCPOS(ventaId, items, total, formaPago, fecha, descuento);
-    enviarBytesAImpresoraUSB(bytes).catch(error => {
-      console.error("Error al imprimir por USB:", error);
-      toast("Error al imprimir por USB — se abre el diálogo normal", "error");
-      _imprimirConDialogo(buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, null, cambioData));
-    });
+    enviarBytesAImpresoraUSB(bytes)
+      .catch(error => {
+        console.error("Error al imprimir por USB:", error);
+        toast("Error al imprimir por USB — se abre el diálogo normal", "error");
+        return _imprimirConDialogo(buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, null, cambioData));
+      })
+      .finally(liberar);
     return;
   }
 
-  _imprimirConDialogo(buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, null, cambioData));
+  _imprimirConDialogo(buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, null, cambioData))
+    .finally(liberar);
 }
 
 /** Falls back to the regular browser print dialog (used when USB printing is off, unsupported, or fails) */
@@ -4945,9 +5013,25 @@ async function _imprimirConDialogo(html) {
   const bridge = window.veekpos || window.posOffline;
   if (bridge && typeof bridge.imprimirSilencioso === "function") {
     const deviceName = localStorage.getItem("veekpos_impresora") || "";
-    const result = await bridge.imprimirSilencioso({ deviceName });
+    let result = await bridge.imprimirSilencioso({ deviceName });
+
+    // Causa más común de "tengo la impresora configurada y igual sale
+    // el diálogo": el nombre guardado (de una lista de impresoras que
+    // se cargó una vez) ya no coincide exactamente con cómo el driver
+    // reporta la impresora ahora mismo (Windows es especialmente
+    // propenso a esto — actualizaciones de driver, reconexión USB,
+    // etc.). Antes, un solo fallo con ese nombre hacía caer directo al
+    // diálogo visible; ahora, si había un nombre guardado, se reintenta
+    // una vez dejando que Electron use la impresora predeterminada del
+    // sistema — que suele ser la térmica igual — antes de rendirse.
+    if (result && !result.success && deviceName) {
+      console.warn(`Impresión silenciosa falló con la impresora guardada ("${deviceName}"): ${result.errorType}. Reintentando con la predeterminada del sistema...`);
+      result = await bridge.imprimirSilencioso({ deviceName: "" });
+    }
+
     if (result && !result.success) {
       console.warn("Impresión silenciosa falló:", result.errorType);
+      toast(`No se pudo imprimir en silencio (${result.errorType || "motivo desconocido"}) — revisá la impresora en Configuración`, "error");
       window.print();
     }
     return;
@@ -4997,6 +5081,52 @@ function buildThermalCierreHTML(resumen) {
 
   const signoTotal = resumen.total.diferencia > 0 ? "+" : "";
 
+  const fmt = n => "$" + Number(n || 0).toLocaleString("es-AR");
+
+  // Egresos del día, desglosados por forma de pago (solo se muestran
+  // los que tuvieron movimiento para no ensuciar el ticket).
+  const egresos = resumen.egresosPorFormaPago || { EFECTIVO: 0, TRANSFERENCIA: 0, TARJETA: 0 };
+  const filasEgresos = [
+    ["Efectivo", egresos.EFECTIVO],
+    ["Transferencia", egresos.TRANSFERENCIA],
+    ["Tarjeta", egresos.TARJETA]
+  ].filter(([, monto]) => Number(monto) > 0);
+
+  const bloqueVentasYEgresos = `
+    <table>
+      <tbody>
+        <tr>
+          <td colspan="2" style="padding-top:1mm;"><strong>VENTAS DEL DÍA</strong></td>
+        </tr>
+        <tr>
+          <td>Total ventas</td>
+          <td style="text-align:right;">${fmt(resumen.totalVentas)}</td>
+        </tr>
+        <tr>
+          <td>&nbsp;&nbsp;Efectivo</td>
+          <td style="text-align:right;">${fmt(resumen.ventasEfectivo)}</td>
+        </tr>
+        <tr>
+          <td>&nbsp;&nbsp;Transferencia</td>
+          <td style="text-align:right;">${fmt(resumen.ventasTransferencia)}</td>
+        </tr>
+        <tr>
+          <td>&nbsp;&nbsp;Tarjeta</td>
+          <td style="text-align:right;">${fmt(resumen.ventasTarjeta)}</td>
+        </tr>
+        ${filasEgresos.length ? `
+        <tr>
+          <td colspan="2" style="padding-top:2mm;"><strong>EGRESOS DEL DÍA</strong></td>
+        </tr>
+        ${filasEgresos.map(([etiqueta, monto]) => `
+        <tr>
+          <td>&nbsp;&nbsp;${etiqueta}</td>
+          <td style="text-align:right;">−${fmt(monto)}</td>
+        </tr>`).join("")}` : ""}
+      </tbody>
+    </table>
+    <hr class="th-sep">`;
+
   // Encabezado: nombre del local + dirección + teléfono(s) (sin subtítulo, este ticket no es de venta)
   let encabezado = `<div class="th-center th-big">${escapeHtml(cfg.nombre)}</div>`;
   encabezado += `<div class="th-center" style="font-size:13pt;font-weight:bold;">Cierre de Caja</div>`;
@@ -5019,6 +5149,7 @@ function buildThermalCierreHTML(resumen) {
       <div>Cierre: #${escapeHtml(String(resumen.cierreId || "—"))}</div>
       <div>Vendedor: ${escapeHtml(String(resumen.vendedor || "—"))}</div>
       <hr class="th-sep">
+      ${bloqueVentasYEgresos}
       <table>
         <tbody>
           ${filaMetodo("EFECTIVO", resumen.efectivo)}
@@ -5083,6 +5214,8 @@ function imprimirCierreCaja() {
   const totalEsperado = efectivo.esperado + transferencia.esperado + tarjeta.esperado;
   const totalContado  = efectivo.contado  + transferencia.contado  + tarjeta.contado;
 
+  const mov = cierreCajaResumenActual.movimientosCaja || {};
+
   const resumen = {
     fecha: cierreCajaResumenActual.fecha,
     cierreId: (cierreCajaResumenActual.cierreExistente && cierreCajaResumenActual.cierreExistente.CIERRE_ID) || "PREVIO",
@@ -5095,7 +5228,13 @@ function imprimirCierreCaja() {
       esperado: totalEsperado,
       contado: totalContado,
       diferencia: totalContado - totalEsperado
-    }
+    },
+    // Datos para el bloque de "Ventas del día" / "Egresos del día" del ticket
+    totalVentas: cierreCajaResumenActual.totalVentas,
+    ventasEfectivo: cierreCajaResumenActual.ventasEfectivo,
+    ventasTransferencia: cierreCajaResumenActual.ventasTransferencia,
+    ventasTarjeta: cierreCajaResumenActual.ventasTarjeta,
+    egresosPorFormaPago: mov.egresosPorFormaPago
   };
 
   if (usbPrintHabilitado() && puertoImpresoraUSB) {
@@ -5427,7 +5566,8 @@ function aplicarDatosCierreCaja(data) {
   actualizarElemento("ccTarjetaEsperado",       "$" + Number(data.esperado.TARJETA).toLocaleString("es-AR"));
   actualizarElemento("ccTotalEsperado",         "$" + Number(data.esperado.TOTAL).toLocaleString("es-AR"));
 
-    // Desglose de movimientos — cada forma de pago muestra solo sus propios movimientos
+    // Desglose de movimientos y pagos de clientes — cada forma de pago
+    // muestra solo lo que le corresponde a ella.
     const movDetalleEl = document.getElementById("ccMovimientosDetalle");
     const mov = data.movimientosCaja;
     const pfp = mov?.porFormaPago || {};
@@ -5435,9 +5575,26 @@ function aplicarDatosCierreCaja(data) {
     const movTransferencia = Number(pfp.TRANSFERENCIA || 0);
     const movTarjeta = Number(pfp.TARJETA || 0);
 
+    const pc = data.pagosClientes || {};
+    const pcEfectivo = Number(pc.EFECTIVO || 0);
+    const pcTransferencia = Number(pc.TRANSFERENCIA || 0);
+    const pcTarjeta = Number(pc.TARJETA || 0);
+
+    function mostrarLineaPagos(idLinea, idMonto, monto) {
+      const lineaEl = document.getElementById(idLinea);
+      if (!lineaEl) return;
+      if (monto > 0) {
+        actualizarElemento(idMonto, "$" + monto.toLocaleString("es-AR"));
+        lineaEl.style.display = "flex";
+      } else {
+        lineaEl.style.display = "none";
+      }
+    }
+
     // Desglose de efectivo
-    if (movDetalleEl && movEfectivo !== 0) {
+    if (movDetalleEl && (movEfectivo !== 0 || pcEfectivo !== 0)) {
       actualizarElemento("ccVentasEfectivo", "$" + Number(data.ventasEfectivo || 0).toLocaleString("es-AR"));
+      mostrarLineaPagos("ccPagosClientesEfectivoLinea", "ccPagosClientesEfectivo", pcEfectivo);
       const ingEf = movEfectivo > 0 ? movEfectivo : 0;
       const egrEf = movEfectivo < 0 ? Math.abs(movEfectivo) : 0;
       actualizarElemento("ccMovIngresos", ingEf > 0 ? "+$" + ingEf.toLocaleString("es-AR") : "$0");
@@ -5447,18 +5604,35 @@ function aplicarDatosCierreCaja(data) {
       movDetalleEl.style.display = "none";
     }
 
-    // Desglose de transferencia (si hubo movimientos)
+    // Desglose de transferencia
     const movTransfEl = document.getElementById("ccMovimientosDetalleTransf");
     if (movTransfEl) {
-      if (movTransferencia !== 0) {
+      if (movTransferencia !== 0 || pcTransferencia !== 0) {
         const ingTr = movTransferencia > 0 ? movTransferencia : 0;
         const egrTr = movTransferencia < 0 ? Math.abs(movTransferencia) : 0;
         actualizarElemento("ccVentasTransferencia", "$" + Number(data.ventasTransferencia || 0).toLocaleString("es-AR"));
+        mostrarLineaPagos("ccPagosClientesTransfLinea", "ccPagosClientesTransf", pcTransferencia);
         actualizarElemento("ccMovIngresosTransf", ingTr > 0 ? "+$" + ingTr.toLocaleString("es-AR") : "$0");
         actualizarElemento("ccMovEgresosTransf",  egrTr > 0 ? "−$" + egrTr.toLocaleString("es-AR") : "$0");
         movTransfEl.style.display = "flex";
       } else {
         movTransfEl.style.display = "none";
+      }
+    }
+
+    // Desglose de tarjeta
+    const movTarjetaEl = document.getElementById("ccMovimientosDetalleTarjeta");
+    if (movTarjetaEl) {
+      if (movTarjeta !== 0 || pcTarjeta !== 0) {
+        const ingTa = movTarjeta > 0 ? movTarjeta : 0;
+        const egrTa = movTarjeta < 0 ? Math.abs(movTarjeta) : 0;
+        actualizarElemento("ccVentasTarjeta", "$" + Number(data.ventasTarjeta || 0).toLocaleString("es-AR"));
+        mostrarLineaPagos("ccPagosClientesTarjetaLinea", "ccPagosClientesTarjeta", pcTarjeta);
+        actualizarElemento("ccMovIngresosTarjeta", ingTa > 0 ? "+$" + ingTa.toLocaleString("es-AR") : "$0");
+        actualizarElemento("ccMovEgresosTarjeta",  egrTa > 0 ? "−$" + egrTa.toLocaleString("es-AR") : "$0");
+        movTarjetaEl.style.display = "flex";
+      } else {
+        movTarjetaEl.style.display = "none";
       }
     }
 
