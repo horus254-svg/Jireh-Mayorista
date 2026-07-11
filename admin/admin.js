@@ -82,21 +82,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     setTimeout(() => cat.remove(), 500);
   }
 
-  setInterval(() => {
-    const dashboardVisible = document.getElementById("dashboard").style.display === "block";
-    const pedidosVisible   = document.getElementById("pedidos").style.display === "block";
-    const clientesVisible  = document.getElementById("clientes").style.display === "block";
-
-    // Antes esto llamaba a cargarMetricas() siempre, aunque el cajero
-    // estuviera en Productos o en el POS vendiendo — son llamadas al
-    // backend (Apps Script + Sheets) que no hacían falta y competían
-    // con lo que el cajero estaba haciendo en ese momento. Ahora solo
-    // se actualiza la pantalla que efectivamente está en uso.
-    if (dashboardVisible) { cargarMetricas(); cargarVentasPOS(); }
-    if (pedidosVisible)   cargarPedidos();
-    if (clientesVisible)  cargarClientes();
-  }, 15000); // 15 s — near real-time without hammering the API
-
   setupScannerListener();
 });
 
@@ -1435,9 +1420,19 @@ async function cargarPedidos() {
     const response = await fetch(API_URL + "?action=pedidos");
     const data = await response.json();
     if (!data.pedidos) return;
+
+    // Si no cambió nada respecto de lo que ya se está mostrando, no
+    // hace falta destruir y reconstruir toda la lista — eso es lo que
+    // hacía "saltar" la pantalla al principio cada vez que el polling
+    // de 15s se disparaba, aunque no hubiera pedidos nuevos.
+    const firma = p => p.PEDIDO_ID + "|" + p.ESTADO + "|" + p.COBRADO + "|" + p.FORMA_PAGO_COBRO + "|" + p.TOTAL;
+    const cambio = !pedidosGlobal
+      || pedidosGlobal.length !== data.pedidos.length
+      || pedidosGlobal.some((p, i) => firma(p) !== firma(data.pedidos[i]));
+
     pedidosGlobal = data.pedidos;
     cacheSet("pedidos", pedidosGlobal);
-    renderPedidos(pedidosGlobal);
+    if (cambio) renderPedidos(pedidosGlobal);
   } catch (error) {
     console.error("Error pedidos:", error);
   }
@@ -1795,9 +1790,20 @@ function mensajeWhatsAppPorEstado(estado, pedidoId, cliente, total, pdfUrl) {
   }
 }
 
+let _renderGenPedidos = 0; // evita que un render viejo (todavía terminando sus chunks) escriba encima de uno más nuevo
+
 function renderPedidos(lista) {
   const container = document.getElementById("tablaPedidos");
   if (!container) return;
+
+  const miGen = ++_renderGenPedidos;
+
+  // Guarda dónde estaba parado el usuario para restaurarlo después de
+  // reconstruir la lista — sin esto, cada refresco hacía "saltar" la
+  // pantalla al principio aunque el usuario estuviera leyendo un
+  // pedido más abajo.
+  const scrollContainer = container.closest(".seccion") || container.parentElement;
+  const scrollTopPrevio = scrollContainer ? scrollContainer.scrollTop : 0;
 
   if (lista.length === 0) {
     container.innerHTML = `<div class="text-center text-muted py-5" style="font-size:14px;">No se encontraron pedidos</div>`;
@@ -1812,6 +1818,7 @@ function renderPedidos(lista) {
   container.innerHTML = "";
 
   const renderChunk = () => {
+    if (miGen !== _renderGenPedidos) return; // superado por un render más nuevo — no seguir escribiendo
     const frag = document.createDocumentFragment();
     const fin = Math.min(idx + CHUNK, lista.length);
     for (; idx < fin; idx++) {
@@ -1871,7 +1878,14 @@ function renderPedidos(lista) {
       frag.appendChild(tmp.firstElementChild);
     }
     container.appendChild(frag);
-    if (idx < lista.length) requestAnimationFrame(renderChunk);
+    if (idx < lista.length) {
+      requestAnimationFrame(renderChunk);
+    } else if (scrollContainer) {
+      // Recién al terminar de reconstruir toda la lista se restaura el
+      // scroll — hacerlo antes dejaría al contenedor más bajo de lo
+      // que todavía existe en el DOM.
+      scrollContainer.scrollTop = scrollTopPrevio;
+    }
   };
 
   requestAnimationFrame(renderChunk);
@@ -1927,9 +1941,13 @@ async function _actualizarProductosAdminEnBackground(cacheKey) {
   }
 }
 
+let _renderGenProductos = 0; // evita que un render viejo (todavía completando sus chunks) mezcle filas con uno más nuevo
+
 function renderTablaProductos(lista) {
   const tbody = document.getElementById("tablaProductos");
   if (!tbody) return;
+
+  const miGen = ++_renderGenProductos;
 
   if (!lista || lista.length === 0) {
     tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-4">No se encontraron productos</td></tr>`;
@@ -1943,6 +1961,16 @@ function renderTablaProductos(lista) {
   tbody.innerHTML = "";
 
   const renderChunk = () => {
+    // Si mientras este render todavía estaba completando sus chunks
+    // (varios requestAnimationFrame seguidos) el usuario tipeó de
+    // nuevo y arrancó un render más nuevo, este viejo tiene que
+    // abandonar en vez de seguir agregando filas — si no, sus filas
+    // (de una búsqueda vieja) terminan mezcladas con las del render
+    // nuevo, o incluso apareciendo solas después de que el nuevo ya
+    // había limpiado y llenado la tabla. Esto era lo que hacía que la
+    // búsqueda "no mostrara bien los resultados hasta volver a escribir".
+    if (miGen !== _renderGenProductos) return;
+
     const frag = document.createDocumentFragment();
     const fin = Math.min(idx + CHUNK, lista.length);
 
@@ -2511,9 +2539,13 @@ async function cargarClientesParaPedido() {
   }
 }
 
+let _renderGenClientes = 0; // mismo guard que en Productos/Pedidos: evita que un render viejo escriba encima de uno nuevo
+
 function renderTablaClientes(lista) {
   const cont = document.getElementById("tablaClientes");
   if (!cont) return;
+
+  const miGen = ++_renderGenClientes;
 
   if (!lista || lista.length === 0) {
     cont.innerHTML = `<div class="text-center text-muted py-5" style="font-size:14px;">No se encontraron clientes</div>`;
@@ -2525,6 +2557,7 @@ function renderTablaClientes(lista) {
   let idxCli = 0;
   cont.innerHTML = "";
   const renderChunkCli = () => {
+    if (miGen !== _renderGenClientes) return; // superado por un render más nuevo
     const frag = document.createDocumentFragment();
     const fin = Math.min(idxCli + CHUNK_CLI, lista.length);
     for (; idxCli < fin; idxCli++) {
