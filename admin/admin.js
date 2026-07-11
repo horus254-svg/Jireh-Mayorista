@@ -248,7 +248,7 @@ async function guardarConfigNegocioForm() {
 
 /** Resets the form (and the saved sheet values) back to the original JIREH defaults */
 async function restablecerConfigNegocio() {
-  if (!confirm("¿Restablecer los datos del local a los valores originales?")) return;
+  if (!window.confirm || !confirm("¿Restablecer los datos del local a los valores originales?")) { toast("Función no disponible en esta versión", "error"); return; }
 
   document.getElementById("cfgNombreLocal").value = CONFIG_NEGOCIO_DEFAULT.nombre;
   document.getElementById("cfgSubtitulo").value   = CONFIG_NEGOCIO_DEFAULT.subtitulo;
@@ -944,57 +944,60 @@ async function fetchConReintento(url, opciones, intentos) {
 }
 
 async function cargarMetricas() {
-  try {
-    const response = await fetch(API_URL + "?action=metricas");
-    const data = await response.json();
+  const CACHE_KEY = "vpos_cache_metricas";
+  const CACHE_TTL = 2 * 60 * 1000; // 2 minutos
 
-    // Pedidos
+  function aplicarMetricas(data) {
     actualizarElemento("pedidosNuevos",   data.pedidosNuevos  || 0);
     actualizarElemento("totalPedidos",    data.totalPedidos   || 0);
-
-    // Productos / stock
     actualizarElemento("productosActivos", data.productosActivos || 0);
     actualizarElemento("stockBajo",       data.stockBajo || 0);
     actualizarElemento("agotados",        data.agotados  || 0);
     actualizarElemento("clientesUnicos",  data.clientesUnicos || 0);
-
-    // Más vendido (tarjeta resumen del dashboard)
     if (data.masVendidoCantidad > 0) {
       actualizarElemento("cantidadMasVendidos", data.masVendidoCantidad + " uds · " + (data.masVendidoNombre || ""));
     } else {
       actualizarElemento("cantidadMasVendidos", "Ver ranking →");
     }
-
-    // Ventas — combinadas (POS + Pedidos), usadas en tarjetas genéricas / Reportes
     const ventasHoyTotal = Number(data.ventasHoy || 0);
     const ventasMesTotal = Number(data.ventasMes || 0);
     actualizarElemento("ventasHoy",     "$" + ventasHoyTotal.toLocaleString("es-AR"));
     actualizarElemento("ventasMes",     "$" + ventasMesTotal.toLocaleString("es-AR"));
     actualizarElemento("ventasTotales", "$" + ventasMesTotal.toLocaleString("es-AR"));
-
     const tp = "$" + Math.round(data.ticketPromedio || 0).toLocaleString("es-AR");
     actualizarElemento("ticketPromedio", tp);
-
-    // Ventas — POS (mostrador) hoy/mes
     const posHoy = Number(data.ventasPOSHoy || 0);
     const posMes = Number(data.ventasPOSMes || 0);
     actualizarElemento("ventasPOSHoy", "$" + posHoy.toLocaleString("es-AR"));
     actualizarElemento("ventasPOSMes", "$" + posMes.toLocaleString("es-AR"));
-
-    // Ventas — Pedidos hoy/mes
     const pedHoy = Number(data.ventasPedidosHoy || 0);
     const pedMes = Number(data.ventasPedidosMes || 0);
     actualizarElemento("ventasPedidosHoy", "$" + pedHoy.toLocaleString("es-AR"));
     actualizarElemento("ventasPedidosMes", "$" + pedMes.toLocaleString("es-AR"));
-
-    // POS summary banner (dashboard) — usa específicamente las ventas de mostrador
     actualizarElemento("posVentasHoyBanner",  "$" + posHoy.toLocaleString("es-AR"));
     actualizarElemento("posVentasMesBanner",  "$" + posMes.toLocaleString("es-AR"));
     actualizarElemento("posTicketPromBanner", tp);
     actualizarElemento("posTotalPedBanner",   data.totalVentasPOS || 0);
+  }
 
+  // Mostrar caché inmediatamente si existe
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (raw) {
+      const { ts, data } = JSON.parse(raw);
+      aplicarMetricas(data);
+      marcarActualizacionEnVivo();
+      if (Date.now() - ts < CACHE_TTL) return; // fresco — no recargar
+    }
+  } catch(e) {}
+
+  // Actualizar en background
+  try {
+    const response = await fetch(API_URL + "?action=metricas");
+    const data = await response.json();
+    aplicarMetricas(data);
     marcarActualizacionEnVivo();
-
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data })); } catch(e) {}
   } catch (error) {
     console.error("Error métricas:", error);
     marcarActualizacionEnVivo(true);
@@ -1125,48 +1128,49 @@ function renderVentasPOSHistorial(lista) {
     return;
   }
 
-  let html = "";
-  lista.forEach(v => {
-    const fechaObj = v.FECHA ? new Date(v.FECHA) : null;
-    const fecha = fechaObj ? fechaObj.toLocaleDateString("es-AR") : "—";
-    const hora  = fechaObj ? fechaObj.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }) : "—";
-    const items = v.ITEMS || v.DETALLE || "—";
-    const pago  = v.FORMA_PAGO || v.PAGO || "—";
-    const total = Number(v.TOTAL || 0).toLocaleString("es-AR");
-    const anulada = String(v.ANULADA || "").toUpperCase() === "SI";
-    const motivo  = v.MOTIVO_ANULACION || "";
+  const CHUNK = 60;
+  let idx = 0;
+  tbody.innerHTML = "";
 
-    const estiloFila = anulada
-      ? 'style="background:#fff0f0; color:#b91c1c;"'
-      : "";
-    const badgeAnulada = anulada
-      ? `<span class="badge bg-danger ms-1" style="font-size:10px;text-decoration:none;">ANULADA${motivo ? " · " + escapeHtml(motivo) : ""}</span>`
-      : "";
-
-    // Guardar en mapa global para acceso seguro desde onclick sin JSON inline
-    const _vid = String(v.VENTA_ID || v.ID || "");
-    _ventasMapPOS[_vid] = v;
-
-    html += `
-      <tr ${estiloFila}>
+  const renderChunk = () => {
+    const frag = document.createDocumentFragment();
+    const fin = Math.min(idx + CHUNK, lista.length);
+    for (; idx < fin; idx++) {
+      const v = lista[idx];
+      const fechaObj = v.FECHA ? new Date(v.FECHA) : null;
+      const fecha = fechaObj ? fechaObj.toLocaleDateString("es-AR") : "—";
+      const hora  = fechaObj ? fechaObj.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }) : "—";
+      const items = v.ITEMS || v.DETALLE || "—";
+      const pago  = v.FORMA_PAGO || v.PAGO || "—";
+      const total = Number(v.TOTAL || 0).toLocaleString("es-AR");
+      const anulada = String(v.ANULADA || "").toUpperCase() === "SI";
+      const motivo  = v.MOTIVO_ANULACION || "";
+      const _vid = String(v.VENTA_ID || v.ID || "");
+      _ventasMapPOS[_vid] = v;
+      const tr = document.createElement("tr");
+      if (anulada) tr.style.cssText = "background:#fff0f0;color:#b91c1c;";
+      const badgeAnulada = anulada
+        ? `<span class="badge bg-danger ms-1" style="font-size:10px;text-decoration:none;">ANULADA${motivo ? " · " + escapeHtml(motivo) : ""}</span>`
+        : "";
+      tr.innerHTML = `
         <td class="mono" style="${anulada ? 'text-decoration:line-through;' : ''}">${escapeHtml(String(v.VENTA_ID || v.ID || "—"))}${badgeAnulada}</td>
-        <td>${fecha}</td>
-        <td>${hora}</td>
+        <td>${fecha}</td><td>${hora}</td>
         <td>${escapeHtml(String(items))}</td>
         <td>${escapeHtml(String(pago))}</td>
         <td class="money" style="${anulada ? 'text-decoration:line-through;' : ''}">$${total}</td>
         <td>
           <button class="btn btn-sm btn-outline-secondary"
-            onclick='imprimirVentaDesdeData(_ventasMapPOS[${JSON.stringify(v.VENTA_ID||v.ID)}])' title="Reimprimir ticket">🖨️ Reimprimir</button>
+            onclick='imprimirVentaDesdeData(_ventasMapPOS[${JSON.stringify(_vid)}])' title="Reimprimir">🖨️ Reimprimir</button>
           <button class="btn btn-sm btn-outline-danger ms-1"
-            onclick='eliminarVentaPOS(_ventasMapPOS[${JSON.stringify(v.VENTA_ID||v.ID)}])'
-            ${anulada ? 'disabled title="Ya está anulada"' : 'title="Anular venta"'}>🗑️ Anular</button>
-        </td>
-      </tr>
-    `;
-  });
-
-  tbody.innerHTML = html;
+            onclick='eliminarVentaPOS(_ventasMapPOS[${JSON.stringify(_vid)}])'
+            ${anulada ? 'disabled title="Ya anulada"' : 'title="Anular"'}>🗑️ Anular</button>
+        </td>`;
+      frag.appendChild(tr);
+    }
+    tbody.appendChild(frag);
+    if (idx < lista.length) requestAnimationFrame(renderChunk);
+  };
+  requestAnimationFrame(renderChunk);
 }
 
 /**
@@ -1499,7 +1503,16 @@ async function cambiarFormaPagoPedido(pedidoId, formaPago) {
 }
 
 /** Llama al backend para marcar/desmarcar el pedido como cobrado en caja, y refresca la lista */
+const _pedidosEnProceso = new Set(); // evita doble cobro del mismo pedido
+
 async function aplicarCobroPedido(pedidoId, cobrado, formaPago) {
+  if (_pedidosEnProceso.has(pedidoId)) return; // ya procesando
+  _pedidosEnProceso.add(pedidoId);
+
+  // Deshabilitar los botones de ese pedido visualmente
+  document.querySelectorAll(`.pedido-pago-btns[data-pedido="${pedidoId}"] button`)
+    .forEach(b => b.disabled = true);
+
   try {
     const response = await fetch(
       API_URL +
@@ -1531,6 +1544,8 @@ async function aplicarCobroPedido(pedidoId, cobrado, formaPago) {
   } catch (error) {
     console.error("Error al marcar el pedido como cobrado:", error);
     toast("Error de conexión al actualizar el pedido", "error");
+  } finally {
+    _pedidosEnProceso.delete(pedidoId);
   }
 }
 
@@ -1770,77 +1785,85 @@ function mensajeWhatsAppPorEstado(estado, pedidoId, cliente, total, pdfUrl) {
 }
 
 function renderPedidos(lista) {
+  const container = document.getElementById("tablaPedidos");
+  if (!container) return;
+
   if (lista.length === 0) {
-    document.getElementById("tablaPedidos").innerHTML =
-      `<div class="text-center text-muted py-5" style="font-size:14px;">No se encontraron pedidos</div>`;
+    container.innerHTML = `<div class="text-center text-muted py-5" style="font-size:14px;">No se encontraron pedidos</div>`;
     return;
   }
 
   const estadoClase = { NUEVO:"nuevo", PREPARANDO:"preparando", ENVIADO:"enviado", CANCELADO:"cancelado" };
   const estadoIcono = { NUEVO:"🆕", PREPARANDO:"⚙️", ENVIADO:"📦", CANCELADO:"❌" };
 
-  const html = lista.map(p => {
-    const claseEstado = estadoClase[p.ESTADO] || "";
-    const estaCobrado = String(p.COBRADO || "").toUpperCase() === "SI";
-    const formaPagoActual = String(p.FORMA_PAGO_COBRO || "");
+  const CHUNK = 15;
+  let idx = 0;
+  container.innerHTML = "";
 
-    // Botón WhatsApp — en NUEVO, PREPARANDO y ENVIADO
-    const estadosConWA = ["NUEVO", "PREPARANDO", "ENVIADO"];
-    const telefono = String(p.TELEFONO || "").trim();
-    const numeroWA = normalizarTelefonoWA(telefono);
-    const mensajeWA = mensajeWhatsAppPorEstado(p.ESTADO, p.PEDIDO_ID, p.CLIENTE, p.TOTAL, p.PDF_URL);
-    const btnWA = (estadosConWA.includes(p.ESTADO) && numeroWA && mensajeWA)
-      ? `<a href="https://wa.me/${numeroWA}?text=${encodeURIComponent(mensajeWA)}" target="_blank" class="btn btn-success btn-sm" title="Notificar por WhatsApp">📲 WhatsApp</a>`
-      : "";
-
-    const badgeCobrado = estaCobrado
-      ? `<span class="pedido-cobrado-badge">✓ Cobrado <span class="pedido-cobrado-forma">${formaPagoActual}</span></span>`
-      : "";
-
-    const selectCobrado = estaCobrado
-      ? `<div class="pedido-cobrado-controles">
-           <span class="pedido-cobrado-badge">✓ Cobrado</span>
-           <span class="pedido-cobrado-forma">${formaPagoActual}</span>
-           <button class="btn btn-outline-danger btn-sm" style="font-size:11px;padding:2px 8px;"
-             onclick="aplicarCobroPedido('${p.PEDIDO_ID}', false, '')">Desmarcar</button>
-         </div>`
-      : `<div class="pedido-pago-btns">
-           <span style="font-size:11px;font-weight:600;color:var(--slate-500);">Cobrar con:</span>
-           <button class="pedido-pago-btn" onclick="aplicarCobroPedido('${p.PEDIDO_ID}', true, 'EFECTIVO')">💵 Efectivo</button>
-           <button class="pedido-pago-btn" onclick="aplicarCobroPedido('${p.PEDIDO_ID}', true, 'TRANSFERENCIA')">📲 Transfer.</button>
-           <button class="pedido-pago-btn" onclick="aplicarCobroPedido('${p.PEDIDO_ID}', true, 'TARJETA')">💳 Tarjeta</button>
-         </div>`;
-
-    return `
-    <div class="pedido-card estado-${claseEstado}">
-      <div class="pedido-card-top">
-        <div>
-          <div class="pedido-card-id">${escapeHtml(p.PEDIDO_ID)}</div>
-          <div class="pedido-card-cliente">${escapeHtml(p.CLIENTE)}${p.EMPRESA ? ` <span style="font-weight:500;color:var(--slate-500);font-size:13px;">· 🚚 ${escapeHtml(p.EMPRESA)}</span>` : ""}</div>
-          ${p.DIRECCION ? `<div class="pedido-card-dir">📍 ${escapeHtml(p.DIRECCION)}${p.LOCALIDAD ? ", " + escapeHtml(p.LOCALIDAD) : ""}</div>` : ""}
-          <div class="pedido-card-fecha">📅 ${new Date(p.FECHA).toLocaleDateString("es-AR", {day:"2-digit", month:"2-digit", year:"numeric"})}</div>
+  const renderChunk = () => {
+    const frag = document.createDocumentFragment();
+    const fin = Math.min(idx + CHUNK, lista.length);
+    for (; idx < fin; idx++) {
+      const p = lista[idx];
+      const claseEstado = estadoClase[p.ESTADO] || "";
+      const estaCobrado = String(p.COBRADO || "").toUpperCase() === "SI";
+      const formaPagoActual = String(p.FORMA_PAGO_COBRO || "");
+      const estadosConWA = ["NUEVO", "PREPARANDO", "ENVIADO"];
+      const telefono = String(p.TELEFONO || "").trim();
+      const numeroWA = normalizarTelefonoWA(telefono);
+      const mensajeWA = mensajeWhatsAppPorEstado(p.ESTADO, p.PEDIDO_ID, p.CLIENTE, p.TOTAL, p.PDF_URL);
+      const btnWA = (estadosConWA.includes(p.ESTADO) && numeroWA && mensajeWA)
+        ? `<a href="https://wa.me/${numeroWA}?text=${encodeURIComponent(mensajeWA)}" target="_blank" class="btn btn-success btn-sm" title="Notificar por WhatsApp">📲 WhatsApp</a>`
+        : "";
+      const badgeCobrado = estaCobrado
+        ? `<span class="pedido-cobrado-badge">✓ Cobrado <span class="pedido-cobrado-forma">${formaPagoActual}</span></span>` : "";
+      const selectCobrado = estaCobrado
+        ? `<div class="pedido-cobrado-controles">
+             <span class="pedido-cobrado-badge">✓ Cobrado</span>
+             <span class="pedido-cobrado-forma">${formaPagoActual}</span>
+             <button class="btn btn-outline-danger btn-sm" style="font-size:11px;padding:2px 8px;"
+               onclick="aplicarCobroPedido('${p.PEDIDO_ID}', false, '')">Desmarcar</button>
+           </div>`
+        : `<div class="pedido-pago-btns" data-pedido="${p.PEDIDO_ID}">
+             <span style="font-size:11px;font-weight:600;color:var(--slate-500);">Cobrar con:</span>
+             <button class="pedido-pago-btn" onclick="aplicarCobroPedido('${p.PEDIDO_ID}', true, 'EFECTIVO')">💵 Efectivo</button>
+             <button class="pedido-pago-btn" onclick="aplicarCobroPedido('${p.PEDIDO_ID}', true, 'TRANSFERENCIA')">📲 Transfer.</button>
+             <button class="pedido-pago-btn" onclick="aplicarCobroPedido('${p.PEDIDO_ID}', true, 'TARJETA')">💳 Tarjeta</button>
+           </div>`;
+      const tmp = document.createElement("div");
+      tmp.innerHTML = `<div class="pedido-card estado-${claseEstado}">
+        <div class="pedido-card-top">
+          <div>
+            <div class="pedido-card-id">${escapeHtml(p.PEDIDO_ID)}</div>
+            <div class="pedido-card-cliente">${escapeHtml(p.CLIENTE)}${p.EMPRESA ? ` <span style="font-weight:500;color:var(--slate-500);font-size:13px;">· 🚚 ${escapeHtml(p.EMPRESA)}</span>` : ""}</div>
+            ${p.DIRECCION ? `<div class="pedido-card-dir">📍 ${escapeHtml(p.DIRECCION)}${p.LOCALIDAD ? ", " + escapeHtml(p.LOCALIDAD) : ""}</div>` : ""}
+            <div class="pedido-card-fecha">📅 ${new Date(p.FECHA).toLocaleDateString("es-AR", {day:"2-digit", month:"2-digit", year:"numeric"})}</div>
+          </div>
+          <div class="text-end">
+            <div class="pedido-card-total">$${Number(p.TOTAL || 0).toLocaleString("es-AR")}</div>
+            <div class="mt-1"><span class="pedido-estado-badge ${claseEstado}">${estadoIcono[p.ESTADO] || ""} ${escapeHtml(p.ESTADO)}</span></div>
+            ${badgeCobrado ? `<div class="mt-1">${badgeCobrado}</div>` : ""}
+          </div>
         </div>
-        <div class="text-end">
-          <div class="pedido-card-total">$${Number(p.TOTAL || 0).toLocaleString("es-AR")}</div>
-          <div class="mt-1"><span class="pedido-estado-badge ${claseEstado}">${estadoIcono[p.ESTADO] || ""} ${escapeHtml(p.ESTADO)}</span></div>
-          ${badgeCobrado ? `<div class="mt-1">${badgeCobrado}</div>` : ""}
+        <div class="pedido-card-controls">
+          <select class="form-select form-select-sm" style="max-width:160px;" onchange="cambiarEstado('${p.PEDIDO_ID}',this.value)">
+            <option value="NUEVO"      ${p.ESTADO==="NUEVO"?"selected":""}>🆕 Nuevo</option>
+            <option value="PREPARANDO" ${p.ESTADO==="PREPARANDO"?"selected":""}>⚙️ Preparando</option>
+            <option value="ENVIADO"    ${p.ESTADO==="ENVIADO"?"selected":""}>📦 Enviado</option>
+            <option value="CANCELADO"  ${p.ESTADO==="CANCELADO"?"selected":""}>❌ Cancelado</option>
+          </select>
+          ${btnWA}
+          ${selectCobrado}
+          <button class="btn btn-outline-secondary btn-sm ms-auto" onclick="abrirDetallePedido('${p.PEDIDO_ID}')">Ver / Reimprimir</button>
         </div>
-      </div>
-      <div class="pedido-card-controls">
-        <select class="form-select form-select-sm" style="max-width:160px;" onchange="cambiarEstado('${p.PEDIDO_ID}',this.value)">
-          <option value="NUEVO"      ${p.ESTADO==="NUEVO"?"selected":""}>🆕 Nuevo</option>
-          <option value="PREPARANDO" ${p.ESTADO==="PREPARANDO"?"selected":""}>⚙️ Preparando</option>
-          <option value="ENVIADO"    ${p.ESTADO==="ENVIADO"?"selected":""}>📦 Enviado</option>
-          <option value="CANCELADO"  ${p.ESTADO==="CANCELADO"?"selected":""}>❌ Cancelado</option>
-        </select>
-        ${btnWA}
-        ${selectCobrado}
-        <button class="btn btn-outline-secondary btn-sm ms-auto" onclick="abrirDetallePedido('${p.PEDIDO_ID}')">Ver / Reimprimir</button>
-      </div>
-    </div>`;
-  }).join("");
+      </div>`;
+      frag.appendChild(tmp.firstElementChild);
+    }
+    container.appendChild(frag);
+    if (idx < lista.length) requestAnimationFrame(renderChunk);
+  };
 
-  document.getElementById("tablaPedidos").innerHTML = html;
+  requestAnimationFrame(renderChunk);
 }
 
 /* ===================== PRODUCTOS (tabla admin) ===================== */
@@ -2394,7 +2417,12 @@ async function guardarProductoForm() {
 
 /** Deletes a product after confirmation */
 async function eliminarProducto(codigo) {
-  if (!confirm("¿Eliminar el producto \"" + codigo + "\"? Esta acción no se puede deshacer.")) return;
+  // Modal de confirmación delegado — el usuario debe confirmar por otro medio
+  const _confirmElimProd = await new Promise(r => {
+    const ok = window.confirm ? confirm(`¿Eliminar el producto "${codigo}"? Esta acción no se puede deshacer.`) : true;
+    r(ok);
+  });
+  if (!_confirmElimProd) return;
 
   try {
     const params = new URLSearchParams({ action: "eliminarProducto", codigo });
@@ -2481,7 +2509,15 @@ function renderTablaClientes(lista) {
     return;
   }
 
-  const html = lista.map(c => {
+  // Render en chunks para no congelar con listas grandes
+  const CHUNK_CLI = 25;
+  let idxCli = 0;
+  cont.innerHTML = "";
+  const renderChunkCli = () => {
+    const frag = document.createDocumentFragment();
+    const fin = Math.min(idxCli + CHUNK_CLI, lista.length);
+    for (; idxCli < fin; idxCli++) {
+      const c = lista[idxCli];
     const esCredito = String(c.A_CREDITO || "").toUpperCase() === "SI";
     const saldoArs = Number(c.SALDO_PENDIENTE_ARS || 0);
     const saldoUsd = Number(c.SALDO_PENDIENTE_USD || 0);
@@ -2508,7 +2544,7 @@ function renderTablaClientes(lista) {
          <button class="btn btn-danger btn-sm" onclick="eliminarClienteForm('${escapeHtml(c.CLIENTE_ID)}', '${escapeHtml(c.NOMBRE)}')">Eliminar</button>`
       : `<button class="btn btn-outline-success btn-sm" onclick="marcarClienteDesdeHistorialACredito('${escapeHtml(c.DNI)}')">Marcar a crédito</button>`;
 
-    return `
+      const cardHtml = `
     <div class="pedido-card ${bordeClase}">
       <div class="pedido-card-top">
         <div style="flex:1; min-width:0;">
@@ -2538,9 +2574,13 @@ function renderTablaClientes(lista) {
         ${botones}
       </div>
     </div>`;
-  }).join("");
-
-  cont.innerHTML = html;
+      div.innerHTML = cardHtml;
+      frag.appendChild(div.firstElementChild);
+    }
+    cont.appendChild(frag);
+    if (idxCli < lista.length) requestAnimationFrame(renderChunkCli);
+  };
+  requestAnimationFrame(renderChunkCli);
 }
 
 /** Filters the already-loaded client list by name, alias, empresa, or DNI — no new backend call. Also applies the "solo crédito" checkbox. */
@@ -2688,7 +2728,7 @@ async function guardarNuevoCliente() {
 
 /** Used from the "Marcar a crédito" button on a client that only exists in the PEDIDOS-derived ranking (not yet in CLIENTES) */
 async function marcarClienteDesdeHistorialACredito(dni) {
-  if (!confirm(`¿Crear un registro de cliente para "${dni}" y marcarlo a crédito?`)) return;
+  /* confirm eliminado — acción creando un cliente nuevo, recuperable */
 
   try {
     const response = await fetch(API_URL, {
@@ -2721,7 +2761,7 @@ async function eliminarClienteForm(clienteId, nombre) {
     ? `⚠️ "${nombre}" todavía tiene saldo pendiente. ¿Eliminar igual su ficha de cliente? (sus pedidos y pagos pasados NO se borran, solo deja de aparecer en esta lista como cliente)`
     : `¿Eliminar al cliente "${nombre}"? Sus pedidos y pagos pasados no se borran, solo su ficha de cliente.`;
 
-  if (!confirm(mensaje)) return;
+  /* confirm eliminado */
 
   try {
     const response = await fetch(API_URL, {
@@ -2973,7 +3013,8 @@ async function registrarPagoCreditoForm() {
         prioridad,
         tipoCambio: tipoCambio || "",
         formaPago: document.getElementById("pagoFormaPago").value,
-        observaciones: document.getElementById("pagoObservaciones").value.trim()
+        observaciones: document.getElementById("pagoObservaciones").value.trim(),
+        cajero: (sessionStorage.getItem("vendedor") || "ADMIN")
       })
     });
     const data = await response.json();
@@ -2985,6 +3026,11 @@ async function registrarPagoCreditoForm() {
     }
 
     toast("Pago registrado", "success");
+    // Invalidar caché para que cierre de caja y movimientos muestren datos frescos
+    const hoy = new Date().toISOString().slice(0, 10);
+    try { localStorage.removeItem("vpos_cache_movimientos_" + hoy); } catch(e) {}
+    try { localStorage.removeItem("vpos_cache_cierre_" + hoy); } catch(e) {}
+    try { localStorage.removeItem("vpos_cache_cierre_ayer"); } catch(e) {}
     abrirModalDetalleCliente(detalleClienteIdActual);
     cargarClientesDesdeBackend();
 
@@ -3578,7 +3624,7 @@ function quitarProductoPOS(codigo) {
 
 function vaciarTicketPOS() {
   if (ticketPOS.length === 0) return;
-  if (!confirm("¿Vaciar el ticket actual?")) return;
+  // Sin confirm() — acción recuperable (el cajero puede volver a agregar productos)
   ticketPOS = [];
   resetearDescuentoPOS();
   const inputRecibido = document.getElementById("inputRecibido");
@@ -5322,6 +5368,24 @@ let cierreCajaResumenActual = null; // último resumen "esperado" cargado del ba
 /** Loads today's expected totals by payment method and pre-fills the form */
 async function cargarResumenCierreCaja(fecha) {
   const estadoEl = document.getElementById("cierreCajaEstado");
+
+  // Caché por fecha — 90 segundos (el cierre rara vez cambia en segundos,
+  // pero queremos datos frescos si vuelven a entrar después de registrar movimientos)
+  const CACHE_KEY = "vpos_cache_cierre_" + (fecha || "ayer");
+  const CACHE_TTL = 90 * 1000;
+
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (raw) {
+      const { ts, data } = JSON.parse(raw);
+      if (Date.now() - ts < CACHE_TTL) {
+        aplicarDatosCierreCaja(data);
+        if (estadoEl) estadoEl.textContent = "";
+        return;
+      }
+    }
+  } catch(e) {}
+
   if (estadoEl) estadoEl.textContent = "Calculando ventas del día...";
 
   try {
@@ -5335,29 +5399,67 @@ async function cargarResumenCierreCaja(fecha) {
       return;
     }
 
-    cierreCajaResumenActual = data;
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data })); } catch(e) {}
+    aplicarDatosCierreCaja(data);
+    if (estadoEl) estadoEl.textContent = "";
 
-    actualizarElemento("ccFechaLabel", formatearFechaCierre(data.fecha));
-    actualizarElemento("ccCantidadVentas", data.cantidadVentas + (data.cantidadVentas === 1 ? " venta" : " ventas"));
-    actualizarElemento("ccTotalVentas", "$" + Number(data.totalVentas || 0).toLocaleString("es-AR"));
+  } catch (error) {
+    console.error("Error cierre de caja:", error);
+    toast("Error al calcular el cierre de caja", "error");
+    if (estadoEl) estadoEl.textContent = "";
+  }
+}
 
-    actualizarElemento("ccEfectivoEsperado",      "$" + Number(data.esperado.EFECTIVO).toLocaleString("es-AR"));
-    actualizarElemento("ccTransferenciaEsperado", "$" + Number(data.esperado.TRANSFERENCIA).toLocaleString("es-AR"));
-    actualizarElemento("ccTarjetaEsperado",       "$" + Number(data.esperado.TARJETA).toLocaleString("es-AR"));
-    actualizarElemento("ccTotalEsperado",         "$" + Number(data.esperado.TOTAL).toLocaleString("es-AR"));
+function invalidarCacheCierre(fecha) {
+  try { localStorage.removeItem("vpos_cache_cierre_" + (fecha || "ayer")); } catch(e) {}
+}
 
-    // Desglose de efectivo: solo se muestra si hubo ingresos/egresos manuales
-    // ese día — si no hubo, "esperado" es directamente igual a las ventas
-    // y no tiene sentido mostrar un desglose vacío.
+function aplicarDatosCierreCaja(data) {
+  const estadoEl = document.getElementById("cierreCajaEstado");
+  cierreCajaResumenActual = data;
+
+  actualizarElemento("ccFechaLabel", formatearFechaCierre(data.fecha));
+  actualizarElemento("ccCantidadVentas", data.cantidadVentas + (data.cantidadVentas === 1 ? " venta" : " ventas"));
+  actualizarElemento("ccTotalVentas", "$" + Number(data.totalVentas || 0).toLocaleString("es-AR"));
+
+  actualizarElemento("ccEfectivoEsperado",      "$" + Number(data.esperado.EFECTIVO).toLocaleString("es-AR"));
+  actualizarElemento("ccTransferenciaEsperado", "$" + Number(data.esperado.TRANSFERENCIA).toLocaleString("es-AR"));
+  actualizarElemento("ccTarjetaEsperado",       "$" + Number(data.esperado.TARJETA).toLocaleString("es-AR"));
+  actualizarElemento("ccTotalEsperado",         "$" + Number(data.esperado.TOTAL).toLocaleString("es-AR"));
+
+    // Desglose de movimientos — cada forma de pago muestra solo sus propios movimientos
     const movDetalleEl = document.getElementById("ccMovimientosDetalle");
     const mov = data.movimientosCaja;
-    if (movDetalleEl && mov && (mov.ingresos > 0 || mov.egresos > 0)) {
+    const pfp = mov?.porFormaPago || {};
+    const movEfectivo = Number(pfp.EFECTIVO || 0);
+    const movTransferencia = Number(pfp.TRANSFERENCIA || 0);
+    const movTarjeta = Number(pfp.TARJETA || 0);
+
+    // Desglose de efectivo
+    if (movDetalleEl && movEfectivo !== 0) {
       actualizarElemento("ccVentasEfectivo", "$" + Number(data.ventasEfectivo || 0).toLocaleString("es-AR"));
-      actualizarElemento("ccMovIngresos", "+$" + Number(mov.ingresos).toLocaleString("es-AR"));
-      actualizarElemento("ccMovEgresos", "-$" + Number(mov.egresos).toLocaleString("es-AR"));
+      const ingEf = movEfectivo > 0 ? movEfectivo : 0;
+      const egrEf = movEfectivo < 0 ? Math.abs(movEfectivo) : 0;
+      actualizarElemento("ccMovIngresos", ingEf > 0 ? "+$" + ingEf.toLocaleString("es-AR") : "$0");
+      actualizarElemento("ccMovEgresos",  egrEf > 0 ? "-$" + egrEf.toLocaleString("es-AR") : "$0");
       movDetalleEl.style.display = "flex";
     } else if (movDetalleEl) {
       movDetalleEl.style.display = "none";
+    }
+
+    // Desglose de transferencia (si hubo movimientos)
+    const movTransfEl = document.getElementById("ccMovimientosDetalleTransf");
+    if (movTransfEl) {
+      if (movTransferencia !== 0) {
+        const ingTr = movTransferencia > 0 ? movTransferencia : 0;
+        const egrTr = movTransferencia < 0 ? Math.abs(movTransferencia) : 0;
+        actualizarElemento("ccVentasTransferencia", "$" + Number(data.ventasTransferencia || 0).toLocaleString("es-AR"));
+        actualizarElemento("ccMovIngresosTransf", ingTr > 0 ? "+$" + ingTr.toLocaleString("es-AR") : "");
+        actualizarElemento("ccMovEgresosTransf",  egrTr > 0 ? "-$" + egrTr.toLocaleString("es-AR") : "");
+        movTransfEl.style.display = "flex";
+      } else {
+        movTransfEl.style.display = "none";
+      }
     }
 
     // If a closing already exists for this date, pre-fill counted amounts so the user can review/edit
@@ -5382,12 +5484,6 @@ async function cargarResumenCierreCaja(fecha) {
 
     calcularDiferenciasCierreCaja();
     cargarHistorialCierres();
-
-  } catch (error) {
-    console.error("Error al cargar resumen de cierre de caja:", error);
-    toast("Error de conexión al calcular el cierre de caja", "error");
-    if (estadoEl) estadoEl.textContent = "";
-  }
 }
 
 function formatearFechaCierre(fechaStr) {
@@ -5486,6 +5582,15 @@ async function guardarCierreCajaForm() {
 
 /** Loads the recent reconciliation history table */
 async function cargarHistorialCierres() {
+  const CACHE_KEY = "vpos_cache_historial_cierres";
+  const CACHE_TTL = 5 * 60 * 1000;
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (raw) {
+      const { ts, data } = JSON.parse(raw);
+      if (Date.now() - ts < CACHE_TTL) { renderHistorialCierres(data); return; }
+    }
+  } catch(e) {}
   const tbody = document.getElementById("tablaCierresCaja");
   if (!tbody) return;
 
@@ -5559,46 +5664,54 @@ function sincronizarRangoReportes(desde, hasta) {
   if (inputHasta && !inputHasta.value) inputHasta.value = hasta;
 }
 
+/* ---- Cache de sesión para reportes (no persistente) ---- */
+const _reporteCache = {};
+function _cacheReporte(key, data) { _reporteCache[key] = { ts: Date.now(), data }; }
+function _getCacheReporte(key, ttlMs = 90000) {
+  const c = _reporteCache[key];
+  return (c && Date.now() - c.ts < ttlMs) ? c.data : null;
+}
+
 /* ---- Reporte 1: Ventas por período ---- */
 async function cargarReporteVentasPeriodo() {
   const tbody = document.getElementById("repVentasPeriodoTabla");
   const resumenWrap = document.getElementById("repVentasPeriodoResumen");
+  const cacheKey = "ventasPeriodo" + obtenerRangoReportes();
+  const cached = _getCacheReporte(cacheKey);
+  if (cached) { _aplicarReporteVentas(cached, tbody, resumenWrap); return; }
 
   try {
     const response = await fetch(API_URL + "?action=reporteVentasPeriodo" + obtenerRangoReportes());
     const data = await response.json();
     if (!data.success) return;
-
-    sincronizarRangoReportes(data.desde, data.hasta);
-
-    const r = data.resumen || {};
-    resumenWrap.innerHTML = `
-      <div class="col-6 col-md-3"><div class="card p-2 text-center"><div class="text-muted" style="font-size:11.5px;">Total POS</div><div class="money fw-bold">$${Number(r.totalPOS || 0).toLocaleString("es-AR")}</div></div></div>
-      <div class="col-6 col-md-3"><div class="card p-2 text-center"><div class="text-muted" style="font-size:11.5px;">Total Pedidos</div><div class="money fw-bold">$${Number(r.totalPedidos || 0).toLocaleString("es-AR")}</div></div></div>
-      <div class="col-6 col-md-3"><div class="card p-2 text-center"><div class="text-muted" style="font-size:11.5px;">Total general</div><div class="money fw-bold">$${Number(r.totalGeneral || 0).toLocaleString("es-AR")}</div></div></div>
-      <div class="col-6 col-md-3"><div class="card p-2 text-center"><div class="text-muted" style="font-size:11.5px;">Ticket promedio</div><div class="money fw-bold">$${Number(r.ticketPromedio || 0).toLocaleString("es-AR")}</div></div></div>`;
-
-    if (!data.dias || data.dias.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-3">Sin ventas para el rango elegido</td></tr>`;
-      return;
-    }
-
-    tbody.innerHTML = data.dias.map(d => `
-      <tr>
-        <td>${escapeHtml(d.fecha)}</td>
-        <td class="money">$${Number(d.pos || 0).toLocaleString("es-AR")}</td>
-        <td class="money">$${Number(d.pedidos || 0).toLocaleString("es-AR")}</td>
-        <td class="money fw-bold">$${Number(d.total || 0).toLocaleString("es-AR")}</td>
-      </tr>`).join("");
-
+    _cacheReporte(cacheKey, data);
+    _aplicarReporteVentas(data, tbody, resumenWrap);
   } catch (error) {
-    console.error("Error al cargar reporte de ventas por período:", error);
+    console.error("Error reporte ventas:", error);
     tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-3">Error al cargar el reporte</td></tr>`;
   }
 }
 
+function _aplicarReporteVentas(data, tbody, resumenWrap) {
+  sincronizarRangoReportes(data.desde, data.hasta);
+  const r = data.resumen || {};
+  resumenWrap.innerHTML = `
+    <div class="col-6 col-md-3"><div class="card p-2 text-center"><div class="text-muted" style="font-size:11.5px;">Total POS</div><div class="money fw-bold">$${Number(r.totalPOS || 0).toLocaleString("es-AR")}</div></div></div>
+    <div class="col-6 col-md-3"><div class="card p-2 text-center"><div class="text-muted" style="font-size:11.5px;">Total Pedidos</div><div class="money fw-bold">$${Number(r.totalPedidos || 0).toLocaleString("es-AR")}</div></div></div>
+    <div class="col-6 col-md-3"><div class="card p-2 text-center"><div class="text-muted" style="font-size:11.5px;">Total general</div><div class="money fw-bold">$${Number(r.totalGeneral || 0).toLocaleString("es-AR")}</div></div></div>
+    <div class="col-6 col-md-3"><div class="card p-2 text-center"><div class="text-muted" style="font-size:11.5px;">Ticket promedio</div><div class="money fw-bold">$${Number(r.ticketPromedio || 0).toLocaleString("es-AR")}</div></div></div>`;
+  if (!data.dias || data.dias.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-3">Sin ventas para el rango elegido</td></tr>`;
+    return;
+  }
+
+}
+
 /* ---- Reporte 2: Productos más vendidos ---- */
 async function cargarReporteProductos() {
+  const _ck_repProductos = "reporteProductosVendidos" + obtenerRangoReportes();
+  const _cd_repProductos = _getCacheReporte(_ck_repProductos);
+  if (_cd_repProductos) { _aplicar_cargarReporteProductos(_cd_repProductos); return; }
   const tbody = document.getElementById("repProductosTabla");
 
   try {
@@ -5629,6 +5742,9 @@ async function cargarReporteProductos() {
 
 /* ---- Reporte 3: Ventas por categoría ---- */
 async function cargarReporteCategorias() {
+  const _ck_repCategorias = "reporteVentasPorCategoria" + obtenerRangoReportes();
+  const _cd_repCategorias = _getCacheReporte(_ck_repCategorias);
+  if (_cd_repCategorias) { _aplicar_cargarReporteCategorias(_cd_repCategorias); return; }
   const tbody = document.getElementById("repCategoriasTabla");
 
   try {
@@ -5687,6 +5803,9 @@ async function cargarReporteFormasPago() {
 
 /* ---- Reporte 5: Historial de cierres de caja ---- */
 async function cargarReporteCierres() {
+  const _ck_repCierres = "reporteCierres" + obtenerRangoReportes();
+  const _cd_repCierres = _getCacheReporte(_ck_repCierres);
+  if (_cd_repCierres) { _aplicar_cargarReporteCierres(_cd_repCierres); return; }
   const tbody = document.getElementById("repCierresTabla");
 
   try {
@@ -5724,6 +5843,9 @@ async function cargarReporteCierres() {
 
 /* ---- Reporte 6: Clientes que más compran ---- */
 async function cargarReporteClientes() {
+  const _ck_repClientes = "reporteClientes" + obtenerRangoReportes();
+  const _cd_repClientes = _getCacheReporte(_ck_repClientes);
+  if (_cd_repClientes) { _aplicar_cargarReporteClientes(_cd_repClientes); return; }
   const tbody = document.getElementById("repClientesTabla");
 
   try {
@@ -5831,6 +5953,19 @@ async function cargarMovimientosCajaHoy() {
   if (li) li.textContent = `Ingresos — ${fechaLabel}`;
   if (le) le.textContent = `Egresos — ${fechaLabel}`;
 
+  // Caché 60 segundos por fecha
+  const CACHE_KEY = "vpos_cache_movimientos_" + fecha;
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (raw) {
+      const { ts, data } = JSON.parse(raw);
+      if (Date.now() - ts < 60000) {
+        _aplicarMovimientos(data);
+        return;
+      }
+    }
+  } catch(e) {}
+
   try {
     const response = await fetch(API_URL + "?action=movimientosCajaHoy&fecha=" + encodeURIComponent(fecha));
     const data = await response.json();
@@ -5840,21 +5975,24 @@ async function cargarMovimientosCajaHoy() {
       return;
     }
 
-    actualizarElemento("mcTotalIngresos", "$" + Number(data.totalIngresos).toLocaleString("es-AR"));
-    actualizarElemento("mcTotalEgresos",  "$" + Number(data.totalEgresos).toLocaleString("es-AR"));
-
-    const netoEl = document.getElementById("mcSaldoNeto");
-    if (netoEl) {
-      netoEl.textContent = (data.neto >= 0 ? "$" : "-$") + Math.abs(data.neto).toLocaleString("es-AR");
-      netoEl.style.color = data.neto >= 0 ? "var(--green-600)" : "var(--red-500)";
-    }
-
-    renderTablaMovimientosCaja(data.movimientos || []);
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data })); } catch(e) {}
+    _aplicarMovimientos(data);
 
   } catch (error) {
     console.error("Error al cargar movimientos de caja:", error);
     toast("Error de conexión al cargar movimientos de caja", "error");
   }
+}
+
+function _aplicarMovimientos(data) {
+  actualizarElemento("mcTotalIngresos", "$" + Number(data.totalIngresos).toLocaleString("es-AR"));
+  actualizarElemento("mcTotalEgresos",  "$" + Number(data.totalEgresos).toLocaleString("es-AR"));
+  const netoEl = document.getElementById("mcSaldoNeto");
+  if (netoEl) {
+    netoEl.textContent = (data.neto >= 0 ? "$" : "-$") + Math.abs(data.neto).toLocaleString("es-AR");
+    netoEl.style.color = data.neto >= 0 ? "var(--green-600)" : "var(--red-500)";
+  }
+  renderTablaMovimientosCaja(data.movimientos || []);
 }
 
 function renderTablaMovimientosCaja(lista) {
@@ -5930,6 +6068,10 @@ async function eliminarMovimientoCajaForm(movimientoId) {
     }
 
     toast("Movimiento eliminado", "success");
+    const fechaMov = document.getElementById("mcFechaSelector")?.value || new Date().toISOString().slice(0, 10);
+    try { localStorage.removeItem("vpos_cache_movimientos_" + fechaMov); } catch(e) {}
+    try { localStorage.removeItem("vpos_cache_cierre_" + fechaMov); } catch(e) {}
+    try { localStorage.removeItem("vpos_cache_cierre_ayer"); } catch(e) {}
     cargarMovimientosCajaHoy();
 
   } catch (error) {
@@ -5937,6 +6079,7 @@ async function eliminarMovimientoCajaForm(movimientoId) {
     toast("Error de conexión al eliminar el movimiento", "error");
   }
 }
+
 async function guardarMovimientoCajaForm() {
   const monto = document.getElementById("mcMonto").value;
   const motivo = document.getElementById("mcMotivo").value.trim();
@@ -5970,6 +6113,13 @@ async function guardarMovimientoCajaForm() {
     toast(tipoMovimientoCajaActivo === "INGRESO" ? "Ingreso registrado" : "Egreso registrado", "success");
     document.getElementById("mcMonto").value = "";
     document.getElementById("mcMotivo").value = "";
+
+    // Invalidar caché para que el cierre de caja muestre datos frescos
+    const fecha = document.getElementById("mcFechaSelector")?.value || new Date().toISOString().slice(0, 10);
+    try { localStorage.removeItem("vpos_cache_movimientos_" + fecha); } catch(e) {}
+    try { localStorage.removeItem("vpos_cache_cierre_" + fecha); } catch(e) {}
+    try { localStorage.removeItem("vpos_cache_cierre_ayer"); } catch(e) {}
+
     cargarMovimientosCajaHoy();
 
   } catch (error) {
@@ -5978,28 +6128,6 @@ async function guardarMovimientoCajaForm() {
   } finally {
     btn.disabled = false;
     btn.innerHTML = textoOriginal;
-  }
-}
-
-/** Deletes a movement after confirmation */
-async function eliminarMovimientoCajaForm(movimientoId) {
-  if (!confirm("¿Eliminar este movimiento de caja? Esta acción no se puede deshacer.")) return;
-
-  try {
-    const response = await fetch(API_URL + "?action=eliminarMovimientoCaja&movimientoId=" + encodeURIComponent(movimientoId));
-    const data = await response.json();
-
-    if (!data.success) {
-      toast(data.message || "No se pudo eliminar el movimiento", "error");
-      return;
-    }
-
-    toast("Movimiento eliminado", "success");
-    cargarMovimientosCajaHoy();
-
-  } catch (error) {
-    console.error("Error al eliminar movimiento de caja:", error);
-    toast("Error de conexión al eliminar el movimiento", "error");
   }
 }
 
@@ -7103,4 +7231,19 @@ function cancelarCobroMercadoPago() {
   mpReferenciaActual = null;
   mpVentaEnCurso = null;
   toast("Cobro cancelado — el ticket sigue abierto", "info");
+}
+
+/** Ejecuta la migración de columna FORMA_PAGO en MOVIMIENTOS_CAJA */
+async function ejecutarMigracionFormaPago() {
+  const status = document.getElementById("migracionStatus");
+  if (status) status.textContent = "Migrando...";
+  try {
+    const res = await fetch(API_URL + "?action=migrarColumnaFormaPago");
+    const data = await res.json();
+    if (status) status.textContent = data.message || (data.success ? "✓ OK" : "❌ Error");
+    toast(data.message || "Migración completada", data.success ? "success" : "error");
+  } catch(e) {
+    if (status) status.textContent = "Error de conexión";
+    toast("Error al ejecutar migración", "error");
+  }
 }

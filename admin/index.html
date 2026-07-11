@@ -799,7 +799,12 @@
           <span class="cc-ic">📲</span>
           <h6>Transferencia</h6>
         </div>
-        <div class="cc-row"><span>Esperado (según ventas)</span><strong id="ccTransferenciaEsperado">$0</strong></div>
+        <div class="cc-row"><span>Esperado (ventas + movimientos)</span><strong id="ccTransferenciaEsperado">$0</strong></div>
+        <div class="cc-movimientos-detalle" id="ccMovimientosDetalleTransf" style="display:none;">
+          <div class="cc-mov-row"><span>Ventas transferencia</span><span id="ccVentasTransferencia">$0</span></div>
+          <div class="cc-mov-row cc-ingreso"><span>+ Ingresos de caja</span><span id="ccMovIngresosTransf"></span></div>
+          <div class="cc-mov-row cc-egreso"><span>- Egresos de caja</span><span id="ccMovEgresosTransf"></span></div>
+        </div>
         <div class="cc-row">
           <span>Contado / conciliado</span>
           <input type="number" class="form-control form-control-sm cc-input" id="ccTransferenciaContado" placeholder="0" min="0" step="1" oninput="calcularDiferenciasCierreCaja()">
@@ -1325,6 +1330,17 @@
         <button class="btn btn-success btn-sm" onclick="guardarImpresoraSeleccionada()">💾 Guardar</button>
       </div>
       <div id="cfgImpresoraActual" class="text-muted mt-2" style="font-size:12px;"></div>
+    </div>
+
+    <div class="card p-3 mt-3">
+      <h6 style="margin-bottom:6px;">🔧 Mantenimiento de la planilla</h6>
+      <p class="text-muted" style="font-size:12.5px; margin-bottom:10px;">
+        Si los movimientos de caja no muestran la forma de pago correcta, ejecutá esta migración para agregar la columna FORMA_PAGO a la planilla.
+      </p>
+      <button class="btn btn-outline-secondary btn-sm" onclick="ejecutarMigracionFormaPago()">
+        🔄 Migrar columna FORMA_PAGO
+      </button>
+      <span id="migracionStatus" class="ms-2 text-muted" style="font-size:12px;"></span>
     </div>
 
     <div class="card p-3 mt-3">
