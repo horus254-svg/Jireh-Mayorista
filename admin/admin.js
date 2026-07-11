@@ -5441,7 +5441,7 @@ function aplicarDatosCierreCaja(data) {
       const ingEf = movEfectivo > 0 ? movEfectivo : 0;
       const egrEf = movEfectivo < 0 ? Math.abs(movEfectivo) : 0;
       actualizarElemento("ccMovIngresos", ingEf > 0 ? "+$" + ingEf.toLocaleString("es-AR") : "$0");
-      actualizarElemento("ccMovEgresos",  egrEf > 0 ? "-$" + egrEf.toLocaleString("es-AR") : "$0");
+      actualizarElemento("ccMovEgresos",  egrEf > 0 ? "−$" + egrEf.toLocaleString("es-AR") : "$0");
       movDetalleEl.style.display = "flex";
     } else if (movDetalleEl) {
       movDetalleEl.style.display = "none";
@@ -5454,8 +5454,8 @@ function aplicarDatosCierreCaja(data) {
         const ingTr = movTransferencia > 0 ? movTransferencia : 0;
         const egrTr = movTransferencia < 0 ? Math.abs(movTransferencia) : 0;
         actualizarElemento("ccVentasTransferencia", "$" + Number(data.ventasTransferencia || 0).toLocaleString("es-AR"));
-        actualizarElemento("ccMovIngresosTransf", ingTr > 0 ? "+$" + ingTr.toLocaleString("es-AR") : "");
-        actualizarElemento("ccMovEgresosTransf",  egrTr > 0 ? "-$" + egrTr.toLocaleString("es-AR") : "");
+        actualizarElemento("ccMovIngresosTransf", ingTr > 0 ? "+$" + ingTr.toLocaleString("es-AR") : "$0");
+        actualizarElemento("ccMovEgresosTransf",  egrTr > 0 ? "−$" + egrTr.toLocaleString("es-AR") : "$0");
         movTransfEl.style.display = "flex";
       } else {
         movTransfEl.style.display = "none";

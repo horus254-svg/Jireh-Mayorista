@@ -801,9 +801,10 @@
         </div>
         <div class="cc-row"><span>Esperado (ventas + movimientos)</span><strong id="ccTransferenciaEsperado">$0</strong></div>
         <div class="cc-movimientos-detalle" id="ccMovimientosDetalleTransf" style="display:none;">
-          <div class="cc-mov-row"><span>Ventas transferencia</span><span id="ccVentasTransferencia">$0</span></div>
-          <div class="cc-mov-row cc-ingreso"><span>+ Ingresos de caja</span><span id="ccMovIngresosTransf"></span></div>
-          <div class="cc-mov-row cc-egreso"><span>- Egresos de caja</span><span id="ccMovEgresosTransf"></span></div>
+          <div class="cc-mov-line"><span>Ventas transferencia</span><span id="ccVentasTransferencia">$0</span></div>
+          <div class="cc-mov-line cc-mov-ingreso"><span>+ Ingresos de caja</span><span id="ccMovIngresosTransf">$0</span></div>
+          <div class="cc-mov-line cc-mov-egreso"><span>− Egresos de caja</span><span id="ccMovEgresosTransf">$0</span></div>
+          <a href="#" class="cc-mov-link" onclick="mostrarSeccion('movimientosCaja'); return false;">Ver detalle de movimientos →</a>
         </div>
         <div class="cc-row">
           <span>Contado / conciliado</span>
