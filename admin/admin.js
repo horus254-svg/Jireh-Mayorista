@@ -2585,6 +2585,7 @@ function renderTablaClientes(lista) {
         ${botones}
       </div>
     </div>`;
+      const div = document.createElement("div");
       div.innerHTML = cardHtml;
       frag.appendChild(div.firstElementChild);
     }
