@@ -1,29 +1,4 @@
-/* ================================================================
-   CODE.GS — Generado por VeekPOS Installer
-   Cliente: {{EMPRESA}}
-   Generado: {{FECHA}}
-
-   INSTRUCCIONES:
-   1. Abrí https://script.google.com
-   2. Creá un nuevo proyecto
-   3. Pegá este código completo
-   4. Guardá (Ctrl+S)
-   5. Click en "Implementar" → "Nueva implementación"
-   6. Tipo: "Aplicación web"
-   7. Ejecutar como: "Yo"
-   8. Quién tiene acceso: "Cualquier persona"
-   9. Click "Implementar" y copiá la URL
-================================================================ */
-
-// ── Configuración del cliente ──────────────────────────────────
-const CLIENTE_CONFIG = {
-  empresa:    "{{EMPRESA}}",
-  version:    "{{VERSION}}",
-  instaladoEn: "{{FECHA}}"
-};
-// ─────────────────────────────────────────────────────────────
-
-const SPREADSHEET_ID = "{{SPREADSHEET_ID}}";
+const SPREADSHEET_ID = "1A2VGs6-he1g2AvK3A4u8zhamxETBPxT3NpLnaRyqsUA";
 const SHEET_NAME = "PRODUCTOS";
 
 function doGet(e) {
@@ -99,6 +74,8 @@ case "historialCierres":
 case "movimientosCajaHoy":
   return getMovimientosCajaHoy(e);
 
+case "migrarColumnaFormaPago":
+  return migrarColumnaFormaPago();
 case "guardarMovimientoCaja":
   return guardarMovimientoCaja(e);
 
@@ -2158,6 +2135,7 @@ function marcarPedidoCobrado(e){
     // pago), se borra primero para no duplicar el total en el cierre.
     if(ventaIdExistente){
       eliminarVentaLocalPorId(ventasSheet, ventaIdExistente);
+      eliminarPagoCreditoAutomaticoPorPedido(pedidoId);
     }
 
     if(!cobrado){
@@ -2235,6 +2213,27 @@ function eliminarVentaLocalPorId(ventasSheet, ventaId){
       // "vinculadas a un pedido" no tienen detalle de productos ahí,
       // el detalle real ya vive en DETALLE_PEDIDOS.
       return;
+    }
+  }
+}
+
+/**
+ * Borra de PAGOS_CREDITO la fila (si existe) que marcarPedidoCobrado
+ * generó automáticamente para el pedido dado ("Cobro automático —
+ * pedido X"). Se usa junto con eliminarVentaLocalPorId al desmarcar o
+ * volver a marcar un pedido como cobrado: si no se borra este pago
+ * también, queda un registro fantasma en la cuenta corriente del
+ * cliente (parece que pagó de más) Y, en el cierre de caja, ese monto
+ * se sumaría una segunda vez el día que se vuelva a marcar cobrado
+ * (una vez como venta, otra como "pago de cliente" — doble conteo).
+ */
+function eliminarPagoCreditoAutomaticoPorPedido(pedidoId){
+  const marca = "Cobro automático — pedido " + pedidoId;
+  const sheet = getOrCrearHojaPagosCredito();
+  const data = sheet.getDataRange().getValues();
+  for(let i = data.length - 1; i >= 1; i--){
+    if(String(data[i][10] || "").trim() === marca){
+      sheet.deleteRow(i + 1);
     }
   }
 }
@@ -3073,6 +3072,40 @@ function registrarPagoCredito(data){
     String(data.observaciones || "")
   ]);
 
+  // Registrar en MOVIMIENTOS_CAJA el dinero físico que ingresó a la caja,
+  // con la forma de pago correcta.
+  // El monto que va a caja es lo que el cliente entregó físicamente convertido a ARS:
+  // - Si pagó en ARS → monto directamente
+  // - Si pagó en USD → monto * tipoCambio
+  const montoEnCajaArs = monedaPago === "ARS"
+    ? monto
+    : (tipoCambio > 0 ? monto * tipoCambio : montoAplicadoArs);
+
+  if (montoEnCajaArs > 0) {
+    try {
+      const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+      const sheetMov = ss.getSheetByName("MOVIMIENTOS_CAJA");
+      if (sheetMov) {
+        const movId = "MOV-" + new Date().getTime();
+        const fp = String(data.formaPago || "EFECTIVO").toUpperCase();
+        const nombreCliente = String(cliente.NOMBRE || cliente.RAZON_SOCIAL || clienteId);
+        const ahora = new Date();
+        sheetMov.appendRow([
+          movId,
+          ahora,
+          "INGRESO",
+          montoEnCajaArs,
+          "Cobro crédito — " + nombreCliente + (data.observaciones ? " (" + data.observaciones + ")" : ""),
+          String(data.cajero || "ADMIN"),
+          ahora,
+          fp
+        ]);
+      }
+    } catch(e) {
+      Logger.log("Error registrando movimiento de caja por pago de crédito: " + e.message);
+    }
+  }
+
   return jsonResponse({
     success: true,
     pagoId: pagoId,
@@ -3432,6 +3465,29 @@ function guardarVenta(e){
 
   }
 
+  // ID generado en el navegador ANTES de intentar guardar (ver
+  // admin.js). Sirve para que un reintento — por ejemplo, una venta
+  // que quedó guardada en una cola local porque se cortó la conexión
+  // justo cuando se mandó, y se reintenta sola más tarde al
+  // reconectar — nunca duplique la venta: si la primera vez SÍ llegó
+  // a guardarse acá pero la respuesta se perdió en el camino (por eso
+  // el navegador la marcó como "falló" y la volvió a mandar), esta
+  // función reconoce el mismo ID y devuelve la venta ya existente en
+  // vez de crear una segunda fila y descontar el stock dos veces.
+  const clienteVentaId =
+  String(e.parameter.clienteVentaId || "").trim();
+
+  if(clienteVentaId){
+    const yaExistente = buscarVentaPorClienteVentaId(ventasSheet, clienteVentaId);
+    if(yaExistente){
+      return jsonResponse({
+        success:true,
+        ventaId: yaExistente,
+        idempotente: true // ya estaba guardada; no se tocó stock ni se creó nada nuevo
+      });
+    }
+  }
+
   const ventaId =
   generarIdCorto("VEN", ventasSheet);
 
@@ -3461,7 +3517,8 @@ function guardarVenta(e){
     total,
     formaPago,
     vendedor,
-    observaciones
+    observaciones,
+    clienteVentaId // columna nueva — vacía para ventas que no la mandan (compatibilidad hacia atrás)
   ]);
 
   carrito.forEach(item => {
@@ -3484,6 +3541,31 @@ function guardarVenta(e){
     ventaId:ventaId
   });
 
+}
+
+/**
+ * Busca, entre las ventas más recientes (no hace falta revisar todo
+ * el historial: un reintento por corte de conexión siempre pasa a los
+ * pocos segundos o minutos del intento original, nunca días después),
+ * si ya existe una venta con este clienteVentaId. Devuelve su VENTA_ID
+ * si la encuentra, o null si no.
+ */
+function buscarVentaPorClienteVentaId(ventasSheet, clienteVentaId){
+  const ULTIMAS_FILAS_A_REVISAR = 300;
+  const totalFilas = ventasSheet.getLastRow();
+  if (totalFilas < 2) return null;
+
+  const desde = Math.max(2, totalFilas - ULTIMAS_FILAS_A_REVISAR + 1);
+  const cantidad = totalFilas - desde + 1;
+  // Columna 7 = CLIENTE_VENTA_ID (índice 6, 0-based)
+  const valores = ventasSheet.getRange(desde, 1, cantidad, 7).getValues();
+
+  for (let i = valores.length - 1; i >= 0; i--){
+    if (String(valores[i][6] || "").trim() === clienteVentaId){
+      return valores[i][0]; // VENTA_ID de esa fila
+    }
+  }
+  return null;
 }
 
 /**
@@ -3869,23 +3951,48 @@ function getCierreCajaResumen(e){
   const totalEsperado =
     totales.EFECTIVO + totales.TRANSFERENCIA + totales.TARJETA;
 
+  // Pagos de clientes (sección Clientes → "Registrar pago") hechos ese
+  // día: son plata que entra a la caja igual que una venta, con su
+  // propia forma de pago, y tienen que sumar al cierre de esa forma
+  // de pago — no quedar afuera del cierre.
+  const pagosClientesDelDia = getPagosCreditoDelDia(fechaObjetivo);
+  const pc = pagosClientesDelDia.porFormaPago;
+
   // Ingresos/egresos manuales de caja (retiros, gastos chicos, aportes):
-  // se asumen siempre en efectivo, así que ajustan el efectivo esperado
-  // en el cajón, no el total general de ventas.
+  // cada movimiento ya guarda su propia forma de pago (EFECTIVO,
+  // TRANSFERENCIA o TARJETA), así que se agrupan por esa forma de pago
+  // en lugar de asumir que todos son en efectivo.
   const movimientosDelDia = getMovimientosCajaDelDia(fechaObjetivo);
 
+  // Movimientos de caja separados por forma de pago
+  // ANTES: todos sumaban/restaban del efectivo — INCORRECTO
+  // AHORA: cada movimiento afecta solo su propia columna (efectivo, transferencia, tarjeta)
+  const movimientosPorFormaPago = { EFECTIVO: 0, TRANSFERENCIA: 0, TARJETA: 0 };
+  const movIngresosPorFormaPago = { EFECTIVO: 0, TRANSFERENCIA: 0, TARJETA: 0 };
+  const movEgresosPorFormaPago  = { EFECTIVO: 0, TRANSFERENCIA: 0, TARJETA: 0 };
   let movimientosIngresos = 0;
-  let movimientosEgresos = 0;
+  let movimientosEgresos  = 0;
+
   movimientosDelDia.forEach(m => {
-    if(String(m.TIPO).toUpperCase() === "INGRESO") movimientosIngresos += m.MONTO;
-    else movimientosEgresos += m.MONTO;
+    const fp = String(m.FORMA_PAGO || "EFECTIVO").toUpperCase().trim();
+    const columna = ["EFECTIVO","TRANSFERENCIA","TARJETA"].includes(fp) ? fp : "EFECTIVO";
+    const signo = String(m.TIPO).toUpperCase() === "INGRESO" ? 1 : -1;
+    movimientosPorFormaPago[columna] += signo * m.MONTO;
+    if(signo === 1){
+      movimientosIngresos += m.MONTO;
+      movIngresosPorFormaPago[columna] += m.MONTO;
+    }else{
+      movimientosEgresos += m.MONTO;
+      movEgresosPorFormaPago[columna] += m.MONTO;
+    }
   });
 
-  const efectivoEsperadoAjustado =
-    totales.EFECTIVO + movimientosIngresos - movimientosEgresos;
+  const efectivoEsperadoAjustado      = totales.EFECTIVO      + pc.EFECTIVO      + movimientosPorFormaPago.EFECTIVO;
+  const transferenciaEsperadoAjustada = totales.TRANSFERENCIA + pc.TRANSFERENCIA + movimientosPorFormaPago.TRANSFERENCIA;
+  const tarjetaEsperadaAjustada        = totales.TARJETA       + pc.TARJETA       + movimientosPorFormaPago.TARJETA;
 
   const totalEsperadoAjustado =
-    efectivoEsperadoAjustado + totales.TRANSFERENCIA + totales.TARJETA;
+    efectivoEsperadoAjustado + transferenciaEsperadoAjustada + tarjetaEsperadaAjustada;
 
   // Verifica si ya existe un cierre guardado para esa fecha
   const cierreExistente = buscarCierrePorFecha(fechaObjetivo);
@@ -3894,18 +4001,34 @@ function getCierreCajaResumen(e){
     success: true,
     fecha: fechaObjetivo,
     cantidadVentas: cantidadVentas,
-    totalVentas: totalEsperado,  // total de ventas del día sin anuladas ni movimientos
+    totalVentas: totalEsperado,
     esperado: {
-      EFECTIVO: efectivoEsperadoAjustado,
-      TRANSFERENCIA: totales.TRANSFERENCIA,
-      TARJETA: totales.TARJETA,
-      TOTAL: totalEsperadoAjustado
+      EFECTIVO:      efectivoEsperadoAjustado,
+      TRANSFERENCIA: transferenciaEsperadoAjustada,
+      TARJETA:       tarjetaEsperadaAjustada,
+      TOTAL:         totalEsperadoAjustado
     },
     ventasEfectivo: totales.EFECTIVO,
+    ventasTransferencia: totales.TRANSFERENCIA,
+    ventasTarjeta: totales.TARJETA,
+    pagosClientes: {
+      EFECTIVO: pc.EFECTIVO,
+      TRANSFERENCIA: pc.TRANSFERENCIA,
+      TARJETA: pc.TARJETA,
+      total: pagosClientesDelDia.total,
+      detalle: pagosClientesDelDia.detalle
+    },
     movimientosCaja: {
       ingresos: movimientosIngresos,
       egresos: movimientosEgresos,
       neto: movimientosIngresos - movimientosEgresos,
+      porFormaPago: {
+        EFECTIVO:      movimientosPorFormaPago.EFECTIVO,
+        TRANSFERENCIA: movimientosPorFormaPago.TRANSFERENCIA,
+        TARJETA:       movimientosPorFormaPago.TARJETA
+      },
+      ingresosPorFormaPago: movIngresosPorFormaPago,
+      egresosPorFormaPago: movEgresosPorFormaPago,
       detalle: movimientosDelDia
     },
     yaCerrado: !!cierreExistente,
@@ -4504,7 +4627,7 @@ function getReporteClientes(e){
 /* =====================================================================
    MOVIMIENTOS DE CAJA — ingresos y egresos manuales (no son ventas)
    Hoja requerida: "MOVIMIENTOS_CAJA" con encabezados:
-   MOVIMIENTO_ID, FECHA, TIPO, MONTO, MOTIVO, VENDEDOR, FECHA_REGISTRO
+   MOVIMIENTO_ID, FECHA, TIPO, MONTO, MOTIVO, VENDEDOR, FECHA_REGISTRO, FORMA_PAGO
 
    TIPO es "INGRESO" o "EGRESO". Se usan junto con las ventas del día
    para calcular el efectivo esperado real en Cierre de Caja (ya que un
@@ -4537,8 +4660,70 @@ function getMovimientosCajaDelDia(fecha){
       MONTO: Number(row[3] || 0),
       MOTIVO: row[4],
       VENDEDOR: row[5],
-      FECHA_REGISTRO: row[6]
+      FECHA_REGISTRO: row[6],
+      FORMA_PAGO: String(row[7] || "EFECTIVO").toUpperCase().trim() || "EFECTIVO"
     }));
+}
+
+/**
+ * Pagos de crédito (hoja PAGOS_CREDITO) registrados en la fecha dada,
+ * agrupados por forma de pago (EFECTIVO / TRANSFERENCIA / TARJETA).
+ * Son pagos que los clientes hacen en la sección "Clientes" para
+ * cancelar su deuda — es plata que entra a la caja ese día con esa
+ * forma de pago, y por lo tanto tiene que sumar al cierre de caja
+ * igual que una venta.
+ *
+ * Nota: se contabiliza el monto tal cual fue pagado (MONTO_PAGO, en
+ * la moneda MONEDA_PAGO). El cierre de caja trabaja en pesos, así que
+ * solo se suman los pagos hechos en pesos (ARS); un pago en dólares
+ * no mueve el cajón de pesos.
+ */
+function getPagosCreditoDelDia(fecha){
+
+  const sheet = getOrCrearHojaPagosCredito();
+  const data = sheet.getDataRange().getValues();
+  data.shift(); // encabezados
+
+  const zona = Session.getScriptTimeZone();
+
+  const detalle = data
+    .filter(row => {
+      const filaFecha = Utilities.formatDate(new Date(row[1]), zona, "yyyy-MM-dd");
+      const monedaPago = String(row[3] || "ARS").toUpperCase().trim();
+      // Los pagos "Cobro automático — pedido X" los genera
+      // marcarPedidoCobrado, y ese mismo dinero YA quedó sumado como
+      // venta en VENTAS_LOCAL en ese momento. Si además se suman acá,
+      // el cierre de caja contaría el mismo cobro dos veces. Se
+      // excluyen — solo cuentan los pagos hechos aparte, en la
+      // sección Clientes, que no tienen fila equivalente en VENTAS_LOCAL.
+      const esCobroAutomaticoDePedido = /^Cobro autom[aá]tico/i.test(String(row[10] || "").trim());
+      return filaFecha === fecha && monedaPago === "ARS" && !esCobroAutomaticoDePedido;
+    })
+    .map(row => {
+      const formaPago = METODOS_PAGO_CIERRE.indexOf(
+        String(row[9] || "").toUpperCase().trim()
+      ) !== -1
+        ? String(row[9]).toUpperCase().trim()
+        : "EFECTIVO";
+
+      return {
+        PAGO_ID: row[0],
+        FECHA: Utilities.formatDate(new Date(row[1]), zona, "yyyy-MM-dd"),
+        CLIENTE_ID: row[2],
+        MONTO: Number(row[4] || 0),
+        FORMA_PAGO: formaPago,
+        OBSERVACIONES: row[10]
+      };
+    });
+
+  const porFormaPago = { EFECTIVO: 0, TRANSFERENCIA: 0, TARJETA: 0 };
+  detalle.forEach(p => { porFormaPago[p.FORMA_PAGO] += p.MONTO; });
+
+  return {
+    detalle: detalle,
+    porFormaPago: porFormaPago,
+    total: porFormaPago.EFECTIVO + porFormaPago.TRANSFERENCIA + porFormaPago.TARJETA
+  };
 }
 
 /** GET ?action=movimientosCajaHoy[&fecha=YYYY-MM-DD] — lista del día, más el saldo neto */
@@ -4573,12 +4758,16 @@ function getMovimientosCajaHoy(e){
 function guardarMovimientoCaja(e){
 
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+
+  // Auto-migrar columna FORMA_PAGO si la planilla es anterior al fix
+  autoMigrarMovimientosCaja();
+
   const sheet = ss.getSheetByName("MOVIMIENTOS_CAJA");
 
   if(!sheet){
     return jsonResponse({
       success:false,
-      message:"Falta la hoja 'MOVIMIENTOS_CAJA' en la planilla. Creála con los encabezados: MOVIMIENTO_ID, FECHA, TIPO, MONTO, MOTIVO, VENDEDOR, FECHA_REGISTRO"
+      message:"Falta la hoja 'MOVIMIENTOS_CAJA' en la planilla. Creála con los encabezados: MOVIMIENTO_ID, FECHA, TIPO, MONTO, MOTIVO, VENDEDOR, FECHA_REGISTRO, FORMA_PAGO"
     });
   }
 
@@ -4633,6 +4822,59 @@ function guardarMovimientoCaja(e){
     success: true,
     movimientoId: movimientoId
   });
+}
+
+/** GET ?action=migrarColumnaFormaPago — agrega FORMA_PAGO a MOVIMIENTOS_CAJA si falta */
+function migrarColumnaFormaPago() {
+  try {
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const sheet = ss.getSheetByName("MOVIMIENTOS_CAJA");
+    if (!sheet) return jsonResponse({ success: false, message: "Hoja MOVIMIENTOS_CAJA no encontrada" });
+
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const tieneFormaPago = headers.some(h => String(h).toUpperCase().trim() === "FORMA_PAGO");
+
+    if (tieneFormaPago) {
+      return jsonResponse({ success: true, message: "Columna FORMA_PAGO ya existe — no se necesita migración" });
+    }
+
+    // Agregar columna FORMA_PAGO en la posición 8 (después de FECHA_REGISTRO)
+    const col = sheet.getLastColumn() + 1;
+    sheet.getRange(1, col).setValue("FORMA_PAGO");
+
+    // Rellenar filas existentes con EFECTIVO como valor por defecto
+    const ultFila = sheet.getLastRow();
+    if (ultFila > 1) {
+      sheet.getRange(2, col, ultFila - 1, 1).setValue("EFECTIVO");
+    }
+
+    return jsonResponse({
+      success: true,
+      message: `Columna FORMA_PAGO agregada. ${ultFila - 1} filas existentes marcadas como EFECTIVO.`
+    });
+  } catch(e) {
+    return jsonResponse({ success: false, message: e.message });
+  }
+}
+
+/** Verifica y migra automáticamente la columna FORMA_PAGO si no existe */
+function autoMigrarMovimientosCaja() {
+  try {
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const sheet = ss.getSheetByName("MOVIMIENTOS_CAJA");
+    if (!sheet || sheet.getLastColumn() === 0) return;
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const tieneFormaPago = headers.some(h => String(h).toUpperCase().trim() === "FORMA_PAGO");
+    if (!tieneFormaPago) {
+      const col = sheet.getLastColumn() + 1;
+      sheet.getRange(1, col).setValue("FORMA_PAGO");
+      const ultFila = sheet.getLastRow();
+      if (ultFila > 1) sheet.getRange(2, col, ultFila - 1, 1).setValue("EFECTIVO");
+      Logger.log("Auto-migración: columna FORMA_PAGO agregada a MOVIMIENTOS_CAJA");
+    }
+  } catch(e) {
+    Logger.log("Error en autoMigrarMovimientosCaja: " + e.message);
+  }
 }
 
 /** GET ?action=eliminarMovimientoCaja&movimientoId=... */

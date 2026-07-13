@@ -10,6 +10,47 @@ let pedidoMinimo = 100000;
 // Si config.json no existe o falla, usa la URL de respaldo.
 let API_URL = "https://script.google.com/macros/s/AKfycbw1eY_mXImG503rU0Cqddx1WBuGIOhxaW_SXGoIMsug_CjsSC-HLsb2XzYwrovaGBU/exec";
 
+/**
+ * Reemplazo de fetch() para las llamadas al backend, con timeout
+ * automático y reintentos seguros — quien navega este catálogo lo hace
+ * casi siempre desde el celular, con conexiones bastante más
+ * inestables que las de una PC en el local. Sin esto, un corte
+ * momentáneo dejaba al cliente mirando el cartel de "cargando" sin
+ * límite de tiempo.
+ *
+ * - LECTURAS (cargar el catálogo, la configuración del negocio, las
+ *   imágenes): se reintentan solas 1 vez si fallan — no tienen
+ *   ningún efecto secundario.
+ * - MUTACIONES (enviar un pedido): NO se reintentan solas — si el
+ *   pedido ya había llegado al servidor y solo se perdió la
+ *   respuesta, reintentar a ciegas podría duplicarlo. Solo se les
+ *   pone un límite de tiempo para fallar rápido y avisar con
+ *   claridad, en vez de dejar al cliente esperando para siempre sin
+ *   saber si su pedido se mandó o no.
+ */
+async function fetchAPI(url, opciones = {}, config = {}) {
+  const esLectura = !opciones.method || opciones.method === "GET";
+  const timeoutMs = config.timeoutMs || (esLectura ? 10000 : 20000);
+  const maxIntentos = esLectura ? (config.reintentos ?? 2) : 1;
+
+  let ultimoError;
+  for (let intento = 1; intento <= maxIntentos; intento++) {
+    const controlador = new AbortController();
+    const timer = setTimeout(() => controlador.abort(), timeoutMs);
+    try {
+      const respuesta = await fetch(url, { ...opciones, signal: controlador.signal });
+      clearTimeout(timer);
+      return respuesta;
+    } catch (error) {
+      clearTimeout(timer);
+      ultimoError = error;
+      if (!esLectura || intento === maxIntentos) throw ultimoError;
+      await new Promise(r => setTimeout(r, 400 * intento));
+    }
+  }
+  throw ultimoError;
+}
+
 async function cargarConfigCliente() {
   try {
     const res = await fetch("../config.json?_=" + Date.now(), { cache: "no-store" });
@@ -138,7 +179,7 @@ async function cargarProductos(){
 
     try{
 
-        const res = await fetch(API_URL + "?action=productos");
+        const res = await fetchAPI(API_URL + "?action=productos");
         const data = await res.json();
 
         estado.productos = (data.productos || [])
@@ -270,11 +311,15 @@ function limpiarBusqueda(){
    RENDER DE PRODUCTOS
 ========================================================= */
 
+let _renderGenCatalogo = 0; // evita que un render viejo (todavía completando sus tandas) escriba encima de uno más nuevo — mismo problema que ya resolvimos en el buscador de Productos del panel
+
 function mostrarProductos(lista){
 
     const container = document.getElementById("productos");
     const sinResultados = document.getElementById("sin-resultados");
     const info = document.getElementById("resultados-info");
+
+    const miGen = ++_renderGenCatalogo;
 
     if(lista.length === 0){
 
@@ -291,9 +336,7 @@ function mostrarProductos(lista){
         ? "1 producto encontrado"
         : `${lista.length} productos encontrados`;
 
-    let html = "";
-
-    lista.forEach(p=>{
+    const tarjetaHtml = p => {
 
         const codigo = escapeHtml(p.CODIGO);
         const nombre = escapeHtml(p.PRODUCTO);
@@ -302,7 +345,7 @@ function mostrarProductos(lista){
 
         const stock = obtenerEstadoStock(p.STOCK);
 
-        html += `
+        return `
         <div class="col-xl-3 col-lg-4 col-md-6 col-sm-6 mb-4">
 
             <div class="card-product h-100" data-code="${codigo}" data-action="quickview">
@@ -346,9 +389,35 @@ function mostrarProductos(lista){
             </div>
 
         </div>`;
-    });
+    };
 
-    container.innerHTML = html;
+    // Con catálogos grandes (varios cientos de productos), armar y
+    // escribir todo el HTML de una sola vez puede trabar el navegador
+    // un instante — más notorio en el celular de un cliente navegando
+    // el catálogo que en una PC de local. Se arma en tandas: la
+    // primera tanda se ve al instante, el resto se agrega de a poco
+    // sin congelar la pantalla.
+    const PRIMERA_TANDA = 24; // alcanza para llenar la pantalla inicial en cualquier tamaño
+    const TANDA = 40;
+
+    const primeros = lista.slice(0, PRIMERA_TANDA);
+    container.innerHTML = primeros.map(tarjetaHtml).join("");
+
+    if (lista.length <= PRIMERA_TANDA) return;
+
+    let idx = PRIMERA_TANDA;
+    const renderTanda = () => {
+        if (miGen !== _renderGenCatalogo) return; // superado por una búsqueda/filtro más nuevo — no seguir escribiendo
+        const fin = Math.min(idx + TANDA, lista.length);
+        const frag = document.createDocumentFragment();
+        const tmp = document.createElement("div");
+        tmp.innerHTML = lista.slice(idx, fin).map(tarjetaHtml).join("");
+        while (tmp.firstElementChild) frag.appendChild(tmp.firstElementChild);
+        container.appendChild(frag);
+        idx = fin;
+        if (idx < lista.length) requestAnimationFrame(renderTanda);
+    };
+    requestAnimationFrame(renderTanda);
 }
 
 /* Delegación de eventos en la grilla de productos */
@@ -809,7 +878,7 @@ async function checkoutWhatsapp(){
         // de URL de Safari/iOS y el pedido fallaba sin guardarse. Con el
         // carrito en el body, no hay ese límite. El backend (doPost) ya
         // espera exactamente este formato para action: "guardarPedido".
-        const response = await fetch(API_URL, {
+        const response = await fetchAPI(API_URL, {
             method: "POST",
             headers: { "Content-Type": "text/plain;charset=utf-8" }, // evita que el navegador dispare un preflight CORS contra Apps Script
             body: JSON.stringify({
@@ -926,7 +995,7 @@ async function aplicarApariencia(){
 
     try{
 
-        const res = await fetch(API_URL + "?action=configuracionNegocio");
+        const res = await fetchAPI(API_URL + "?action=configuracionNegocio");
         const data = await res.json();
 
         if(!data.success || !data.config) return;
@@ -1246,7 +1315,7 @@ async function cargarImagenParaPDF(url){
     if(!url) return null;
 
     try{
-        const response = await fetch(API_URL + "?action=imagenProxy&url=" + encodeURIComponent(url));
+        const response = await fetchAPI(API_URL + "?action=imagenProxy&url=" + encodeURIComponent(url));
         const data = await response.json();
 
         if(!data.success || !data.dataUrl) return null;

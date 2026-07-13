@@ -12,6 +12,54 @@
 let API_URL =
   "https://script.google.com/macros/s/AKfycbw1eY_mXImG503rU0Cqddx1WBuGIOhxaW_SXGoIMsug_CjsSC-HLsb2XzYwrovaGBU/exec";
 
+/**
+ * Reemplazo de fetch() para las llamadas al backend, con timeout
+ * automático y reintentos seguros — pensado para conexiones
+ * inestables (wifi que se corta un momento, 4G que titila, etc.).
+ *
+ * Antes, un corte momentáneo de conexión dejaba el fetch() colgado
+ * esperando una respuesta que podía no llegar nunca — sin timeout, el
+ * navegador puede tardar más de un minuto en darse por vencido solo.
+ * Eso se sentía como que "el sistema se congeló", cuando en realidad
+ * solo hacía falta reintentar.
+ *
+ * - LECTURAS (sin body / GET, la gran mayoría de las llamadas: cargar
+ *   productos, pedidos, clientes, reportes, etc.): si fallan por
+ *   timeout o corte de red, se reintentan solas 1 vez más — no tienen
+ *   ningún efecto secundario, así que reintentar es 100% seguro.
+ * - MUTACIONES (POST: crear/editar/eliminar algo, registrar un pago,
+ *   etc.): acá NO se reintenta solo. Si la operación ya había llegado
+ *   al servidor y solo se cortó la respuesta de vuelta, reintentar a
+ *   ciegas podría duplicarla (dos clientes, dos pagos, dos deudas).
+ *   Solo se les pone un límite de tiempo para que al menos fallen
+ *   rápido y avisen con un error claro, en vez de dejar el botón
+ *   "Guardando..." colgado para siempre — así el usuario puede
+ *   revisar si se guardó o no antes de reintentar a mano.
+ */
+async function fetchAPI(url, opciones = {}, config = {}) {
+  const esLectura = !opciones.method || opciones.method === "GET";
+  const timeoutMs = config.timeoutMs || (esLectura ? 10000 : 20000);
+  const maxIntentos = esLectura ? (config.reintentos ?? 2) : 1;
+
+  let ultimoError;
+  for (let intento = 1; intento <= maxIntentos; intento++) {
+    const controlador = new AbortController();
+    const timer = setTimeout(() => controlador.abort(), timeoutMs);
+    try {
+      const respuesta = await fetch(url, { ...opciones, signal: controlador.signal });
+      clearTimeout(timer);
+      return respuesta;
+    } catch (error) {
+      clearTimeout(timer);
+      ultimoError = error;
+      if (!esLectura || intento === maxIntentos) throw ultimoError;
+      // Corte momentáneo — pequeña espera antes de reintentar
+      await new Promise(r => setTimeout(r, 400 * intento));
+    }
+  }
+  throw ultimoError;
+}
+
 async function cargarConfigCliente() {
   try {
     const res = await fetch("../config.json?_=" + Date.now(), { cache: "no-store" });
@@ -25,6 +73,7 @@ async function cargarConfigCliente() {
 }
 
 let pedidosGlobal = [];
+let _avisoPedidosCaido = false; // evita repetir el toast de error de conexión en cada ciclo del polling
 
 // Store last completed sale for "print from receipt modal"
 let ultimaVentaImprimible = null;
@@ -71,9 +120,19 @@ document.addEventListener("DOMContentLoaded", async () => {
   mostrarSeccion("dashboard");
   cargarConfigNegocioDesdeBackend();
   reconectarImpresoraUSBSiPosible();
-  await cargarMetricas();
-  cargarVentasPOS();
+  // Antes esto esperaba a que terminaran las métricas para recién
+  // ahí arrancar el pedido de ventas POS — dos idas y vueltas al
+  // backend en serie, una atrás de la otra, aunque no dependen entre
+  // sí. Ahora arrancan las dos al mismo tiempo: el dashboard queda
+  // listo en lo que tarda la más lenta de las dos, no en la suma.
+  await Promise.all([cargarMetricas(), cargarVentasPOS()]);
   iniciarPollingSecciones();
+
+  // Si quedaron ventas pendientes de sincronizar de una sesión
+  // anterior (por ejemplo, se cerró la app en medio de un corte de
+  // conexión), mostrar el aviso y probar subirlas ahora.
+  actualizarBadgeVentasPendientes(_leerColaVentasPendientes().length);
+  sincronizarVentasPendientes();
 
   // Ocultar el loading cat una vez que el dashboard cargó
   const cat = document.getElementById("loadingCat");
@@ -150,7 +209,7 @@ function obtenerConfigNegocio() {
 /** Fetches the saved config from the backend (hoja CONFIGURACION) and refreshes the in-memory cache */
 async function cargarConfigNegocioDesdeBackend() {
   try {
-    const response = await fetch(API_URL + "?action=configuracionNegocio");
+    const response = await fetchAPI(API_URL + "?action=configuracionNegocio");
     const data = await response.json();
     if (data.success && data.config) {
       configNegocioCache = { ...CONFIG_NEGOCIO_DEFAULT, ...data.config };
@@ -212,7 +271,7 @@ async function guardarConfigNegocioForm() {
 
   try {
     const params = new URLSearchParams({ action: "guardarConfiguracionNegocio", ...cfg });
-    const response = await fetch(API_URL + "?" + params.toString());
+    const response = await fetchAPI(API_URL + "?" + params.toString());
     const data = await response.json();
 
     if (!data.success) {
@@ -313,7 +372,7 @@ async function guardarSidebarForm() {
 
   try {
     const params = new URLSearchParams({ action: "guardarConfiguracionNegocio", ...cfg });
-    const response = await fetch(API_URL + "?" + params.toString());
+    const response = await fetchAPI(API_URL + "?" + params.toString());
     const data = await response.json();
 
     if (!data.success) {
@@ -359,7 +418,7 @@ async function guardarDriveProductosForm() {
 
   try {
     const params = new URLSearchParams({ action: "guardarConfiguracionNegocio", ...cfg });
-    const response = await fetch(API_URL + "?" + params.toString());
+    const response = await fetchAPI(API_URL + "?" + params.toString());
     const data = await response.json();
 
     if (!data.success) {
@@ -416,7 +475,7 @@ async function guardarUrlCatalogoForm() {
 
   try {
     const params = new URLSearchParams({ action: "guardarConfiguracionNegocio", ...cfg });
-    const response = await fetch(API_URL + "?" + params.toString());
+    const response = await fetchAPI(API_URL + "?" + params.toString());
     const data = await response.json();
 
     if (!data.success) {
@@ -457,7 +516,7 @@ async function guardarDrivePedidosForm() {
 
   try {
     const params = new URLSearchParams({ action: "guardarConfiguracionNegocio", ...cfg });
-    const response = await fetch(API_URL + "?" + params.toString());
+    const response = await fetchAPI(API_URL + "?" + params.toString());
     const data = await response.json();
 
     if (!data.success) {
@@ -513,7 +572,7 @@ async function guardarCredencialesForm() {
       nuevoUsuario,
       nuevaPassword
     });
-    const response = await fetch(API_URL + "?" + params.toString());
+    const response = await fetchAPI(API_URL + "?" + params.toString());
     const data = await response.json();
 
     if (!data.success) {
@@ -699,11 +758,11 @@ async function onSeleccionarImagenPopup(event) {
 
     if (statusEl) { statusEl.className = "pm-image-status uploading"; statusEl.textContent = `⏳ Subiendo a Drive... (${pesoKB}KB)`; }
 
-    const response = await fetch(API_URL, {
+    const response = await fetchAPI(API_URL, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify({ action: "subirImagenProducto", imagenBase64: base64, tipoMime, codigoProducto: "POPUP_PROMO" })
-    });
+    }, { timeoutMs: 40000 }); // las imágenes pesan más y tardan más en subir — no es una mutación chica
     const data = await response.json();
 
     if (!data.success) {
@@ -729,7 +788,7 @@ async function guardarPopupPromoForm() {
   const imagen = (document.getElementById("cfgPopupImagen")?.value || "").trim();
   try {
     const params = new URLSearchParams({ action: "guardarConfiguracionNegocio", popupImagen: imagen, popupActivo: activo });
-    const res = await fetch(API_URL + "?" + params.toString());
+    const res = await fetchAPI(API_URL + "?" + params.toString());
     const data = await res.json();
     if (data.success) toast("Popup guardado correctamente", "success");
     else toast(data.message || "Error al guardar", "error");
@@ -779,7 +838,7 @@ async function guardarAparienciaForm() {
 
   try {
     const params = new URLSearchParams({ action: "guardarConfiguracionNegocio", ...cfg });
-    const response = await fetch(API_URL + "?" + params.toString());
+    const response = await fetchAPI(API_URL + "?" + params.toString());
     const data = await response.json();
 
     if (!data.success) {
@@ -851,7 +910,7 @@ async function guardarBeneficiosForm() {
 
   try {
     const params = new URLSearchParams({ action: "guardarConfiguracionNegocio", ...cfg });
-    const response = await fetch(API_URL + "?" + params.toString());
+    const response = await fetchAPI(API_URL + "?" + params.toString());
     const data = await response.json();
 
     if (!data.success) {
@@ -880,7 +939,7 @@ async function guardarBannerTopForm() {
 
   try {
     const params = new URLSearchParams({ action: "guardarConfiguracionNegocio", nombre: configNegocioCache.nombre, bannerTopMensajes });
-    const response = await fetch(API_URL + "?" + params.toString());
+    const response = await fetchAPI(API_URL + "?" + params.toString());
     const data = await response.json();
 
     if (!data.success) {
@@ -989,7 +1048,7 @@ async function cargarMetricas() {
 
   // Actualizar en background
   try {
-    const response = await fetch(API_URL + "?action=metricas");
+    const response = await fetchAPI(API_URL + "?action=metricas");
     const data = await response.json();
     aplicarMetricas(data);
     marcarActualizacionEnVivo();
@@ -1021,7 +1080,7 @@ function marcarActualizacionEnVivo(fallo) {
 
 async function cargarVentasPOS() {
   try {
-    const response = await fetch(API_URL + "?action=ventasPOS");
+    const response = await fetchAPI(API_URL + "?action=ventasPOS");
     const data = await response.json();
     ventasPOSGlobal = data.ventas || [];
     renderVentasPOSRecientes(ventasPOSGlobal);
@@ -1102,7 +1161,7 @@ async function cargarVentasPOSHistorial() {
     if (desdeInput && desdeInput.value) params.set("desde", desdeInput.value);
     if (hastaInput && hastaInput.value) params.set("hasta", hastaInput.value);
 
-    const response = await fetch(API_URL + "?" + params.toString());
+    const response = await fetchAPI(API_URL + "?" + params.toString());
     const data = await response.json();
 
     ventasPOSHistorialGlobal = data.ventas || [];
@@ -1228,7 +1287,7 @@ async function confirmarAnulacionVenta() {
       carrito: venta.CARRITO || "[]",
       motivo: motivo
     });
-    const response = await fetch(API_URL + "?" + params.toString());
+    const response = await fetchAPI(API_URL + "?" + params.toString());
     const data = await response.json();
 
     if (!data.success) {
@@ -1393,6 +1452,102 @@ function invalidarCache(...claves) {
   });
 }
 
+/* =====================================================
+   COLA DE VENTAS PENDIENTES (sin conexión)
+   Si guardarVenta falla por un corte de conexión, la venta ya se le
+   mostró y (si el cajero eligió imprimir) ya se imprimió al cliente
+   — no hay vuelta atrás con eso. Lo único que puede fallar es que la
+   fila todavía no llegó a VENTAS_LOCAL. Esta cola guarda esa venta en
+   el navegador (localStorage) y la reintenta sola en cuanto vuelve la
+   conexión, usando el mismo clienteVentaId — que el backend reconoce
+   para no duplicarla aunque el primer intento sí hubiera llegado a
+   guardarse y solo se haya perdido la respuesta.
+===================================================== */
+
+const CLAVE_COLA_VENTAS = "vpos_cola_ventas_pendientes";
+
+function _leerColaVentasPendientes() {
+  try { return JSON.parse(localStorage.getItem(CLAVE_COLA_VENTAS) || "[]"); }
+  catch(e) { return []; }
+}
+
+function _guardarColaVentasPendientes(cola) {
+  try { localStorage.setItem(CLAVE_COLA_VENTAS, JSON.stringify(cola)); } catch(e) {}
+  actualizarBadgeVentasPendientes(cola.length);
+}
+
+function encolarVentaPendiente(venta) {
+  const cola = _leerColaVentasPendientes();
+  cola.push(venta);
+  _guardarColaVentasPendientes(cola);
+}
+
+/** Muestra/oculta un aviso discreto de cuántas ventas todavía no se subieron al servidor */
+function actualizarBadgeVentasPendientes(cantidad) {
+  let badge = document.getElementById("badgeVentasPendientes");
+  if (!badge) {
+    badge = document.createElement("div");
+    badge.id = "badgeVentasPendientes";
+    badge.style.cssText = "position:fixed;bottom:14px;right:14px;z-index:9999;background:var(--amber-500,#f59e0b);color:#fff;padding:8px 14px;border-radius:20px;font-size:13px;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,.25);cursor:pointer;display:none;";
+    badge.onclick = () => sincronizarVentasPendientes();
+    document.body.appendChild(badge);
+  }
+  if (cantidad > 0) {
+    badge.textContent = `📴 ${cantidad} venta${cantidad === 1 ? "" : "s"} sin sincronizar — tocar para reintentar`;
+    badge.style.display = "block";
+  } else {
+    badge.style.display = "none";
+  }
+}
+
+let _sincronizandoVentasPendientes = false;
+
+/** Reintenta subir cada venta encolada, en orden, una por vez (no en paralelo — si el servidor está lento, mandar 10 a la vez lo empeora) */
+async function sincronizarVentasPendientes() {
+  if (_sincronizandoVentasPendientes) return;
+  const cola = _leerColaVentasPendientes();
+  if (cola.length === 0) return;
+
+  _sincronizandoVentasPendientes = true;
+  const pendientes = [];
+
+  for (const venta of cola) {
+    try {
+      const response = await fetchAPI(
+        API_URL +
+        "?action=guardarVenta" +
+        "&total="          + encodeURIComponent(venta.total) +
+        "&formaPago="      + encodeURIComponent(venta.formaPago) +
+        "&observaciones="  + encodeURIComponent(venta.observaciones || "") +
+        "&carrito="        + encodeURIComponent(JSON.stringify(venta.carrito)) +
+        "&clienteVentaId=" + encodeURIComponent(venta.clienteVentaId),
+        {}, { reintentos: 1, timeoutMs: 15000 }
+      );
+      const data = await response.json();
+      if (!data.success) pendientes.push(venta); // el servidor respondió pero rechazó la venta — se mantiene en cola para revisar
+    } catch (error) {
+      pendientes.push(venta); // seguía sin conexión — se mantiene en cola, se reintenta en el próximo ciclo
+    }
+  }
+
+  _guardarColaVentasPendientes(pendientes);
+  _sincronizandoVentasPendientes = false;
+
+  const subieron = cola.length - pendientes.length;
+  if (subieron > 0) {
+    toast(`✅ ${subieron} venta${subieron === 1 ? "" : "s"} pendiente${subieron === 1 ? "" : "s"} sincronizada${subieron === 1 ? "" : "s"}`, "success");
+    invalidarCache("ventasPOS");
+    cargarMetricas();
+  }
+}
+
+// Reintentar apenas el navegador detecta que volvió la conexión, y
+// además cada 30s como red de respaldo (el evento "online" del
+// navegador no siempre es 100% confiable para saber si hay internet
+// real, solo que hay una interfaz de red activa).
+window.addEventListener("online", sincronizarVentasPendientes);
+setInterval(sincronizarVentasPendientes, 30000);
+
 function cacheGet(clave) {
   try {
     const raw = localStorage.getItem("vpos_cache_" + clave);
@@ -1417,7 +1572,7 @@ async function cargarPedidos() {
     if (!cached.stale) return; // fresco, no hace falta recargar
   }
   try {
-    const response = await fetch(API_URL + "?action=pedidos");
+    const response = await fetchAPI(API_URL + "?action=pedidos");
     const data = await response.json();
     if (!data.pedidos) return;
 
@@ -1432,9 +1587,17 @@ async function cargarPedidos() {
 
     pedidosGlobal = data.pedidos;
     cacheSet("pedidos", pedidosGlobal);
+    _avisoPedidosCaido = false; // se pudo actualizar bien — resetea el aviso para el próximo corte
     if (cambio) renderPedidos(pedidosGlobal);
   } catch (error) {
     console.error("Error pedidos:", error);
+    // Solo se avisa la primera vez que falla, no en cada intento del
+    // polling de 15s — si la conexión está mal por un rato, un toast
+    // nuevo cada 15s sería más molesto que informativo.
+    if (!_avisoPedidosCaido) {
+      toast("No se pudieron actualizar los pedidos — revisá tu conexión", "error");
+      _avisoPedidosCaido = true;
+    }
   }
 }
 
@@ -1578,7 +1741,7 @@ async function abrirDetallePedido(pedidoId) {
   document.getElementById("pedidoDetalleModalBackdrop").classList.add("show");
 
   try {
-    const response = await fetch(API_URL + "?action=getDetallePedido&pedidoId=" + encodeURIComponent(pedidoId));
+    const response = await fetchAPI(API_URL + "?action=getDetallePedido&pedidoId=" + encodeURIComponent(pedidoId));
     const data = await response.json();
     if (!data.success) { toast(data.message || "No se pudo cargar el pedido", "error"); cerrarModalDetallePedido(); return; }
 
@@ -1929,7 +2092,7 @@ async function actualizarCatalogoProductosManual() {
 
 async function _actualizarProductosAdminEnBackground(cacheKey) {
   try {
-    const response = await fetch(API_URL + "?action=productosAdmin");
+    const response = await fetchAPI(API_URL + "?action=productosAdmin");
     const data = await response.json();
     if (!data.productos) return;
     productosAdminGlobal = data.productos;
@@ -1938,6 +2101,7 @@ async function _actualizarProductosAdminEnBackground(cacheKey) {
     filtrarProductos();
   } catch (error) {
     console.error("Error productos:", error);
+    toast("No se pudieron actualizar los productos — revisá tu conexión", "error");
   }
 }
 
@@ -2213,7 +2377,7 @@ async function confirmarAgregarStock() {
       cantidad: cantidad
     });
 
-    const response = await fetch(API_URL + "?" + params.toString());
+    const response = await fetchAPI(API_URL + "?" + params.toString());
     const data = await response.json();
 
     if (!data.success) {
@@ -2354,7 +2518,7 @@ async function onSeleccionarArchivoImagenProducto(event) {
 
     const codigoProducto = document.getElementById("pmCodigo").value.trim() || document.getElementById("pmCodigoOriginal").value.trim();
 
-    const response = await fetch(API_URL, {
+    const response = await fetchAPI(API_URL, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" }, // evita preflight CORS contra Apps Script
       body: JSON.stringify({
@@ -2363,7 +2527,7 @@ async function onSeleccionarArchivoImagenProducto(event) {
         tipoMime: tipoMime,
         codigoProducto: codigoProducto
       })
-    });
+    }, { timeoutMs: 40000 }); // las imágenes pesan más y tardan más en subir — no es una mutación chica
 
     const data = await response.json();
 
@@ -2430,7 +2594,7 @@ async function guardarProductoForm() {
     });
     if (esEdicion) params.set("codigoOriginal", codigoOriginal);
 
-    const response = await fetch(API_URL + "?" + params.toString());
+    const response = await fetchAPI(API_URL + "?" + params.toString());
     const data = await response.json();
 
     if (!data.success) {
@@ -2465,7 +2629,7 @@ async function eliminarProducto(codigo) {
 
   try {
     const params = new URLSearchParams({ action: "eliminarProducto", codigo });
-    const response = await fetch(API_URL + "?" + params.toString());
+    const response = await fetchAPI(API_URL + "?" + params.toString());
     const data = await response.json();
 
     if (!data.success) {
@@ -2486,6 +2650,7 @@ async function eliminarProducto(codigo) {
 /* ===================== CLIENTES ===================== */
 
 let clientesGlobal = [];
+let _avisoClientesCaido = false; // evita repetir el toast de error de conexión en cada ciclo del polling
 
 /** Refresca manualmente la tabla de clientes desde el backend, con feedback visual en el botón */
 async function actualizarClientesForm() {
@@ -2515,14 +2680,19 @@ async function cargarClientesDesdeBackend() {
     if (!cached.stale) return;
   }
   try {
-    const response = await fetch(API_URL + "?action=clientesConCredito");
+    const response = await fetchAPI(API_URL + "?action=clientesConCredito");
     const data = await response.json();
     if (!data.clientes) return;
     clientesGlobal = data.clientes;
     cacheSet("clientes", clientesGlobal);
+    _avisoClientesCaido = false; // se pudo actualizar bien — resetea el aviso para el próximo corte
     filtrarClientes();
   } catch (error) {
     console.error("Error clientes:", error);
+    if (!_avisoClientesCaido) {
+      toast("No se pudieron actualizar los clientes — revisá tu conexión", "error");
+      _avisoClientesCaido = true;
+    }
   }
 }
 
@@ -2531,7 +2701,7 @@ let _clientesPedidoCache = [];
 async function cargarClientesParaPedido() {
   if (_clientesPedidoCache.length > 0) return _clientesPedidoCache;
   try {
-    const response = await fetch(API_URL + "?action=todosClientes");
+    const response = await fetchAPI(API_URL + "?action=todosClientes");
     const data = await response.json();
     _clientesPedidoCache = data.clientes || [];
     return _clientesPedidoCache;
@@ -2746,7 +2916,7 @@ async function guardarNuevoCliente() {
           aCredito: document.getElementById("clACredito").checked ? "SI" : "NO"
         };
 
-    const response = await fetch(API_URL, {
+    const response = await fetchAPI(API_URL, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify(cuerpo)
@@ -2778,7 +2948,7 @@ async function marcarClienteDesdeHistorialACredito(dni) {
   /* confirm eliminado — acción creando un cliente nuevo, recuperable */
 
   try {
-    const response = await fetch(API_URL, {
+    const response = await fetchAPI(API_URL, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify({ action: "crearClienteDesdeHistorialYMarcarCredito", dni })
@@ -2812,7 +2982,7 @@ async function eliminarClienteForm(clienteId, nombre) {
   /* confirm eliminado */
 
   try {
-    const response = await fetch(API_URL, {
+    const response = await fetchAPI(API_URL, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify({ action: "eliminarCliente", clienteId })
@@ -2850,7 +3020,7 @@ async function abrirModalDetalleCliente(clienteId) {
   detalleClienteIdActual = clienteId;
 
   try {
-    const response = await fetch(API_URL + "?action=detalleClienteCredito&clienteId=" + encodeURIComponent(clienteId));
+    const response = await fetchAPI(API_URL + "?action=detalleClienteCredito&clienteId=" + encodeURIComponent(clienteId));
     const data = await response.json();
 
     if (!data.success) {
@@ -2990,7 +3160,7 @@ async function registrarDeudaExtraForm() {
   if (btn) { btn.disabled = true; btn.textContent = "Registrando..."; }
 
   try {
-    const response = await fetch(API_URL, {
+    const response = await fetchAPI(API_URL, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify({
@@ -3052,7 +3222,7 @@ async function registrarPagoCreditoForm() {
   if (btn) { btn.disabled = true; btn.textContent = "Registrando..."; }
 
   try {
-    const response = await fetch(API_URL, {
+    const response = await fetchAPI(API_URL, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify({
@@ -3301,7 +3471,7 @@ async function cargarStockBajo() {
     // Reusar productos ya cacheados si están disponibles
     let productos = productosPOS.length > 0 ? productosPOS : null;
     if (!productos) {
-      const response = await fetch(API_URL + "?action=productos");
+      const response = await fetchAPI(API_URL + "?action=productos");
       const data = await response.json();
       productos = data.productos || [];
     }
@@ -3324,7 +3494,7 @@ async function cargarAgotados() {
   try {
     let productos = productosPOS.length > 0 ? productosPOS : null;
     if (!productos) {
-      const response = await fetch(API_URL + "?action=productos");
+      const response = await fetchAPI(API_URL + "?action=productos");
       const data = await response.json();
       productos = data.productos || [];
     }
@@ -3344,7 +3514,7 @@ async function cargarAgotados() {
 
 async function cargarMasVendidos() {
   try {
-    const response = await fetch(API_URL + "?action=masVendidos");
+    const response = await fetchAPI(API_URL + "?action=masVendidos");
     const data = await response.json();
     let html = "";
     (data.productos || []).forEach(p => {
@@ -3406,7 +3576,7 @@ async function asegurarProductosPOS() {
 
 async function _actualizarCacheProductosPOS(cacheKey) {
   try {
-    const response = await fetch(API_URL + "?action=productos");
+    const response = await fetchAPI(API_URL + "?action=productos");
     const data = await response.json();
     const productos = data.productos || [];
     localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), productos }));
@@ -4069,6 +4239,10 @@ async function confirmarFinalizarVenta() {
   const itemsSnapshot = [...ticketPOS];
   const fechaVenta = new Date();
   const ventaIdTemp = "VEN-" + Date.now().toString().slice(-6);
+  // Generado ACÁ, antes de intentar guardar — así, si hay que
+  // reintentar más tarde (ver colaVentasPendientes), el backend puede
+  // reconocer que es el mismo intento y no duplicar la venta.
+  const clienteVentaId = "CVL-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
 
   // Guardar para impresión
   ultimaVentaImprimible = {
@@ -4104,13 +4278,16 @@ async function confirmarFinalizarVenta() {
 
   // ── GUARDAR en el backend en segundo plano ──
   try {
-    const response = await fetch(
+    const response = await fetchAPI(
       API_URL +
       "?action=guardarVenta" +
-      "&total="         + encodeURIComponent(total) +
-      "&formaPago="     + encodeURIComponent(formaPagoPOS) +
-      "&observaciones=" + encodeURIComponent(etiquetaDescuento ? "Descuento: " + etiquetaDescuento : "") +
-      "&carrito="       + encodeURIComponent(JSON.stringify(itemsSnapshot))
+      "&total="          + encodeURIComponent(total) +
+      "&formaPago="      + encodeURIComponent(formaPagoPOS) +
+      "&observaciones="  + encodeURIComponent(etiquetaDescuento ? "Descuento: " + etiquetaDescuento : "") +
+      "&carrito="        + encodeURIComponent(JSON.stringify(itemsSnapshot)) +
+      "&clienteVentaId=" + encodeURIComponent(clienteVentaId),
+      {}, // sigue siendo GET — es el formato real que espera guardarVenta en el backend
+      { reintentos: 1, timeoutMs: 15000 } // mutación: sin reintento automático propio (lo maneja la cola de abajo), con más margen que una lectura chica
     );
     const data = await response.json();
 
@@ -4125,7 +4302,21 @@ async function confirmarFinalizarVenta() {
     }
   } catch (err) {
     console.error("Error al guardar venta en backend:", err);
-    toast("⚠️ Sin conexión — la venta no se guardó. Verificá el servidor.", "error");
+    // Antes acá la venta se perdía directamente — el cajero ya le
+    // había dado el ticket al cliente, pero la fila nunca llegaba a
+    // VENTAS_LOCAL ni se descontaba el stock del lado del servidor, y
+    // no había ninguna forma de recuperarla después. Ahora se guarda
+    // en una cola local (localStorage) con el mismo clienteVentaId, y
+    // se reintenta sola en cuanto vuelve la conexión — de forma
+    // segura: el backend reconoce ese ID y nunca la duplica, aunque el
+    // primer intento sí hubiera llegado a guardarse y solo se haya
+    // perdido la respuesta.
+    encolarVentaPendiente({
+      clienteVentaId, total, formaPago: formaPagoPOS,
+      observaciones: etiquetaDescuento ? "Descuento: " + etiquetaDescuento : "",
+      carrito: itemsSnapshot
+    });
+    toast("📴 Sin conexión — la venta se guardó localmente y se subirá sola al reconectar", "error");
   }
 
   // Métricas en segundo plano
@@ -4269,7 +4460,7 @@ async function chequearClienteCreditoPedidoAdmin() {
   }
 
   try {
-    const response = await fetch(API_URL + "?action=consultarClienteCreditoPorDni&dni=" + encodeURIComponent(dni));
+    const response = await fetchAPI(API_URL + "?action=consultarClienteCreditoPorDni&dni=" + encodeURIComponent(dni));
     const data = await response.json();
 
     wrap.style.display = data.esCredito ? "block" : "none";
@@ -4342,7 +4533,7 @@ async function confirmarPedidoAdmin() {
       carrito: JSON.stringify(ticketPOS)
     });
 
-    const response = await fetch(API_URL + "?" + params.toString());
+    const response = await fetchAPI(API_URL + "?" + params.toString());
     const data = await response.json();
 
     if (!data.success) {
@@ -5036,9 +5227,7 @@ async function _imprimirConDialogo(html) {
   frame.innerHTML = html;
 
   // Esperar a que el contenido del frame esté completamente pintado
-  // Primero un requestAnimationFrame para que el DOM procese el innerHTML,
-  // luego verificar si hay imágenes pendientes de cargar
-  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+  await new Promise(r => requestAnimationFrame(r));
 
   const imagenes = frame.querySelectorAll("img");
   if (imagenes.length > 0) {
@@ -5050,11 +5239,24 @@ async function _imprimirConDialogo(html) {
     ));
   }
 
+  // Alto real del ticket ya renderizado, en micrones (lo que usa
+  // Electron para pageSize). Antes se mandaba siempre un alto fijo de
+  // 297mm (largo de hoja A4) para evitar el error "configuración
+  // inválida" de algunos drivers — pero eso hace que Windows tenga que
+  // generar y encolar una página mucho más grande de lo necesario en
+  // cada ticket (un ticket real mide 10-20cm, no 30cm), lo cual se
+  // siente como impresión lenta. Ahora se mide el contenido real y se
+  // le suma un margen chico; 297mm queda solo como techo de seguridad
+  // por si el cálculo da algo raro.
+  const altoPx = frame.scrollHeight || 800;
+  const altoMicronesMedido = Math.round(altoPx * 264.583) + 6000; // px→micrones + ~6mm de margen
+  const altoMicrones = Math.min(Math.max(altoMicronesMedido, 40000), 297000);
+
   // En Electron: impresión silenciosa sin diálogo del sistema
   const bridge = window.veekpos || window.posOffline;
   if (bridge && typeof bridge.imprimirSilencioso === "function") {
     const deviceName = localStorage.getItem("veekpos_impresora") || "";
-    let result = await bridge.imprimirSilencioso({ deviceName });
+    let result = await bridge.imprimirSilencioso({ deviceName, altoMicrones });
 
     // Causa más común de "tengo la impresora configurada y igual sale
     // el diálogo": el nombre guardado (de una lista de impresoras que
@@ -5067,7 +5269,7 @@ async function _imprimirConDialogo(html) {
     // sistema — que suele ser la térmica igual — antes de rendirse.
     if (result && !result.success && deviceName) {
       console.warn(`Impresión silenciosa falló con la impresora guardada ("${deviceName}"): ${result.errorType}. Reintentando con la predeterminada del sistema...`);
-      result = await bridge.imprimirSilencioso({ deviceName: "" });
+      result = await bridge.imprimirSilencioso({ deviceName: "", altoMicrones });
     }
 
     if (result && !result.success) {
@@ -5776,7 +5978,7 @@ async function guardarCierreCajaForm() {
       observaciones:         observaciones || ""
     });
 
-    const response = await fetch(API_URL + "?" + params.toString());
+    const response = await fetchAPI(API_URL + "?" + params.toString());
     const data = await response.json();
 
     if (!data.success) {
@@ -5810,7 +6012,7 @@ async function cargarHistorialCierres() {
   if (!tbody) return;
 
   try {
-    const response = await fetch(API_URL + "?action=historialCierres");
+    const response = await fetchAPI(API_URL + "?action=historialCierres");
     const data = await response.json();
     const lista = data.cierres || [];
 
@@ -5896,7 +6098,7 @@ async function cargarReporteVentasPeriodo() {
   if (cached) { _aplicarReporteVentas(cached, tbody, resumenWrap); return; }
 
   try {
-    const response = await fetch(API_URL + "?action=reporteVentasPeriodo" + obtenerRangoReportes());
+    const response = await fetchAPI(API_URL + "?action=reporteVentasPeriodo" + obtenerRangoReportes());
     const data = await response.json();
     if (!data.success) return;
     _cacheReporte(cacheKey, data);
@@ -5930,7 +6132,7 @@ async function cargarReporteProductos() {
   const tbody = document.getElementById("repProductosTabla");
 
   try {
-    const response = await fetch(API_URL + "?action=reporteProductosVendidos" + obtenerRangoReportes());
+    const response = await fetchAPI(API_URL + "?action=reporteProductosVendidos" + obtenerRangoReportes());
     const data = await response.json();
     if (!data.success) return;
 
@@ -5963,7 +6165,7 @@ async function cargarReporteCategorias() {
   const tbody = document.getElementById("repCategoriasTabla");
 
   try {
-    const response = await fetch(API_URL + "?action=reporteVentasPorCategoria" + obtenerRangoReportes());
+    const response = await fetchAPI(API_URL + "?action=reporteVentasPorCategoria" + obtenerRangoReportes());
     const data = await response.json();
     if (!data.success) return;
 
@@ -5992,7 +6194,7 @@ async function cargarReporteFormasPago() {
   const tbody = document.getElementById("repFormasPagoTabla");
 
   try {
-    const response = await fetch(API_URL + "?action=reporteFormasPago" + obtenerRangoReportes());
+    const response = await fetchAPI(API_URL + "?action=reporteFormasPago" + obtenerRangoReportes());
     const data = await response.json();
     if (!data.success) return;
 
@@ -6024,7 +6226,7 @@ async function cargarReporteCierres() {
   const tbody = document.getElementById("repCierresTabla");
 
   try {
-    const response = await fetch(API_URL + "?action=reporteCierresCaja" + obtenerRangoReportes());
+    const response = await fetchAPI(API_URL + "?action=reporteCierresCaja" + obtenerRangoReportes());
     const data = await response.json();
     if (!data.success) return;
 
@@ -6064,7 +6266,7 @@ async function cargarReporteClientes() {
   const tbody = document.getElementById("repClientesTabla");
 
   try {
-    const response = await fetch(API_URL + "?action=reporteClientes" + obtenerRangoReportes());
+    const response = await fetchAPI(API_URL + "?action=reporteClientes" + obtenerRangoReportes());
     const data = await response.json();
     if (!data.success) return;
 
@@ -6182,7 +6384,7 @@ async function cargarMovimientosCajaHoy() {
   } catch(e) {}
 
   try {
-    const response = await fetch(API_URL + "?action=movimientosCajaHoy&fecha=" + encodeURIComponent(fecha));
+    const response = await fetchAPI(API_URL + "?action=movimientosCajaHoy&fecha=" + encodeURIComponent(fecha));
     const data = await response.json();
 
     if (!data.success) {
@@ -6274,7 +6476,7 @@ async function eliminarMovimientoCajaForm(movimientoId) {
   if (!id) return;
 
   try {
-    const response = await fetch(API_URL + "?action=eliminarMovimientoCaja&movimientoId=" + encodeURIComponent(id));
+    const response = await fetchAPI(API_URL + "?action=eliminarMovimientoCaja&movimientoId=" + encodeURIComponent(id));
     const data = await response.json();
 
     if (!data.success) {
@@ -6317,7 +6519,7 @@ async function guardarMovimientoCajaForm() {
       formaPago: formaPago
     });
 
-    const response = await fetch(API_URL + "?" + params.toString());
+    const response = await fetchAPI(API_URL + "?" + params.toString());
     const data = await response.json();
 
     if (!data.success) {
@@ -7453,7 +7655,7 @@ async function ejecutarMigracionFormaPago() {
   const status = document.getElementById("migracionStatus");
   if (status) status.textContent = "Migrando...";
   try {
-    const res = await fetch(API_URL + "?action=migrarColumnaFormaPago");
+    const res = await fetchAPI(API_URL + "?action=migrarColumnaFormaPago");
     const data = await res.json();
     if (status) status.textContent = data.message || (data.success ? "✓ OK" : "❌ Error");
     toast(data.message || "Migración completada", data.success ? "success" : "error");
