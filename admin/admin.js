@@ -5871,6 +5871,15 @@ function aplicarDatosCierreCaja(data) {
     const movTransferencia = Number(pfp.TRANSFERENCIA || 0);
     const movTarjeta = Number(pfp.TARJETA || 0);
 
+    // Ingresos y egresos BRUTOS de cada forma de pago (no el neto). Si
+    // un mismo día hay un ingreso y un egreso por el mismo importe en
+    // la misma forma de pago, el neto da $0 — pero eso no significa
+    // que no hubo ningún movimiento, así que mostrar el neto acá
+    // ocultaría un ingreso y un egreso reales. Por eso se usan los
+    // valores brutos que ya vienen separados desde el backend.
+    const ingPorFormaPago = mov?.ingresosPorFormaPago || {};
+    const egrPorFormaPago = mov?.egresosPorFormaPago || {};
+
     const pc = data.pagosClientes || {};
     const pcEfectivo = Number(pc.EFECTIVO || 0);
     const pcTransferencia = Number(pc.TRANSFERENCIA || 0);
@@ -5891,8 +5900,8 @@ function aplicarDatosCierreCaja(data) {
     if (movDetalleEl && (movEfectivo !== 0 || pcEfectivo !== 0)) {
       actualizarElemento("ccVentasEfectivo", "$" + Number(data.ventasEfectivo || 0).toLocaleString("es-AR"));
       mostrarLineaPagos("ccPagosClientesEfectivoLinea", "ccPagosClientesEfectivo", pcEfectivo);
-      const ingEf = movEfectivo > 0 ? movEfectivo : 0;
-      const egrEf = movEfectivo < 0 ? Math.abs(movEfectivo) : 0;
+      const ingEf = Number(ingPorFormaPago.EFECTIVO || 0);
+      const egrEf = Number(egrPorFormaPago.EFECTIVO || 0);
       actualizarElemento("ccMovIngresos", ingEf > 0 ? "+$" + ingEf.toLocaleString("es-AR") : "$0");
       actualizarElemento("ccMovEgresos",  egrEf > 0 ? "−$" + egrEf.toLocaleString("es-AR") : "$0");
       movDetalleEl.style.display = "flex";
@@ -5904,8 +5913,8 @@ function aplicarDatosCierreCaja(data) {
     const movTransfEl = document.getElementById("ccMovimientosDetalleTransf");
     if (movTransfEl) {
       if (movTransferencia !== 0 || pcTransferencia !== 0) {
-        const ingTr = movTransferencia > 0 ? movTransferencia : 0;
-        const egrTr = movTransferencia < 0 ? Math.abs(movTransferencia) : 0;
+        const ingTr = Number(ingPorFormaPago.TRANSFERENCIA || 0);
+        const egrTr = Number(egrPorFormaPago.TRANSFERENCIA || 0);
         actualizarElemento("ccVentasTransferencia", "$" + Number(data.ventasTransferencia || 0).toLocaleString("es-AR"));
         mostrarLineaPagos("ccPagosClientesTransfLinea", "ccPagosClientesTransf", pcTransferencia);
         actualizarElemento("ccMovIngresosTransf", ingTr > 0 ? "+$" + ingTr.toLocaleString("es-AR") : "$0");
@@ -5920,8 +5929,8 @@ function aplicarDatosCierreCaja(data) {
     const movTarjetaEl = document.getElementById("ccMovimientosDetalleTarjeta");
     if (movTarjetaEl) {
       if (movTarjeta !== 0 || pcTarjeta !== 0) {
-        const ingTa = movTarjeta > 0 ? movTarjeta : 0;
-        const egrTa = movTarjeta < 0 ? Math.abs(movTarjeta) : 0;
+        const ingTa = Number(ingPorFormaPago.TARJETA || 0);
+        const egrTa = Number(egrPorFormaPago.TARJETA || 0);
         actualizarElemento("ccVentasTarjeta", "$" + Number(data.ventasTarjeta || 0).toLocaleString("es-AR"));
         mostrarLineaPagos("ccPagosClientesTarjetaLinea", "ccPagosClientesTarjeta", pcTarjeta);
         actualizarElemento("ccMovIngresosTarjeta", ingTa > 0 ? "+$" + ingTa.toLocaleString("es-AR") : "$0");
