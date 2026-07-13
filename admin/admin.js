@@ -5281,18 +5281,6 @@ async function _imprimirConDialogo(html) {
 
   frame.innerHTML = html;
 
-  // El frame tiene display:none fuera del modo impresión (para no
-  // verse en pantalla normal) — pero eso significa que, mientras está
-  // así, CUALQUIER medición de alto (scrollHeight) da 0, sin importar
-  // cuánto contenido tenga adentro. Antes de medir, hay que "mostrarlo"
-  // (aunque sea fuera de la pantalla, invisible) para que el navegador
-  // calcule su layout de verdad — si no, el cálculo de abajo caía
-  // siempre al valor de respaldo (800px), más corto que lo que
-  // necesita un ticket largo como el del cierre de caja, y por eso se
-  // imprimía cortado.
-  const estiloPrevioFrame = frame.style.cssText;
-  frame.style.cssText = "display:block !important; position:fixed; top:0; left:-9999px; visibility:hidden;";
-
   // Esperar a que el contenido del frame esté completamente pintado
   await new Promise(r => requestAnimationFrame(r));
 
@@ -5306,24 +5294,16 @@ async function _imprimirConDialogo(html) {
     ));
   }
 
-  // Alto real del ticket ya renderizado, en micrones (lo que usa
-  // Electron para pageSize). Antes se mandaba siempre un alto fijo de
-  // 297mm (largo de hoja A4) para evitar el error "configuración
-  // inválida" de algunos drivers — pero eso hace que Windows tenga que
-  // generar y encolar una página mucho más grande de lo necesario en
-  // cada ticket (un ticket real mide 10-20cm, no 30cm), lo cual se
-  // siente como impresión lenta. Ahora se mide el contenido real y se
-  // le suma un margen chico; 297mm queda solo como techo de seguridad
-  // por si el cálculo da algo raro.
-  const altoPx = frame.scrollHeight || 800;
-  const altoMicronesMedido = Math.round(altoPx * 264.583) + 6000; // px→micrones + ~6mm de margen
-  const altoMicrones = Math.min(Math.max(altoMicronesMedido, 40000), 297000);
-
-  // Ya se midió — el frame vuelve a su estado oculto normal. La
-  // impresión en sí (silenciosa o por diálogo) reactiva su propia
-  // visibilidad a través de las reglas @media print, así que esto no
-  // le afecta nada al resultado impreso.
-  frame.style.cssText = estiloPrevioFrame;
+  // NOTA: acá hubo dos intentos de calcular el alto real del ticket
+  // (midiendo scrollHeight) para no pedirle a Windows una página más
+  // grande de lo necesario y así imprimir más rápido. Los dos
+  // terminaron cortando o desalineando tickets reales — medir el alto
+  // de un elemento que normalmente está oculto (display:none) es
+  // frágil: para que la medición sea correcta hay que "mostrarlo"
+  // brevemente, y esa manipulación de estilos resultó nada confiable
+  // en la práctica. Se vuelve a un alto fijo, simple y sin trucos:
+  // menos veloz en teoría, pero nunca corta ni desalinea un ticket.
+  const altoMicrones = 297000; // 297mm (largo A4) — margen de sobra para cualquier ticket, incluido el de cierre de caja
 
   // En Electron: impresión silenciosa sin diálogo del sistema
   const bridge = window.veekpos || window.posOffline;
