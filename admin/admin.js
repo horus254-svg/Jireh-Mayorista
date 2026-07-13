@@ -239,7 +239,6 @@ async function cargarConfigNegocioForm() {
   cargarAparienciaForm(cfg);
   cargarBeneficiosForm(cfg);
   document.getElementById("cfgBannerTopMensajes").value = cfg.bannerTopMensajes ?? "";
-  document.getElementById("cfgTransportesNoDisponibles").value = cfg.transportesNoDisponibles ?? "";
   cargarSidebarForm(cfg);
   cargarDriveProductosForm(cfg);
   cargarDrivePedidosForm(cfg);
@@ -291,10 +290,45 @@ async function guardarConfigNegocioForm() {
   }
 }
 
-/** Resets the form (and the saved sheet values) back to the original JIREH defaults */
-async function restablecerConfigNegocio() {
-  if (!window.confirm || !confirm("¿Restablecer los datos del local a los valores originales?")) { toast("Función no disponible en esta versión", "error"); return; }
+/**
+ * Modal de confirmación genérico, para reemplazar usos puntuales de
+ * window.confirm() nativo — ese diálogo síncrono puede dejar el foco
+ * de teclado roto en Electron después de cerrarse (el input de texto
+ * deja de responder). mensaje: texto a mostrar. onConfirmar: función
+ * que se ejecuta si el usuario confirma.
+ */
+function confirmarAccion(mensaje, onConfirmar, titulo) {
+  window._accionConfirmadaCallback = onConfirmar;
 
+  const backdrop = document.getElementById("modalConfirmGenericoBackdrop");
+  const texto = document.getElementById("modalConfirmGenericoTexto");
+  const tituloEl = document.getElementById("modalConfirmGenericoTitulo");
+  if (texto) texto.textContent = mensaje;
+  if (tituloEl) tituloEl.textContent = titulo || "⚠️ Confirmar acción";
+  if (backdrop) backdrop.classList.add("show");
+}
+
+function cerrarModalConfirmGenerico() {
+  const backdrop = document.getElementById("modalConfirmGenericoBackdrop");
+  if (backdrop) backdrop.classList.remove("show");
+  window._accionConfirmadaCallback = null;
+}
+
+function _ejecutarAccionConfirmada() {
+  const fn = window._accionConfirmadaCallback;
+  cerrarModalConfirmGenerico();
+  if (typeof fn === "function") fn();
+}
+
+/** Resets the form (and the saved sheet values) back to the original JIREH defaults */
+function restablecerConfigNegocio() {
+  confirmarAccion(
+    "¿Restablecer los datos del local a los valores originales?",
+    _restablecerConfigNegocioConfirmado
+  );
+}
+
+async function _restablecerConfigNegocioConfirmado() {
   document.getElementById("cfgNombreLocal").value = CONFIG_NEGOCIO_DEFAULT.nombre;
   document.getElementById("cfgSubtitulo").value   = CONFIG_NEGOCIO_DEFAULT.subtitulo;
   document.getElementById("cfgDireccion").value   = CONFIG_NEGOCIO_DEFAULT.direccion;
@@ -598,7 +632,6 @@ async function guardarCredencialesForm() {
 
 const APARIENCIA_DEFAULT = {
   navbarTexto:     "Jireh Mayorista",
-  navbarIcono:     "🏬",
   bannerTitulo:    "Mayorista Jireh",
   bannerSubtitulo: "Catálogo Mayorista Online",
   bannerImagen:    "",
@@ -617,7 +650,6 @@ function aplicarTemaAdmin(cfg) {
 /** Loads the saved banner/tema config into the "Apariencia" form (called when Configuración opens) */
 function cargarAparienciaForm(cfg) {
   document.getElementById("cfgNavbarTexto").value     = cfg.navbarTexto     ?? APARIENCIA_DEFAULT.navbarTexto;
-  document.getElementById("cfgNavbarIcono").value     = cfg.navbarIcono     ?? APARIENCIA_DEFAULT.navbarIcono;
   document.getElementById("cfgBannerTitulo").value    = cfg.bannerTitulo    ?? APARIENCIA_DEFAULT.bannerTitulo;
   document.getElementById("cfgBannerSubtitulo").value = cfg.bannerSubtitulo ?? APARIENCIA_DEFAULT.bannerSubtitulo;
   document.getElementById("cfgBannerImagen").value    = cfg.bannerImagen   ?? APARIENCIA_DEFAULT.bannerImagen;
@@ -832,8 +864,7 @@ async function guardarAparienciaForm() {
     bannerSubtitulo: document.getElementById("cfgBannerSubtitulo").value.trim(),
     bannerImagen:    document.getElementById("cfgBannerImagen").value.trim(),
     tema:            document.getElementById("cfgTema").value,
-    navbarTexto:     document.getElementById("cfgNavbarTexto").value.trim(),
-    navbarIcono:     document.getElementById("cfgNavbarIcono").value.trim()
+    navbarTexto:     document.getElementById("cfgNavbarTexto").value.trim()
   };
 
   const btn = document.getElementById("btnGuardarApariencia");
@@ -957,35 +988,6 @@ async function guardarBannerTopForm() {
   } catch (error) {
     console.error("Error al guardar el banner superior:", error);
     toast("Error de conexión al guardar el banner", "error");
-  } finally {
-    if (btn) { btn.disabled = false; btn.innerHTML = textoOriginal; }
-  }
-}
-
-/** Saves the list of blocked shipping carriers — one per line, same pattern as the top-banner messages */
-async function guardarTransportesNoDisponiblesForm() {
-  const transportesNoDisponibles = document.getElementById("cfgTransportesNoDisponibles").value.trim();
-
-  const btn = document.getElementById("btnGuardarTransportesNoDisponibles");
-  const textoOriginal = btn ? btn.innerHTML : "";
-  if (btn) { btn.disabled = true; btn.innerHTML = "Guardando..."; }
-
-  try {
-    const params = new URLSearchParams({ action: "guardarConfiguracionNegocio", nombre: configNegocioCache.nombre, transportesNoDisponibles });
-    const response = await fetchAPI(API_URL + "?" + params.toString());
-    const data = await response.json();
-
-    if (!data.success) {
-      toast(data.message || "No se pudieron guardar los transportes", "error");
-      return;
-    }
-
-    configNegocioCache.transportesNoDisponibles = transportesNoDisponibles;
-    toast("Transportes bloqueados guardados — ya rige en el catálogo", "success");
-
-  } catch (error) {
-    console.error("Error al guardar los transportes no disponibles:", error);
-    toast("Error de conexión al guardar los transportes", "error");
   } finally {
     if (btn) { btn.disabled = false; btn.innerHTML = textoOriginal; }
   }
@@ -2652,13 +2654,33 @@ async function guardarProductoForm() {
 }
 
 /** Deletes a product after confirmation */
-async function eliminarProducto(codigo) {
-  // Modal de confirmación delegado — el usuario debe confirmar por otro medio
-  const _confirmElimProd = await new Promise(r => {
-    const ok = window.confirm ? confirm(`¿Eliminar el producto "${codigo}"? Esta acción no se puede deshacer.`) : true;
-    r(ok);
-  });
-  if (!_confirmElimProd) return;
+/**
+ * Pide confirmación con modal propio antes de eliminar un producto.
+ * IMPORTANTE: antes esto usaba window.confirm(), pero confirm()/alert()
+ * son diálogos nativos síncronos que, en Electron, pueden dejar el
+ * foco de teclado roto en la ventana después de cerrarse — el input
+ * de texto deja de responder hasta recargar. Por eso en todo el panel
+ * se usa este patrón de modal propio en vez de confirm() nativo.
+ */
+function eliminarProducto(codigo) {
+  window._codigoProductoParaEliminar = codigo;
+
+  const backdrop = document.getElementById("modalEliminarProdBackdrop");
+  const texto = document.getElementById("modalEliminarProdTexto");
+  if (texto) texto.textContent = `¿Eliminar el producto "${codigo}"? Esta acción no se puede deshacer.`;
+  if (backdrop) backdrop.classList.add("show");
+}
+
+function cerrarModalEliminarProd() {
+  const backdrop = document.getElementById("modalEliminarProdBackdrop");
+  if (backdrop) backdrop.classList.remove("show");
+  window._codigoProductoParaEliminar = null;
+}
+
+async function eliminarProductoForm() {
+  const codigo = window._codigoProductoParaEliminar;
+  cerrarModalEliminarProd();
+  if (!codigo) return;
 
   try {
     const params = new URLSearchParams({ action: "eliminarProducto", codigo });
@@ -5259,6 +5281,18 @@ async function _imprimirConDialogo(html) {
 
   frame.innerHTML = html;
 
+  // El frame tiene display:none fuera del modo impresión (para no
+  // verse en pantalla normal) — pero eso significa que, mientras está
+  // así, CUALQUIER medición de alto (scrollHeight) da 0, sin importar
+  // cuánto contenido tenga adentro. Antes de medir, hay que "mostrarlo"
+  // (aunque sea fuera de la pantalla, invisible) para que el navegador
+  // calcule su layout de verdad — si no, el cálculo de abajo caía
+  // siempre al valor de respaldo (800px), más corto que lo que
+  // necesita un ticket largo como el del cierre de caja, y por eso se
+  // imprimía cortado.
+  const estiloPrevioFrame = frame.style.cssText;
+  frame.style.cssText = "display:block !important; position:fixed; top:0; left:-9999px; visibility:hidden;";
+
   // Esperar a que el contenido del frame esté completamente pintado
   await new Promise(r => requestAnimationFrame(r));
 
@@ -5284,6 +5318,12 @@ async function _imprimirConDialogo(html) {
   const altoPx = frame.scrollHeight || 800;
   const altoMicronesMedido = Math.round(altoPx * 264.583) + 6000; // px→micrones + ~6mm de margen
   const altoMicrones = Math.min(Math.max(altoMicronesMedido, 40000), 297000);
+
+  // Ya se midió — el frame vuelve a su estado oculto normal. La
+  // impresión en sí (silenciosa o por diálogo) reactiva su propia
+  // visibilidad a través de las reglas @media print, así que esto no
+  // le afecta nada al resultado impreso.
+  frame.style.cssText = estiloPrevioFrame;
 
   // En Electron: impresión silenciosa sin diálogo del sistema
   const bridge = window.veekpos || window.posOffline;
