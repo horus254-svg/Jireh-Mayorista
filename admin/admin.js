@@ -1990,9 +1990,17 @@ function mensajeWhatsAppPorEstado(estado, pedidoId, cliente, total, pdfUrl) {
 
 let _renderGenPedidos = 0; // evita que un render viejo (todavía terminando sus chunks) escriba encima de uno más nuevo
 
-function renderPedidos(lista) {
+function renderPedidos(listaOriginal) {
   const container = document.getElementById("tablaPedidos");
   if (!container) return;
+
+  // Se ordena una COPIA, más nuevo primero — nunca a "lista" en sí ni
+  // a pedidosGlobal, porque cargarPedidos() compara el orden crudo del
+  // backend contra el anterior para saber si hubo cambios (y así
+  // evitar redibujar cuando no hace falta). Si acá se ordenara el
+  // array real, esa comparación dejaría de funcionar y volvería el
+  // salto de pantalla en cada actualización.
+  const lista = [...listaOriginal].sort((a, b) => new Date(b.FECHA) - new Date(a.FECHA));
 
   const miGen = ++_renderGenPedidos;
 
