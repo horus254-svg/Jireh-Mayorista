@@ -194,6 +194,20 @@ select:focus-visible{
     cursor:not-allowed;
 }
 
+/* Con 3 elementos compitiendo por espacio en el navbar (buscador +
+   2 botones), en un celular chico (<400px) el buscador quedaría muy
+   angosto para escribir cómodo. Se esconde el texto de los botones y
+   se deja solo el ícono — siguen siendo reconocibles (📦 / 📄) y el
+   buscador recupera el espacio que necesita. */
+@media (max-width:400px){
+    .btn-texto-navbar{
+        display:none;
+    }
+    .btn-pdf-top{
+        padding:11px 12px;
+    }
+}
+
 /* =========================================================
    HERO
    Signature: zigzag "torn price-tag" edge at the bottom.

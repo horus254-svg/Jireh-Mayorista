@@ -5,6 +5,25 @@
 // Monto mínimo para poder enviar un pedido (configurable desde el panel admin)
 let pedidoMinimo = 100000;
 
+// Nombres de empresas de transporte que el negocio NO trabaja (ya
+// normalizados), cargados desde Configuración. El cliente no puede
+// escribir ninguno de estos en el campo "Transporte" del carrito.
+let transportesNoDisponibles = [];
+
+/**
+ * Normaliza texto para comparar transportes ignorando mayúsculas,
+ * acentos, y espacios de más — así "Vía Cargo", "via cargo" y
+ * "VIA  CARGO" se consideran el mismo texto. Debe coincidir
+ * exactamente con normalizarTextoTransporte() del backend.
+ */
+function normalizarTextoTransporte(texto){
+    return String(texto || "")
+        .trim()
+        .toLowerCase()
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        .replace(/\s+/g, " ");
+}
+
 // API_URL se carga desde config.json para permitir instalaciones
 // multi-cliente sin modificar el código fuente.
 // Si config.json no existe o falla, usa la URL de respaldo.
@@ -798,6 +817,39 @@ document.getElementById("cart-items").addEventListener("change", function(e){
     }
 });
 
+/**
+ * Se ejecuta con cada tecla en el campo "Transporte". Si lo que hay
+ * escrito coincide con una empresa que el negocio no trabaja, muestra
+ * un aviso debajo del campo — no bloquea el tipeo en sí, pero si al
+ * momento de enviar el pedido sigue coincidiendo, ahí sí se bloquea
+ * el envío (ver checkoutWhatsapp).
+ */
+function validarCampoTransporte(){
+    const input = document.getElementById("clienteEmpresa");
+    const errorEl = document.getElementById("clienteEmpresaError");
+    if(!input || !errorEl) return true;
+
+    const bloqueado = transporteEstaBloqueado(input.value);
+
+    if(bloqueado){
+        errorEl.textContent = "No trabajamos con esa empresa de transporte. Elegí otra, por favor.";
+        errorEl.style.display = "block";
+        input.classList.add("is-invalid");
+    }else{
+        errorEl.style.display = "none";
+        input.classList.remove("is-invalid");
+    }
+
+    return !bloqueado;
+}
+
+/** true si el texto ingresado coincide con alguna empresa de transporte no disponible */
+function transporteEstaBloqueado(texto){
+    const normalizado = normalizarTextoTransporte(texto);
+    if(!normalizado) return false;
+    return transportesNoDisponibles.some(bloqueado => normalizado.indexOf(bloqueado) !== -1);
+}
+
 /* =========================================================
    CHECKOUT (WHATSAPP)
 ========================================================= */
@@ -855,6 +907,13 @@ async function checkoutWhatsapp(){
         return;
     }
 
+    if(transporteEstaBloqueado(empresa)){
+        validarCampoTransporte(); // muestra el aviso debajo del campo, por si no lo había visto
+        mostrarToast("No trabajamos con la empresa de transporte indicada. Elegí otra para poder continuar.", "error");
+        desactivarCargaCheckout();
+        return;
+    }
+
     if(estado.carrito.length === 0){
         mostrarToast("Tu carrito está vacío.", "error");
         desactivarCargaCheckout();
@@ -898,7 +957,7 @@ async function checkoutWhatsapp(){
         const resultado = await response.json();
 
         if(!resultado.success){
-            mostrarToast("No se pudo guardar el pedido. Intentá de nuevo.", "error");
+            mostrarToast(resultado.message || "No se pudo guardar el pedido. Intentá de nuevo.", "error");
             desactivarCargaCheckout();
             return;
         }
@@ -1163,6 +1222,14 @@ function aplicarBeneficios(cfg){
     if(!isNaN(minimoConfigurado) && minimoConfigurado >= 0){
         pedidoMinimo = minimoConfigurado;
     }
+
+    // Transportes que el negocio no trabaja — el cliente no puede
+    // escribirlos en el campo "Transporte" del carrito (ver
+    // validarCampoTransporte()).
+    transportesNoDisponibles = String(cfg.transportesNoDisponibles || "")
+        .split("\n")
+        .map(normalizarTextoTransporte)
+        .filter(Boolean);
 
     // Popup promocional — se muestra si está activo y tiene imagen
     cargarPopupPromo(cfg);

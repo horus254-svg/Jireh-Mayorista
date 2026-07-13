@@ -734,6 +734,15 @@ const CONFIG_NEGOCIO_DEFAULTS = {
   // el navbar) — un mensaje por línea, separados por salto de línea ----
   BANNER_TOP_MENSAJES: "🚚 Envíos a todo el país\n✅ Stock actualizado\n💳 Aceptamos todos los medios de pago",
 
+  // ---- Transportes que NO se trabajan (uno por línea) — el catálogo
+  // web no deja que el cliente escriba en el campo "Transporte" del
+  // carrito ninguno de estos nombres, para evitar que pida un envío
+  // con una empresa que el negocio no usa. La comparación ignora
+  // mayúsculas/minúsculas y acentos, y es por "contiene" (si el
+  // cliente escribe "Correo Argentino - Sucursal Once" y está
+  // bloqueado "Correo Argentino", igual lo detecta). ----
+  TRANSPORTES_NO_DISPONIBLES: "",
+
   // ---- Apariencia del panel admin (letra/ícono y nombre del sidebar) ----
   SIDEBAR_MARK:   "J",
   SIDEBAR_TEXTO:  "JIREH",
@@ -1014,6 +1023,7 @@ function getConfiguracionNegocio(){
       beneficioTextoLibre2:    config.BENEFICIO_TEXTO_LIBRE2,
 
       bannerTopMensajes: config.BANNER_TOP_MENSAJES,
+      transportesNoDisponibles: config.TRANSPORTES_NO_DISPONIBLES,
 
       sidebarMark:  config.SIDEBAR_MARK,
       sidebarTexto: config.SIDEBAR_TEXTO,
@@ -1105,6 +1115,7 @@ function guardarConfiguracionNegocio(e){
     BENEFICIO_TEXTO_LIBRE2:    valorOPreservado("beneficioTextoLibre2", "BENEFICIO_TEXTO_LIBRE2"),
 
     BANNER_TOP_MENSAJES: valorOPreservado("bannerTopMensajes", "BANNER_TOP_MENSAJES"),
+    TRANSPORTES_NO_DISPONIBLES: valorOPreservado("transportesNoDisponibles", "TRANSPORTES_NO_DISPONIBLES"),
 
     SIDEBAR_MARK:  valorOPreservado("sidebarMark", "SIDEBAR_MARK", "J"),
     SIDEBAR_TEXTO: valorOPreservado("sidebarTexto", "SIDEBAR_TEXTO", "JIREH"),
@@ -1180,6 +1191,39 @@ function jsonResponse(obj) {
     .createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
 }
+/**
+ * Normaliza texto para comparar transportes ignorando mayúsculas,
+ * acentos, y espacios de más — así "Vía Cargo", "via cargo" y
+ * "VIA  CARGO" se consideran el mismo texto.
+ */
+function normalizarTextoTransporte(texto){
+  return String(texto || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // saca acentos
+    .replace(/\s+/g, " ");
+}
+
+/** Lista de nombres de transporte bloqueados, ya normalizados, leída desde la configuración */
+function obtenerTransportesNoDisponibles(){
+  const sheet = getOrCrearHojaConfiguracion();
+  const data = sheet.getDataRange().getValues();
+  data.shift();
+
+  let valor = "";
+  for(const row of data){
+    if(String(row[0] || "").trim().toUpperCase() === "TRANSPORTES_NO_DISPONIBLES"){
+      valor = String(row[1] || "");
+      break;
+    }
+  }
+
+  return valor
+    .split("\n")
+    .map(normalizarTextoTransporte)
+    .filter(Boolean);
+}
+
 function guardarPedido(data){
 
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
@@ -1189,6 +1233,22 @@ function guardarPedido(data){
 
   const detalleSheet =
     ss.getSheetByName("DETALLE_PEDIDOS");
+
+  // El catálogo web ya bloquea en el navegador que el cliente escriba
+  // una empresa de transporte no habilitada, pero eso se puede
+  // saltear (por ejemplo, llamando a esta acción directo). Se valida
+  // también acá para que el bloqueo sea real y no solo cosmético.
+  const transporteElegido = normalizarTextoTransporte(data.empresa);
+  if(transporteElegido){
+    const bloqueados = obtenerTransportesNoDisponibles();
+    const estaBloqueado = bloqueados.some(b => transporteElegido.indexOf(b) !== -1);
+    if(estaBloqueado){
+      return jsonResponse({
+        success:false,
+        message:"La empresa de transporte elegida no está disponible. Por favor, seleccioná otra."
+      });
+    }
+  }
 
   const pedidoId =
     generarIdCorto("PED", pedidosSheet);

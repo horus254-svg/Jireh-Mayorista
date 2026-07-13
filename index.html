@@ -364,12 +364,21 @@
                 </div>
 
                 <button
+                    id="btn-consultar-pedido-nav"
+                    class="btn btn-pdf-top"
+                    type="button"
+                    onclick="abrirConsultaPedido()"
+                    title="Consultá el estado de tu pedido">
+                    📦 <span class="btn-texto-navbar">Mi pedido</span>
+                </button>
+
+                <button
                     id="btn-descargar-pdf"
                     class="btn btn-pdf-top"
                     type="button"
                     onclick="descargarCatalogoPDF()"
                     title="Descargar en PDF los productos que se están mostrando">
-                    📄 PDF
+                    📄 <span class="btn-texto-navbar">PDF</span>
                 </button>
 
             </div>
@@ -436,26 +445,6 @@
 
         </div>
 
-    </section>
-
-    <!-- SEGUIMIENTO DE PEDIDO -->
-    <section class="container my-4" id="seccion-seguimiento">
-      <div class="card shadow-sm border-0 rounded-4 p-4" style="background:linear-gradient(135deg,#f0f4ff 0%,#fff 100%);">
-        <div class="row align-items-center gy-3">
-          <div class="col-12 col-md-auto">
-            <span style="font-size:28px;">📦</span>
-          </div>
-          <div class="col-12 col-md">
-            <h5 class="fw-bold mb-1" style="color:#0b1633;">Consultá el estado de tu pedido</h5>
-            <p class="text-muted mb-0" style="font-size:13.5px;">Ingresá tu número de pedido y DNI para ver el estado y los detalles.</p>
-          </div>
-          <div class="col-12 col-md-auto">
-            <button class="btn btn-primary px-4 fw-bold" onclick="abrirConsultaPedido()">
-              Consultar pedido
-            </button>
-          </div>
-        </div>
-      </div>
     </section>
 
     <!-- MODAL CONSULTA PEDIDO -->
@@ -573,8 +562,10 @@
                         <input
                             type="text"
                             id="clienteEmpresa"
-                            class="form-control mb-2"
-                            placeholder="Transporte (opcional)">
+                            class="form-control mb-1"
+                            placeholder="Transporte (opcional)"
+                            oninput="validarCampoTransporte()">
+                        <div id="clienteEmpresaError" class="text-danger small mb-2" style="display:none;"></div>
 
                         <input
                             type="text"

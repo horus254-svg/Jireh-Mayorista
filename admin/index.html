@@ -1525,6 +1525,22 @@
     </div>
 
     <div class="card p-3 mt-3">
+      <h6 style="margin-bottom:6px;">🚫 Transportes que no trabajamos</h6>
+      <p class="text-muted" style="font-size:12.5px; margin-top:-4px; margin-bottom:14px;">
+        Escribí acá los nombres de las empresas de transporte con las que NO trabajás (una por línea). El catálogo web no va a dejar que el cliente escriba ninguno de esos nombres en el campo "Transporte" del carrito — ni parecido, ni con mayúsculas o acentos distintos. Dejalo vacío si no querés restringir ninguna.
+      </p>
+
+      <div class="mb-3">
+        <textarea class="form-control" id="cfgTransportesNoDisponibles" rows="4" placeholder="Correo Argentino&#10;OCA&#10;Vía Cargo"></textarea>
+        <div class="form-text" style="font-size:11.5px;">Un transporte por renglón. No hace falta escribir mayúsculas ni acentos exactos — "via cargo" también bloquea "Vía Cargo".</div>
+      </div>
+
+      <div class="d-flex justify-content-end mt-3">
+        <button class="btn btn-success" id="btnGuardarTransportesNoDisponibles" onclick="guardarTransportesNoDisponiblesForm()">💾 Guardar</button>
+      </div>
+    </div>
+
+    <div class="card p-3 mt-3">
       <div class="config-preview-hint">
         <span class="ic">ℹ️</span>
         El número de WhatsApp que pongas aquí es el que usa el botón flotante de ayuda y al que llegan los pedidos del catálogo.
