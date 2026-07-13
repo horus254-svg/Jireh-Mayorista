@@ -717,6 +717,11 @@ const CONFIG_NEGOCIO_DEFAULTS = {
   BANNER_IMAGEN:    "",
   TEMA:             "navy",
   NAVBAR_TEXTO:     "Jireh Mayorista",
+  // Ícono junto al nombre del negocio en el navbar del catálogo. Por
+  // defecto NO es un carrito/bolsa — ya hay un botón de carrito al
+  // lado, y usar el mismo tipo de ícono para las dos cosas confunde
+  // al cliente (parecen dos botones de carrito).
+  NAVBAR_ICONO:     "🏬",
 
   // ---- Sección "Beneficios" del catálogo web (los 4 chips bajo el banner) ----
   // Son independientes de DIRECCION/TELEFONO1/TELEFONO2 de arriba, que son
@@ -1009,6 +1014,7 @@ function getConfiguracionNegocio(){
       tema:            temaFinal,
       temasDisponibles: TEMAS_VALIDOS,
       navbarTexto:     config.NAVBAR_TEXTO,
+      navbarIcono:     config.NAVBAR_ICONO,
 
       popupImagen:     config.POPUP_IMAGEN,
       popupActivo:     String(config.POPUP_ACTIVO || "NO").toUpperCase() === "SI",
@@ -1105,6 +1111,7 @@ function guardarConfiguracionNegocio(e){
     BANNER_IMAGEN:    valorOPreservado("bannerImagen", "BANNER_IMAGEN"),
     TEMA:             temaNuevo,
     NAVBAR_TEXTO:     valorOPreservado("navbarTexto", "NAVBAR_TEXTO", "Jireh Mayorista"),
+    NAVBAR_ICONO:     valorOPreservado("navbarIcono", "NAVBAR_ICONO", "🏬"),
 
     BENEFICIO_WHATSAPP_NUMERO: valorOPreservado("beneficioWhatsappNumero", "BENEFICIO_WHATSAPP_NUMERO", "5491140975795"),
     BENEFICIO_INSTAGRAM_URL:   valorOPreservado("beneficioInstagramUrl", "BENEFICIO_INSTAGRAM_URL"),

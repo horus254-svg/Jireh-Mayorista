@@ -1065,11 +1065,15 @@ async function aplicarApariencia(){
         const tema = (cfg.tema || "navy").toLowerCase();
         document.body.setAttribute("data-tema", tema);
 
-        // --- Texto del encabezado (navbar) ---
+        // --- Texto e ícono del encabezado (navbar) ---
         const navbarTextoEl = document.getElementById("navbar-brand-texto");
+        const navbarIconoEl = document.getElementById("navbar-brand-icono");
 
         if(navbarTextoEl && cfg.navbarTexto){
             navbarTextoEl.textContent = cfg.navbarTexto;
+        }
+        if(navbarIconoEl && cfg.navbarIcono){
+            navbarIconoEl.textContent = cfg.navbarIcono;
         }
 
         // --- Título / subtítulo del banner ---
