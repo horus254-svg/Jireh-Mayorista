@@ -577,7 +577,7 @@ html,body{
 .product-tile .tile-edit{
   position:absolute;
   top:6px;
-  right:6px;
+  left:6px;
   width:26px;
   height:26px;
   border-radius:50%;
