@@ -1083,6 +1083,15 @@ async function aplicarApariencia(){
             navbarIconoEl.textContent = cfg.navbarIcono;
         }
 
+        // --- Gradiente propio (opcional, pisa el tema de arriba) ---
+        if(cfg.gradPersonalizado && cfg.gradA && cfg.gradB){
+            document.body.style.setProperty("--grad-a", cfg.gradA);
+            document.body.style.setProperty("--grad-b", cfg.gradB);
+        }else{
+            document.body.style.removeProperty("--grad-a");
+            document.body.style.removeProperty("--grad-b");
+        }
+
         // --- Título / subtítulo del banner ---
         // Si vienen vacíos desde Configuración, se ocultan del todo (en vez
         // de dejar el texto de respaldo del HTML para siempre) — pensado

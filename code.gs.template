@@ -734,6 +734,14 @@ const CONFIG_NEGOCIO_DEFAULTS = {
   BANNER_SUBTITULO: "Catálogo Mayorista Online",
   BANNER_IMAGEN:    "",
   TEMA:             "navy",
+  // Gradiente propio del encabezado/banner — pisa la paleta del TEMA
+  // de arriba cuando está activado. Pensado para que el negocio pueda
+  // hacer que el encabezado combine con los colores de su propio
+  // banner (imagen), en vez de quedar un choque de estilos entre el
+  // navy del panel y los colores del banner subido.
+  GRAD_PERSONALIZADO: "NO",
+  GRAD_A:           "#241536",
+  GRAD_B:           "#3a2856",
   NAVBAR_TEXTO:     "Jireh Mayorista",
   // Ícono junto al nombre del negocio en el navbar del catálogo. Por
   // defecto NO es un carrito/bolsa — ya hay un botón de carrito al
@@ -1031,6 +1039,9 @@ function getConfiguracionNegocio(){
       bannerImagen:    config.BANNER_IMAGEN,
       tema:            temaFinal,
       temasDisponibles: TEMAS_VALIDOS,
+      gradPersonalizado: String(config.GRAD_PERSONALIZADO || "NO").toUpperCase() === "SI",
+      gradA: config.GRAD_A,
+      gradB: config.GRAD_B,
       navbarTexto:     config.NAVBAR_TEXTO,
       navbarIcono:     config.NAVBAR_ICONO,
 
@@ -1128,6 +1139,11 @@ function guardarConfiguracionNegocio(e){
     BANNER_SUBTITULO: valorOPreservado("bannerSubtitulo", "BANNER_SUBTITULO"),
     BANNER_IMAGEN:    valorOPreservado("bannerImagen", "BANNER_IMAGEN"),
     TEMA:             temaNuevo,
+    GRAD_PERSONALIZADO: params.gradPersonalizado !== undefined
+      ? (params.gradPersonalizado === "1" || params.gradPersonalizado === "true" ? "SI" : "NO")
+      : (configGuardada.GRAD_PERSONALIZADO || "NO"),
+    GRAD_A: valorOPreservado("gradA", "GRAD_A", "#241536"),
+    GRAD_B: valorOPreservado("gradB", "GRAD_B", "#3a2856"),
     NAVBAR_TEXTO:     valorOPreservado("navbarTexto", "NAVBAR_TEXTO", "Jireh Mayorista"),
     NAVBAR_ICONO:     valorOPreservado("navbarIcono", "NAVBAR_ICONO", "🏬"),
 

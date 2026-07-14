@@ -1,24 +1,27 @@
 /* =========================================================
    DESIGN TOKENS
-   Palette: deep navy surface + indigo action color +
-   amber/coral tag accents on a warm paper background.
+   Palette: curated warm duotone — deep violet-plum surface +
+   coral-orange action color + amber tag accent, on a warm
+   cream paper background. Echoes the banner's own gradient
+   (violet → coral → amber) so the whole page reads as one
+   family instead of "navy chrome + rainbow banner".
    Signature: a "price-tag" motif — zigzag torn edge under
    the hero, and a perforated ticket-stub line on cards.
 ========================================================= */
 
 :root{
-    --navy-950:#0a1020;
-    --navy-900:#0f1830;
-    --navy-800:#141d36;
-    --indigo-600:#3d5afe;
-    --indigo-700:#2c41d6;
-    --gold-500:#d99a3d;
-    --amber-500:#f5a623;
-    --coral-600:#ff5d5d;
-    --paper:#f6f3ec;
-    --paper-line:#e7e2d2;
-    --ink-900:#171a23;
-    --ink-600:#5b6072;
+    --navy-950:#241536;
+    --navy-900:#2c1c40;
+    --navy-800:#3a2856;
+    --indigo-600:#ff6a39;
+    --indigo-700:#e8531f;
+    --gold-500:#f0a83d;
+    --amber-500:#ffb020;
+    --coral-600:#e8397c;
+    --paper:#fdf6ec;
+    --paper-line:#f0e2cf;
+    --ink-900:#2a1f1a;
+    --ink-600:#7d6c60;
 
     --bg-card:#ffffff;
 
@@ -27,14 +30,20 @@
     --amber-low-bg:#fdecc8;
     --amber-low-text:#9a5b06;
 
+    /* Gradiente del hero/navbar — configurable desde el panel admin
+       (Apariencia → "Gradiente propio"). Si no hay valores guardados
+       se usa la pareja violeta→coral de arriba. */
+    --grad-a:var(--navy-950);
+    --grad-b:var(--navy-800);
+
     --radius-lg:18px;
     --radius-md:12px;
     --radius-sm:9px;
     --radius-pill:50px;
 
-    --shadow-card:0 8px 22px rgba(11,18,36,.07), 0 2px 6px rgba(11,18,36,.05);
-    --shadow-card-hover:0 16px 34px rgba(11,18,36,.14), 0 4px 10px rgba(11,18,36,.08);
-    --shadow-float:0 10px 28px rgba(11,18,36,.28);
+    --shadow-card:0 8px 22px rgba(42,25,54,.08), 0 2px 6px rgba(42,25,54,.05);
+    --shadow-card-hover:0 16px 34px rgba(42,25,54,.16), 0 4px 10px rgba(42,25,54,.08);
+    --shadow-float:0 10px 28px rgba(42,25,54,.3);
 
     --font-display:'Space Grotesk', system-ui, sans-serif;
     --font-body:'Inter', system-ui, -apple-system, sans-serif;
@@ -73,11 +82,11 @@ select:focus-visible{
 ========================================================= */
 
 .navbar{
-    background:linear-gradient(135deg, var(--navy-950), var(--navy-800));
+    background:linear-gradient(135deg, var(--grad-a), var(--grad-b));
     background-image:
         repeating-linear-gradient(135deg, rgba(255,255,255,.035) 0px, rgba(255,255,255,.035) 1px, transparent 1px, transparent 13px),
-        linear-gradient(135deg, var(--navy-950), var(--navy-800));
-    box-shadow:0 4px 20px rgba(11,18,36,.25);
+        linear-gradient(135deg, var(--grad-a), var(--grad-b));
+    box-shadow:0 4px 20px rgba(42,25,54,.28);
     padding:12px 0 16px;
 }
 
@@ -225,10 +234,10 @@ select:focus-visible{
 
 .hero{
     position:relative;
-    background:radial-gradient(120% 140% at 15% 0%, #1c2a52 0%, var(--navy-950) 55%, var(--navy-950) 100%);
+    background:radial-gradient(120% 140% at 15% 0%, var(--grad-b) 0%, var(--grad-a) 55%, var(--grad-a) 100%);
     color:#fff;
     text-align:center;
-    padding:50px 20px 64px;
+    padding:22px 20px 42px;
     overflow:hidden;
 }
 
@@ -694,8 +703,8 @@ select:focus-visible{
 }
 
 .modal-header{
-    background:var(--navy-950);
-    background-image:repeating-linear-gradient(135deg, rgba(255,255,255,.035) 0px, rgba(255,255,255,.035) 1px, transparent 1px, transparent 13px);
+    background:linear-gradient(135deg, var(--grad-a), var(--grad-b));
+    background-image:repeating-linear-gradient(135deg, rgba(255,255,255,.035) 0px, rgba(255,255,255,.035) 1px, transparent 1px, transparent 13px), linear-gradient(135deg, var(--grad-a), var(--grad-b));
     color:#fff;
 }
 
@@ -967,7 +976,7 @@ select:focus-visible{
     height:44px;
     border-radius:50%;
     border:none;
-    background:var(--navy-950);
+    background:var(--grad-a);
     color:#fff;
     font-size:1.2rem;
     font-weight:700;
@@ -1150,11 +1159,19 @@ body[data-tema="rojo"]{
 
 .hero.hero--imagen{
     background-image:
-        linear-gradient(180deg, rgba(11,18,36,.62), rgba(11,18,36,.78)),
+        linear-gradient(180deg, rgba(36,21,54,.55), rgba(36,21,54,.72)),
         var(--hero-bg-img);
-    background-size:contain;
+    background-size:cover;
     background-position:center;
     background-repeat:no-repeat;
+
+    /* Marco tipo tarjeta: la imagen del banner flota sobre el fondo
+       cálido de la página en vez de pegarse borde a borde, con un
+       aro sutil en degradé que la conecta con la paleta del sitio. */
+    max-width:1400px;
+    margin:18px auto 0;
+    border-radius:22px;
+    box-shadow:0 18px 44px rgba(42,25,54,.35), 0 0 0 3px rgba(255,255,255,.14) inset;
 
     /* Alto fijo, no calculado según el ancho de pantalla — así el
        banner siempre ocupa el mismo espacio, sin sentirse "invasivo"
@@ -1162,20 +1179,24 @@ body[data-tema="rojo"]{
        abajo. La imagen recomendada (ver guía de tamaños) está
        diseñada para encajar bien en este alto sin recortarse ni
        dejar franjas vacías notorias. */
-    height:220px;
+    height:260px;
 }
 
 @media (max-width:600px){
     .hero.hero--imagen{
         height:150px;
+        margin-top:10px;
+        border-radius:16px;
     }
 }
 
 /* Cuando el banner ya tiene su propio texto/diseño incorporado (no se
    usa el título de texto del sistema), se quita el oscurecido — la
-   imagen del banner queda nítida, al frente, sin ningún velo encima. */
+   imagen del banner queda nítida, al frente, con un aro cálido en vez
+   de un velo encima. */
 .hero.hero--imagen.hero--sin-degradado{
     background-image: var(--hero-bg-img);
+    box-shadow:0 18px 44px rgba(42,25,54,.35), 0 0 0 3px rgba(255,184,64,.5) inset;
 }
 
 

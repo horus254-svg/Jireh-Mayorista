@@ -632,10 +632,14 @@ async function guardarCredencialesForm() {
 
 const APARIENCIA_DEFAULT = {
   navbarTexto:     "Jireh Mayorista",
+  navbarIcono:     "🏬",
   bannerTitulo:    "Mayorista Jireh",
   bannerSubtitulo: "Catálogo Mayorista Online",
   bannerImagen:    "",
-  tema:            "navy"
+  tema:            "navy",
+  gradPersonalizado: false,
+  gradA: "#241536",
+  gradB: "#3a2856"
 };
 
 /**
@@ -647,13 +651,26 @@ function aplicarTemaAdmin(cfg) {
   document.body.setAttribute("data-tema", tema);
 }
 
+/** Muestra u oculta los dos selectores de color del gradiente propio */
+function toggleGradPersonalizado() {
+  const activo = document.getElementById("cfgGradPersonalizado").checked;
+  document.getElementById("cfgGradWrap").style.display = activo ? "" : "none";
+}
+
 /** Loads the saved banner/tema config into the "Apariencia" form (called when Configuración opens) */
 function cargarAparienciaForm(cfg) {
   document.getElementById("cfgNavbarTexto").value     = cfg.navbarTexto     ?? APARIENCIA_DEFAULT.navbarTexto;
+  document.getElementById("cfgNavbarIcono").value     = cfg.navbarIcono     ?? APARIENCIA_DEFAULT.navbarIcono;
   document.getElementById("cfgBannerTitulo").value    = cfg.bannerTitulo    ?? APARIENCIA_DEFAULT.bannerTitulo;
   document.getElementById("cfgBannerSubtitulo").value = cfg.bannerSubtitulo ?? APARIENCIA_DEFAULT.bannerSubtitulo;
   document.getElementById("cfgBannerImagen").value    = cfg.bannerImagen   ?? APARIENCIA_DEFAULT.bannerImagen;
   document.getElementById("cfgTema").value            = cfg.tema           || APARIENCIA_DEFAULT.tema;
+
+  const gradActivo = cfg.gradPersonalizado ?? APARIENCIA_DEFAULT.gradPersonalizado;
+  document.getElementById("cfgGradPersonalizado").checked = !!gradActivo;
+  document.getElementById("cfgGradA").value = cfg.gradA || APARIENCIA_DEFAULT.gradA;
+  document.getElementById("cfgGradB").value = cfg.gradB || APARIENCIA_DEFAULT.gradB;
+  document.getElementById("cfgGradWrap").style.display = gradActivo ? "" : "none";
 
   // Pedido mínimo
   const cfgPedidoMinimoEl = document.getElementById("cfgPedidoMinimo");
@@ -864,7 +881,11 @@ async function guardarAparienciaForm() {
     bannerSubtitulo: document.getElementById("cfgBannerSubtitulo").value.trim(),
     bannerImagen:    document.getElementById("cfgBannerImagen").value.trim(),
     tema:            document.getElementById("cfgTema").value,
-    navbarTexto:     document.getElementById("cfgNavbarTexto").value.trim()
+    gradPersonalizado: document.getElementById("cfgGradPersonalizado").checked,
+    gradA:           document.getElementById("cfgGradA").value,
+    gradB:           document.getElementById("cfgGradB").value,
+    navbarTexto:     document.getElementById("cfgNavbarTexto").value.trim(),
+    navbarIcono:     document.getElementById("cfgNavbarIcono").value.trim()
   };
 
   const btn = document.getElementById("btnGuardarApariencia");
