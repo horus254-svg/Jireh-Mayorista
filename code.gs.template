@@ -194,6 +194,17 @@ if (data.action === "guardarPedido") {
   return guardarPedido(data);
 }
 
+// Pedidos creados desde "Generar Pedido" en el POS (panel admin), NO
+// desde el catálogo web. Antes solo existía por GET (con el carrito
+// en la URL) — funcionaba para pedidos chicos, pero con varios
+// cientos de ítems la URL se vuelve enorme y el pedido fallaba con
+// "error de conexión" (en realidad, la URL superaba lo que
+// Google/Apps Script acepta, no un problema real de red). Por POST,
+// con el carrito en el body en vez de la URL, no hay ese límite.
+if (data.action === "guardarPedidoAdmin") {
+  return guardarPedidoAdmin(data);
+}
+
 if (data.action === "subirImagenProducto") {
   return subirImagenProducto(data);
 }
@@ -1375,7 +1386,11 @@ function guardarPedido(data){
  */
 function guardarPedidoAdmin(e){
 
-  const params = (e && e.parameter) || {};
+  // Acepta tanto e.parameter (si llega por GET, como antes) como un
+  // objeto plano ya parseado (si llega por POST, con el carrito en el
+  // body en vez de la URL — necesario para pedidos grandes, ver nota
+  // en el dispatcher de doPost).
+  const params = (e && e.parameter) || e || {};
 
   const nombre = (params.nombre || "").toString().trim();
   if(!nombre){
@@ -1397,7 +1412,10 @@ function guardarPedidoAdmin(e){
     return jsonResponse({ success:false, message:"La provincia es obligatoria." });
   }
 
-  const carrito = JSON.parse(params.carrito || "[]");
+  // El carrito llega como string JSON si el pedido vino por GET (URL,
+  // como antes), o ya como array si vino por POST con body (necesario
+  // para pedidos grandes — ver nota en el dispatcher de doPost).
+  const carrito = Array.isArray(params.carrito) ? params.carrito : JSON.parse(params.carrito || "[]");
   if(carrito.length === 0){
     return jsonResponse({ success:false, message:"El pedido no tiene productos." });
   }
@@ -3254,24 +3272,66 @@ function getDetalleClienteCredito(clienteId){
  * A_CREDITO — se usa para el selector de cliente al generar pedidos
  * desde el POS, donde todos los clientes son válidos.
  */
+/**
+ * La hoja CLIENTES nunca tuvo columnas para LOCALIDAD, PROVINCIA ni
+ * CODIGO_POSTAL — por eso, aunque un cliente ya haya hecho pedidos
+ * con esos datos completos, al seleccionarlo desde "Generar Pedido"
+ * en el POS esos campos aparecían vacíos (no es que faltaran para ese
+ * cliente puntual, es que no había dónde guardarlos). En vez de
+ * migrar el esquema de la hoja (riesgoso con datos reales ya
+ * cargados), se completan al vuelo con los datos del pedido MÁS
+ * RECIENTE de ese cliente — la fuente real donde esa información sí
+ * se guardó siempre.
+ *
+ * Devuelve un mapa: DNI normalizado → { LOCALIDAD, PROVINCIA, CODIGO_POSTAL }
+ */
+function obtenerUltimaDireccionPorDni(pedidosData){
+  const porDni = {};
+  pedidosData.forEach(p => {
+    const dniNorm = normalizarDni(p.DNI);
+    if(!dniNorm) return;
+    const fechaPedido = new Date(p.FECHA).getTime() || 0;
+    const anterior = porDni[dniNorm];
+    if(!anterior || fechaPedido >= anterior._fecha){
+      porDni[dniNorm] = {
+        LOCALIDAD: p.LOCALIDAD || "",
+        PROVINCIA: p.PROVINCIA || "",
+        CODIGO_POSTAL: p.CODIGO_POSTAL || "",
+        _fecha: fechaPedido
+      };
+    }
+  });
+  return porDni;
+}
+
 function getTodosClientes(){
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sheet = getOrCrearHojaClientes();
   const data = rowsToObjects(sheet.getDataRange().getValues());
+
+  const pedidosSheet = ss.getSheetByName("PEDIDOS");
+  const pedidosData = pedidosSheet ? rowsToObjects(pedidosSheet.getDataRange().getValues()) : [];
+  const direccionesPorDni = obtenerUltimaDireccionPorDni(pedidosData);
+
   const clientes = data
     .filter(c => c.CLIENTE_ID && c.NOMBRE)
-    .map(c => ({
-      CLIENTE_ID: c.CLIENTE_ID,
-      NOMBRE:     c.NOMBRE,
-      ALIAS:      c.ALIAS     || "",
-      DNI:        c.DNI       || "",
-      TELEFONO:   c.TELEFONO  || "",
-      DIRECCION:  c.DIRECCION || "",
-      EMPRESA:    c.EMPRESA   || "",
-      LOCALIDAD:  c.LOCALIDAD || "",
-      PROVINCIA:  c.PROVINCIA || "",
-      CODIGO_POSTAL: c.CODIGO_POSTAL || "",
-      A_CREDITO:  c.A_CREDITO || "NO"
-    }));
+    .map(c => {
+      const dniNorm = normalizarDni(c.DNI);
+      const direccionPedido = direccionesPorDni[dniNorm];
+      return {
+        CLIENTE_ID: c.CLIENTE_ID,
+        NOMBRE:     c.NOMBRE,
+        ALIAS:      c.ALIAS     || "",
+        DNI:        c.DNI       || "",
+        TELEFONO:   c.TELEFONO  || "",
+        DIRECCION:  c.DIRECCION || "",
+        EMPRESA:    c.EMPRESA   || "",
+        LOCALIDAD:  c.LOCALIDAD || (direccionPedido ? direccionPedido.LOCALIDAD : "") || "",
+        PROVINCIA:  c.PROVINCIA || (direccionPedido ? direccionPedido.PROVINCIA : "") || "",
+        CODIGO_POSTAL: c.CODIGO_POSTAL || (direccionPedido ? direccionPedido.CODIGO_POSTAL : "") || "",
+        A_CREDITO:  c.A_CREDITO || "NO"
+      };
+    });
   return jsonResponse({ success: true, clientes });
 }
 
@@ -4041,6 +4101,20 @@ function getCierreCajaResumen(e){
   let movimientosEgresos  = 0;
 
   movimientosDelDia.forEach(m => {
+    // registrarPagoCredito() ya crea automáticamente, en Movimientos
+    // de Caja, un INGRESO "Cobro crédito — <cliente>" por cada pago
+    // que un cliente hace en la sección Clientes — es lo que permite
+    // ver en Movimientos de Caja que entró plata física a la caja.
+    // Pero esa misma plata YA se suma acá arriba vía "pagosClientes"
+    // (leído directo de PAGOS_CREDITO). Sumar además este ingreso
+    // automático la contaría dos veces — una vez como "pago de
+    // cliente", otra como "ingreso de caja". Por eso se excluye de
+    // esta suma (sigue viéndose igual en la pantalla de Movimientos de
+    // Caja, que sí necesita mostrar todo el movimiento físico de la
+    // caja; solo se excluye del cálculo del cierre).
+    const esCobroCreditoAutomatico = /^Cobro cr[eé]dito\s*—/.test(String(m.MOTIVO || "").trim());
+    if(esCobroCreditoAutomatico) return;
+
     const fp = String(m.FORMA_PAGO || "EFECTIVO").toUpperCase().trim();
     const columna = ["EFECTIVO","TRANSFERENCIA","TARJETA"].includes(fp) ? fp : "EFECTIVO";
     const signo = String(m.TIPO).toUpperCase() === "INGRESO" ? 1 : -1;
