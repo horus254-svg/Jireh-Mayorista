@@ -194,6 +194,13 @@ if (data.action === "guardarPedido") {
   return guardarPedido(data);
 }
 
+// Ventas del POS con carritos grandes: por GET, con todo en la URL,
+// se puede superar lo que Google/Apps Script acepta (se sentía como
+// "error de conexión" sin serlo). Por POST no hay ese límite.
+if (data.action === "guardarVenta") {
+  return guardarVenta(data);
+}
+
 // Pedidos creados desde "Generar Pedido" en el POS (panel admin), NO
 // desde el catálogo web. Antes solo existía por GET (con el carrito
 // en la URL) — funcionaba para pedidos chicos, pero con varios
@@ -3592,6 +3599,13 @@ function guardarVenta(e){
 
   }
 
+  // Acepta tanto e.parameter (GET, como antes) como un objeto plano ya
+  // parseado (POST, con el carrito en el body en vez de la URL — hace
+  // falta para carritos grandes, donde meter todo en la URL supera lo
+  // que Google/Apps Script acepta y la venta fallaba con "error de
+  // conexión" sin serlo realmente).
+  const params = (e && e.parameter) || e || {};
+
   // ID generado en el navegador ANTES de intentar guardar (ver
   // admin.js). Sirve para que un reintento — por ejemplo, una venta
   // que quedó guardada en una cola local porque se cortó la conexión
@@ -3602,7 +3616,7 @@ function guardarVenta(e){
   // función reconoce el mismo ID y devuelve la venta ya existente en
   // vez de crear una segunda fila y descontar el stock dos veces.
   const clienteVentaId =
-  String(e.parameter.clienteVentaId || "").trim();
+  String(params.clienteVentaId || "").trim();
 
   if(clienteVentaId){
     const yaExistente = buscarVentaPorClienteVentaId(ventasSheet, clienteVentaId);
@@ -3622,21 +3636,19 @@ function guardarVenta(e){
   new Date();
 
   const total =
-  Number(e.parameter.total || 0);
+  Number(params.total || 0);
 
   const formaPago =
-  e.parameter.formaPago || "EFECTIVO";
+  params.formaPago || "EFECTIVO";
 
   const vendedor =
-  e.parameter.vendedor || "ADMIN";
+  params.vendedor || "ADMIN";
 
   const observaciones =
-  e.parameter.observaciones || "";
+  params.observaciones || "";
 
   const carrito =
-  JSON.parse(
-    e.parameter.carrito || "[]"
-  );
+  Array.isArray(params.carrito) ? params.carrito : JSON.parse(params.carrito || "[]");
 
   ventasSheet.appendRow([
     ventaId,

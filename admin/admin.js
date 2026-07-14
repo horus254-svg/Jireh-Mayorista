@@ -1524,7 +1524,7 @@ function actualizarBadgeVentasPendientes(cantidad) {
     badge = document.createElement("div");
     badge.id = "badgeVentasPendientes";
     badge.style.cssText = "position:fixed;bottom:14px;right:14px;z-index:9999;background:var(--amber-500,#f59e0b);color:#fff;padding:8px 14px;border-radius:20px;font-size:13px;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,.25);cursor:pointer;display:none;";
-    badge.onclick = () => sincronizarVentasPendientes();
+    badge.onclick = () => sincronizarVentasPendientes(true);
     document.body.appendChild(badge);
   }
   if (cantidad > 0) {
@@ -1537,8 +1537,10 @@ function actualizarBadgeVentasPendientes(cantidad) {
 
 let _sincronizandoVentasPendientes = false;
 
-/** Reintenta subir cada venta encolada, en orden, una por vez (no en paralelo — si el servidor está lento, mandar 10 a la vez lo empeora) */
-async function sincronizarVentasPendientes() {
+/** Reintenta subir cada venta encolada, en orden, una por vez (no en paralelo — si el servidor está lento, mandar 10 a la vez lo empeora).
+ *  manual=true cuando lo dispara el usuario (tocando el aviso) — ahí sí se avisa si sigue sin poder subir nada; en los reintentos
+ *  automáticos de fondo (cada 30s, o al reconectar) no, para no repetir el mismo error cada rato mientras dure el corte. */
+async function sincronizarVentasPendientes(manual) {
   if (_sincronizandoVentasPendientes) return;
   const cola = _leerColaVentasPendientes();
   if (cola.length === 0) return;
@@ -1549,14 +1551,20 @@ async function sincronizarVentasPendientes() {
   for (const venta of cola) {
     try {
       const response = await fetchAPI(
-        API_URL +
-        "?action=guardarVenta" +
-        "&total="          + encodeURIComponent(venta.total) +
-        "&formaPago="      + encodeURIComponent(venta.formaPago) +
-        "&observaciones="  + encodeURIComponent(venta.observaciones || "") +
-        "&carrito="        + encodeURIComponent(JSON.stringify(venta.carrito)) +
-        "&clienteVentaId=" + encodeURIComponent(venta.clienteVentaId),
-        {}, { reintentos: 1, timeoutMs: 15000 }
+        API_URL,
+        {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({
+            action: "guardarVenta",
+            total: venta.total,
+            formaPago: venta.formaPago,
+            observaciones: venta.observaciones || "",
+            carrito: venta.carrito,
+            clienteVentaId: venta.clienteVentaId
+          })
+        },
+        { timeoutMs: 15000 }
       );
       const data = await response.json();
       if (!data.success) pendientes.push(venta); // el servidor respondió pero rechazó la venta — se mantiene en cola para revisar
@@ -1573,6 +1581,14 @@ async function sincronizarVentasPendientes() {
     toast(`✅ ${subieron} venta${subieron === 1 ? "" : "s"} pendiente${subieron === 1 ? "" : "s"} sincronizada${subieron === 1 ? "" : "s"}`, "success");
     invalidarCache("ventasPOS");
     cargarMetricas();
+  } else if (pendientes.length > 0 && manual) {
+    // Sigue habiendo ventas sin subir — antes esto no avisaba nada,
+    // así que tocar el botón "no hacía nada" visible aunque en
+    // realidad sí lo había intentado y seguía fallando. Esto solo se
+    // avisa cuando el usuario lo pidió a propósito (no en cada
+    // reintento automático de fondo, para no repetir el mismo error
+    // cada 30s mientras dure el corte).
+    toast(`Todavía sin conexión — ${pendientes.length} venta${pendientes.length === 1 ? "" : "s"} pendiente${pendientes.length === 1 ? "" : "s"} de subir`, "error");
   }
 }
 
@@ -4341,16 +4357,25 @@ async function confirmarFinalizarVenta() {
 
   // ── GUARDAR en el backend en segundo plano ──
   try {
+    // Por POST, con el carrito en el body — un carrito grande por GET
+    // (todo metido en la URL) puede superar lo que Google/Apps Script
+    // acepta, y la venta fallaba con "error de conexión" sin serlo
+    // realmente (el mismo problema que tenían los pedidos grandes).
     const response = await fetchAPI(
-      API_URL +
-      "?action=guardarVenta" +
-      "&total="          + encodeURIComponent(total) +
-      "&formaPago="      + encodeURIComponent(formaPagoPOS) +
-      "&observaciones="  + encodeURIComponent(etiquetaDescuento ? "Descuento: " + etiquetaDescuento : "") +
-      "&carrito="        + encodeURIComponent(JSON.stringify(itemsSnapshot)) +
-      "&clienteVentaId=" + encodeURIComponent(clienteVentaId),
-      {}, // sigue siendo GET — es el formato real que espera guardarVenta en el backend
-      { reintentos: 1, timeoutMs: 15000 } // mutación: sin reintento automático propio (lo maneja la cola de abajo), con más margen que una lectura chica
+      API_URL,
+      {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({
+          action: "guardarVenta",
+          total: total,
+          formaPago: formaPagoPOS,
+          observaciones: etiquetaDescuento ? "Descuento: " + etiquetaDescuento : "",
+          carrito: itemsSnapshot,
+          clienteVentaId: clienteVentaId
+        })
+      },
+      { timeoutMs: 15000 } // mutación: sin reintento automático propio (lo maneja la cola de abajo), con más margen que una lectura chica
     );
     const data = await response.json();
 
@@ -7650,14 +7675,26 @@ async function consultarCobroMercadoPagoPolling() {
 
         // Guardar en backend — recién ahora que el pago está confirmado
         let ventaId = "VEN-" + Date.now().toString().slice(-6);
+        const clienteVentaIdMP = "CVL-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
         try {
-          const res = await fetch(
-            API_URL +
-            "?action=guardarVenta" +
-            "&total="         + encodeURIComponent(total) +
-            "&formaPago=TRANSFERENCIA" +
-            "&observaciones=" + encodeURIComponent(etiquetaDescuento ? "Descuento: " + etiquetaDescuento : "") +
-            "&carrito="       + encodeURIComponent(JSON.stringify(itemsSnapshot))
+          // Por POST, con el carrito en el body — igual que el resto de
+          // las ventas, para no toparse con el límite de tamaño de URL
+          // en carritos grandes, y con timeout para no quedar colgado.
+          const res = await fetchAPI(
+            API_URL,
+            {
+              method: "POST",
+              headers: { "Content-Type": "text/plain;charset=utf-8" },
+              body: JSON.stringify({
+                action: "guardarVenta",
+                total: total,
+                formaPago: "TRANSFERENCIA",
+                observaciones: etiquetaDescuento ? "Descuento: " + etiquetaDescuento : "",
+                carrito: itemsSnapshot,
+                clienteVentaId: clienteVentaIdMP
+              })
+            },
+            { timeoutMs: 15000 }
           );
           const data = await res.json();
           if (data.success && data.ventaId) ventaId = data.ventaId;
