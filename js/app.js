@@ -136,6 +136,8 @@ function obtenerEstadoStock(stock){
 
     if(isNaN(n)) return null;
 
+    if(n <= 0) return { texto: "Sin stock", clase: "stock-agotado" };
+
     return n < 5
         ? { texto: "Últimas Unidades", clase: "stock-bajo" }
         : { texto: "Disponible", clase: "stock-ok" };
@@ -565,11 +567,16 @@ function agregarAlCarrito(producto, cantidad){
 
     const stockDisponible = Number(String(producto.STOCK ?? "").trim()) || 0;
 
+    if(stockDisponible <= 0){
+        mostrarToast(`"${producto.PRODUCTO}" no tiene stock disponible`, "error");
+        return;
+    }
+
     const existente = estado.carrito.find(p => String(p.CODIGO) === String(producto.CODIGO));
     const yaEnCarrito = existente ? existente.cantidad : 0;
     const totalSolicitado = yaEnCarrito + cantidad;
 
-    if(stockDisponible > 0 && totalSolicitado > stockDisponible){
+    if(totalSolicitado > stockDisponible){
         const podemos = stockDisponible - yaEnCarrito;
         if(podemos <= 0){
             mostrarToast(`⚠️ Ya tenés el máximo disponible de "${producto.PRODUCTO}" en el carrito (${stockDisponible} ud${stockDisponible !== 1 ? "s" : ""})`, "error");

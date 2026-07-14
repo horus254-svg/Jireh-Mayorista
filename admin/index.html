@@ -1689,6 +1689,35 @@
   </div>
 </div>
 
+<div class="product-modal-backdrop" id="modalEdicionRapidaPOSBackdrop">
+  <div class="product-modal" style="max-width:360px;">
+    <div class="product-modal-header">
+      <h6>✏️ Editar rápido</h6>
+      <button onclick="cerrarEdicionRapidaPOS()">✕</button>
+    </div>
+    <div class="product-modal-body">
+      <p id="erpNombreProducto" style="font-weight:600; font-size:14px; margin-bottom:14px;"></p>
+      <div class="mb-2">
+        <label class="form-label" style="font-size:12.5px;">Código</label>
+        <input type="text" class="form-control" id="erpCodigo">
+      </div>
+      <div class="mb-2">
+        <label class="form-label" style="font-size:12.5px;">Precio</label>
+        <input type="number" class="form-control" id="erpPrecio" min="0" step="1">
+      </div>
+      <div class="mb-2">
+        <label class="form-label" style="font-size:12.5px;">Stock</label>
+        <input type="number" class="form-control" id="erpStock" step="1">
+        <div class="form-text" style="font-size:11px;">Puede ser negativo — se usa para saber cuánto se vendió sin stock cargado.</div>
+      </div>
+    </div>
+    <div class="product-modal-actions">
+      <button class="btn btn-outline-secondary" onclick="cerrarEdicionRapidaPOS()">Cancelar</button>
+      <button class="btn btn-primary" id="btnGuardarEdicionRapidaPOS" onclick="guardarEdicionRapidaPOS()">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <div class="product-modal-backdrop" id="modalEliminarProdBackdrop">
   <div class="product-modal" style="max-width:400px;">
     <div class="product-modal-header">

@@ -544,6 +544,11 @@ select:focus-visible{
     color:var(--amber-low-text);
 }
 
+.stock-badge.stock-agotado{
+    background:#fee2e2;
+    color:#b91c1c;
+}
+
 .qty-stepper{
     display:flex;
     align-items:center;

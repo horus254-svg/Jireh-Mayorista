@@ -2052,8 +2052,19 @@ function renderPedidos(listaOriginal) {
       const telefono = String(p.TELEFONO || "").trim();
       const numeroWA = normalizarTelefonoWA(telefono);
       const mensajeWA = mensajeWhatsAppPorEstado(p.ESTADO, p.PEDIDO_ID, p.CLIENTE, p.TOTAL, p.PDF_URL);
-      const btnWA = (estadosConWA.includes(p.ESTADO) && numeroWA && mensajeWA)
-        ? `<a href="https://wa.me/${numeroWA}?text=${encodeURIComponent(mensajeWA)}" target="_blank" class="btn btn-success btn-sm" title="Notificar por WhatsApp">📲 WhatsApp</a>`
+      // Si el teléfono no tiene ningún dígito, no hay nada que mandar
+      // — ahí sí no tiene sentido mostrar el botón. Pero si HAY
+      // dígitos y solo falló el reconocimiento del formato (área rara,
+      // como pasa con algunos números fijos o de localidades chicas),
+      // se muestra igual con el mejor intento posible (los dígitos tal
+      // cual, con el prefijo de Argentina) en vez de ocultarlo del
+      // todo sin avisar — antes esto desaparecía en silencio y no
+      // había forma de saber por qué.
+      const soloDigitos = telefono.replace(/\D/g, "");
+      const numeroWAConFallback = numeroWA || (soloDigitos ? "54" + soloDigitos.replace(/^0+/, "") : null);
+      const esNumeroDudoso = !numeroWA && !!numeroWAConFallback;
+      const btnWA = (estadosConWA.includes(p.ESTADO) && numeroWAConFallback && mensajeWA)
+        ? `<a href="https://wa.me/${numeroWAConFallback}?text=${encodeURIComponent(mensajeWA)}" target="_blank" class="btn btn-success btn-sm" title="${esNumeroDudoso ? "Verificá el teléfono antes de mandar — el formato no se reconoció con seguridad" : "Notificar por WhatsApp"}">📲 WhatsApp${esNumeroDudoso ? " ⚠️" : ""}</a>`
         : "";
       const badgeCobrado = estaCobrado
         ? `<span class="pedido-cobrado-badge">✓ Cobrado <span class="pedido-cobrado-forma">${formaPagoActual}</span></span>` : "";
@@ -3755,10 +3766,11 @@ function renderPosGrid(filtroTexto) {
     const imagenUrl = p.IMAGEN ? String(p.IMAGEN).trim() : "";
 
     html += `
-      <button type="button"
-        class="product-tile ${agotado ? "disabled" : ""}"
-        data-idx="${idx}"
-        ${agotado ? "disabled" : ""}>
+      <div
+        class="product-tile"
+        role="button"
+        tabindex="0"
+        data-idx="${idx}">
         <div class="tile-photo">
           ${imagenUrl
             ? `<img src="${escapeHtml(imagenUrl)}" alt="" loading="lazy" onerror="this.parentElement.innerHTML='🛒';">`
@@ -3773,8 +3785,9 @@ function renderPosGrid(filtroTexto) {
           <span class="tile-price">$${Number(p.PRECIO || 0).toLocaleString("es-AR")}</span>
           ${stockBadge}
         </div>
+        <button type="button" class="tile-edit" data-idx="${idx}" title="Editar precio y stock" onclick="event.stopPropagation(); abrirEdicionRapidaPOS('${escapeHtml(p.CODIGO)}');">✏️</button>
         <span class="tile-add">+</span>
-      </button>`;
+      </div>`;
   });
 
   grid.innerHTML = html;
@@ -3782,9 +3795,12 @@ function renderPosGrid(filtroTexto) {
   grid.querySelectorAll(".product-tile[data-idx]").forEach(tile => {
     const idx     = Number(tile.getAttribute("data-idx"));
     const producto = visibleList[idx];
-    if (producto && !tile.disabled) {
+    if (producto) {
       tile.dataset.codigo = producto.CODIGO;
       tile.addEventListener("click", () => agregarProductoPOS(producto.CODIGO));
+      tile.addEventListener("keydown", e => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); agregarProductoPOS(producto.CODIGO); }
+      });
     }
   });
 }
@@ -3827,12 +3843,124 @@ async function agregarProductoPorCodigo(codigo) {
   agregarProductoPOS(producto.CODIGO);
 }
 
+/**
+ * Edición rápida de precio y stock desde el mismo grid del POS — sin
+ * tener que ir a la sección Productos. Se preservan categoría,
+ * imagen, publicado, destacado y oferta tal cual estaban: la acción
+ * del backend (actualizarProducto) sobreescribe TODO el producto, así
+ * que si no se mandaran esos valores existentes quedarían borrados.
+ */
+let _codigoEdicionRapidaPOS = null;
+
+function abrirEdicionRapidaPOS(codigo) {
+  const producto = productosPOS.find(p => String(p.CODIGO).trim() === String(codigo).trim());
+  if (!producto) { toast("Producto no encontrado", "error"); return; }
+
+  _codigoEdicionRapidaPOS = codigo;
+  document.getElementById("erpNombreProducto").textContent = producto.PRODUCTO;
+  document.getElementById("erpCodigo").value = producto.CODIGO;
+  document.getElementById("erpPrecio").value = producto.PRECIO ?? 0;
+  document.getElementById("erpStock").value = producto.STOCK ?? 0;
+  document.getElementById("modalEdicionRapidaPOSBackdrop").classList.add("show");
+}
+
+function cerrarEdicionRapidaPOS() {
+  document.getElementById("modalEdicionRapidaPOSBackdrop").classList.remove("show");
+  _codigoEdicionRapidaPOS = null;
+}
+
+async function guardarEdicionRapidaPOS() {
+  const codigoOriginal = _codigoEdicionRapidaPOS;
+  if (!codigoOriginal) return;
+
+  const producto = productosPOS.find(p => String(p.CODIGO).trim() === String(codigoOriginal).trim());
+  if (!producto) { toast("Producto no encontrado", "error"); cerrarEdicionRapidaPOS(); return; }
+
+  const codigoNuevo = document.getElementById("erpCodigo").value.trim();
+  const precio = document.getElementById("erpPrecio").value;
+  const stock  = document.getElementById("erpStock").value;
+
+  if (!codigoNuevo) { toast("El código no puede quedar vacío", "error"); return; }
+  if (precio === "" || Number(precio) < 0) { toast("Ingresá un precio válido", "error"); return; }
+  if (stock === "") { toast("Ingresá un stock válido", "error"); return; }
+
+  // Si cambiaron el código, chequeo local rápido para avisar antes de
+  // mandarlo — el backend igual lo vuelve a validar (por si otra
+  // persona creó ese código justo en el medio).
+  if (codigoNuevo !== codigoOriginal && productosPOS.some(p => String(p.CODIGO).trim() === codigoNuevo)) {
+    toast(`Ya existe otro producto con el código "${codigoNuevo}"`, "error");
+    return;
+  }
+
+  const btn = document.getElementById("btnGuardarEdicionRapidaPOS");
+  const textoOriginal = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = "Guardando...";
+
+  try {
+    // Se mandan TODOS los campos del producto (no solo código/precio/
+    // stock), preservando lo que ya tenía — ver nota arriba.
+    const params = new URLSearchParams({
+      action: "actualizarProducto",
+      codigoOriginal: producto.CODIGO,
+      CODIGO: codigoNuevo,
+      PRODUCTO: producto.PRODUCTO,
+      CATEGORIA: producto.CATEGORIA || "",
+      PRECIO: precio,
+      STOCK: stock,
+      IMAGEN: producto.IMAGEN || "",
+      PUBLICADO: producto.PUBLICADO || "SI",
+      DESTACADO: producto.DESTACADO || "NO",
+      OFERTA: producto.OFERTA || "NO"
+    });
+
+    const response = await fetchAPI(API_URL + "?" + params.toString());
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo actualizar el producto", "error");
+      return;
+    }
+
+    // Actualiza en memoria al instante — no hace falta esperar a
+    // recargar todo el catálogo para ver el cambio reflejado
+    producto.CODIGO = codigoNuevo;
+    producto.PRECIO = Number(precio);
+    producto.STOCK = Number(stock);
+    // Si el producto editado ya estaba en el ticket actual, el código
+    // ahí también tiene que actualizarse — si no, quedaría apuntando
+    // a un código que ya no existe más en productosPOS.
+    const itemEnTicket = ticketPOS.find(i => String(i.CODIGO).trim() === String(codigoOriginal).trim());
+    if (itemEnTicket) itemEnTicket.CODIGO = codigoNuevo;
+
+    renderPosGrid(document.getElementById("posBusqueda")?.value.trim() || "");
+    if (itemEnTicket) renderTicketPOS();
+
+    toast("Producto actualizado", "success");
+    cerrarEdicionRapidaPOS();
+    invalidarCache("productosAdmin");
+
+  } catch (error) {
+    console.error("Error en edición rápida de producto:", error);
+    toast("Error de conexión al actualizar el producto", "error");
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = textoOriginal;
+  }
+}
+
 function agregarProductoPOS(codigo) {
   codigo = String(codigo).trim();
   const producto = productosPOS.find(p => String(p.CODIGO).trim() === codigo);
   if (!producto) { toast("Producto no encontrado", "error"); return; }
   const stock = producto.STOCK !== undefined ? Number(producto.STOCK) : null;
-  if (stock !== null && stock <= 0) { toast(`${producto.PRODUCTO} está sin stock`, "error"); return; }
+  if (stock !== null && stock <= 0) {
+    // Antes esto bloqueaba la venta directamente. Ahora se permite —
+    // hay negocios que venden sobre pedido, o el stock cargado no
+    // siempre está perfectamente al día — pero se avisa para que
+    // quede claro que se está vendiendo sin stock disponible.
+    toast(`${producto.PRODUCTO} no tiene stock cargado — se agrega igual`, "error");
+  }
 
   const existente = ticketPOS.find(item => String(item.CODIGO).trim() === codigo);
   if (existente) {
