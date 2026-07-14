@@ -4587,16 +4587,22 @@ async function confirmarPedidoAdmin() {
   btn.innerHTML = "Creando pedido...";
 
   try {
-    const params = new URLSearchParams({
-      action: "guardarPedidoAdmin",
-      nombre, empresa, direccion, localidad, provincia, codigoPostal, telefono, dni,
-      total: total,
-      moneda: moneda,
-      tipoCambio: moneda === "USD" ? tipoCambio : "",
-      carrito: JSON.stringify(ticketPOS)
-    });
-
-    const response = await fetchAPI(API_URL + "?" + params.toString());
+    // Por POST, con el carrito en el body — no por GET con todo en la
+    // URL. Un pedido con varios cientos de ítems arma una URL enorme
+    // que Google/Apps Script rechaza (esto se sentía como "error de
+    // conexión" sin serlo realmente). El body no tiene ese límite.
+    const response = await fetchAPI(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" }, // evita preflight CORS contra Apps Script
+      body: JSON.stringify({
+        action: "guardarPedidoAdmin",
+        nombre, empresa, direccion, localidad, provincia, codigoPostal, telefono, dni,
+        total: total,
+        moneda: moneda,
+        tipoCambio: moneda === "USD" ? tipoCambio : "",
+        carrito: ticketPOS
+      })
+    }, { timeoutMs: 30000 }); // pedidos grandes tardan más en subir — margen extra
     const data = await response.json();
 
     if (!data.success) {
