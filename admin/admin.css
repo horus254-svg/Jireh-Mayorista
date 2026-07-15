@@ -642,6 +642,7 @@ html,body{
 .tile-stock.low{ background:var(--amber-50); color:var(--amber-500); }
 .tile-stock.out{ background:var(--red-50); color:var(--red-500); }
 .tile-stock.ok{ background:var(--green-50); color:var(--green-600); }
+.tile-stock.negativo{ background:var(--red-500); color:#fff; font-weight:700; }
 
 /* Miniatura de producto en la tabla de la sección "Productos" */
 .tabla-producto-thumb{

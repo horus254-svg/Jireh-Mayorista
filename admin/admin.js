@@ -1866,6 +1866,12 @@ async function abrirDetallePedido(pedidoId) {
     const btnEtiqueta = document.getElementById("btnImprimirEtiquetaDetalle");
     if (btnEtiqueta) btnEtiqueta.style.display = pedido.ESTADO === "PREPARANDO" ? "inline-flex" : "none";
 
+    // Editar ítems: solo mientras el pedido sigue en NUEVO — una vez
+    // que pasa a Preparando ya se descontó stock, y editar ahí
+    // complicaría tener que devolver/redescontar con más margen de error.
+    const btnEditarItems = document.getElementById("btnEditarItemsPedido");
+    if (btnEditarItems) btnEditarItems.style.display = pedido.ESTADO === "NUEVO" ? "inline-flex" : "none";
+
     const simbolo = String(pedido.MONEDA || "ARS").toUpperCase() === "USD" ? "US$" : "$";
     const filas = detalle.map(item => `
       <tr>
@@ -1911,6 +1917,204 @@ async function abrirDetallePedido(pedidoId) {
 function cerrarModalDetallePedido() {
   document.getElementById("pedidoDetalleModalBackdrop").classList.remove("show");
   pedidoDetalleActual = null;
+  _carritoEdicionPedido = null;
+}
+
+/* ===================== EDITAR ÍTEMS DE UN PEDIDO (solo estado NUEVO) ===================== */
+
+let _carritoEdicionPedido = null; // copia de trabajo mientras se edita — no toca pedidoDetalleActual hasta guardar
+
+function activarEdicionItemsPedido() {
+  if (!pedidoDetalleActual) return;
+  // Copia de trabajo — si cancela, pedidoDetalleActual queda intacto
+  _carritoEdicionPedido = pedidoDetalleActual.detalle.map(item => ({ ...item }));
+  renderEdicionItemsPedido();
+}
+
+function cancelarEdicionItemsPedido() {
+  _carritoEdicionPedido = null;
+  abrirDetallePedido(pedidoDetalleActual.pedido.PEDIDO_ID); // vuelve a la vista normal, con los datos tal cual estaban
+}
+
+function renderEdicionItemsPedido() {
+  const pedido = pedidoDetalleActual.pedido;
+  const simbolo = String(pedido.MONEDA || "ARS").toUpperCase() === "USD" ? "US$" : "$";
+
+  const filas = _carritoEdicionPedido.map((item, idx) => `
+    <tr>
+      <td style="padding:5px 4px;">
+        <input type="number" min="1" step="1" value="${item.cantidad}" class="form-control form-control-sm" style="width:64px;"
+          onchange="_edicionPedidoCambiarCampo(${idx}, 'cantidad', this.value)">
+      </td>
+      <td style="padding:5px 4px; font-size:13px;">${escapeHtml(item.PRODUCTO)}</td>
+      <td style="padding:5px 4px;">
+        <input type="number" min="0" step="1" value="${item.PRECIO}" class="form-control form-control-sm" style="width:90px;"
+          onchange="_edicionPedidoCambiarCampo(${idx}, 'PRECIO', this.value)">
+      </td>
+      <td style="padding:5px 4px; text-align:right; font-family:var(--font-mono); font-size:13px;">${simbolo}${(item.PRECIO * item.cantidad).toLocaleString("es-AR")}</td>
+      <td style="padding:5px 4px;">
+        <button type="button" class="btn btn-outline-danger btn-sm" title="Quitar" onclick="_edicionPedidoQuitarItem(${idx})">🗑️</button>
+      </td>
+    </tr>`).join("");
+
+  const subtotal = _carritoEdicionPedido.reduce((acc, i) => acc + Number(i.PRECIO) * Number(i.cantidad), 0);
+  const descuento = Number(pedido.DESCUENTO || 0);
+  const total = Math.max(0, subtotal - descuento);
+
+  document.getElementById("pedidoDetalleBody").innerHTML = `
+    <div class="config-preview-hint mb-3">
+      <span class="ic">✏️</span> Editando ítems del pedido <strong>${escapeHtml(pedido.PEDIDO_ID)}</strong> — solo se puede mientras está en NUEVO.
+    </div>
+    <table style="width:100%; border-collapse:collapse; font-size:13px;">
+      <thead>
+        <tr style="color:var(--slate-500); font-size:11.5px;">
+          <td style="padding:0 4px 4px;">Cant.</td>
+          <td style="padding:0 4px 4px;">Producto</td>
+          <td style="padding:0 4px 4px;">Precio</td>
+          <td style="padding:0 4px 4px; text-align:right;">Subtotal</td>
+          <td></td>
+        </tr>
+      </thead>
+      <tbody>${filas}</tbody>
+    </table>
+
+    <div class="d-flex gap-2 align-items-center mt-3 mb-2">
+      <input type="text" id="edicionPedidoBuscarProducto" class="form-control form-control-sm" placeholder="🔍 Código o nombre del producto a agregar..."
+        list="edicionPedidoDatalist" oninput="_edicionPedidoActualizarDatalist()">
+      <datalist id="edicionPedidoDatalist"></datalist>
+      <button type="button" class="btn btn-outline-primary btn-sm" style="white-space:nowrap;" onclick="_edicionPedidoAgregarProducto()">+ Agregar</button>
+    </div>
+
+    <table style="width:100%; border-collapse:collapse; font-size:13.5px; margin-top:10px;">
+      <tfoot>
+        ${descuento > 0 ? `
+        <tr style="border-top:1px solid var(--slate-200);">
+          <td colspan="4" style="padding-top:8px; color:var(--slate-500);">Subtotal</td>
+          <td style="padding-top:8px; text-align:right; font-family:var(--font-mono); color:var(--slate-500);">${simbolo}${subtotal.toLocaleString("es-AR")}</td>
+        </tr>
+        <tr>
+          <td colspan="4" style="padding-top:4px; color:var(--red-500); font-weight:700;">Descuento${pedido.DESCUENTO_ETIQUETA ? " (" + pedido.DESCUENTO_ETIQUETA + ")" : ""}</td>
+          <td style="padding-top:4px; text-align:right; font-family:var(--font-mono); color:var(--red-500); font-weight:700;">-${simbolo}${descuento.toLocaleString("es-AR")}</td>
+        </tr>` : ""}
+        <tr style="border-top:2px solid var(--slate-200);">
+          <td colspan="4" style="padding-top:10px;"><strong>Nuevo total</strong></td>
+          <td style="padding-top:10px; text-align:right; font-family:var(--font-mono);"><strong>${simbolo}${total.toLocaleString("es-AR")}</strong></td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <div class="d-flex justify-content-end gap-2 mt-3">
+      <button type="button" class="btn btn-outline-secondary btn-sm" onclick="cancelarEdicionItemsPedido()">Cancelar</button>
+      <button type="button" class="btn btn-success btn-sm" id="btnGuardarEdicionItemsPedido" onclick="guardarEdicionItemsPedido()">💾 Guardar cambios</button>
+    </div>`;
+}
+
+function _edicionPedidoCambiarCampo(idx, campo, valor) {
+  const n = Number(valor);
+  if (isNaN(n) || n < 0 || (campo === "cantidad" && n < 1)) { renderEdicionItemsPedido(); return; }
+  _carritoEdicionPedido[idx][campo] = n;
+  renderEdicionItemsPedido();
+}
+
+function _edicionPedidoQuitarItem(idx) {
+  if (_carritoEdicionPedido.length <= 1) {
+    toast("El pedido no puede quedar sin productos — editalo o cancelalo en vez de vaciarlo", "error");
+    return;
+  }
+  _carritoEdicionPedido.splice(idx, 1);
+  renderEdicionItemsPedido();
+}
+
+function _edicionPedidoActualizarDatalist() {
+  const texto = document.getElementById("edicionPedidoBuscarProducto").value.trim().toLowerCase();
+  const datalist = document.getElementById("edicionPedidoDatalist");
+  if (!texto || texto.length < 2) { datalist.innerHTML = ""; return; }
+
+  const fuente = (productosAdminGlobal && productosAdminGlobal.length ? productosAdminGlobal : productosPOS) || [];
+  const coincidencias = fuente
+    .filter(p => String(p.CODIGO).toLowerCase().includes(texto) || String(p.PRODUCTO).toLowerCase().includes(texto))
+    .slice(0, 15);
+
+  datalist.innerHTML = coincidencias
+    .map(p => `<option value="${escapeHtml(p.CODIGO)} — ${escapeHtml(p.PRODUCTO)}">`)
+    .join("");
+}
+
+function _edicionPedidoAgregarProducto() {
+  const input = document.getElementById("edicionPedidoBuscarProducto");
+  const texto = input.value.trim();
+  if (!texto) return;
+
+  const codigoEscrito = texto.split(" — ")[0].trim().toLowerCase();
+  const fuente = (productosAdminGlobal && productosAdminGlobal.length ? productosAdminGlobal : productosPOS) || [];
+  const producto = fuente.find(p => String(p.CODIGO).toLowerCase() === codigoEscrito)
+    || fuente.find(p => String(p.PRODUCTO).toLowerCase() === texto.toLowerCase());
+
+  if (!producto) { toast("No se encontró ese producto — elegilo de la lista", "error"); return; }
+
+  const existente = _carritoEdicionPedido.find(i => String(i.CODIGO) === String(producto.CODIGO));
+  if (existente) {
+    existente.cantidad++;
+  } else {
+    _carritoEdicionPedido.push({
+      CODIGO: producto.CODIGO,
+      PRODUCTO: producto.PRODUCTO,
+      cantidad: 1,
+      PRECIO: Number(producto.PRECIO) || 0
+    });
+  }
+
+  input.value = "";
+  renderEdicionItemsPedido();
+}
+
+async function guardarEdicionItemsPedido() {
+  if (!_carritoEdicionPedido || _carritoEdicionPedido.length === 0) return;
+
+  const pedidoId = pedidoDetalleActual.pedido.PEDIDO_ID;
+  const btn = document.getElementById("btnGuardarEdicionItemsPedido");
+  const textoOriginal = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = "Guardando...";
+
+  try {
+    // Por POST, con el carrito en el body — mismo motivo que en
+    // ventas/pedidos grandes: por GET, con todo en la URL, un pedido
+    // con muchos ítems puede superar lo que Apps Script acepta.
+    const response = await fetchAPI(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({
+        action: "editarItemsPedido",
+        pedidoId,
+        carrito: _carritoEdicionPedido
+      })
+    }, { timeoutMs: 30000 });
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudieron guardar los cambios", "error");
+      return;
+    }
+
+    if (data.pdfError) {
+      toast(data.message, "error");
+    } else {
+      toast("Ítems del pedido actualizados", "success");
+    }
+
+    _carritoEdicionPedido = null;
+    invalidarCache("pedidos");
+    cargarPedidos(); // refresca el total en la lista de atrás también
+    abrirDetallePedido(pedidoId); // vuelve a la vista normal con los datos ya guardados
+
+  } catch (error) {
+    console.error("Error al editar ítems del pedido:", error);
+    toast("Error de conexión al guardar los cambios", "error");
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = textoOriginal;
+  }
 }
 
 function imprimirEtiquetaDesdeDetalle() {
@@ -2263,7 +2467,9 @@ function renderTablaProductos(lista) {
       const p = lista[idx];
       const publicado = String(p.PUBLICADO || "").toUpperCase() === "SI";
       const stock = Number(p.STOCK || 0);
-      const stockBadge = stock === 0
+      const stockBadge = stock < 0
+        ? `<span class="tile-stock negativo" title="Se vendió sin tener stock cargado">${stock}</span>`
+        : stock === 0
         ? `<span class="tile-stock out">Sin stock</span>`
         : (stock <= 5 ? `<span class="tile-stock low">${stock}</span>` : stock);
 
@@ -2356,6 +2562,11 @@ function filtrarProductos() {
     filtrados = filtrados.filter(p => !String(p.IMAGEN || "").trim());
   } else if (estado === "sin_stock") {
     filtrados = filtrados.filter(p => Number(p.STOCK ?? 0) <= 0);
+  } else if (estado === "stock_negativo") {
+    // Productos que se vendieron sin tener stock cargado (el POS ya
+    // permite hacerlo) — sirve para encontrarlos rápido y actualizar
+    // el stock real cuando llegue mercadería o se corrija la carga.
+    filtrados = filtrados.filter(p => Number(p.STOCK ?? 0) < 0);
   } else if (estado === "sin_imagen_y_stock") {
     filtrados = filtrados.filter(p => !String(p.IMAGEN || "").trim() && Number(p.STOCK ?? 0) <= 0);
   }

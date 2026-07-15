@@ -549,6 +549,7 @@
             <option value="">Todos los productos</option>
             <option value="sin_imagen">Sin imagen</option>
             <option value="sin_stock">Sin stock (0)</option>
+            <option value="stock_negativo">Stock negativo</option>
             <option value="sin_imagen_y_stock">Sin imagen y sin stock</option>
           </select>
         </div>
@@ -2439,6 +2440,7 @@
     <div class="product-modal-actions">
       <button class="btn btn-outline-secondary" onclick="cerrarModalDetallePedido()">Cerrar</button>
       <button class="btn btn-outline-secondary" id="btnImprimirEtiquetaDetalle" onclick="imprimirEtiquetaDesdeDetalle()">Imprimir etiqueta</button>
+      <button class="btn btn-outline-primary" id="btnEditarItemsPedido" style="display:none;" onclick="activarEdicionItemsPedido()">✏️ Editar ítems</button>
       <button class="btn btn-success" onclick="imprimirNotaPedidoA4()">Imprimir pedido (A4)</button>
     </div>
   </div>
