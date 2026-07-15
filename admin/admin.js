@@ -239,6 +239,7 @@ async function cargarConfigNegocioForm() {
   cargarAparienciaForm(cfg);
   cargarBeneficiosForm(cfg);
   document.getElementById("cfgBannerTopMensajes").value = cfg.bannerTopMensajes ?? "";
+  document.getElementById("cfgTransportesNoDisponibles").value = cfg.transportesNoDisponibles ?? "";
   cargarSidebarForm(cfg);
   cargarDriveProductosForm(cfg);
   cargarDrivePedidosForm(cfg);
@@ -1009,6 +1010,35 @@ async function guardarBannerTopForm() {
   } catch (error) {
     console.error("Error al guardar el banner superior:", error);
     toast("Error de conexión al guardar el banner", "error");
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = textoOriginal; }
+  }
+}
+
+/** Saves the list of blocked shipping carriers — one per line, same pattern as the top-banner messages */
+async function guardarTransportesNoDisponiblesForm() {
+  const transportesNoDisponibles = document.getElementById("cfgTransportesNoDisponibles").value.trim();
+
+  const btn = document.getElementById("btnGuardarTransportesNoDisponibles");
+  const textoOriginal = btn ? btn.innerHTML : "";
+  if (btn) { btn.disabled = true; btn.innerHTML = "Guardando..."; }
+
+  try {
+    const params = new URLSearchParams({ action: "guardarConfiguracionNegocio", nombre: configNegocioCache.nombre, transportesNoDisponibles });
+    const response = await fetchAPI(API_URL + "?" + params.toString());
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudieron guardar los transportes", "error");
+      return;
+    }
+
+    configNegocioCache.transportesNoDisponibles = transportesNoDisponibles;
+    toast("Transportes bloqueados guardados — ya rige en el catálogo", "success");
+
+  } catch (error) {
+    console.error("Error al guardar los transportes no disponibles:", error);
+    toast("Error de conexión al guardar los transportes", "error");
   } finally {
     if (btn) { btn.disabled = false; btn.innerHTML = textoOriginal; }
   }
