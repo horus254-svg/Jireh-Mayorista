@@ -1382,6 +1382,27 @@
     </div>
 
     <div class="card p-3 mt-3">
+      <h6 style="margin-bottom:14px;">📦 Acceso a Gestión de Stock</h6>
+      <p class="text-muted" style="font-size:12.5px; margin-top:-8px; margin-bottom:14px;">
+        Contraseña propia para <code>stock.html</code> — a propósito distinta de la del panel completo, para poder dársela a alguien de depósito sin darle acceso a ventas, clientes ni el resto de la configuración. Para cambiarla necesitás tu contraseña del panel admin (no la de stock vieja).
+      </p>
+
+      <div class="mb-3">
+        <label class="form-label">Tu contraseña del panel admin *</label>
+        <input type="password" class="form-control" id="stockPasswordAdminActual" placeholder="Para confirmar el cambio" autocomplete="current-password">
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Nueva contraseña de stock</label>
+        <input type="password" class="form-control" id="stockPasswordNueva" placeholder="Mínimo 4 caracteres" autocomplete="new-password">
+      </div>
+
+      <div class="d-flex justify-content-end mt-3">
+        <button class="btn btn-success" id="btnGuardarPasswordStock" onclick="guardarPasswordStockForm()">💾 Cambiar contraseña de stock</button>
+      </div>
+    </div>
+
+    <div class="card p-3 mt-3">
       <h6 style="margin-bottom:14px;">🎨 Apariencia del catálogo web</h6>
 
       <div class="mb-3">

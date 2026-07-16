@@ -629,6 +629,55 @@ async function guardarCredencialesForm() {
   }
 }
 
+/**
+ * Cambia la contraseña de acceso a stock.html. Requiere la contraseña
+ * ACTUAL DEL PANEL ADMIN (no la de stock vieja) para autorizar el
+ * cambio — quien está acá adentro ya demostró ser admin, no hace
+ * falta pedirle que recuerde una segunda contraseña.
+ */
+async function guardarPasswordStockForm() {
+  const passwordActualAdmin = document.getElementById("stockPasswordAdminActual").value;
+  const nuevaPasswordStock = document.getElementById("stockPasswordNueva").value;
+
+  if (!passwordActualAdmin) {
+    toast("Ingresá tu contraseña del panel admin para confirmar el cambio", "error");
+    return;
+  }
+  if (!nuevaPasswordStock || nuevaPasswordStock.length < 4) {
+    toast("La nueva contraseña de stock debe tener al menos 4 caracteres", "error");
+    return;
+  }
+
+  const btn = document.getElementById("btnGuardarPasswordStock");
+  const textoOriginal = btn ? btn.innerHTML : "";
+  if (btn) { btn.disabled = true; btn.innerHTML = "Guardando..."; }
+
+  try {
+    const params = new URLSearchParams({
+      action: "guardarPasswordStock",
+      passwordActualAdmin,
+      nuevaPasswordStock
+    });
+    const response = await fetchAPI(API_URL + "?" + params.toString());
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo cambiar la contraseña de stock", "error");
+      return;
+    }
+
+    document.getElementById("stockPasswordAdminActual").value = "";
+    document.getElementById("stockPasswordNueva").value = "";
+    toast("Contraseña de stock actualizada", "success");
+
+  } catch (error) {
+    console.error("Error al cambiar la contraseña de stock:", error);
+    toast("Error de conexión al guardar", "error");
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = textoOriginal; }
+  }
+}
+
 /* ===================== APARIENCIA DEL CATÁLOGO WEB (banner + tema) ===================== */
 
 const APARIENCIA_DEFAULT = {
@@ -1476,18 +1525,35 @@ function mostrarSeccion(id) {
       const tConexion = document.getElementById("cardConexionNegocio");
       if (tConexion) {
         tConexion.style.display = "block";
-        bridge.obtenerApiUrl?.().then(url => {
-          const el = document.getElementById("conexionNegocioUrlActual");
-          if (el) el.textContent = url ? "Conectada a: " + url : "No hay URL configurada.";
-          const input = document.getElementById("conexionNegocioUrl");
-          if (input && url) input.value = url;
-        }).catch(() => {});
+        // bridge.obtenerApiUrl?.() por sí solo solo protege el LLAMADO
+        // a la función — si no existe, da undefined, y encadenar
+        // .then()/.catch() sin su propio "?." revienta con un error
+        // real (Cannot read properties of undefined). Como esta
+        // función no está expuesta todavía desde preload.js, esto
+        // cortaba la ejecución acá y las tarjetas de Mercado Pago y
+        // licencia que venían DESPUÉS en este mismo bloque nunca
+        // llegaban a mostrarse.
+        const promesaUrl = bridge.obtenerApiUrl?.();
+        if (promesaUrl && typeof promesaUrl.then === "function") {
+          promesaUrl.then(url => {
+            const el = document.getElementById("conexionNegocioUrlActual");
+            if (el) el.textContent = url ? "Conectada a: " + url : "No hay URL configurada.";
+            const input = document.getElementById("conexionNegocioUrl");
+            if (input && url) input.value = url;
+          }).catch(() => {});
+        }
       }
       // Tarjeta licencia
       if (typeof mostrarEstadoLicenciaEnConfig === "function") mostrarEstadoLicenciaEnConfig();
-      // Tarjeta multicaja
-      const tRed = document.getElementById("cardMultiCajaRed");
-      if (tRed) tRed.style.display = "block";
+      // Tarjeta multicaja — OCULTA a propósito: el guardado de esta
+      // config (actualizarVisibilidadCampoNombreCaja / guardarConfigRed)
+      // nunca se terminó de implementar, y la función de red local en
+      // sí (el servidor HTTP que compartiría stock/ventas entre varias
+      // cajas) tampoco está construida del lado de Electron. Mostrar
+      // este formulario llevaba a un error real al tocarlo — mejor no
+      // ofrecer una función que en los hechos no hace nada.
+      // const tRed = document.getElementById("cardMultiCajaRed");
+      // if (tRed) tRed.style.display = "block";
       // Tarjeta MercadoPago
       const tMp = document.getElementById("cardMercadoPago");
       if (tMp) {

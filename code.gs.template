@@ -41,6 +41,12 @@ if (e.parameter.action === "guardarPedido") {
   case "login":
 return login(e);
 
+case "loginStock":
+  return loginStock(e);
+
+case "guardarPasswordStock":
+  return guardarPasswordStock(e);
+
 case "dashboard":
 return dashboard();
 
@@ -105,6 +111,9 @@ case "stockBajo":
 
 case "actualizarEstado":
 return actualizarEstado(e);
+
+case "editarItemsPedido":
+  return editarItemsPedido(e);
 
 case "marcarPedidoCobrado":
   return marcarPedidoCobrado(e);
@@ -210,6 +219,10 @@ if (data.action === "guardarVenta") {
 // con el carrito en el body en vez de la URL, no hay ese límite.
 if (data.action === "guardarPedidoAdmin") {
   return guardarPedidoAdmin(data);
+}
+
+if (data.action === "editarItemsPedido") {
+  return editarItemsPedido(data);
 }
 
 if (data.action === "subirImagenProducto") {
@@ -1842,7 +1855,11 @@ function testPDF(){
 
 const CREDENCIALES_DEFAULT = {
   USUARIO: "admin",
-  PASSWORD: "Jireh2026"
+  PASSWORD: "Jireh2026",
+  // Contraseña propia para stock.html — a propósito distinta de la
+  // del panel completo, así se le puede dar a alguien de depósito sin
+  // darle acceso a todo lo demás (ventas, clientes, configuración...).
+  STOCK_PASSWORD: "Deposito2026"
 };
 
 function getOrCrearHojaCredenciales(){
@@ -1855,6 +1872,7 @@ function getOrCrearHojaCredenciales(){
     sheet.appendRow(["CLAVE", "VALOR"]);
     sheet.appendRow(["USUARIO", CREDENCIALES_DEFAULT.USUARIO]);
     sheet.appendRow(["PASSWORD", CREDENCIALES_DEFAULT.PASSWORD]);
+    sheet.appendRow(["STOCK_PASSWORD", CREDENCIALES_DEFAULT.STOCK_PASSWORD]);
     // La hoja de credenciales no necesita estar visible para operar el
     // negocio día a día; se oculta para que no se edite por error desde
     // la planilla. Se puede mostrar de nuevo desde Sheets si hace falta.
@@ -1901,6 +1919,78 @@ function login(e){
     )
     .setMimeType(ContentService.MimeType.JSON);
 
+}
+
+/**
+ * Login de stock.html — a propósito una contraseña propia, distinta
+ * de la del panel completo (sin usuario, para que sea más rápido de
+ * escribir desde el celular en el depósito).
+ */
+function loginStock(e){
+
+  const password = e.parameter.password;
+  const creds = leerCredencialesAdmin();
+
+  const ok = password === creds.STOCK_PASSWORD;
+
+  return ContentService
+    .createTextOutput(
+      JSON.stringify({
+        success: ok
+      })
+    )
+    .setMimeType(ContentService.MimeType.JSON);
+
+}
+
+/**
+ * Cambia la contraseña de stock.html — se pide la contraseña ACTUAL
+ * del panel admin para autorizar el cambio (igual que el resto de los
+ * cambios de acceso), no la contraseña de stock vieja: quien cambia
+ * esto ya tiene que estar dentro del panel admin como para pedirle
+ * además que recuerde una segunda contraseña.
+ */
+function guardarPasswordStock(e){
+
+  const params = (e && e.parameter) || {};
+
+  const passwordActualAdmin = (params.passwordActualAdmin || "").toString();
+  const nuevaPasswordStock = (params.nuevaPasswordStock || "").toString();
+
+  const creds = leerCredencialesAdmin();
+
+  if(passwordActualAdmin !== creds.PASSWORD){
+    return jsonResponse({
+      success:false,
+      message:"La contraseña del panel admin no es correcta."
+    });
+  }
+
+  if(!nuevaPasswordStock || nuevaPasswordStock.length < 4){
+    return jsonResponse({
+      success:false,
+      message:"La nueva contraseña de stock debe tener al menos 4 caracteres."
+    });
+  }
+
+  const sheet = getOrCrearHojaCredenciales();
+  const data = sheet.getDataRange().getValues();
+
+  let filaEncontrada = -1;
+  for(let i = 1; i < data.length; i++){
+    if(String(data[i][0] || "").trim().toUpperCase() === "STOCK_PASSWORD"){
+      filaEncontrada = i;
+      break;
+    }
+  }
+
+  if(filaEncontrada === -1){
+    sheet.appendRow(["STOCK_PASSWORD", nuevaPasswordStock]);
+  }else{
+    sheet.getRange(filaEncontrada + 1, 2).setValue(nuevaPasswordStock);
+  }
+
+  return jsonResponse({ success:true });
 }
 
 /**
@@ -2173,8 +2263,121 @@ function getDetallePedido(e){
 
 
 /**
- * caja", y lo refleja en VENTAS_LOCAL para que el cierre de caja del
- * día en que se cobró lo tenga en cuenta — sin tocar el stock (eso ya
+ * Edita los ítems (productos, cantidades, precios) de un pedido que
+ * todavía está en estado NUEVO — antes de pasar a PREPARANDO, que es
+ * el momento en que se descuenta stock de verdad. Por eso se
+ * restringe a NUEVO: editar después complicaría tener que devolver y
+ * volver a descontar stock, con mucho más margen de error.
+ *
+ * Recalcula el subtotal a partir de los ítems nuevos, mantiene el
+ * descuento que ya tenía el pedido (si tenía uno) tal cual estaba, y
+ * vuelve a generar el PDF para que quede en sincro con lo editado.
+ */
+function editarItemsPedido(e){
+  const params = (e && e.parameter) || e || {};
+
+  const pedidoId = String(params.pedidoId || "").trim();
+  if(!pedidoId) return jsonResponse({ success:false, message:"Falta el pedidoId." });
+
+  const carrito = Array.isArray(params.carrito) ? params.carrito : JSON.parse(params.carrito || "[]");
+  if(carrito.length === 0){
+    return jsonResponse({ success:false, message:"El pedido no puede quedar sin productos." });
+  }
+
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const pedidosSheet = ss.getSheetByName("PEDIDOS");
+  const detalleSheet = ss.getSheetByName("DETALLE_PEDIDOS");
+
+  const dataPedidos = pedidosSheet.getDataRange().getValues();
+  let filaPedido = -1;
+  for(let i = 1; i < dataPedidos.length; i++){
+    if(String(dataPedidos[i][0]) === pedidoId){ filaPedido = i; break; }
+  }
+  if(filaPedido === -1) return jsonResponse({ success:false, message:"Pedido no encontrado." });
+
+  const estadoActual = String(dataPedidos[filaPedido][8] || "").toUpperCase();
+  if(estadoActual !== "NUEVO"){
+    return jsonResponse({
+      success:false,
+      message:`Este pedido ya está en estado ${estadoActual} — los ítems solo se pueden editar mientras está en NUEVO (una vez que pasa a Preparando ya se descontó el stock).`
+    });
+  }
+
+  // Borra las filas de detalle viejas de este pedido (de atrás para
+  // adelante, para no correr los índices al borrar) y escribe las
+  // nuevas.
+  const dataDetalle = detalleSheet.getDataRange().getValues();
+  for(let i = dataDetalle.length - 1; i >= 1; i--){
+    if(String(dataDetalle[i][0]) === pedidoId){
+      detalleSheet.deleteRow(i + 1);
+    }
+  }
+
+  const filasNuevas = carrito.map(item => [
+    pedidoId,
+    item.CODIGO,
+    item.PRODUCTO,
+    item.cantidad,
+    item.PRECIO,
+    Number(item.PRECIO) * Number(item.cantidad)
+  ]);
+  detalleSheet
+    .getRange(detalleSheet.getLastRow() + 1, 1, filasNuevas.length, filasNuevas[0].length)
+    .setValues(filasNuevas);
+
+  // Recalcula subtotal/total. El descuento (si el pedido ya tenía uno
+  // cargado) se mantiene tal cual estaba — no se intenta recalcular
+  // automáticamente contra los ítems nuevos.
+  const subtotalNuevo = carrito.reduce((acc, item) => acc + Number(item.PRECIO) * Number(item.cantidad), 0);
+  const descuentoExistente = Number(dataPedidos[filaPedido][17] || 0);
+  const totalNuevo = Math.max(0, subtotalNuevo - descuentoExistente);
+
+  pedidosSheet.getRange(filaPedido + 1, 8).setValue(totalNuevo);   // columna 8: TOTAL
+  pedidosSheet.getRange(filaPedido + 1, 17).setValue(subtotalNuevo); // columna 17: SUBTOTAL
+
+  // Vuelve a generar el PDF con los ítems actualizados, para que no
+  // quede desincronizado de lo que realmente se va a preparar/enviar.
+  try{
+    const fila = dataPedidos[filaPedido];
+    const dataPdf = {
+      nombre: fila[2],
+      empresa: fila[3],
+      direccion: fila[4],
+      telefono: fila[5],
+      dni: fila[6],
+      codigoPostal: fila[10],
+      localidad: fila[11],
+      provincia: fila[12],
+      total: totalNuevo,
+      subtotal: subtotalNuevo,
+      descuento: descuentoExistente,
+      descuentoEtiqueta: fila[18] || "",
+      carrito: carrito
+    };
+    const pdfUrl = generarPDFPedido(pedidoId, fila[1], dataPdf);
+    pedidosSheet.getRange(filaPedido + 1, 10).setValue(pdfUrl); // columna 10: PDF_URL
+  }catch(error){
+    // Si falla la generación del PDF no se revierte la edición de
+    // ítems (ya se guardó bien) — solo se avisa que el PDF quedó
+    // desactualizado, para no perder el trabajo del cajero por un
+    // problema aparte (por ejemplo, Drive lento en ese momento).
+    Logger.log("Error regenerando PDF tras editar ítems: " + error);
+    return jsonResponse({
+      success:true,
+      total: totalNuevo,
+      pdfError: true,
+      message:"Los ítems se guardaron, pero no se pudo regenerar el PDF. Volvé a intentar desde el detalle del pedido."
+    });
+  }
+
+  return jsonResponse({ success:true, total: totalNuevo });
+}
+
+/**
+ * Marca un pedido como cobrado ("cobrado" = pagado) o desmarca ese
+ * cobro. Actualiza el estado de pago del pedido en la hoja PEDIDOS y
+ * lo refleja en VENTAS_LOCAL para que el cierre de caja del día en
+ * que se cobró lo tenga en cuenta — sin tocar el stock (eso ya
  * se descontó al pasar el pedido a PREPARANDO, no debe descontarse
  * de nuevo acá).
  *
