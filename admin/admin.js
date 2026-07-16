@@ -2672,6 +2672,12 @@ function nuevoProducto() {
   document.getElementById("pmDestacado").checked = false;
   document.getElementById("pmOferta").checked = false;
 
+  document.getElementById("pmVentaPorCaja").checked = false;
+  document.getElementById("pmCodigoCaja").value = "";
+  document.getElementById("pmUnidadesPorCaja").value = "";
+  document.getElementById("pmPrecioCaja").value = "";
+  document.getElementById("pmCajaWrap").style.display = "none";
+
   poblarCategoriasDatalist();
   document.getElementById("productModalBackdrop").classList.add("show");
   setTimeout(() => document.getElementById("pmNombre").focus(), 80);
@@ -2697,9 +2703,22 @@ function editarProducto(codigo) {
   document.getElementById("pmDestacado").checked = String(p.DESTACADO || "").toUpperCase() === "SI";
   document.getElementById("pmOferta").checked = String(p.OFERTA || "").toUpperCase() === "SI";
 
+  const tieneVentaPorCaja = !!(p.CODIGO_CAJA && String(p.CODIGO_CAJA).trim());
+  document.getElementById("pmVentaPorCaja").checked = tieneVentaPorCaja;
+  document.getElementById("pmCodigoCaja").value = p.CODIGO_CAJA || "";
+  document.getElementById("pmUnidadesPorCaja").value = p.UNIDADES_POR_CAJA || "";
+  document.getElementById("pmPrecioCaja").value = p.PRECIO_CAJA || "";
+  document.getElementById("pmCajaWrap").style.display = tieneVentaPorCaja ? "" : "none";
+
   actualizarPreviewImagenProducto();
   poblarCategoriasDatalist();
   document.getElementById("productModalBackdrop").classList.add("show");
+}
+
+/** Muestra/oculta los campos de código/unidades/precio de caja */
+function toggleVentaPorCaja() {
+  const activo = document.getElementById("pmVentaPorCaja").checked;
+  document.getElementById("pmCajaWrap").style.display = activo ? "" : "none";
 }
 
 function cerrarModalProducto() {
@@ -2968,8 +2987,17 @@ async function guardarProductoForm() {
   const destacado  = document.getElementById("pmDestacado").checked ? "SI" : "NO";
   const oferta     = document.getElementById("pmOferta").checked ? "SI" : "NO";
 
+  const ventaPorCaja = document.getElementById("pmVentaPorCaja").checked;
+  const codigoCaja = ventaPorCaja ? document.getElementById("pmCodigoCaja").value.trim() : "";
+  const unidadesPorCaja = ventaPorCaja ? document.getElementById("pmUnidadesPorCaja").value : "";
+  const precioCaja = ventaPorCaja ? document.getElementById("pmPrecioCaja").value : "";
+
   if (!nombre) { toast("El nombre del producto es obligatorio", "error"); return; }
   if (precio === "" || Number(precio) < 0) { toast("Ingresá un precio válido", "error"); return; }
+  if (ventaPorCaja && (!codigoCaja || !unidadesPorCaja || Number(unidadesPorCaja) < 1 || precioCaja === "")) {
+    toast("Completá código, unidades y precio de la caja (o desactivá la venta por caja)", "error");
+    return;
+  }
 
   const esEdicion = !!codigoOriginal;
   const btn = document.getElementById("btnGuardarProducto");
@@ -2988,7 +3016,10 @@ async function guardarProductoForm() {
       IMAGEN: imagen,
       PUBLICADO: publicado,
       DESTACADO: destacado,
-      OFERTA: oferta
+      OFERTA: oferta,
+      CODIGO_CAJA: codigoCaja,
+      UNIDADES_POR_CAJA: unidadesPorCaja || 0,
+      PRECIO_CAJA: precioCaja || 0
     });
     if (esEdicion) params.set("codigoOriginal", codigoOriginal);
 
@@ -4114,6 +4145,7 @@ function renderPosGrid(filtroTexto) {
           ${stockBadge}
         </div>
         <button type="button" class="tile-edit" data-idx="${idx}" title="Editar precio y stock" onclick="event.stopPropagation(); abrirEdicionRapidaPOS('${escapeHtml(p.CODIGO)}');">✏️</button>
+        ${Number(p.UNIDADES_POR_CAJA) > 0 ? `<button type="button" class="tile-caja" title="Agregar 1 caja (${p.UNIDADES_POR_CAJA} uds) a $${Number(p.PRECIO_CAJA || 0).toLocaleString("es-AR")}" onclick="event.stopPropagation(); agregarCajaAlTicket(productosPOS.find(x => String(x.CODIGO)==='${escapeHtml(p.CODIGO)}'));">📦x${p.UNIDADES_POR_CAJA}</button>` : ""}
         <span class="tile-add">+</span>
       </div>`;
   });
@@ -4166,9 +4198,45 @@ async function agregarProductoPorCodigo(codigo) {
   codigo = String(codigo).trim();
   if (codigo === "") return;
   await asegurarProductosPOS();
+
   const producto = productosPOS.find(p => String(p.CODIGO).trim().toLowerCase() === codigo.toLowerCase());
-  if (!producto) { toast(`Producto no encontrado: ${codigo}`, "error"); return; }
-  agregarProductoPOS(producto.CODIGO);
+  if (producto) { agregarProductoPOS(producto.CODIGO); return; }
+
+  // No matcheó el código unitario — probar si es el código de la caja/bulto cerrado
+  const productoPorCaja = productosPOS.find(p =>
+    String(p.CODIGO_CAJA || "").trim().toLowerCase() === codigo.toLowerCase() && Number(p.UNIDADES_POR_CAJA) > 0
+  );
+  if (productoPorCaja) { agregarCajaAlTicket(productoPorCaja); return; }
+
+  toast(`Producto no encontrado: ${codigo}`, "error");
+}
+
+/**
+ * Agrega al ticket una "caja" (bulto cerrado) de un producto que se
+ * vende también por unidad — mismo CODIGO real (para que el stock se
+ * descuente del mismo lugar de siempre), pero como línea aparte
+ * (marcada con _esCaja) porque el precio por unidad equivalente es
+ * distinto al de venderlo suelto.
+ */
+function agregarCajaAlTicket(producto) {
+  const unidades = Number(producto.UNIDADES_POR_CAJA) || 1;
+  const precioCaja = Number(producto.PRECIO_CAJA) || 0;
+  const precioUnitarioEquivalente = precioCaja / unidades;
+
+  const existente = ticketPOS.find(item => String(item.CODIGO).trim() === String(producto.CODIGO).trim() && item._esCaja);
+  if (existente) {
+    existente.cantidad += unidades;
+  } else {
+    ticketPOS.push({
+      CODIGO: producto.CODIGO,
+      PRODUCTO: `${producto.PRODUCTO} (caja x${unidades})`,
+      cantidad: unidades,
+      PRECIO: precioUnitarioEquivalente,
+      _esCaja: true
+    });
+  }
+  renderTicketPOS();
+  toast(`+1 caja de ${producto.PRODUCTO} (${unidades} uds) — $${precioCaja.toLocaleString("es-AR")}`, "success");
 }
 
 /**

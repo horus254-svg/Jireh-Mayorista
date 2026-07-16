@@ -821,28 +821,67 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function procesarCodigoEscaneado(codigo){
-    const existente = colaRecepcion.find(i => i.codigo === codigo);
-    if(existente){
-        existente.cantidad++;
+    // Primero, código unitario normal — cada escaneo repetido suma 1 unidad.
+    const existenteUnidad = colaRecepcion.find(i => i.codigo === codigo && !i.esCaja);
+    if(existenteUnidad){
+        existenteUnidad.cantidad++;
         renderColaRecepcion();
         return;
     }
 
     const producto = productos.find(p => String(p.CODIGO).trim() === codigo);
+    if(producto){
+        colaRecepcion.unshift({
+            codigo,
+            PRODUCTO: producto.PRODUCTO,
+            cantidad: 1,
+            stockActual: Number(producto.STOCK ?? 0),
+            encontrado: true,
+            esCaja: false
+        });
+        renderColaRecepcion();
+        return;
+    }
 
+    // No matcheó como código unitario — probar como código de la
+    // caja/bulto cerrado (venta por caja). Cada escaneo repetido de
+    // este mismo código suma UNA CAJA (varias unidades de una vez),
+    // no una unidad sola.
+    const productoPorCaja = productos.find(p =>
+        String(p.CODIGO_CAJA || "").trim() === codigo && Number(p.UNIDADES_POR_CAJA) > 0
+    );
+
+    if(productoPorCaja){
+        const unidadesPorCaja = Number(productoPorCaja.UNIDADES_POR_CAJA);
+        const existenteCaja = colaRecepcion.find(i => i.codigo === productoPorCaja.CODIGO && i.esCaja);
+        if(existenteCaja){
+            existenteCaja.cantidad += unidadesPorCaja;
+        }else{
+            colaRecepcion.unshift({
+                codigo: productoPorCaja.CODIGO, // se usa el código REAL del producto, no el de la caja — el stock es uno solo
+                PRODUCTO: productoPorCaja.PRODUCTO,
+                cantidad: unidadesPorCaja,
+                stockActual: Number(productoPorCaja.STOCK ?? 0),
+                encontrado: true,
+                esCaja: true,
+                unidadesPorCaja
+            });
+        }
+        renderColaRecepcion();
+        return;
+    }
+
+    // No matcheó ni como unitario ni como caja
     colaRecepcion.unshift({
         codigo,
-        PRODUCTO: producto ? producto.PRODUCTO : null,
+        PRODUCTO: null,
         cantidad: 1,
-        stockActual: producto ? Number(producto.STOCK ?? 0) : null,
-        encontrado: !!producto
+        stockActual: null,
+        encontrado: false,
+        esCaja: false
     });
-
     renderColaRecepcion();
-
-    if(!producto){
-        mostrarToast(`No se encontró ningún producto con el código "${codigo}" — buscalo a mano en la lista de abajo`, "error");
-    }
+    mostrarToast(`No se encontró ningún producto con el código "${codigo}" — buscalo a mano en la lista de abajo`, "error");
 }
 
 function renderColaRecepcion(){
@@ -871,11 +910,12 @@ function renderColaRecepcion(){
         }
 
         const stockNuevo = item.stockActual + item.cantidad;
+        const etiquetaCaja = item.esCaja ? `<span style="color:var(--ink-600);"> · 📦 ${Math.round(item.cantidad / item.unidadesPorCaja)} caja${item.cantidad !== item.unidadesPorCaja ? "s" : ""} (${item.unidadesPorCaja} c/u)</span>` : "";
         return `
         <div class="cola-item">
             <div class="cola-info">
-                <p class="cola-nombre">${escapeHtml(item.PRODUCTO)}</p>
-                <div class="cola-detalle">${escapeHtml(item.codigo)} · stock ${item.stockActual} → <b>${stockNuevo}</b></div>
+                <p class="cola-nombre">${escapeHtml(item.PRODUCTO)}${etiquetaCaja}</p>
+                <div class="cola-detalle">${escapeHtml(item.codigo)} · stock ${item.stockActual} → <b>${stockNuevo}</b>${item.esCaja ? " (en unidades)" : ""}</div>
             </div>
             <input type="number" min="1" step="1" class="cola-cantidad" value="${item.cantidad}"
                 onchange="_cambiarCantidadCola(${idx}, this.value)">

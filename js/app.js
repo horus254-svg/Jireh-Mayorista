@@ -395,6 +395,12 @@ function mostrarProductos(lista){
 
                     ${stock ? `<div class="stock-badge ${stock.clase}">${stock.texto}</div>` : ""}
 
+                    ${Number(p.UNIDADES_POR_CAJA) > 0 ? `
+                    <div class="caja-oferta">
+                        📦 Por caja (${p.UNIDADES_POR_CAJA} uds): <b>$${formatearPrecio(p.PRECIO_CAJA)}</b>
+                        <button type="button" class="btn-caja" data-action="agregar-caja">Agregar caja</button>
+                    </div>` : ""}
+
                     <div class="qty-stepper">
                         <button type="button" class="qty-btn" data-action="qty-minus" aria-label="Restar">−</button>
                         <input type="number" class="qty-input" data-role="qty" value="1" min="1" inputmode="numeric">
@@ -471,6 +477,10 @@ document.getElementById("productos").addEventListener("click", function(e){
         case "agregar":
             agregarAlCarrito(producto, parseInt(qtyInput.value) || 1);
             qtyInput.value = 1;
+            break;
+
+        case "agregar-caja":
+            agregarCajaAlCarrito(producto);
             break;
 
         case "quickview":
@@ -598,6 +608,50 @@ function agregarAlCarrito(producto, cantidad){
     if(stockDisponible <= 0 || totalSolicitado <= stockDisponible){
         mostrarToast(`✓ ${producto.PRODUCTO} agregado (${cantidad})`, "success");
     }
+}
+
+/**
+ * Agrega al carrito una "caja" (bulto cerrado) de un producto que
+ * también se vende suelto. Usa el mismo CODIGO real del producto
+ * (el stock es el mismo, se descuenta de ahí), pero como línea
+ * aparte del carrito (marcada _esCaja) porque el precio por unidad
+ * equivalente de la caja es distinto al de comprarlo suelto.
+ */
+function agregarCajaAlCarrito(producto){
+    if(!producto) return;
+
+    const unidades = Number(producto.UNIDADES_POR_CAJA) || 0;
+    const precioCaja = Number(producto.PRECIO_CAJA) || 0;
+    if(unidades <= 0 || precioCaja <= 0) return;
+
+    const stockDisponible = Number(String(producto.STOCK ?? "").trim()) || 0;
+
+    // Ya en el carrito, sumando lo que haya tanto suelto como en cajas
+    // anteriores — el stock es uno solo para el mismo producto.
+    const yaEnCarrito = estado.carrito
+        .filter(p => String(p.CODIGO) === String(producto.CODIGO))
+        .reduce((acc, p) => acc + p.cantidad, 0);
+
+    if(stockDisponible > 0 && yaEnCarrito + unidades > stockDisponible){
+        mostrarToast(`⚠️ No hay suficiente stock para otra caja de "${producto.PRODUCTO}" (disponible: ${stockDisponible - yaEnCarrito} ud${(stockDisponible - yaEnCarrito) !== 1 ? "s" : ""})`, "error");
+        return;
+    }
+
+    const existente = estado.carrito.find(p => String(p.CODIGO) === String(producto.CODIGO) && p._esCaja);
+    if(existente){
+        existente.cantidad += unidades;
+    }else{
+        estado.carrito.push({
+            ...producto,
+            cantidad: unidades,
+            PRECIO: precioCaja / unidades,
+            PRODUCTO: `${producto.PRODUCTO} (caja x${unidades})`,
+            _esCaja: true
+        });
+    }
+
+    guardarCarrito();
+    mostrarToast(`✓ 1 caja de "${producto.PRODUCTO}" agregada (${unidades} uds) — $${formatearPrecio(precioCaja)}`, "success");
 }
 
 function guardarCarrito(){

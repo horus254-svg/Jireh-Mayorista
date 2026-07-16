@@ -423,6 +423,24 @@ function getOfertas() {
    Cualquier encabezado no provisto por el formulario queda vacío.
 ===================================================================== */
 
+/**
+ * Si la hoja PRODUCTOS todavía no tiene las columnas para manejar el
+ * precio por caja (CODIGO_CAJA / UNIDADES_POR_CAJA / PRECIO_CAJA),
+ * las agrega al final — sin tocar ninguna columna ni fila existente.
+ * Se llama solo al GUARDAR un producto con estos datos, no en cada
+ * lectura del catálogo (para no gastar de más revisando esto en cada
+ * carga del catálogo web).
+ */
+function asegurarColumnasProductoCaja(sheet){
+  const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const columnasNecesarias = ["CODIGO_CAJA", "UNIDADES_POR_CAJA", "PRECIO_CAJA"];
+  const faltantes = columnasNecesarias.filter(c => headerRow.indexOf(c) === -1);
+  if(faltantes.length > 0){
+    const inicio = sheet.getLastColumn() + 1;
+    sheet.getRange(1, inicio, 1, faltantes.length).setValues([faltantes]);
+  }
+}
+
 function guardarProducto(e){
 
   const sheet = getSheet();
@@ -435,6 +453,8 @@ function guardarProducto(e){
   }
 
   const params = (e && e.parameter) || {};
+
+  asegurarColumnasProductoCaja(sheet);
 
   const headerRow =
     sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
@@ -478,7 +498,13 @@ function guardarProducto(e){
     DESTACADO:  (params.DESTACADO || "NO").toString().toUpperCase(),
     OFERTA:     (params.OFERTA || "NO").toString().toUpperCase(),
     DESCRIPCION:(params.DESCRIPCION || "").toString(),
-    IMAGEN:     (params.IMAGEN || "").toString().trim()
+    IMAGEN:     (params.IMAGEN || "").toString().trim(),
+    // Venta por caja (opcional) — mismo producto, otro código de
+    // barras para el bulto/caja cerrada, a un precio total distinto
+    // (normalmente más conveniente que N veces el precio unitario).
+    CODIGO_CAJA:       (params.CODIGO_CAJA || "").toString().trim(),
+    UNIDADES_POR_CAJA: Number(params.UNIDADES_POR_CAJA || 0),
+    PRECIO_CAJA:       Number(params.PRECIO_CAJA || 0)
   };
 
   // Armar la fila en el MISMO ORDEN que los encabezados reales de la hoja.
@@ -514,6 +540,8 @@ function actualizarProducto(e){
   }
 
   const params = (e && e.parameter) || {};
+
+  asegurarColumnasProductoCaja(sheet);
 
   const codigoOriginal = (params.codigoOriginal || "").toString().trim();
 
@@ -575,7 +603,10 @@ function actualizarProducto(e){
     DESTACADO:  (params.DESTACADO || "NO").toString().toUpperCase(),
     OFERTA:     (params.OFERTA || "NO").toString().toUpperCase(),
     DESCRIPCION:(params.DESCRIPCION || "").toString(),
-    IMAGEN:     (params.IMAGEN || "").toString().trim()
+    IMAGEN:     (params.IMAGEN || "").toString().trim(),
+    CODIGO_CAJA:       (params.CODIGO_CAJA || "").toString().trim(),
+    UNIDADES_POR_CAJA: Number(params.UNIDADES_POR_CAJA || 0),
+    PRECIO_CAJA:       Number(params.PRECIO_CAJA || 0)
   };
 
   const filaActual = data[filaIndex];

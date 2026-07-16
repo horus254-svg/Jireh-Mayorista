@@ -594,6 +594,27 @@ html,body{
 }
 .product-tile .tile-edit:hover{ opacity:1; border-color:var(--navy-700); }
 
+.product-tile .tile-caja{
+  position:absolute;
+  top:36px;
+  left:6px;
+  height:22px;
+  padding:0 7px;
+  border-radius:11px;
+  border:1px solid var(--indigo-600);
+  background:#fff;
+  color:var(--indigo-600);
+  font-size:10.5px;
+  font-weight:700;
+  line-height:1;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  z-index:2;
+}
+.product-tile .tile-caja:hover{ background:var(--indigo-600); color:#fff; }
+
 .product-tile .tile-photo{
   width:100%; aspect-ratio:1/1;
   border-radius:var(--radius-sm);
