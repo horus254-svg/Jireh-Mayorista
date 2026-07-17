@@ -2202,6 +2202,7 @@ function imprimirNotaPedidoA4() {
 
   const filasItems = detalle.map(item => `
     <tr>
+      <td style="padding:6px; border:1px solid #ddd; font-family:monospace; font-size:9pt;">${escapeHtml(item.CODIGO || "")}</td>
       <td style="padding:6px; border:1px solid #ddd;">${escapeHtml(item.PRODUCTO)}</td>
       <td style="padding:6px; border:1px solid #ddd; text-align:center;">${item.cantidad}</td>
       <td style="padding:6px; border:1px solid #ddd; text-align:right;">${simbolo}${Number(item.PRECIO).toLocaleString("es-AR")}</td>
@@ -2237,6 +2238,7 @@ function imprimirNotaPedidoA4() {
       <table style="width:100%; border-collapse:collapse; font-size:11pt;">
         <thead>
           <tr style="background:#f4f4f4;">
+            <th style="padding:6px; text-align:left; border:1px solid #ddd;">Código</th>
             <th style="padding:6px; text-align:left; border:1px solid #ddd;">Producto</th>
             <th style="padding:6px; text-align:center; border:1px solid #ddd;">Cant.</th>
             <th style="padding:6px; text-align:right; border:1px solid #ddd;">Precio</th>
@@ -2247,15 +2249,15 @@ function imprimirNotaPedidoA4() {
         <tfoot>
           ${Number(pedido.DESCUENTO || 0) > 0 ? `
           <tr>
-            <td colspan="3" style="padding:6px; text-align:right; border:1px solid #ddd; color:#555;">Subtotal</td>
+            <td colspan="4" style="padding:6px; text-align:right; border:1px solid #ddd; color:#555;">Subtotal</td>
             <td style="padding:6px; text-align:right; border:1px solid #ddd; color:#555;">${simbolo}${Number(pedido.SUBTOTAL || pedido.TOTAL || 0).toLocaleString("es-AR")}</td>
           </tr>
           <tr>
-            <td colspan="3" style="padding:6px; text-align:right; border:1px solid #ddd; color:#d32f2f; font-weight:700;">Descuento${pedido.DESCUENTO_ETIQUETA ? " (" + pedido.DESCUENTO_ETIQUETA + ")" : ""}</td>
+            <td colspan="4" style="padding:6px; text-align:right; border:1px solid #ddd; color:#d32f2f; font-weight:700;">Descuento${pedido.DESCUENTO_ETIQUETA ? " (" + pedido.DESCUENTO_ETIQUETA + ")" : ""}</td>
             <td style="padding:6px; text-align:right; border:1px solid #ddd; color:#d32f2f; font-weight:700;">-${simbolo}${Number(pedido.DESCUENTO).toLocaleString("es-AR")}</td>
           </tr>` : ""}
           <tr>
-            <td colspan="3" style="padding:8px; text-align:right; border:1px solid #ddd;"><strong>TOTAL</strong></td>
+            <td colspan="4" style="padding:8px; text-align:right; border:1px solid #ddd;"><strong>TOTAL</strong></td>
             <td style="padding:8px; text-align:right; border:1px solid #ddd;"><strong>${simbolo}${Number(pedido.TOTAL || 0).toLocaleString("es-AR")}</strong></td>
           </tr>
         </tfoot>
