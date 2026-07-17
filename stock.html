@@ -688,7 +688,10 @@ async function guardarStock(codigo, nuevoStock){
             IMAGEN: producto.IMAGEN || "",
             PUBLICADO: producto.PUBLICADO || "SI",
             DESTACADO: producto.DESTACADO || "NO",
-            OFERTA: producto.OFERTA || "NO"
+            OFERTA: producto.OFERTA || "NO",
+            CODIGO_CAJA: producto.CODIGO_CAJA || "",
+            UNIDADES_POR_CAJA: producto.UNIDADES_POR_CAJA || 0,
+            PRECIO_CAJA: producto.PRECIO_CAJA || 0
         });
 
         const response = await fetchConTimeout(API_URL + "?" + params.toString(), 15000);

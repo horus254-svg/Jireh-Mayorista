@@ -4295,7 +4295,8 @@ async function guardarEdicionRapidaPOS() {
 
   try {
     // Se mandan TODOS los campos del producto (no solo código/precio/
-    // stock), preservando lo que ya tenía — ver nota arriba.
+    // stock), preservando lo que ya tenía — incluyendo el precio por
+    // caja, que este modal no permite editar pero tampoco debe borrar.
     const params = new URLSearchParams({
       action: "actualizarProducto",
       codigoOriginal: producto.CODIGO,
@@ -4307,7 +4308,10 @@ async function guardarEdicionRapidaPOS() {
       IMAGEN: producto.IMAGEN || "",
       PUBLICADO: producto.PUBLICADO || "SI",
       DESTACADO: producto.DESTACADO || "NO",
-      OFERTA: producto.OFERTA || "NO"
+      OFERTA: producto.OFERTA || "NO",
+      CODIGO_CAJA: producto.CODIGO_CAJA || "",
+      UNIDADES_POR_CAJA: producto.UNIDADES_POR_CAJA || 0,
+      PRECIO_CAJA: producto.PRECIO_CAJA || 0
     });
 
     const response = await fetchAPI(API_URL + "?" + params.toString());
