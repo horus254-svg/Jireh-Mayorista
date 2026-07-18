@@ -1285,7 +1285,7 @@ async function cargarVentasPOSHistorial() {
   const cached = cacheGet("ventasPOS");
   if (cached && cached.data?.key === cacheKey) {
     ventasPOSHistorialGlobal = cached.data.ventas;
-    renderVentasPOSHistorial(ventasPOSHistorialGlobal);
+    filtrarVentasPOSHistorial(); // respeta el filtro de forma de pago/estado/búsqueda activo, en vez de mostrar siempre todo
     if (!cached.stale) return;
   } else {
     tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-3">Cargando ventas...</td></tr>`;
@@ -1301,7 +1301,7 @@ async function cargarVentasPOSHistorial() {
 
     ventasPOSHistorialGlobal = data.ventas || [];
     cacheSet("ventasPOS", { key: cacheKey, ventas: ventasPOSHistorialGlobal });
-    renderVentasPOSHistorial(ventasPOSHistorialGlobal);
+    filtrarVentasPOSHistorial(); // idem — no pisar el filtro activo con la lista completa
 
   } catch (error) {
     console.error("Error al cargar historial de ventas POS:", error);
@@ -1454,7 +1454,7 @@ function filtrarVentasPOSHistorial() {
   const filtradas = ventasPOSHistorialGlobal.filter(v => {
     const id     = String(v.VENTA_ID || v.ID || "").toLowerCase();
     const items  = String(v.ITEMS || v.DETALLE || "").toLowerCase();
-    const pago   = String(v.FORMA_PAGO || v.PAGO || "").toUpperCase();
+    const pago   = String(v.FORMA_PAGO || v.PAGO || "").toUpperCase().trim();
     const anulada = String(v.ANULADA || "").toUpperCase() === "SI";
 
     if (termino && !id.includes(termino) && !items.includes(termino)) return false;
