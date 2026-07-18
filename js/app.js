@@ -626,13 +626,18 @@ function agregarCajaAlCarrito(producto){
 
     const stockDisponible = Number(String(producto.STOCK ?? "").trim()) || 0;
 
+    if(stockDisponible <= 0){
+        mostrarToast(`"${producto.PRODUCTO}" no tiene stock disponible`, "error");
+        return;
+    }
+
     // Ya en el carrito, sumando lo que haya tanto suelto como en cajas
     // anteriores — el stock es uno solo para el mismo producto.
     const yaEnCarrito = estado.carrito
         .filter(p => String(p.CODIGO) === String(producto.CODIGO))
         .reduce((acc, p) => acc + p.cantidad, 0);
 
-    if(stockDisponible > 0 && yaEnCarrito + unidades > stockDisponible){
+    if(yaEnCarrito + unidades > stockDisponible){
         mostrarToast(`⚠️ No hay suficiente stock para otra caja de "${producto.PRODUCTO}" (disponible: ${stockDisponible - yaEnCarrito} ud${(stockDisponible - yaEnCarrito) !== 1 ? "s" : ""})`, "error");
         return;
     }
@@ -756,7 +761,69 @@ function vaciarCarrito(){
     mostrarToast("Carrito vaciado", "success");
 }
 
+/**
+ * Vuelve a comparar cada ítem del carrito contra el stock ACTUAL
+ * (el que ya está cargado en estado.productos, recién traído del
+ * servidor) — el carrito puede tener quedado guardado en el
+ * navegador de una visita anterior, con datos de stock y hasta de
+ * precio ya viejos. Devuelve true si hubo que tocar algo (para poder
+ * avisarle al cliente).
+ *
+ * - Producto que ya no existe/no está publicado → se quita del carrito.
+ * - Producto sin stock (0 o negativo) → se quita del carrito.
+ * - Cantidad pedida mayor a la disponible → se ajusta al máximo disponible.
+ * - Precio actualizado → se refresca (por si cambió desde que se agregó).
+ */
+function sincronizarCarritoConStockActual(){
+    if(estado.carrito.length === 0) return false;
+
+    let huboAjustes = false;
+    const avisos = [];
+    const nuevoCarrito = [];
+
+    estado.carrito.forEach(item => {
+        const actual = estado.productos.find(p => String(p.CODIGO) === String(item.CODIGO));
+
+        if(!actual){
+            huboAjustes = true;
+            avisos.push(`"${item.PRODUCTO}" ya no está disponible y se quitó del carrito`);
+            return; // no se agrega al nuevo carrito
+        }
+
+        const stockActual = Number(String(actual.STOCK ?? "").trim()) || 0;
+
+        if(stockActual <= 0){
+            huboAjustes = true;
+            avisos.push(`"${item.PRODUCTO}" se quedó sin stock y se quitó del carrito`);
+            return;
+        }
+
+        // Actualiza el precio y el stock "de referencia" del ítem por si cambiaron
+        item.PRECIO = actual.PRECIO;
+        item.STOCK = stockActual;
+
+        if(item.cantidad > stockActual){
+            huboAjustes = true;
+            avisos.push(`"${item.PRODUCTO}": se ajustó de ${item.cantidad} a ${stockActual} unidad${stockActual !== 1 ? "es" : ""} (es lo que hay disponible)`);
+            item.cantidad = stockActual;
+        }
+
+        nuevoCarrito.push(item);
+    });
+
+    estado.carrito = nuevoCarrito;
+
+    if(huboAjustes){
+        guardarCarrito();
+        avisos.forEach(msg => mostrarToast(`⚠️ ${msg}`, "error"));
+    }
+
+    return huboAjustes;
+}
+
 function abrirCarrito(){
+
+    sincronizarCarritoConStockActual();
 
     const cont = document.getElementById("cart-items");
     const emptyEl = document.getElementById("cart-empty");
@@ -977,6 +1044,24 @@ async function checkoutWhatsapp(){
 
     if(estado.carrito.length === 0){
         mostrarToast("Tu carrito está vacío.", "error");
+        desactivarCargaCheckout();
+        return;
+    }
+
+    // Último chequeo antes de enviar: puede haber pasado tiempo desde
+    // que se abrió el carrito (o directamente nunca se abrió si el
+    // cliente fue directo a completar sus datos con un carrito viejo
+    // guardado de una visita anterior). Si algo cambió, se corta acá
+    // y se le pide que revise el carrito ya actualizado, en vez de
+    // mandar un pedido con datos viejos.
+    if(sincronizarCarritoConStockActual()){
+        mostrarToast("Algunos productos de tu carrito cambiaron de stock — revisalo antes de enviar el pedido.", "error");
+        desactivarCargaCheckout();
+        return;
+    }
+
+    if(estado.carrito.length === 0){
+        mostrarToast("Tu carrito quedó vacío después de actualizar el stock — agregá productos de nuevo.", "error");
         desactivarCargaCheckout();
         return;
     }

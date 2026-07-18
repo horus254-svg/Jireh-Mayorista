@@ -2017,13 +2017,13 @@ function renderEdicionItemsPedido() {
         <input type="number" min="0" step="1" value="${item.PRECIO}" class="form-control form-control-sm" style="width:90px;"
           onchange="_edicionPedidoCambiarCampo(${idx}, 'PRECIO', this.value)">
       </td>
-      <td style="padding:5px 4px; text-align:right; font-family:var(--font-mono); font-size:13px;">${simbolo}${(item.PRECIO * item.cantidad).toLocaleString("es-AR")}</td>
+      <td style="padding:5px 4px; text-align:right; font-family:var(--font-mono); font-size:13px;">${simbolo}${((Number(item.PRECIO) || 0) * (Number(item.cantidad) || 0)).toLocaleString("es-AR")}</td>
       <td style="padding:5px 4px;">
         <button type="button" class="btn btn-outline-danger btn-sm" title="Quitar" onclick="_edicionPedidoQuitarItem(${idx})">🗑️</button>
       </td>
     </tr>`).join("");
 
-  const subtotal = _carritoEdicionPedido.reduce((acc, i) => acc + Number(i.PRECIO) * Number(i.cantidad), 0);
+  const subtotal = _carritoEdicionPedido.reduce((acc, i) => acc + (Number(i.PRECIO) || 0) * (Number(i.cantidad) || 0), 0);
   const descuento = Number(pedido.DESCUENTO || 0);
   const total = Math.max(0, subtotal - descuento);
 

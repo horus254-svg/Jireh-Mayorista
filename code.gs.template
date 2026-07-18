@@ -1309,6 +1309,32 @@ function obtenerTransportesNoDisponibles(){
     .filter(Boolean);
 }
 
+/**
+ * Devuelve un mapa CODIGO -> STOCK actual, leído fresco de la hoja
+ * PRODUCTOS, para los códigos pedidos (no hace falta traer todo el
+ * catálogo si el carrito tiene pocos ítems).
+ */
+function obtenerStockActualPorCodigo(codigos){
+  const sheet = getSheet();
+  if(!sheet) return {};
+
+  const codigosSet = new Set(codigos.map(c => String(c).trim()));
+  const data = sheet.getDataRange().getValues();
+  const headers = data.shift();
+  const idxCodigo = headers.indexOf("CODIGO");
+  const idxStock = headers.indexOf("STOCK");
+
+  const mapa = {};
+  data.forEach(row => {
+    const codigo = String(row[idxCodigo] || "").trim();
+    if(codigosSet.has(codigo)){
+      mapa[codigo] = Number(row[idxStock]) || 0;
+    }
+  });
+
+  return mapa;
+}
+
 function guardarPedido(data){
 
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
@@ -1337,6 +1363,42 @@ function guardarPedido(data){
 
   const pedidoId =
     generarIdCorto("PED", pedidosSheet);
+
+  // Valida el stock real (el de la planilla en este momento) contra
+  // lo que pide el carrito — el frontend puede tener datos viejos
+  // (el cliente guardó el carrito hace días, o el stock cambió
+  // mientras tenía la página abierta), así que la única validación
+  // que realmente importa es esta, del lado del servidor. Se rechaza
+  // el pedido ENTERO si algo no alcanza — no se acepta parcialmente,
+  // para no confundir con un pedido distinto al que el cliente pidió.
+  if(data.carrito && data.carrito.length > 0){
+    const stockPorCodigo = obtenerStockActualPorCodigo(
+      data.carrito.map(item => item.CODIGO)
+    );
+
+    const faltantes = [];
+    data.carrito.forEach(item => {
+      const stockActual = stockPorCodigo[String(item.CODIGO).trim()];
+      if(stockActual === undefined || stockActual < Number(item.cantidad)){
+        faltantes.push({
+          producto: item.PRODUCTO,
+          pedido: Number(item.cantidad),
+          disponible: Math.max(0, stockActual || 0)
+        });
+      }
+    });
+
+    if(faltantes.length > 0){
+      const detalle = faltantes
+        .map(f => `${f.producto} (pediste ${f.pedido}, disponible ${f.disponible})`)
+        .join("; ");
+      return jsonResponse({
+        success:false,
+        message:"Algunos productos ya no tienen el stock que pediste — es probable que se hayan vendido mientras tenías el carrito guardado. Actualizá la página y ajustá el pedido: " + detalle,
+        stockInsuficiente: faltantes
+      });
+    }
+  }
 
   const fecha = new Date();
 
@@ -1533,6 +1595,29 @@ const resultado = guardarPedido(data);
 Logger.log(resultado.getContent());
 
 }
+/**
+ * Convierte un código de producto a texto plano, sin notación
+ * científica — puede llegar como número (si Sheets interpretó el
+ * código de barras como número en vez de texto) o ya como un string
+ * tipo "6.934112480112E12" (lo que Sheets muestra en pantalla para un
+ * número así de largo). En cualquiera de los dos casos, se reconstruye
+ * el número completo con toFixed(0), que nunca usa notación
+ * científica para números de este tamaño.
+ */
+function formatearCodigoComoTexto(valor){
+  if(valor === null || valor === undefined || valor === "") return "";
+
+  const texto = String(valor).trim();
+  const pareceNotacionCientifica = /e\+?\d+/i.test(texto);
+  const numero = Number(texto);
+
+  if(pareceNotacionCientifica && !isNaN(numero)){
+    return numero.toFixed(0);
+  }
+
+  return texto;
+}
+
 function generarPDFPedido(
   pedidoId,
   fecha,
@@ -1661,6 +1746,7 @@ function generarPDFPedido(
 
 const tabla = [
   [
+    "Código",
     "Producto",
     "Cant",
     "$",
@@ -1674,6 +1760,7 @@ data.carrito.forEach(item => {
   item.PRECIO * item.cantidad;
 
  tabla.push([
+  formatearCodigoComoTexto(item.CODIGO),
   item.PRODUCTO,
   String(parseInt(item.cantidad)),
   "$" + Number(item.PRECIO)
@@ -1688,25 +1775,31 @@ body.appendTable(tabla);
 
 table.setBorderWidth(0);
 
-// Ancho de columnas
+// Ancho de columnas — 5 columnas: Código, Producto, Cant, $, Subtotal
+// (el total suma igual que antes, 515pt, solo redistribuido para que
+// entre la columna nueva sin angostar de más a "Producto")
 
 try {
 
   table.getRow(0)
        .getCell(0)
-       .setWidth(320);
+       .setWidth(90); // Código
 
   table.getRow(0)
        .getCell(1)
-       .setWidth(45);
+       .setWidth(230); // Producto
 
   table.getRow(0)
        .getCell(2)
-       .setWidth(70);
+       .setWidth(40); // Cant
 
   table.getRow(0)
        .getCell(3)
-       .setWidth(80);
+       .setWidth(65); // $
+
+  table.getRow(0)
+       .getCell(4)
+       .setWidth(80); // Subtotal
 
 } catch(err) {
   Logger.log(err);
@@ -2344,14 +2437,18 @@ function editarItemsPedido(e){
     }
   }
 
-  const filasNuevas = carrito.map(item => [
-    pedidoId,
-    item.CODIGO,
-    item.PRODUCTO,
-    item.cantidad,
-    item.PRECIO,
-    Number(item.PRECIO) * Number(item.cantidad)
-  ]);
+  const filasNuevas = carrito.map(item => {
+    const precio = Number(item.PRECIO) || 0;
+    const cantidad = Number(item.cantidad) || 0;
+    return [
+      pedidoId,
+      item.CODIGO,
+      item.PRODUCTO,
+      cantidad,
+      precio,
+      precio * cantidad
+    ];
+  });
   detalleSheet
     .getRange(detalleSheet.getLastRow() + 1, 1, filasNuevas.length, filasNuevas[0].length)
     .setValues(filasNuevas);
@@ -2359,9 +2456,27 @@ function editarItemsPedido(e){
   // Recalcula subtotal/total. El descuento (si el pedido ya tenía uno
   // cargado) se mantiene tal cual estaba — no se intenta recalcular
   // automáticamente contra los ítems nuevos.
-  const subtotalNuevo = carrito.reduce((acc, item) => acc + Number(item.PRECIO) * Number(item.cantidad), 0);
-  const descuentoExistente = Number(dataPedidos[filaPedido][17] || 0);
+  //
+  // Cada PRECIO/cantidad se pasa por "|| 0" ANTES de multiplicar, no
+  // después de sumar — si se hiciera después, un solo ítem con un
+  // valor inválido (por ejemplo, llegó sin PRECIO por algún motivo)
+  // convierte la suma ENTERA en NaN, y ese NaN se guardaba tal cual
+  // en la planilla (así quedó el pedido de la captura: "$NaN" en todos
+  // lados). Con el "|| 0" en cada ítem, como mucho ese ítem puntual
+  // suma $0 al total, pero el resto del cálculo sigue siendo válido.
+  const subtotalNuevo = carrito.reduce((acc, item) => acc + (Number(item.PRECIO) || 0) * (Number(item.cantidad) || 0), 0);
+  const descuentoExistente = Number(dataPedidos[filaPedido][17]) || 0;
   const totalNuevo = Math.max(0, subtotalNuevo - descuentoExistente);
+
+  // Última barrera: si por algún motivo el resultado igual no es un
+  // número válido, se corta ACÁ, antes de guardar nada — mejor un
+  // error visible que un "$NaN" guardado en silencio.
+  if(isNaN(subtotalNuevo) || isNaN(totalNuevo)){
+    return jsonResponse({
+      success:false,
+      message:"No se pudo calcular el total del pedido — revisá que todos los productos tengan precio y cantidad cargados, y volvé a intentar."
+    });
+  }
 
   pedidosSheet.getRange(filaPedido + 1, 8).setValue(totalNuevo);   // columna 8: TOTAL
   pedidosSheet.getRange(filaPedido + 1, 17).setValue(subtotalNuevo); // columna 17: SUBTOTAL
