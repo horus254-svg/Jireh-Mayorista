@@ -2044,11 +2044,13 @@ function renderEdicionItemsPedido() {
       <tbody>${filas}</tbody>
     </table>
 
-    <div class="d-flex gap-2 align-items-center mt-3 mb-2">
-      <input type="text" id="edicionPedidoBuscarProducto" class="form-control form-control-sm" placeholder="🔍 Código o nombre del producto a agregar..."
-        list="edicionPedidoDatalist" oninput="_edicionPedidoActualizarDatalist()">
-      <datalist id="edicionPedidoDatalist"></datalist>
-      <button type="button" class="btn btn-outline-primary btn-sm" style="white-space:nowrap;" onclick="_edicionPedidoAgregarProducto()">+ Agregar</button>
+    <div class="mt-3 mb-2" style="position:relative;">
+      <div class="d-flex gap-2 align-items-center">
+        <input type="text" id="edicionPedidoBuscarProducto" class="form-control form-control-sm" placeholder="🔍 Código o nombre del producto a agregar..."
+          autocomplete="off" oninput="_edicionPedidoActualizarResultados()" onkeydown="if(event.key==='Enter'){event.preventDefault(); _edicionPedidoAgregarProducto();}">
+        <button type="button" class="btn btn-outline-primary btn-sm" style="white-space:nowrap;" onclick="_edicionPedidoAgregarProducto()">+ Agregar</button>
+      </div>
+      <div id="edicionPedidoResultados" class="edicion-pedido-resultados" style="display:none;"></div>
     </div>
 
     <table style="width:100%; border-collapse:collapse; font-size:13.5px; margin-top:10px;">
@@ -2091,32 +2093,84 @@ function _edicionPedidoQuitarItem(idx) {
   renderEdicionItemsPedido();
 }
 
-function _edicionPedidoActualizarDatalist() {
-  const texto = document.getElementById("edicionPedidoBuscarProducto").value.trim().toLowerCase();
-  const datalist = document.getElementById("edicionPedidoDatalist");
-  if (!texto || texto.length < 2) { datalist.innerHTML = ""; return; }
+let _productoElegidoEdicionPedido = null; // el producto que quedó seleccionado al hacer clic en un resultado de la lista
+
+function _edicionPedidoActualizarResultados() {
+  const input = document.getElementById("edicionPedidoBuscarProducto");
+  const texto = input.value.trim().toLowerCase();
+  const cont = document.getElementById("edicionPedidoResultados");
+
+  // Si el texto cambió después de haber elegido un producto de la
+  // lista, esa selección ya no es válida (el cajero puede estar
+  // buscando otra cosa) — se limpia hasta que vuelva a elegir.
+  _productoElegidoEdicionPedido = null;
+
+  if (!texto || texto.length < 2) { cont.style.display = "none"; cont.innerHTML = ""; return; }
 
   const fuente = (productosAdminGlobal && productosAdminGlobal.length ? productosAdminGlobal : productosPOS) || [];
   const coincidencias = fuente
     .filter(p => String(p.CODIGO).toLowerCase().includes(texto) || String(p.PRODUCTO).toLowerCase().includes(texto))
     .slice(0, 15);
 
-  datalist.innerHTML = coincidencias
-    .map(p => `<option value="${escapeHtml(p.CODIGO)} — ${escapeHtml(p.PRODUCTO)}">`)
-    .join("");
+  if (coincidencias.length === 0) {
+    cont.innerHTML = `<div class="edicion-pedido-resultado-vacio">Sin resultados</div>`;
+    cont.style.display = "block";
+    return;
+  }
+
+  cont.innerHTML = coincidencias.map((p, idx) => `
+    <div class="edicion-pedido-resultado-item" onclick="_edicionPedidoElegirResultado(${idx})">
+      <span class="epr-codigo">${escapeHtml(p.CODIGO)}</span>
+      <span class="epr-nombre">${escapeHtml(p.PRODUCTO)}</span>
+      <span class="epr-precio">$${Number(p.PRECIO || 0).toLocaleString("es-AR")}</span>
+    </div>`).join("");
+
+  // Se guardan las coincidencias actuales para que el clic (que solo
+  // manda el índice) sepa a qué producto corresponde cada fila.
+  _resultadosEdicionPedidoActuales = coincidencias;
+
+  cont.style.display = "block";
 }
+
+let _resultadosEdicionPedidoActuales = [];
+
+function _edicionPedidoElegirResultado(idx) {
+  const producto = _resultadosEdicionPedidoActuales[idx];
+  if (!producto) return;
+
+  _productoElegidoEdicionPedido = producto;
+  document.getElementById("edicionPedidoBuscarProducto").value = `${producto.CODIGO} — ${producto.PRODUCTO}`;
+  document.getElementById("edicionPedidoResultados").style.display = "none";
+
+  _edicionPedidoAgregarProducto();
+}
+
+// Cierra la lista de resultados si se toca en cualquier otro lado del modal
+document.addEventListener("click", (e) => {
+  const cont = document.getElementById("edicionPedidoResultados");
+  const input = document.getElementById("edicionPedidoBuscarProducto");
+  if (!cont || cont.style.display === "none") return;
+  if (e.target === input || cont.contains(e.target)) return;
+  cont.style.display = "none";
+});
 
 function _edicionPedidoAgregarProducto() {
   const input = document.getElementById("edicionPedidoBuscarProducto");
   const texto = input.value.trim();
   if (!texto) return;
 
-  const codigoEscrito = texto.split(" — ")[0].trim().toLowerCase();
-  const fuente = (productosAdminGlobal && productosAdminGlobal.length ? productosAdminGlobal : productosPOS) || [];
-  const producto = fuente.find(p => String(p.CODIGO).toLowerCase() === codigoEscrito)
-    || fuente.find(p => String(p.PRODUCTO).toLowerCase() === texto.toLowerCase());
+  // Si se hizo clic en un resultado de la lista, ya sabemos exactamente
+  // qué producto es (sin depender de volver a parsear el texto escrito).
+  let producto = _productoElegidoEdicionPedido;
 
-  if (!producto) { toast("No se encontró ese producto — elegilo de la lista", "error"); return; }
+  if (!producto) {
+    const codigoEscrito = texto.split(" — ")[0].trim().toLowerCase();
+    const fuente = (productosAdminGlobal && productosAdminGlobal.length ? productosAdminGlobal : productosPOS) || [];
+    producto = fuente.find(p => String(p.CODIGO).toLowerCase() === codigoEscrito)
+      || fuente.find(p => String(p.PRODUCTO).toLowerCase() === texto.toLowerCase());
+  }
+
+  if (!producto) { toast("No se encontró ese producto — elegilo de la lista de resultados", "error"); return; }
 
   const existente = _carritoEdicionPedido.find(i => String(i.CODIGO) === String(producto.CODIGO));
   if (existente) {
@@ -2131,6 +2185,7 @@ function _edicionPedidoAgregarProducto() {
   }
 
   input.value = "";
+  _productoElegidoEdicionPedido = null;
   renderEdicionItemsPedido();
 }
 
