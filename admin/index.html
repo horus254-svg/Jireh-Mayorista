@@ -1716,17 +1716,25 @@
     </div>
 
     <!-- Paso 4: Verificar conexión -->
-    <div class="card p-4">
-      <h6 class="mb-1">✅ Paso 4 — Verificar conexión</h6>
+    <div class="card p-4 mb-3">
+      <h6 class="mb-1">✅ Paso 4 — Verificar conexión y crear las hojas</h6>
       <p class="text-muted mb-3" style="font-size:13px;">
-        Una vez publicado el Code.gs y pegada la API URL, verificá que la conexión funcione.
+        Una vez publicado el Code.gs y pegada la API URL de arriba, tocá el botón — prueba que la conexión funcione y, de paso, crea en la planilla todas las hojas que el sistema necesita (si ya existían, no las toca).
       </p>
       <div class="d-flex gap-3 align-items-center flex-wrap">
         <button class="btn btn-outline-success" onclick="verificarConexionInstalador()">
-          🔌 Probar conexión con la API
+          🔌 Probar conexión y crear hojas
         </button>
         <span id="instConexionStatus" style="font-size:13px;"></span>
       </div>
+    </div>
+
+    <!-- Paso 5: Activar el panel -->
+    <div class="card p-4">
+      <h6 class="mb-1">🔐 Paso 5 — Activar el panel para este negocio</h6>
+      <p class="text-muted mb-3" style="font-size:13px;">
+        Con la conexión verificada, descargá el <code>config.json</code> del Paso 3 (con la API URL ya cargada) y colocalo en la raíz de esta instalación, al lado de la carpeta <code>admin/</code>. Al recargar esta página, el panel va a reconocer que ya está configurado y va a pedir usuario y contraseña por primera vez — usá <strong>admin</strong> / <strong>Jireh2026</strong> (después la podés cambiar desde Configuración → Acceso al panel).
+      </p>
     </div>
   </div>
 

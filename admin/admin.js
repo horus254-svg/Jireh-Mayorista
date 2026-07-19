@@ -66,10 +66,12 @@ async function cargarConfigCliente() {
     if (res.ok) {
       const cfg = await res.json();
       if (cfg.apiUrl) API_URL = cfg.apiUrl;
+      return true; // config.json existe: esta instalación ya fue configurada alguna vez
     }
   } catch(e) {
     console.log("config.json no encontrado, usando URL por defecto");
   }
+  return false;
 }
 
 let pedidosGlobal = [];
@@ -81,9 +83,16 @@ let ultimaVentaImprimible = null;
 // Store POS sales loaded for dashboard
 let ventasPOSGlobal = [];
 
-if (sessionStorage.getItem("admin") !== "true") {
-  window.location.href = "login.html";
-}
+// El chequeo de "¿está logueado?" se hizo ANTES una función síncrona
+// que corría acá mismo, redirigiendo a login.html apenas se cargaba
+// el script — sin siquiera esperar a ver si config.json existía. El
+// problema: en una instalación recién copiada para un cliente nuevo
+// (sin config.json todavía, porque no pasó por el Instalador), esto
+// mandaba a login.html, que terminaba usando la URL de Apps Script
+// de Jireh que viene por defecto en el código — pidiendo la
+// contraseña de OTRA cuenta que el cliente nuevo ni siquiera tiene.
+// Ahora esa decisión se toma recién dentro de DOMContentLoaded, una
+// vez que ya se supo si esta instalación tiene config.json propio o no.
 
 function iniciarPollingSecciones() {
   const offsetInicial = Math.floor(Math.random() * 4000);
@@ -112,7 +121,28 @@ function ejecutarPollingSecciones() {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
-  await cargarConfigCliente();
+  const yaConfigurado = await cargarConfigCliente();
+
+  if (!yaConfigurado) {
+    // Instalación nueva, sin config.json propio todavía — no tiene
+    // sentido pedir login (no hay ninguna cuenta real detrás todavía,
+    // y menos la de otro cliente). Se muestra directo el Instalador,
+    // sin arrancar nada que dependa de un backend que no existe.
+    document.querySelectorAll(".sidebar a[data-target], #bottomNavLinks a[data-target]").forEach(a => {
+      if (a.getAttribute("data-target") !== "instalador") a.style.display = "none";
+    });
+    mostrarSeccion("instalador");
+    toast("Primera vez acá — completá el Instalador para configurar este negocio", "success");
+
+    const cat = document.getElementById("loadingCat");
+    if (cat) { cat.style.opacity = "0"; setTimeout(() => cat.remove(), 500); }
+    return;
+  }
+
+  if (sessionStorage.getItem("admin") !== "true") {
+    window.location.href = "login.html";
+    return;
+  }
 
   // Verificar licencia (solo en Electron con window.veekpos disponible)
   aplicarEstadoLicencia();
@@ -7759,12 +7789,20 @@ async function generarCodeGs() {
     if (!res.ok) throw new Error("No se encontró el template code.gs.template");
     let template = await res.text();
 
-    // Reemplazar placeholders
-    template = template
-      .replace(/\{\{SPREADSHEET_ID\}\}/g, d.spreadsheetId)
-      .replace(/\{\{EMPRESA\}\}/g, d.empresa)
-      .replace(/\{\{FECHA\}\}/g, d.fecha)
-      .replace(/\{\{VERSION\}\}/g, d.version);
+    // El template real (el mismo que corre en producción para el
+    // negocio actual, así que no puede tener un {{marcador}} literal
+    // sin romper ese uso directo) tiene el ID de la planilla escrito
+    // como una constante de verdad: const SPREADSHEET_ID = "...".
+    // Se busca esa línea puntual con una expresión regular y se le
+    // cambia el valor — antes se buscaba un {{SPREADSHEET_ID}} que
+    // nunca existió en el archivo, así que el reemplazo no encontraba
+    // nada y el .gs se descargaba con el ID de OTRO negocio adentro,
+    // sin ningún aviso de que eso había pasado.
+    const regexSpreadsheetId = /const\s+SPREADSHEET_ID\s*=\s*"[^"]*"/;
+    if (!regexSpreadsheetId.test(template)) {
+      throw new Error("No se encontró la línea 'const SPREADSHEET_ID = ...' en el template — no se puede generar el archivo con seguridad.");
+    }
+    template = template.replace(regexSpreadsheetId, `const SPREADSHEET_ID = "${d.spreadsheetId}"`);
 
     const nombreArchivo = `Code_${d.empresa.replace(/\s+/g, "_")}.gs`;
     descargarArchivo(nombreArchivo, template, "text/plain");
@@ -7904,16 +7942,20 @@ async function verificarConexionInstalador() {
     return;
   }
 
-  if (status) status.innerHTML = `<span class="text-muted">⏳ Probando conexión...</span>`;
+  if (status) status.innerHTML = `<span class="text-muted">⏳ Probando conexión y preparando las hojas...</span>`;
 
   try {
-    const res = await fetch(apiUrl + "?action=productos", { signal: AbortSignal.timeout(10000) });
+    // Un solo paso: probar que la API responde Y, de paso, crear en la
+    // planilla todas las hojas que el sistema necesita (si ya
+    // estaban creadas, no se tocan ni se duplican).
+    const res = await fetch(apiUrl + "?action=inicializarHojas", { signal: AbortSignal.timeout(20000) });
     const data = await res.json();
-    if (data.productos !== undefined || data.success !== undefined) {
-      if (status) status.innerHTML = `<span class="text-success">✅ Conexión exitosa — la API responde correctamente</span>`;
-      toast("Conexión verificada", "success");
+
+    if (data.success) {
+      if (status) status.innerHTML = `<span class="text-success">✅ Conexión exitosa — ${data.message}</span>`;
+      toast("Conexión verificada y hojas listas", "success");
     } else {
-      if (status) status.innerHTML = `<span class="text-warning">⚠️ La API responde pero el formato es inesperado</span>`;
+      if (status) status.innerHTML = `<span class="text-warning">⚠️ La API respondió pero algo falló: ${data.message || "revisá el Code.gs publicado"}</span>`;
     }
   } catch (err) {
     if (status) status.innerHTML = `<span class="text-danger">❌ No se pudo conectar: ${err.message}</span>`;
