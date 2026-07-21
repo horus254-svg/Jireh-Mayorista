@@ -1766,7 +1766,7 @@ async function cargarPedidos() {
   const cached = cacheGet("pedidos");
   if (cached) {
     pedidosGlobal = cached.data;
-    renderPedidos(pedidosGlobal);
+    filtrarPedidos();
     if (!cached.stale) return; // fresco, no hace falta recargar
   }
   try {
@@ -1786,7 +1786,7 @@ async function cargarPedidos() {
     pedidosGlobal = data.pedidos;
     cacheSet("pedidos", pedidosGlobal);
     _avisoPedidosCaido = false; // se pudo actualizar bien — resetea el aviso para el próximo corte
-    if (cambio) renderPedidos(pedidosGlobal);
+    if (cambio) filtrarPedidos();
   } catch (error) {
     console.error("Error pedidos:", error);
     // Solo se avisa la primera vez que falla, no en cada intento del
@@ -1824,7 +1824,7 @@ async function cambiarEstado(pedidoId, estado) {
     if (!data.success) { toast("No se pudo actualizar el pedido", "error"); return; }
     // Actualizar en memoria sin recargar todo
     const p = pedidosGlobal.find(x => x.PEDIDO_ID === pedidoId);
-    if (p) { p.ESTADO = estado; invalidarCache("pedidos"); renderPedidos(pedidosGlobal); }
+    if (p) { p.ESTADO = estado; invalidarCache("pedidos"); filtrarPedidos(); }
     toast("Estado actualizado", "success");
   } catch (error) {
     console.error(error);
@@ -1901,7 +1901,7 @@ async function aplicarCobroPedido(pedidoId, cobrado, formaPago) {
       p.COBRADO = cobrado ? "SI" : "NO";
       p.FORMA_PAGO_COBRO = formaPago || "";
       invalidarCache("pedidos");
-      renderPedidos(pedidosGlobal);
+      filtrarPedidos();
     }
 
     toast(cobrado
