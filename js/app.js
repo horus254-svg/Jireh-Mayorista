@@ -1781,8 +1781,6 @@ async function descargarCatalogoPDF(){
   actualizarContador();
   cargarProductos();
 })();
-// Blindaje frontend
-window.addEventListener('visibilitychange',()=>{if(!document.hidden&&typeof cargarProductos==='function')cargarProductos();});
 
 /* =========================================================
    SEGUIMIENTO DE PEDIDO
