@@ -41,6 +41,9 @@ if (e.parameter.action === "guardarPedido") {
   case "login":
 return login(e);
 
+case "inicializarHojas":
+  return inicializarHojasNuevoNegocio();
+
 case "loginStock":
   return loginStock(e);
 
@@ -279,6 +282,88 @@ function getSheet() {
   return SpreadsheetApp
     .openById(SPREADSHEET_ID)
     .getSheetByName(SHEET_NAME);
+}
+
+/**
+ * Crea, en la planilla configurada (SPREADSHEET_ID), todas las hojas
+ * que el sistema necesita para funcionar — con sus encabezados
+ * correctos — si todavía no existen. Pensada para usarse una sola vez,
+ * recién implementado el Code.gs de un negocio nuevo (paso "Probar
+ * conexión" del Instalador): antes, varias de estas hojas (PRODUCTOS,
+ * PEDIDOS, DETALLE_PEDIDOS, VENTAS_LOCAL, DETALLE_VENTAS,
+ * MOVIMIENTOS_CAJA) no se creaban solas en ningún lado — había que
+ * armarlas a mano, con los encabezados exactos, antes de poder usar
+ * el sistema. Las demás (CONFIGURACION, CLIENTES, PAGOS_CREDITO,
+ * DEUDAS_EXTRA, ADMIN_CREDENCIALES) ya se creaban solas la primera vez
+ * que algo las necesitaba — acá también se fuerza su creación, para
+ * no depender de qué acción se ejecute primero.
+ *
+ * No toca ninguna hoja que ya exista (nunca borra ni reescribe datos).
+ */
+function inicializarHojasNuevoNegocio(){
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const creadas = [];
+  const yaExistian = [];
+
+  const asegurarHojaConEncabezados = (nombre, encabezados) => {
+    let sheet = ss.getSheetByName(nombre);
+    if(sheet){
+      yaExistian.push(nombre);
+      return;
+    }
+    sheet = ss.insertSheet(nombre);
+    sheet.appendRow(encabezados);
+    sheet.setFrozenRows(1);
+    creadas.push(nombre);
+  };
+
+  asegurarHojaConEncabezados("PRODUCTOS", [
+    "CODIGO", "PRODUCTO", "CATEGORIA", "PRECIO", "STOCK",
+    "PUBLICADO", "DESTACADO", "OFERTA", "DESCRIPCION", "IMAGEN",
+    "CODIGO_CAJA", "UNIDADES_POR_CAJA", "PRECIO_CAJA"
+  ]);
+
+  asegurarHojaConEncabezados("PEDIDOS", [
+    "PEDIDO_ID", "FECHA", "NOMBRE", "EMPRESA", "DIRECCION", "TELEFONO", "DNI",
+    "TOTAL", "ESTADO", "PDF_URL", "CODIGO_POSTAL", "LOCALIDAD", "PROVINCIA",
+    "STOCK_DESCONTADO", "MONEDA", "TIPO_CAMBIO", "SUBTOTAL", "DESCUENTO", "DESCUENTO_ETIQUETA"
+  ]);
+
+  asegurarHojaConEncabezados("DETALLE_PEDIDOS", [
+    "PEDIDO_ID", "CODIGO", "PRODUCTO", "CANTIDAD", "PRECIO", "SUBTOTAL"
+  ]);
+
+  asegurarHojaConEncabezados("VENTAS_LOCAL", [
+    "VENTA_ID", "FECHA", "TOTAL", "FORMA_PAGO", "VENDEDOR", "OBSERVACIONES",
+    "CLIENTE_VENTA_ID", "ANULADA", "MOTIVO_ANULACION"
+  ]);
+
+  asegurarHojaConEncabezados("DETALLE_VENTAS", [
+    "VENTA_ID", "CODIGO", "PRODUCTO", "CANTIDAD", "PRECIO", "SUBTOTAL"
+  ]);
+
+  asegurarHojaConEncabezados("MOVIMIENTOS_CAJA", [
+    "MOVIMIENTO_ID", "FECHA", "TIPO", "MONTO", "MOTIVO", "VENDEDOR",
+    "FECHA_REGISTRO", "FORMA_PAGO"
+  ]);
+
+  // Estas ya se auto-crean solas al primer uso (getOrCrearHoja*), pero
+  // se fuerza acá también para que el instalador las deje todas listas
+  // de una — no depende de qué pantalla se abra primero en el panel.
+  getOrCrearHojaConfiguracion();
+  getOrCrearHojaCredenciales();
+  getOrCrearHojaClientes();
+  getOrCrearHojaPagosCredito();
+  getOrCrearHojaDeudasExtra();
+
+  return jsonResponse({
+    success: true,
+    creadas: creadas,
+    yaExistian: yaExistian,
+    message: creadas.length > 0
+      ? `Se crearon ${creadas.length} hojas nuevas: ${creadas.join(", ")}.`
+      : "Todas las hojas ya existían — no hizo falta crear ninguna."
+  });
 }
 
 function rowsToObjects(data) {
