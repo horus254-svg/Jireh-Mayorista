@@ -38,7 +38,7 @@ let API_URL =
  */
 async function fetchAPI(url, opciones = {}, config = {}) {
   const esLectura = !opciones.method || opciones.method === "GET";
-  const Ms = config.timeoutMs || (esLectura ? 30000 : 40000);
+  const Ms = config.timeoutMs || (esLectura ? 10000 : 20000);
   const maxIntentos = esLectura ? (config.reintentos ?? 2) : 1;
 
   let ultimoError;
