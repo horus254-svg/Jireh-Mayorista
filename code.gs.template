@@ -4484,6 +4484,15 @@ function eliminarVenta(e){
   for(let i = 1; i < dataVentas.length; i++){
     if(String(dataVentas[i][0]) === ventaId){
       const fila = i + 1;
+
+      // Evita devolver el stock dos veces si la venta ya estaba anulada
+      // (ej. doble clic, dos pestañas del panel abiertas, un reintento
+      // que le llega al servidor después de que ya se procesó la primera vez).
+      const yaAnulada = String(dataVentas[i][colAnulada] || "").toUpperCase() === "SI";
+      if(yaAnulada){
+        return jsonResponse({ success:false, message:"Esta venta ya estaba anulada." });
+      }
+
       ventasSheet.getRange(fila, colAnulada + 1, 1, 2).setValues([["SI", motivo]]);
 
       // Devuelve el stock igual que antes
