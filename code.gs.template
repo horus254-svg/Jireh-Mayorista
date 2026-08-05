@@ -3247,6 +3247,15 @@ function getClientesConCredito(){
   const pedidosSheet = getHoja("PEDIDOS");
   const pedidosData = pedidosSheet ? rowsToObjects(pedidosSheet.getDataRange().getValues()) : [];
 
+  // OPTIMIZACION: leer PAGOS_CREDITO y DEUDAS_EXTRA una sola vez acá
+  // arriba (en vez de dejar que calcularSaldosCliente las releyera por
+  // cada cliente a crédito) es lo que más acelera esta sección — con
+  // muchos clientes a crédito, antes se leían esas hojas completas una
+  // vez por cliente.
+  const pagosData = rowsToObjects(getOrCrearHojaPagosCredito().getDataRange().getValues());
+  const deudasSheetGlobal = getHoja("DEUDAS_EXTRA");
+  const deudasData = deudasSheetGlobal ? rowsToObjects(deudasSheetGlobal.getDataRange().getValues()) : [];
+
   // Total pedido (en cualquier moneda, solo para la columna informativa
   // "Total Comprado" de la tabla general) y cantidad de pedidos,
   // agrupado por DNI normalizado.
@@ -3266,8 +3275,11 @@ function getClientesConCredito(){
 
     // calcularSaldosCliente separa por moneda y mira PAGOS_CREDITO real
     // — solo se calcula para clientes a crédito, ya que para los demás
-    // no representa una deuda real (es solo informativo).
-    const saldos = esCredito ? calcularSaldosCliente(c.CLIENTE_ID, dniNorm) : null;
+    // no representa una deuda real (es solo informativo). Le pasamos
+    // los datos ya leídos arriba para que no vuelva a leer las hojas.
+    const saldos = esCredito
+      ? calcularSaldosCliente(c.CLIENTE_ID, dniNorm, { pedidosData, pagosData, deudasData })
+      : null;
 
     return {
       CLIENTE_ID: c.CLIENTE_ID,
@@ -3483,16 +3495,33 @@ function crearClienteDesdeHistorialYMarcarCredito(data){
  * (para mostrar) como registrarPagoCredito (para saber cuánto hay que
  * descontar de cada deuda antes de repartir un pago nuevo).
  */
-function calcularSaldosCliente(clienteId, dniNorm){
+function calcularSaldosCliente(clienteId, dniNorm, datosPrecargados){
 
-  const ss = getSS();
+  // OPTIMIZACION: antes, esta función releía PEDIDOS, PAGOS_CREDITO y
+  // DEUDAS_EXTRA completas cada vez que se llamaba — y
+  // getClientesConCredito() la llama UNA VEZ POR CADA cliente a
+  // crédito. Con 30 clientes a crédito, eso eran 30 lecturas completas
+  // de cada una de esas 3 hojas (90 lecturas de hoja completa en una
+  // sola carga de la sección Clientes) — de ahí la demora, y en
+  // negocios con historial grande, el riesgo de pasarse del tiempo
+  // máximo de ejecución de Apps Script (lo que se veía como que "a
+  // veces falla").
+  //
+  // Ahora, quien llama a esta función puede pasar los datos ya leídos
+  // en datosPrecargados = {pedidosData, pagosData, deudasData} para
+  // que no se vuelvan a leer. Si no se pasan (como en
+  // registrarPagoCredito, que solo calcula para UN cliente por vez),
+  // se leen igual que antes — ningún llamador existente se rompe.
+  datosPrecargados = datosPrecargados || {};
 
-  const pedidosSheet = getHoja("PEDIDOS");
-  const pedidosData = pedidosSheet ? rowsToObjects(pedidosSheet.getDataRange().getValues()) : [];
+  const pedidosData = datosPrecargados.pedidosData || (function(){
+    const pedidosSheet = getHoja("PEDIDOS");
+    return pedidosSheet ? rowsToObjects(pedidosSheet.getDataRange().getValues()) : [];
+  })();
   const pedidosDelCliente = pedidosData.filter(p => normalizarDni(p.DNI) === dniNorm);
 
-  const pagosSheet = getOrCrearHojaPagosCredito();
-  const pagosData = rowsToObjects(pagosSheet.getDataRange().getValues());
+  const pagosData = datosPrecargados.pagosData ||
+    rowsToObjects(getOrCrearHojaPagosCredito().getDataRange().getValues());
   const pagosDelCliente = pagosData.filter(pago => String(pago.CLIENTE_ID) === String(clienteId));
 
   let compradoArs = 0, compradoUsd = 0;
@@ -3502,9 +3531,13 @@ function calcularSaldosCliente(clienteId, dniNorm){
   });
 
   // Deudas extra (cobros fuera de pedidos y POS)
-  const deudasSheet = getHoja("DEUDAS_EXTRA");
-  if(deudasSheet){
-    const deudasData = rowsToObjects(deudasSheet.getDataRange().getValues());
+  const deudasData = datosPrecargados.deudasData !== undefined
+    ? datosPrecargados.deudasData
+    : (function(){
+        const deudasSheet = getHoja("DEUDAS_EXTRA");
+        return deudasSheet ? rowsToObjects(deudasSheet.getDataRange().getValues()) : [];
+      })();
+  if(deudasData){
     deudasData
       .filter(d => String(d.CLIENTE_ID) === String(clienteId))
       .forEach(d => {
@@ -3723,13 +3756,11 @@ function getDetalleClienteCredito(clienteId){
     .filter(pago => String(pago.CLIENTE_ID) === String(clienteId))
     .reverse();
 
-  const ss2 = getSS();
   const deudasSheet = getHoja("DEUDAS_EXTRA");
-  const deudasDelCliente = deudasSheet
-    ? rowsToObjects(deudasSheet.getDataRange().getValues())
-        .filter(d => String(d.CLIENTE_ID) === String(clienteId))
-        .reverse()
-    : [];
+  const deudasData = deudasSheet ? rowsToObjects(deudasSheet.getDataRange().getValues()) : [];
+  const deudasDelCliente = deudasData
+    .filter(d => String(d.CLIENTE_ID) === String(clienteId))
+    .reverse();
 
   const esCredito = String(cliente.A_CREDITO || "").toUpperCase() === "SI";
 
@@ -3738,8 +3769,10 @@ function getDetalleClienteCredito(clienteId){
   // automáticamente desde un pedido del catálogo web), el total de
   // sus pedidos es solo informativo — no representa plata que deban,
   // así que el saldo siempre es $0, sin importar cuántos pedidos tenga.
+  // Le pasamos a calcularSaldosCliente los datos que ya leímos arriba
+  // (pedidosData, pagosData, deudasData) para que no los vuelva a leer.
   const saldos = esCredito
-    ? calcularSaldosCliente(clienteId, dniNorm)
+    ? calcularSaldosCliente(clienteId, dniNorm, { pedidosData, pagosData, deudasData })
     : { compradoArs: 0, compradoUsd: 0, pagadoArs: 0, pagadoUsd: 0, saldoArs: 0, saldoUsd: 0 };
 
   return jsonResponse({
