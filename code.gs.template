@@ -1,6 +1,41 @@
 const SPREADSHEET_ID = "1A2VGs6-he1g2AvK3A4u8zhamxETBPxT3NpLnaRyqsUA";
 const SHEET_NAME = "PRODUCTOS";
 
+// --- OPTIMIZACION: cache del Spreadsheet dentro de una misma ejecucion. ---
+// SpreadsheetApp.openById() es la llamada mas costosa de todo el script
+// (hace un viaje de red). Antes se llamaba una vez por cada funcion que
+// necesitaba la planilla; si una sola solicitud terminaba disparando
+// varias funciones (por ej. dashboard(), que combina datos de varias
+// hojas), se reabria la planilla varias veces sin necesidad.
+// getSS() guarda el resultado en una variable global de script: la
+// primera llamada abre la planilla, todas las siguientes (dentro de la
+// misma ejecucion) reutilizan el mismo objeto. No cambia ningun
+// comportamiento: sigue siendo la misma planilla, con los mismos datos.
+let _ssCache = null;
+function getSS() {
+  if (!_ssCache) {
+    _ssCache = SpreadsheetApp.openById(SPREADSHEET_ID);
+  }
+  return _ssCache;
+}
+
+// --- OPTIMIZACION: cache de hojas por nombre dentro de una misma ejecucion. ---
+// ss.getSheetByName("PEDIDOS") se repetia muchas veces con el mismo
+// nombre dentro de la misma solicitud (por ej. PEDIDOS y DETALLE_PEDIDOS
+// se buscan una y otra vez en varias funciones que se llaman entre si).
+// getHoja(nombre) guarda cada hoja ya encontrada en un mapa; si se pide
+// el mismo nombre de nuevo en la misma ejecucion, se devuelve la hoja
+// ya obtenida en vez de volver a buscarla. Es exactamente la misma hoja
+// (mismo objeto que devolvia ss.getSheetByName), asi que no cambia nada
+// del comportamiento — solo evita busquedas repetidas.
+const _hojaCache = {};
+function getHoja(nombre) {
+  if (!(nombre in _hojaCache)) {
+    _hojaCache[nombre] = getSS().getSheetByName(nombre);
+  }
+  return _hojaCache[nombre];
+}
+
 function doGet(e) {
   if (e.parameter.action === "metricas") {
 
@@ -279,9 +314,7 @@ return jsonResponse({
 }
 
 function getSheet() {
-  return SpreadsheetApp
-    .openById(SPREADSHEET_ID)
-    .getSheetByName(SHEET_NAME);
+  return getHoja(SHEET_NAME);
 }
 
 /**
@@ -301,12 +334,12 @@ function getSheet() {
  * No toca ninguna hoja que ya exista (nunca borra ni reescribe datos).
  */
 function inicializarHojasNuevoNegocio(){
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const ss = getSS();
   const creadas = [];
   const yaExistian = [];
 
   const asegurarHojaConEncabezados = (nombre, encabezados) => {
-    let sheet = ss.getSheetByName(nombre);
+    let sheet = getHoja(nombre);
     if(sheet){
       yaExistian.push(nombre);
       return;
@@ -932,8 +965,8 @@ const TEMAS_VALIDOS = ["navy", "azul", "verde", "rojo"];
 /** Returns the CONFIGURACION sheet, creating it with default values if it doesn't exist yet */
 function getOrCrearHojaConfiguracion(){
 
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  let sheet = ss.getSheetByName("CONFIGURACION");
+  const ss = getSS();
+  let sheet = getHoja("CONFIGURACION");
 
   if(!sheet){
     sheet = ss.insertSheet("CONFIGURACION");
@@ -1422,13 +1455,13 @@ function obtenerStockActualPorCodigo(codigos){
 
 function guardarPedido(data){
 
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const ss = getSS();
 
   const pedidosSheet =
-    ss.getSheetByName("PEDIDOS");
+    getHoja("PEDIDOS");
 
   const detalleSheet =
-    ss.getSheetByName("DETALLE_PEDIDOS");
+    getHoja("DETALLE_PEDIDOS");
 
   // El catálogo web ya bloquea en el navegador que el cliente escriba
   // una empresa de transporte no habilitada, pero eso se puede
@@ -1999,10 +2032,10 @@ for (let c = 0; c < 4; c++) {
 function getPedidos(){
 
 const ss =
-SpreadsheetApp.openById(SPREADSHEET_ID);
+getSS();
 
 const sheet =
-ss.getSheetByName("PEDIDOS");
+getHoja("PEDIDOS");
 
 const data =
 sheet.getDataRange().getValues();
@@ -2073,8 +2106,8 @@ const CREDENCIALES_DEFAULT = {
 
 function getOrCrearHojaCredenciales(){
 
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  let sheet = ss.getSheetByName("ADMIN_CREDENCIALES");
+  const ss = getSS();
+  let sheet = getHoja("ADMIN_CREDENCIALES");
 
   if(!sheet){
     sheet = ss.insertSheet("ADMIN_CREDENCIALES");
@@ -2257,10 +2290,10 @@ function guardarCredencialesAdmin(e){
 function dashboard(){
 
 const ss =
-SpreadsheetApp.openById(SPREADSHEET_ID);
+getSS();
 
 const sheet =
-ss.getSheetByName("PEDIDOS");
+getHoja("PEDIDOS");
 
 const data =
 sheet.getDataRange().getValues();
@@ -2323,10 +2356,10 @@ const estado =
 e.parameter.estado;
 
 const ss =
-SpreadsheetApp.openById(SPREADSHEET_ID);
+getSS();
 
 const sheet =
-ss.getSheetByName("PEDIDOS");
+getHoja("PEDIDOS");
 
 const data =
 sheet.getDataRange().getValues();
@@ -2392,8 +2425,8 @@ function consultarPedido(e){
     return jsonResponse({ success:false, message:"Ingresá el número de pedido y tu DNI." });
   }
 
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const pedidosSheet = ss.getSheetByName("PEDIDOS");
+  const ss = getSS();
+  const pedidosSheet = getHoja("PEDIDOS");
   const pedidosData = rowsToObjects(pedidosSheet.getDataRange().getValues());
   const pedido = pedidosData.find(p => String(p.PEDIDO_ID) === pedidoId);
 
@@ -2407,7 +2440,7 @@ function consultarPedido(e){
   }
 
   // Items del pedido
-  const detalleSheet = ss.getSheetByName("DETALLE_PEDIDOS");
+  const detalleSheet = getHoja("DETALLE_PEDIDOS");
   const items = detalleSheet
     ? rowsToObjects(detalleSheet.getDataRange().getValues())
         .filter(d => String(d.PEDIDO_ID) === pedidoId)
@@ -2445,16 +2478,16 @@ function getDetallePedido(e){
   const pedidoId = String(e.parameter.pedidoId || "").trim();
   if(!pedidoId) return jsonResponse({ success:false, message:"Falta el pedidoId." });
 
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const ss = getSS();
 
   // Encabezado del pedido
-  const pedidosSheet = ss.getSheetByName("PEDIDOS");
+  const pedidosSheet = getHoja("PEDIDOS");
   const pedidosData = rowsToObjects(pedidosSheet.getDataRange().getValues());
   const pedido = pedidosData.find(p => String(p.PEDIDO_ID) === pedidoId);
   if(!pedido) return jsonResponse({ success:false, message:"Pedido no encontrado." });
 
   // Items del pedido
-  const detalleSheet = ss.getSheetByName("DETALLE_PEDIDOS");
+  const detalleSheet = getHoja("DETALLE_PEDIDOS");
   const detalle = detalleSheet
     ? rowsToObjects(detalleSheet.getDataRange().getValues())
         .filter(d => String(d.PEDIDO_ID) === pedidoId)
@@ -2493,9 +2526,9 @@ function editarItemsPedido(e){
     return jsonResponse({ success:false, message:"El pedido no puede quedar sin productos." });
   }
 
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const pedidosSheet = ss.getSheetByName("PEDIDOS");
-  const detalleSheet = ss.getSheetByName("DETALLE_PEDIDOS");
+  const ss = getSS();
+  const pedidosSheet = getHoja("PEDIDOS");
+  const detalleSheet = getHoja("DETALLE_PEDIDOS");
 
   const dataPedidos = pedidosSheet.getDataRange().getValues();
   let filaPedido = -1;
@@ -2637,9 +2670,9 @@ function marcarPedidoCobrado(e){
     return jsonResponse({ success:false, message:"Elegí una forma de pago válida (efectivo, transferencia o tarjeta)." });
   }
 
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const pedidosSheet = ss.getSheetByName("PEDIDOS");
-  const ventasSheet = ss.getSheetByName("VENTAS_LOCAL");
+  const ss = getSS();
+  const pedidosSheet = getHoja("PEDIDOS");
+  const ventasSheet = getHoja("VENTAS_LOCAL");
 
   if(!ventasSheet){
     return jsonResponse({ success:false, message:"Falta la hoja 'VENTAS_LOCAL' en la planilla." });
@@ -2789,8 +2822,8 @@ function eliminarPagoCreditoAutomaticoPorPedido(pedidoId){
  */
 function descontarStockPorPedido(pedidoId){
 
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const detalleSheet = ss.getSheetByName("DETALLE_PEDIDOS");
+  const ss = getSS();
+  const detalleSheet = getHoja("DETALLE_PEDIDOS");
   if(!detalleSheet) return;
 
   const detalles = detalleSheet.getDataRange().getValues();
@@ -2813,8 +2846,8 @@ function descontarStockPorPedido(pedidoId){
  */
 function devolverStockPorPedido(pedidoId){
 
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const detalleSheet = ss.getSheetByName("DETALLE_PEDIDOS");
+  const ss = getSS();
+  const detalleSheet = getHoja("DETALLE_PEDIDOS");
   if(!detalleSheet) return;
 
   const detalles = detalleSheet.getDataRange().getValues();
@@ -2828,7 +2861,7 @@ function devolverStockPorPedido(pedidoId){
 }
 function obtenerMetricas() {
 
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const ss = getSS();
 
   const hoy = new Date();
 
@@ -2837,7 +2870,7 @@ function obtenerMetricas() {
   ========================================================= */
 
   const hojaPedidos =
-    ss.getSheetByName("PEDIDOS");
+    getHoja("PEDIDOS");
 
   const pedidos =
     hojaPedidos
@@ -2920,7 +2953,7 @@ function obtenerMetricas() {
   ========================================================= */
 
   const hojaVentasPOS =
-    ss.getSheetByName("VENTAS_LOCAL");
+    getHoja("VENTAS_LOCAL");
 
   const ventasLocal =
     hojaVentasPOS
@@ -2974,7 +3007,7 @@ function obtenerMetricas() {
   ========================================================= */
 
   const hojaProductos =
-    ss.getSheetByName("PRODUCTOS");
+    getHoja("PRODUCTOS");
 
   const productos =
     hojaProductos
@@ -3074,7 +3107,7 @@ function obtenerTopVendidoCombinado(ss){
 
   function sumar(sheetName, idxCodigo, idxNombre, idxCantidad){
 
-    const hoja = ss.getSheetByName(sheetName);
+    const hoja = getHoja(sheetName);
     if(!hoja) return;
 
     const data = hoja.getDataRange().getValues();
@@ -3118,8 +3151,8 @@ function obtenerTopVendidoCombinado(ss){
 /** Returns the CLIENTES sheet, creating it (with headers) the first time it's needed */
 function getOrCrearHojaClientes(){
 
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  let sheet = ss.getSheetByName("CLIENTES");
+  const ss = getSS();
+  let sheet = getHoja("CLIENTES");
 
   if(!sheet){
     sheet = ss.insertSheet("CLIENTES");
@@ -3132,8 +3165,8 @@ function getOrCrearHojaClientes(){
 /** Returns the PAGOS_CREDITO sheet, creating it (with headers) the first time it's needed */
 function getOrCrearHojaPagosCredito(){
 
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  let sheet = ss.getSheetByName("PAGOS_CREDITO");
+  const ss = getSS();
+  let sheet = getHoja("PAGOS_CREDITO");
 
   const encabezadosNuevos = ["PAGO_ID", "FECHA", "CLIENTE_ID", "MONEDA_PAGO", "MONTO_PAGO", "TIPO_CAMBIO", "PRIORIDAD", "MONTO_APLICADO_ARS", "MONTO_APLICADO_USD", "FORMA_PAGO", "OBSERVACIONES"];
 
@@ -3206,12 +3239,12 @@ function consultarClienteCreditoPorDni(dni){
 
 function getClientesConCredito(){
 
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const ss = getSS();
 
   const clientesSheet = getOrCrearHojaClientes();
   const clientesData = rowsToObjects(clientesSheet.getDataRange().getValues());
 
-  const pedidosSheet = ss.getSheetByName("PEDIDOS");
+  const pedidosSheet = getHoja("PEDIDOS");
   const pedidosData = pedidosSheet ? rowsToObjects(pedidosSheet.getDataRange().getValues()) : [];
 
   // Total pedido (en cualquier moneda, solo para la columna informativa
@@ -3418,8 +3451,8 @@ function crearClienteDesdeHistorialYMarcarCredito(data){
     return jsonResponse({ success:false, message:"Ese cliente ya existe en la lista — usá 'Marcar a crédito' directo desde su fila." });
   }
 
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const pedidosSheet = ss.getSheetByName("PEDIDOS");
+  const ss = getSS();
+  const pedidosSheet = getHoja("PEDIDOS");
   const pedidosData = pedidosSheet ? rowsToObjects(pedidosSheet.getDataRange().getValues()) : [];
 
   const pedidoDelCliente = pedidosData.reverse().find(p => normalizarDni(p.DNI) === dniBuscado);
@@ -3452,9 +3485,9 @@ function crearClienteDesdeHistorialYMarcarCredito(data){
  */
 function calcularSaldosCliente(clienteId, dniNorm){
 
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const ss = getSS();
 
-  const pedidosSheet = ss.getSheetByName("PEDIDOS");
+  const pedidosSheet = getHoja("PEDIDOS");
   const pedidosData = pedidosSheet ? rowsToObjects(pedidosSheet.getDataRange().getValues()) : [];
   const pedidosDelCliente = pedidosData.filter(p => normalizarDni(p.DNI) === dniNorm);
 
@@ -3469,7 +3502,7 @@ function calcularSaldosCliente(clienteId, dniNorm){
   });
 
   // Deudas extra (cobros fuera de pedidos y POS)
-  const deudasSheet = ss.getSheetByName("DEUDAS_EXTRA");
+  const deudasSheet = getHoja("DEUDAS_EXTRA");
   if(deudasSheet){
     const deudasData = rowsToObjects(deudasSheet.getDataRange().getValues());
     deudasData
@@ -3625,8 +3658,8 @@ function registrarPagoCredito(data){
 
   if (montoEnCajaArs > 0) {
     try {
-      const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-      const sheetMov = ss.getSheetByName("MOVIMIENTOS_CAJA");
+      const ss = getSS();
+      const sheetMov = getHoja("MOVIMIENTOS_CAJA");
       if (sheetMov) {
         const movId = "MOV-" + new Date().getTime();
         const fp = String(data.formaPago || "EFECTIVO").toUpperCase();
@@ -3666,7 +3699,7 @@ function registrarPagoCredito(data){
  */
 function getDetalleClienteCredito(clienteId){
 
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const ss = getSS();
 
   const clientesSheet = getOrCrearHojaClientes();
   const clientesData = rowsToObjects(clientesSheet.getDataRange().getValues());
@@ -3678,7 +3711,7 @@ function getDetalleClienteCredito(clienteId){
 
   const dniNorm = normalizarDni(cliente.DNI);
 
-  const pedidosSheet = ss.getSheetByName("PEDIDOS");
+  const pedidosSheet = getHoja("PEDIDOS");
   const pedidosData = pedidosSheet ? rowsToObjects(pedidosSheet.getDataRange().getValues()) : [];
   const pedidosDelCliente = pedidosData
     .filter(p => normalizarDni(p.DNI) === dniNorm)
@@ -3690,8 +3723,8 @@ function getDetalleClienteCredito(clienteId){
     .filter(pago => String(pago.CLIENTE_ID) === String(clienteId))
     .reverse();
 
-  const ss2 = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const deudasSheet = ss2.getSheetByName("DEUDAS_EXTRA");
+  const ss2 = getSS();
+  const deudasSheet = getHoja("DEUDAS_EXTRA");
   const deudasDelCliente = deudasSheet
     ? rowsToObjects(deudasSheet.getDataRange().getValues())
         .filter(d => String(d.CLIENTE_ID) === String(clienteId))
@@ -3762,11 +3795,11 @@ function obtenerUltimaDireccionPorDni(pedidosData){
 }
 
 function getTodosClientes(){
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const ss = getSS();
   const sheet = getOrCrearHojaClientes();
   const data = rowsToObjects(sheet.getDataRange().getValues());
 
-  const pedidosSheet = ss.getSheetByName("PEDIDOS");
+  const pedidosSheet = getHoja("PEDIDOS");
   const pedidosData = pedidosSheet ? rowsToObjects(pedidosSheet.getDataRange().getValues()) : [];
   const direccionesPorDni = obtenerUltimaDireccionPorDni(pedidosData);
 
@@ -3795,9 +3828,7 @@ function getTodosClientes(){
 function getClientes(){
 
 const sheet =
-SpreadsheetApp
-.openById(SPREADSHEET_ID)
-.getSheetByName("PEDIDOS");
+getHoja("PEDIDOS");
 
 const data =
 rowsToObjects(
@@ -3892,13 +3923,13 @@ productos:stockBajo
 function getMasVendidos(){
 
 const ss =
-SpreadsheetApp.openById(SPREADSHEET_ID);
+getSS();
 
 const productos = {};
 
 function acumular(sheetName, idxCodigo, idxNombre, idxCantidad){
 
-  const sheet = ss.getSheetByName(sheetName);
+  const sheet = getHoja(sheetName);
   if(!sheet) return;
 
   const data = sheet.getDataRange().getValues();
@@ -3946,13 +3977,13 @@ productos: ranking
 function generarPDFPendientes(){
 
 const ss =
-SpreadsheetApp.openById(SPREADSHEET_ID);
+getSS();
 
 const pedidosSheet =
-ss.getSheetByName("PEDIDOS");
+getHoja("PEDIDOS");
 
 const detalleSheet =
-ss.getSheetByName("DETALLE_PEDIDOS");
+getHoja("DETALLE_PEDIDOS");
 
 const pedidos =
 pedidosSheet.getDataRange().getValues();
@@ -4032,13 +4063,13 @@ for(let i=1;i<pedidos.length;i++){
 function guardarVenta(e){
 
   const ss =
-  SpreadsheetApp.openById(SPREADSHEET_ID);
+  getSS();
 
   const ventasSheet =
-  ss.getSheetByName("VENTAS_LOCAL");
+  getHoja("VENTAS_LOCAL");
 
   const detalleSheet =
-  ss.getSheetByName("DETALLE_VENTAS");
+  getHoja("DETALLE_VENTAS");
 
   if(!ventasSheet || !detalleSheet){
 
@@ -4269,10 +4300,10 @@ function getVentasPOSHistorial(e){
 function getVentasPOSPorRango(desde, hasta, excluirAnuladas){
 
   const ss =
-  SpreadsheetApp.openById(SPREADSHEET_ID);
+  getSS();
 
   const ventasSheet =
-  ss.getSheetByName("VENTAS_LOCAL");
+  getHoja("VENTAS_LOCAL");
 
   if(!ventasSheet){
     return jsonResponse({
@@ -4282,7 +4313,7 @@ function getVentasPOSPorRango(desde, hasta, excluirAnuladas){
   }
 
   const detalleSheet =
-  ss.getSheetByName("DETALLE_VENTAS");
+  getHoja("DETALLE_VENTAS");
 
   const dataRaw = ventasSheet.getDataRange().getValues();
   const headers = dataRaw.shift(); // VENTA_ID, FECHA, TOTAL, FORMA_PAGO, VENDEDOR, OBSERVACIONES [, ANULADA, MOTIVO_ANULACION]
@@ -4393,8 +4424,8 @@ function eliminarVenta(e){
     return jsonResponse({ success:false, message:"Falta el ID de la venta a eliminar." });
   }
 
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const ventasSheet = ss.getSheetByName("VENTAS_LOCAL");
+  const ss = getSS();
+  const ventasSheet = getHoja("VENTAS_LOCAL");
 
   if(!ventasSheet){
     return jsonResponse({ success:false, message:"No se encontró la hoja VENTAS_LOCAL." });
@@ -4424,7 +4455,7 @@ function eliminarVenta(e){
 
       // Devuelve el stock igual que antes
       try{
-        const detalleSheet = ss.getSheetByName("DETALLE_VENTAS");
+        const detalleSheet = getHoja("DETALLE_VENTAS");
         const carrito = JSON.parse(params.carrito || "[]");
         if(carrito.length > 0){
           const carritoInvertido = carrito.map(item => ({
@@ -4476,10 +4507,10 @@ function getCierreCajaResumen(e){
   const fechaParam = e.parameter.fecha; // "yyyy-MM-dd", opcional
 
   const ss =
-  SpreadsheetApp.openById(SPREADSHEET_ID);
+  getSS();
 
   const ventasSheet =
-  ss.getSheetByName("VENTAS_LOCAL");
+  getHoja("VENTAS_LOCAL");
 
   if(!ventasSheet){
     return jsonResponse({
@@ -4643,10 +4674,10 @@ function getCierreCajaResumen(e){
 function buscarCierrePorFecha(fechaStr){
 
   const ss =
-  SpreadsheetApp.openById(SPREADSHEET_ID);
+  getSS();
 
   const sheet =
-  ss.getSheetByName("CIERRES_CAJA");
+  getHoja("CIERRES_CAJA");
 
   if(!sheet) return null;
 
@@ -4686,10 +4717,10 @@ function buscarCierrePorFecha(fechaStr){
 function guardarCierreCaja(e){
 
   const ss =
-  SpreadsheetApp.openById(SPREADSHEET_ID);
+  getSS();
 
   const sheet =
-  ss.getSheetByName("CIERRES_CAJA");
+  getHoja("CIERRES_CAJA");
 
   if(!sheet){
     return jsonResponse({
@@ -4785,10 +4816,10 @@ function guardarCierreCaja(e){
 function getHistorialCierres(){
 
   const ss =
-  SpreadsheetApp.openById(SPREADSHEET_ID);
+  getSS();
 
   const sheet =
-  ss.getSheetByName("CIERRES_CAJA");
+  getHoja("CIERRES_CAJA");
 
   if(!sheet){
     return jsonResponse({
@@ -4848,7 +4879,7 @@ function resolverRangoReporte(e){
  */
 function obtenerVentasCombinadasPorRango(desde, hasta){
 
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const ss = getSS();
   const zona = Session.getScriptTimeZone();
 
   const ventas = [];
@@ -4860,7 +4891,7 @@ function obtenerVentasCombinadasPorRango(desde, hasta){
   // distinguen por esa columna para que el reporte 1 pueda seguir
   // mostrando "POS" y "Pedidos" por separado, aunque ambos sumen al
   // mismo total general sin duplicar nada.
-  const hojaPOS = ss.getSheetByName("VENTAS_LOCAL");
+  const hojaPOS = getHoja("VENTAS_LOCAL");
   if(hojaPOS){
     const dataPOS = hojaPOS.getDataRange().getValues();
     dataPOS.shift();
@@ -4945,13 +4976,13 @@ function getReporteVentasPeriodo(e){
 function getReporteProductosVendidos(e){
 
   const { desde, hasta } = resolverRangoReporte(e);
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const ss = getSS();
   const zona = Session.getScriptTimeZone();
 
   const productos = {}; // codigo -> {CODIGO, PRODUCTO, VENDIDOS, INGRESOS}
 
   function acumular(idsEnRango, sheetNameDetalle){
-    const hojaDetalle = ss.getSheetByName(sheetNameDetalle);
+    const hojaDetalle = getHoja(sheetNameDetalle);
     if(!hojaDetalle) return;
 
     const dataDetalle = hojaDetalle.getDataRange().getValues();
@@ -4978,7 +5009,7 @@ function getReporteProductosVendidos(e){
 
   // ---- POS: VENTAS_LOCAL (incluye ventas de mostrador reales)
   const idsPOSEnRango = new Set();
-  const hojaPOS = ss.getSheetByName("VENTAS_LOCAL");
+  const hojaPOS = getHoja("VENTAS_LOCAL");
   if(hojaPOS){
     const dataPOS = hojaPOS.getDataRange().getValues();
     dataPOS.shift();
@@ -5000,7 +5031,7 @@ function getReporteProductosVendidos(e){
   // ---- Pedidos cobrados: PEDIDOS (filtrados por COBRADO=SI, con la
   // fecha real de cobro) + su detalle real en DETALLE_PEDIDOS.
   const idsPedidosCobradosEnRango = new Set();
-  const hojaPedidos = ss.getSheetByName("PEDIDOS");
+  const hojaPedidos = getHoja("PEDIDOS");
   if(hojaPedidos){
     const dataPedidos = rowsToObjects(hojaPedidos.getDataRange().getValues());
     dataPedidos.forEach(p => {
@@ -5031,11 +5062,11 @@ function getReporteProductosVendidos(e){
 function getReporteVentasPorCategoria(e){
 
   const { desde, hasta } = resolverRangoReporte(e);
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const ss = getSS();
   const zona = Session.getScriptTimeZone();
 
   // Mapa CODIGO -> CATEGORIA, usando la hoja de productos por nombre de columna
-  const productos = rowsToObjects(ss.getSheetByName(SHEET_NAME).getDataRange().getValues());
+  const productos = rowsToObjects(getHoja(SHEET_NAME).getDataRange().getValues());
   const categoriaPorCodigo = {};
   productos.forEach(p => {
     categoriaPorCodigo[p.CODIGO] = (p.CATEGORIA || "Sin categoría").toString().trim() || "Sin categoría";
@@ -5044,7 +5075,7 @@ function getReporteVentasPorCategoria(e){
   const porCategoria = {}; // categoria -> { categoria, cantidad, ingresos }
 
   function acumular(idsEnRango, sheetNameDetalle){
-    const hojaDetalle = ss.getSheetByName(sheetNameDetalle);
+    const hojaDetalle = getHoja(sheetNameDetalle);
     if(!hojaDetalle) return;
 
     const dataDetalle = hojaDetalle.getDataRange().getValues();
@@ -5070,7 +5101,7 @@ function getReporteVentasPorCategoria(e){
   // ---- POS: VENTAS_LOCAL (excluye las filas de pedidos cobrados,
   // cuyo detalle real vive en DETALLE_PEDIDOS, no en DETALLE_VENTAS)
   const idsPOSEnRango = new Set();
-  const hojaPOS = ss.getSheetByName("VENTAS_LOCAL");
+  const hojaPOS = getHoja("VENTAS_LOCAL");
   if(hojaPOS){
     const dataPOS = hojaPOS.getDataRange().getValues();
     dataPOS.shift();
@@ -5088,7 +5119,7 @@ function getReporteVentasPorCategoria(e){
   // ---- Pedidos cobrados: PEDIDOS (filtrados por COBRADO=SI, con la
   // fecha real de cobro) + su detalle real en DETALLE_PEDIDOS.
   const idsPedidosCobradosEnRango = new Set();
-  const hojaPedidos = ss.getSheetByName("PEDIDOS");
+  const hojaPedidos = getHoja("PEDIDOS");
   if(hojaPedidos){
     const dataPedidos = rowsToObjects(hojaPedidos.getDataRange().getValues());
     dataPedidos.forEach(p => {
@@ -5148,10 +5179,10 @@ function getReporteFormasPago(e){
 function getReporteCierresCaja(e){
 
   const { desde, hasta } = resolverRangoReporte(e);
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const ss = getSS();
   const zona = Session.getScriptTimeZone();
 
-  const sheet = ss.getSheetByName("CIERRES_CAJA");
+  const sheet = getHoja("CIERRES_CAJA");
   if(!sheet){
     return jsonResponse({ success:true, desde, hasta, cierres: [] });
   }
@@ -5181,10 +5212,10 @@ function getReporteCierresCaja(e){
 function getReporteClientes(e){
 
   const { desde, hasta } = resolverRangoReporte(e);
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const ss = getSS();
   const zona = Session.getScriptTimeZone();
 
-  const hojaPedidos = ss.getSheetByName("PEDIDOS");
+  const hojaPedidos = getHoja("PEDIDOS");
   if(!hojaPedidos){
     return jsonResponse({ success:true, desde, hasta, clientes: [] });
   }
@@ -5240,8 +5271,8 @@ function getReporteClientes(e){
 
 function getMovimientosCajaDelDia(fecha){
 
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = ss.getSheetByName("MOVIMIENTOS_CAJA");
+  const ss = getSS();
+  const sheet = getHoja("MOVIMIENTOS_CAJA");
 
   if(!sheet){
     return []; // si no existe la hoja todavía, simplemente no hay movimientos que sumar
@@ -5360,12 +5391,12 @@ function getMovimientosCajaHoy(e){
 /** GET ?action=guardarMovimientoCaja&tipo=INGRESO|EGRESO&monto=...&motivo=... */
 function guardarMovimientoCaja(e){
 
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const ss = getSS();
 
   // Auto-migrar columna FORMA_PAGO si la planilla es anterior al fix
   autoMigrarMovimientosCaja();
 
-  const sheet = ss.getSheetByName("MOVIMIENTOS_CAJA");
+  const sheet = getHoja("MOVIMIENTOS_CAJA");
 
   if(!sheet){
     return jsonResponse({
@@ -5430,8 +5461,8 @@ function guardarMovimientoCaja(e){
 /** GET ?action=migrarColumnaFormaPago — agrega FORMA_PAGO a MOVIMIENTOS_CAJA si falta */
 function migrarColumnaFormaPago() {
   try {
-    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-    const sheet = ss.getSheetByName("MOVIMIENTOS_CAJA");
+    const ss = getSS();
+    const sheet = getHoja("MOVIMIENTOS_CAJA");
     if (!sheet) return jsonResponse({ success: false, message: "Hoja MOVIMIENTOS_CAJA no encontrada" });
 
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
@@ -5463,8 +5494,8 @@ function migrarColumnaFormaPago() {
 /** Verifica y migra automáticamente la columna FORMA_PAGO si no existe */
 function autoMigrarMovimientosCaja() {
   try {
-    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-    const sheet = ss.getSheetByName("MOVIMIENTOS_CAJA");
+    const ss = getSS();
+    const sheet = getHoja("MOVIMIENTOS_CAJA");
     if (!sheet || sheet.getLastColumn() === 0) return;
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
     const tieneFormaPago = headers.some(h => String(h).toUpperCase().trim() === "FORMA_PAGO");
@@ -5483,8 +5514,8 @@ function autoMigrarMovimientosCaja() {
 /** GET ?action=eliminarMovimientoCaja&movimientoId=... */
 function eliminarMovimientoCaja(e){
 
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = ss.getSheetByName("MOVIMIENTOS_CAJA");
+  const ss = getSS();
+  const sheet = getHoja("MOVIMIENTOS_CAJA");
 
   if(!sheet){
     return jsonResponse({
@@ -5555,8 +5586,8 @@ function testAutorizacionUrlFetch(){
  */
 function migrarClientesDesdePedidos() {
 
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const pedidosSheet = ss.getSheetByName("PEDIDOS");
+  const ss = getSS();
+  const pedidosSheet = getHoja("PEDIDOS");
 
   if (!pedidosSheet) {
     Logger.log("No se encontró la hoja PEDIDOS.");
@@ -5638,8 +5669,8 @@ function migrarClientesDesdePedidos() {
 ===================================================================== */
 
 function getOrCrearHojaDeudasExtra(){
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  let sheet = ss.getSheetByName("DEUDAS_EXTRA");
+  const ss = getSS();
+  let sheet = getHoja("DEUDAS_EXTRA");
   if(!sheet){
     sheet = ss.insertSheet("DEUDAS_EXTRA");
     sheet.appendRow(["DEUDA_ID","FECHA","CLIENTE_ID","MONEDA","MONTO","CONCEPTO"]);
