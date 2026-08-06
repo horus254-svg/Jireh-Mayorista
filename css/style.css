@@ -218,9 +218,16 @@ select:focus-visible{
    angosto para escribir cómodo. Se esconde el texto de los botones y
    se deja solo el ícono — siguen siendo reconocibles (📦 / 📄) y el
    buscador recupera el espacio que necesita. */
+.btn-texto-navbar-corto{
+    display:none;
+}
+
 @media (max-width:400px){
     .btn-texto-navbar{
         display:none;
+    }
+    .btn-texto-navbar-corto{
+        display:inline;
     }
     .btn-pdf-top{
         padding:11px 12px;
