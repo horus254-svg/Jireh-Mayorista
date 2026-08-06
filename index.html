@@ -493,6 +493,43 @@
 
     <section class="container categorias-section">
         <div id="categoria-chips" class="chip-scroll" role="tablist" aria-label="Filtrar por categoría"></div>
+
+        <div class="precio-filtro-wrap">
+
+            <span class="precio-filtro-label">💰 Precio</span>
+
+            <div class="precio-filtro-inputs">
+                <input
+                    type="number"
+                    id="precio-min"
+                    class="precio-input"
+                    placeholder="Mín."
+                    min="0"
+                    inputmode="numeric"
+                    oninput="filtrarPorPrecio()">
+
+                <span class="precio-filtro-sep">—</span>
+
+                <input
+                    type="number"
+                    id="precio-max"
+                    class="precio-input"
+                    placeholder="Máx."
+                    min="0"
+                    inputmode="numeric"
+                    oninput="filtrarPorPrecio()">
+            </div>
+
+            <button
+                id="precio-clear"
+                class="precio-filtro-clear"
+                type="button"
+                aria-label="Quitar filtro de precio"
+                onclick="limpiarFiltroPrecio()">
+                ✕
+            </button>
+
+        </div>
     </section>
 
     <!-- PRODUCTOS -->

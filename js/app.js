@@ -95,7 +95,9 @@ const estado = {
     productosVisibles: [],
     carrito: JSON.parse(localStorage.getItem("carrito")) || [],
     busqueda: "",
-    categoria: ""
+    categoria: "",
+    precioMin: null,
+    precioMax: null
 };
 
 // Número de WhatsApp usado por el botón flotante y por el checkout.
@@ -115,6 +117,7 @@ let nombreNegocio = "Catálogo";
 
 let qvProductoActual = null;
 let debounceTimer = null;
+let precioDebounceTimer = null;
 
 /* =========================================================
    HELPERS
@@ -263,14 +266,56 @@ function limpiarFiltros(){
 
     estado.categoria = "";
     estado.busqueda = "";
+    estado.precioMin = null;
+    estado.precioMax = null;
 
     document.getElementById("search").value = "";
     document.getElementById("search-clear").classList.remove("visible");
+
+    document.getElementById("precio-min").value = "";
+    document.getElementById("precio-max").value = "";
+    document.getElementById("precio-clear").classList.remove("visible");
 
     document.querySelectorAll("#categoria-chips .chip").forEach(c => c.classList.remove("active"));
 
     const todas = document.querySelector('#categoria-chips .chip[data-cat=""]');
     if(todas) todas.classList.add("active");
+
+    aplicarFiltros();
+}
+
+/* =========================================================
+   FILTRO DE PRECIO (rango mín/máx)
+========================================================= */
+
+function filtrarPorPrecio(){
+
+    clearTimeout(precioDebounceTimer);
+
+    precioDebounceTimer = setTimeout(()=>{
+
+        const minVal = document.getElementById("precio-min").value;
+        const maxVal = document.getElementById("precio-max").value;
+
+        estado.precioMin = minVal !== "" ? Number(minVal) : null;
+        estado.precioMax = maxVal !== "" ? Number(maxVal) : null;
+
+        const hayFiltro = estado.precioMin !== null || estado.precioMax !== null;
+        document.getElementById("precio-clear").classList.toggle("visible", hayFiltro);
+
+        aplicarFiltros();
+
+    }, 300);
+}
+
+function limpiarFiltroPrecio(){
+
+    document.getElementById("precio-min").value = "";
+    document.getElementById("precio-max").value = "";
+    document.getElementById("precio-clear").classList.remove("visible");
+
+    estado.precioMin = null;
+    estado.precioMax = null;
 
     aplicarFiltros();
 }
@@ -291,6 +336,14 @@ function aplicarFiltros(){
         lista = lista.filter(p =>
             String(p.PRODUCTO || "").toLowerCase().includes(estado.busqueda)
         );
+    }
+
+    if(estado.precioMin !== null){
+        lista = lista.filter(p => Number(p.PRECIO) >= estado.precioMin);
+    }
+
+    if(estado.precioMax !== null){
+        lista = lista.filter(p => Number(p.PRECIO) <= estado.precioMax);
     }
 
     // Se guarda la lista visible actual, para que el botón de descarga
