@@ -926,6 +926,11 @@ const CONFIG_NEGOCIO_DEFAULTS = {
   BENEFICIO_TEXTO_LIBRE1:     "",
   BENEFICIO_TEXTO_LIBRE2:     "",
 
+  // ---- Datos bancarios para el mensaje de WhatsApp que se manda al
+  // cliente cuando un pedido queda en estado "Nuevo" (pedido en línea 2421 de admin.js) ----
+  CBU_TRANSFERENCIA:  "1910249655024901554778",
+  NOMBRE_TITULAR_CBU: "ESCALERA CARBAJAL DANIEL",
+
   // ---- Franja superior de mensajes rotativos (arriba de todo, sobre
   // el navbar) — un mensaje por línea, separados por salto de línea ----
   BANNER_TOP_MENSAJES: "🚚 Envíos a todo el país\n✅ Stock actualizado\n💳 Aceptamos todos los medios de pago",
@@ -1222,6 +1227,9 @@ function getConfiguracionNegocio(){
       beneficioTextoLibre1:    config.BENEFICIO_TEXTO_LIBRE1,
       beneficioTextoLibre2:    config.BENEFICIO_TEXTO_LIBRE2,
 
+      cbuTransferencia:  config.CBU_TRANSFERENCIA,
+      nombreTitularCbu:  config.NOMBRE_TITULAR_CBU,
+
       bannerTopMensajes: config.BANNER_TOP_MENSAJES,
       transportesNoDisponibles: config.TRANSPORTES_NO_DISPONIBLES,
 
@@ -1319,6 +1327,9 @@ function guardarConfiguracionNegocio(e){
     BENEFICIO_DIRECCION:       valorOPreservado("beneficioDireccion", "BENEFICIO_DIRECCION"),
     BENEFICIO_TEXTO_LIBRE1:    valorOPreservado("beneficioTextoLibre1", "BENEFICIO_TEXTO_LIBRE1"),
     BENEFICIO_TEXTO_LIBRE2:    valorOPreservado("beneficioTextoLibre2", "BENEFICIO_TEXTO_LIBRE2"),
+
+    CBU_TRANSFERENCIA:  valorOPreservado("cbuTransferencia", "CBU_TRANSFERENCIA", "1910249655024901554778"),
+    NOMBRE_TITULAR_CBU: valorOPreservado("nombreTitularCbu", "NOMBRE_TITULAR_CBU", "ESCALERA CARBAJAL DANIEL"),
 
     BANNER_TOP_MENSAJES: valorOPreservado("bannerTopMensajes", "BANNER_TOP_MENSAJES"),
     TRANSPORTES_NO_DISPONIBLES: valorOPreservado("transportesNoDisponibles", "TRANSPORTES_NO_DISPONIBLES"),
