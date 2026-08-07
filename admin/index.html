@@ -1680,6 +1680,27 @@
     </div>
 
     <div class="card p-3 mt-3">
+      <h6 style="margin-bottom:14px;">🏦 Datos para transferencia (mensaje de WhatsApp)</h6>
+      <p class="text-muted" style="font-size:12.5px; margin-top:-8px; margin-bottom:14px;">
+        Estos datos se incluyen automáticamente en el mensaje de WhatsApp que se manda a los clientes cuando un pedido queda en estado "Nuevo".
+      </p>
+
+      <div class="mb-3">
+        <label class="form-label">CBU / Alias <span class="text-muted" style="font-size:11px;">(para recibir transferencias)</span></label>
+        <input type="text" class="form-control" id="cfgCbuTransferencia" placeholder="Ej: 1910249655024901554778">
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Nombre del titular</label>
+        <input type="text" class="form-control" id="cfgNombreTitularCbu" placeholder="Ej: ESCALERA CARBAJAL DANIEL">
+      </div>
+
+      <div class="d-flex justify-content-end mt-3">
+        <button class="btn btn-success" id="btnGuardarDatosTransferencia" onclick="guardarDatosTransferenciaForm()">💾 Guardar datos de transferencia</button>
+      </div>
+    </div>
+
+    <div class="card p-3 mt-3">
       <h6 style="margin-bottom:6px;">📢 Banner superior (mensajes rotativos)</h6>
       <p class="text-muted" style="font-size:12.5px; margin-top:-4px; margin-bottom:14px;">
         Una franja verde arriba de todo el catálogo, que va rotando solo entre los mensajes que escribas acá. Escribí un mensaje por línea — si dejás solo uno, queda fijo sin rotar.

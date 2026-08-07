@@ -223,7 +223,10 @@ const CONFIG_NEGOCIO_DEFAULT = {
   bannerTitulo:    "Mayorista Jireh",
   bannerSubtitulo: "Catálogo Mayorista Online",
   bannerImagen:    "",
-  tema:            "navy"
+  tema:            "navy",
+
+  cbuTransferencia:  "1910249655024901554778",
+  nombreTitularCbu:  "ESCALERA CARBAJAL DANIEL"
 };
 
 // Caché en memoria de la config, para que imprimir un ticket no tenga
@@ -268,6 +271,8 @@ async function cargarConfigNegocioForm() {
 
   cargarAparienciaForm(cfg);
   cargarBeneficiosForm(cfg);
+  document.getElementById("cfgCbuTransferencia").value = cfg.cbuTransferencia ?? CONFIG_NEGOCIO_DEFAULT.cbuTransferencia;
+  document.getElementById("cfgNombreTitularCbu").value = cfg.nombreTitularCbu ?? CONFIG_NEGOCIO_DEFAULT.nombreTitularCbu;
   document.getElementById("cfgBannerTopMensajes").value = cfg.bannerTopMensajes ?? "";
   document.getElementById("cfgTransportesNoDisponibles").value = cfg.transportesNoDisponibles ?? "";
   cargarSidebarForm(cfg);
@@ -1060,6 +1065,46 @@ async function guardarBeneficiosForm() {
   } catch (error) {
     console.error("Error al guardar los beneficios:", error);
     toast("Error de conexión al guardar los beneficios", "error");
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = textoOriginal; }
+  }
+}
+
+/** Reads the CBU/titular form fields and saves them to the backend (hoja CONFIGURACION) — usados en el mensaje de WhatsApp */
+async function guardarDatosTransferenciaForm() {
+  const nombre = document.getElementById("cfgNombreLocal").value.trim();
+
+  if (!nombre) {
+    toast("Completá primero el nombre del local, arriba", "error");
+    return;
+  }
+
+  const cfg = {
+    nombre,
+    cbuTransferencia: document.getElementById("cfgCbuTransferencia").value.trim(),
+    nombreTitularCbu: document.getElementById("cfgNombreTitularCbu").value.trim()
+  };
+
+  const btn = document.getElementById("btnGuardarDatosTransferencia");
+  const textoOriginal = btn ? btn.innerHTML : "";
+  if (btn) { btn.disabled = true; btn.innerHTML = "Guardando..."; }
+
+  try {
+    const params = new URLSearchParams({ action: "guardarConfiguracionNegocio", ...cfg });
+    const response = await fetchAPI(API_URL + "?" + params.toString());
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudieron guardar los datos de transferencia", "error");
+      return;
+    }
+
+    configNegocioCache = { ...configNegocioCache, ...cfg };
+    toast("Datos de transferencia guardados", "success");
+
+  } catch (error) {
+    console.error("Error al guardar los datos de transferencia:", error);
+    toast("Error de conexión al guardar los datos de transferencia", "error");
   } finally {
     if (btn) { btn.disabled = false; btn.innerHTML = textoOriginal; }
   }
@@ -2416,9 +2461,12 @@ function normalizarTelefonoWA(tel) {
 function mensajeWhatsAppPorEstado(estado, pedidoId, cliente, total, pdfUrl) {
   const totalStr = "$" + Number(total || 0).toLocaleString("es-AR");
   const linkPdf = pdfUrl ? `\n\nComprobante de pedido: ${pdfUrl}` : "";
+  const cfg = obtenerConfigNegocio();
+  const cbu = cfg.cbuTransferencia || CONFIG_NEGOCIO_DEFAULT.cbuTransferencia;
+  const titular = cfg.nombreTitularCbu || CONFIG_NEGOCIO_DEFAULT.nombreTitularCbu;
   switch(estado) {
     case "NUEVO":
-      return `Hola ${cliente}! Recibimos tu pedido ${pedidoId} por ${totalStr}.\n\nPara confirmar tu pedido, realizá la transferencia a:\nCBU: 1910249655024901554778\nNombre: ESCALERA CARBAJAL DANIEL\n\nUna vez realizado el pago, envianos el comprobante por este medio para que podamos empezar a preparar tu pedido. Gracias por elegirnos!${linkPdf}`;
+      return `Hola ${cliente}! Recibimos tu pedido ${pedidoId} por ${totalStr}.\n\nPara confirmar tu pedido, realizá la transferencia a:\nCBU: ${cbu}\nNombre: ${titular}\n\nUna vez realizado el pago, envianos el comprobante por este medio para que podamos empezar a preparar tu pedido. Gracias por elegirnos!${linkPdf}`;
     case "PREPARANDO":
       return `Hola ${cliente}! Tu pedido ${pedidoId} por ${totalStr} ya esta siendo preparado. En cuanto este listo te avisamos. Gracias por tu compra!${linkPdf}`;
     case "ENVIADO":
