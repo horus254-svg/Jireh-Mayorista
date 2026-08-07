@@ -2241,7 +2241,7 @@ async function guardarEdicionItemsPedido() {
         pedidoId,
         carrito: _carritoEdicionPedido
       })
-    }, { timeoutMs: 30000 });
+    }, { timeoutMs: 45000 });
     const data = await response.json();
 
     if (!data.success) {
@@ -2262,7 +2262,22 @@ async function guardarEdicionItemsPedido() {
 
   } catch (error) {
     console.error("Error al editar ítems del pedido:", error);
-    toast("Error de conexión al guardar los cambios", "error");
+    // OJO: este "error de conexión" no significa necesariamente que el
+    // cambio no se guardó. El backend (Apps Script) puede haber
+    // terminado de escribir en la hoja después de que el navegador ya
+    // se rindió esperando la respuesta (regenerar el PDF del pedido
+    // puede tardar bastante). Por eso, en vez de asumir que falló,
+    // recargamos el detalle del pedido para mostrar el estado real
+    // en vez de dejar al usuario con una duda y un carrito de edición
+    // "colgado" que podría reintentar y duplicar ítems.
+    toast("Se cortó la conexión esperando la respuesta — revisando si el cambio se guardó igual...", "error");
+    try {
+      _carritoEdicionPedido = null;
+      invalidarCache("pedidos");
+      await abrirDetallePedido(pedidoId);
+    } catch (e2) {
+      console.error("Error al revisar el estado real del pedido tras el timeout:", e2);
+    }
   } finally {
     btn.disabled = false;
     btn.innerHTML = textoOriginal;
