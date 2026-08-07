@@ -1612,6 +1612,7 @@ function mostrarSeccion(id) {
   }
   if (id === "movimientosCaja") cargarMovimientosCajaHoy();
   if (id === "reportes")   cargarSiVencido("reportes", cargarTodosLosReportes);
+  if (id === "reportesCompras") cargarReporteCompras();
 }
 
 /* ===================== PEDIDOS ===================== */
@@ -1813,8 +1814,6 @@ function recargarVentasPOSHistorial() {
 }
 
 async function cambiarEstado(pedidoId, estado) {
-  const p = pedidosGlobal.find(x => x.PEDIDO_ID === pedidoId);
-  const estadoAnterior = p ? p.ESTADO : null;
   try {
     const response = await fetch(
       API_URL +
@@ -1823,25 +1822,14 @@ async function cambiarEstado(pedidoId, estado) {
       "&estado="   + encodeURIComponent(estado)
     );
     const data = await response.json();
-    if (!data.success) {
-      // El backend no aplicó el cambio (por ejemplo, no pudo ajustar
-      // el stock a tiempo) — el <select> ya muestra visualmente el
-      // valor nuevo porque el navegador lo cambia solo con el
-      // onchange, aunque el pedido en realidad siga con el estado
-      // anterior. Sin este re-render quedaba una desincronización
-      // entre lo que se ve en pantalla y lo que hay guardado.
-      toast(data.message || "No se pudo actualizar el pedido", "error");
-      if (p && estadoAnterior){ p.ESTADO = estadoAnterior; }
-      filtrarPedidos();
-      return;
-    }
+    if (!data.success) { toast("No se pudo actualizar el pedido", "error"); return; }
     // Actualizar en memoria sin recargar todo
+    const p = pedidosGlobal.find(x => x.PEDIDO_ID === pedidoId);
     if (p) { p.ESTADO = estado; invalidarCache("pedidos"); filtrarPedidos(); }
     toast("Estado actualizado", "success");
   } catch (error) {
     console.error(error);
     toast("Error de conexión", "error");
-    if (p && estadoAnterior){ p.ESTADO = estadoAnterior; filtrarPedidos(); }
   }
 }
 
@@ -2415,7 +2403,7 @@ function mensajeWhatsAppPorEstado(estado, pedidoId, cliente, total, pdfUrl) {
   const linkPdf = pdfUrl ? `\n\nComprobante de pedido: ${pdfUrl}` : "";
   switch(estado) {
     case "NUEVO":
-      return `Hola ${cliente}! Recibimos tu pedido ${pedidoId} por ${totalStr}.\n\nPara confirmar tu pedido, realizá la transferencia a:\nCBU: 1910249655024901554778\nNombre: ESCALERA CARBAJAL DANIEL\n\nUna vez realizado el pago, envianos el comprobante por este medio para que podamos empezar a preparar tu pedido. Gracias por elegirnos!${linkPdf}`;
+      return `Hola ${cliente}! Recibimos tu pedido ${pedidoId} por ${totalStr}.\n\nPara confirmar tu pedido, realizá la transferencia a:\nAlias: jireholga\nNombre: Olga Carbajal Alvis\n\nUna vez realizado el pago, envianos el comprobante por este medio para que podamos empezar a preparar tu pedido. Gracias por elegirnos!${linkPdf}`;
     case "PREPARANDO":
       return `Hola ${cliente}! Tu pedido ${pedidoId} por ${totalStr} ya esta siendo preparado. En cuanto este listo te avisamos. Gracias por tu compra!${linkPdf}`;
     case "ENVIADO":
@@ -3944,41 +3932,41 @@ function imprimirEtiquetaEnvio(datos) {
 
       <!-- Franja frágil / cabecera -->
       <div style="background:#d32f2f; color:#fff; text-align:center; padding:6mm 4mm; border-radius:2mm; margin-bottom:6mm;">
-        <div style="font-size:22pt; font-weight:900; letter-spacing:2px; text-transform:uppercase;">POR FAVOR</div>
-        <div style="font-size:16pt; font-weight:700; letter-spacing:4px; text-transform:uppercase;">MANEJESE CON CUIDADO</div>
-        <div style="font-size:30pt; font-weight:900; letter-spacing:6px; margin:4px 0;">FRAGIL</div>
-        <div style="font-size:16pt; font-weight:700; letter-spacing:3px;">== GRACIAS ==</div>
+        <div style="font-size:18pt; font-weight:900; letter-spacing:2px; text-transform:uppercase;">POR FAVOR</div>
+        <div style="font-size:11pt; font-weight:700; letter-spacing:4px; text-transform:uppercase;">MANEJESE CON CUIDADO</div>
+        <div style="font-size:26pt; font-weight:900; letter-spacing:6px; margin:4px 0;">FRAGIL</div>
+        <div style="font-size:11pt; font-weight:700; letter-spacing:3px;">== GRACIAS ==</div>
       </div>
 
       <!-- Datos del destinatario -->
       <table style="width:100%; border-collapse:collapse; font-size:13pt;">
         <tr>
-          <td style="font-size:10pt; font-weight:700; text-transform:uppercase; color:#000; width:28mm; vertical-align:top; padding-top:4px;">Nombre:</td>
-          <td style="font-size:26pt; font-weight:900; text-transform:uppercase; letter-spacing:1px;">${escapeHtml(cliente)}</td>
+          <td style="font-size:7pt; font-weight:700; text-transform:uppercase; color:#555; width:28mm; vertical-align:top; padding-top:4px;">Nombre:</td>
+          <td style="font-size:16pt; font-weight:900; text-transform:uppercase; letter-spacing:1px;">${escapeHtml(cliente)}</td>
         </tr>
         ${telefono ? `<tr>
-          <td style="font-size:10pt; font-weight:700; text-transform:uppercase; color:#000; padding-top:4px;">Teléfono:</td>
-          <td style="font-size:26pt; font-weight:700;">${escapeHtml(telefono)}</td>
+          <td style="font-size:7pt; font-weight:700; text-transform:uppercase; color:#555; padding-top:4px;">Teléfono:</td>
+          <td style="font-size:14pt; font-weight:700;">${escapeHtml(telefono)}</td>
         </tr>` : ""}
         ${direccion ? `<tr>
-          <td style="font-size:10pt; font-weight:700; text-transform:uppercase; color:#000; padding-top:4px;">Dirección:</td>
-          <td style="font-size:26pt; font-weight:700; text-transform:uppercase;">${escapeHtml(direccion)}</td>
+          <td style="font-size:7pt; font-weight:700; text-transform:uppercase; color:#555; padding-top:4px;">Dirección:</td>
+          <td style="font-size:14pt; font-weight:700; text-transform:uppercase;">${escapeHtml(direccion)}</td>
         </tr>` : ""}
         ${localidadStr ? `<tr>
-          <td style="font-size:10pt; font-weight:700; text-transform:uppercase; color:#000; padding-top:4px;">Localidad:</td>
-          <td style="font-size:26pt; font-weight:700; text-transform:uppercase;">${escapeHtml(localidadStr)}</td>
+          <td style="font-size:7pt; font-weight:700; text-transform:uppercase; color:#555; padding-top:4px;">Localidad:</td>
+          <td style="font-size:14pt; font-weight:700; text-transform:uppercase;">${escapeHtml(localidadStr)}</td>
         </tr>` : ""}
         ${provincia ? `<tr>
-          <td style="font-size:10pt; font-weight:700; text-transform:uppercase; color:#000; padding-top:4px;">Provincia:</td>
-          <td style="font-size:26pt; font-weight:700; text-transform:uppercase;">${escapeHtml(provincia)}</td>
+          <td style="font-size:7pt; font-weight:700; text-transform:uppercase; color:#555; padding-top:4px;">Provincia:</td>
+          <td style="font-size:14pt; font-weight:700; text-transform:uppercase;">${escapeHtml(provincia)}</td>
         </tr>` : ""}
         ${dni ? `<tr>
-          <td style="font-size:10pt; font-weight:700; text-transform:uppercase; color:#000; padding-top:4px;">DNI:</td>
-          <td style="font-size:26pt; font-weight:700;">${escapeHtml(dni)}</td>
+          <td style="font-size:7pt; font-weight:700; text-transform:uppercase; color:#555; padding-top:4px;">DNI:</td>
+          <td style="font-size:14pt; font-weight:700;">${escapeHtml(dni)}</td>
         </tr>` : ""}
         ${transporte ? `<tr>
-          <td style="font-size:10pt; font-weight:700; text-transform:uppercase; color:#000; padding-top:4px;">Transporte:</td>
-          <td style="font-size:26pt; font-weight:700; text-transform:uppercase;">${escapeHtml(transporte)}</td>
+          <td style="font-size:7pt; font-weight:700; text-transform:uppercase; color:#555; padding-top:4px;">Transporte:</td>
+          <td style="font-size:14pt; font-weight:700; text-transform:uppercase;">${escapeHtml(transporte)}</td>
         </tr>` : ""}
       </table>
 
@@ -6851,6 +6839,18 @@ function _aplicarReporteVentas(data, tbody, resumenWrap) {
     return;
   }
 
+  // Más reciente arriba, como en el resto de las tablas de reportes
+  const diasOrdenados = [...data.dias].sort((a,b) => String(b.fecha).localeCompare(String(a.fecha)));
+  tbody.innerHTML = diasOrdenados.map(d => {
+    const fecha = d.fecha ? new Date(d.fecha + "T12:00:00").toLocaleDateString("es-AR") : "—";
+    return `
+      <tr>
+        <td>${escapeHtml(fecha)}</td>
+        <td class="money">$${Number(d.pos || 0).toLocaleString("es-AR")}</td>
+        <td class="money">$${Number(d.pedidos || 0).toLocaleString("es-AR")}</td>
+        <td class="money">$${Number(d.total || 0).toLocaleString("es-AR")}</td>
+      </tr>`;
+  }).join("");
 }
 
 /* ---- Reporte 2: Productos más vendidos ---- */
@@ -7067,6 +7067,450 @@ function exportarReportePDF(cardId, tituloReporte) {
   }
 }
 
+
+/* ===================================================================
+   REPORTE DE COMPRAS — cruza productos vendidos con stock actual para
+   guiar qué reponer, cuándo y en qué categoría invertir el presupuesto.
+   Reusa el endpoint reporteProductosVendidos y el catálogo ya cargado
+   en productosAdminGlobal (o lo pide si todavía no está en memoria).
+=================================================================== */
+
+let _rcCharts = {}; // instancias de Chart.js activas, para poder destruirlas antes de re-dibujar
+
+function _rcRangoFechas() {
+  const desde = document.getElementById("rcDesde").value;
+  const hasta = document.getElementById("rcHasta").value;
+  let qs = "";
+  if (desde) qs += "&desde=" + encodeURIComponent(desde);
+  if (hasta) qs += "&hasta=" + encodeURIComponent(hasta);
+  return qs;
+}
+
+function _rcDiasDelRango(desdeStr, hastaStr) {
+  if (!desdeStr || !hastaStr) return 30;
+  const d = new Date(desdeStr), h = new Date(hastaStr);
+  const dias = Math.round((h - d) / 86400000) + 1;
+  return dias > 0 ? dias : 30;
+}
+
+async function cargarReporteCompras() {
+  const tbody = document.getElementById("rcSemaforoTabla");
+  try {
+    // 1) Asegurar que tenemos el catálogo completo (con STOCK y CATEGORIA) en memoria
+    if (!productosAdminGlobal || productosAdminGlobal.length === 0) {
+      await cargarProductos(); // función existente que llena productosAdminGlobal
+    }
+
+    // 2) Pedir productos vendidos del rango elegido
+    const qs = _rcRangoFechas();
+    const response = await fetchAPI(API_URL + "?action=reporteProductosVendidos" + qs);
+    const data = await response.json();
+    if (!data.success) { toast("No se pudo cargar el reporte de compras", "error"); return; }
+
+    sincronizarRangoReportesCompras(data.desde, data.hasta);
+    const dias = _rcDiasDelRango(data.desde, data.hasta);
+
+    // 3) Cruzar cada producto vendido con su stock/categoría actual
+    const stockPorCodigo = {};
+    productosAdminGlobal.forEach(p => { stockPorCodigo[String(p.CODIGO)] = p; });
+
+    const productos = (data.productos || []).map(v => {
+      const info = stockPorCodigo[String(v.CODIGO)] || {};
+      return {
+        codigo:    v.CODIGO,
+        nombre:    v.PRODUCTO,
+        categoria: info.CATEGORIA || "Sin categoría",
+        vendidos:  Number(v.VENDIDOS || 0),
+        ingresos:  Number(v.INGRESOS || 0),
+        stock:     info.STOCK !== undefined ? Number(info.STOCK) : 0,
+      };
+    });
+
+    // 4) Pedir la tendencia diaria por categoría (endpoint nuevo — ver nota al final
+    //    de este archivo con el código de Apps Script a agregar). Si el backend
+    //    todavía no lo tiene, cae automáticamente a una sola línea total.
+    const tendenciaPorCategoria = await _rcCargarTendenciaPorCategoria(data.desde, data.hasta);
+
+    _renderReporteCompras(productos, dias, tendenciaPorCategoria);
+
+  } catch (error) {
+    console.error("Error al cargar reporte de compras:", error);
+    if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-3">Error al cargar el reporte</td></tr>`;
+    toast("Error de conexión al cargar el reporte de compras", "error");
+  }
+}
+
+/**
+ * Pide la venta diaria desglosada por categoría para el gráfico de tendencia.
+ * Requiere una acción nueva en el backend (reporteVentasDiariasPorCategoria) que
+ * todavía no existe en el Apps Script actual — ver el comentario al final de este
+ * archivo con el código para agregarla. Mientras no exista, devuelve null y el
+ * gráfico cae automáticamente a una sola línea con el total de ventas por día
+ * (usando ventasPOSHistorial, que sí existe hoy).
+ *
+ * Formato esperado de una respuesta exitosa:
+ *   { success:true, categorias:["Bebidas","Snacks",...],
+ *     dias:[{ fecha:"2026-07-01", valores:{ "Bebidas":12000, "Snacks":4500 } }, ...] }
+ */
+async function _rcCargarTendenciaPorCategoria(desde, hasta) {
+  try {
+    const params = new URLSearchParams({ action: "reporteVentasDiariasPorCategoria" });
+    if (desde) params.set("desde", desde);
+    if (hasta) params.set("hasta", hasta);
+    const response = await fetchAPI(API_URL + "?" + params.toString());
+    const data = await response.json();
+    if (data && data.success && data.dias) return data;
+    return null;
+  } catch (error) {
+    console.warn("reporteVentasDiariasPorCategoria no disponible todavía en el backend:", error);
+    return null;
+  }
+}
+
+/** Fallback: total de ventas por día (sin desglose de categoría), usando el
+ *  historial que sí existe hoy en el backend. */
+async function _rcCargarVentasDelRango(desde, hasta) {
+  try {
+    const params = new URLSearchParams({ action: "ventasPOSHistorial" });
+    if (desde) params.set("desde", desde);
+    if (hasta) params.set("hasta", hasta);
+    const response = await fetchAPI(API_URL + "?" + params.toString());
+    const data = await response.json();
+    return data.ventas || [];
+  } catch (error) {
+    console.warn("No se pudo cargar el historial de ventas para la tendencia:", error);
+    return [];
+  }
+}
+
+function sincronizarRangoReportesCompras(desde, hasta) {
+  const inputDesde = document.getElementById("rcDesde");
+  const inputHasta = document.getElementById("rcHasta");
+  if (inputDesde && !inputDesde.value) inputDesde.value = desde;
+  if (inputHasta && !inputHasta.value) inputHasta.value = hasta;
+}
+
+function _rcVentaDiaria(p, dias) { return p.vendidos / dias; }
+
+function _rcCobertura(p, dias) {
+  const vd = _rcVentaDiaria(p, dias);
+  if (vd <= 0) return Infinity;
+  return p.stock / vd;
+}
+
+function _rcEstado(p, dias) {
+  if (p.stock <= 0 && p.vendidos > 0) return "sinstock";
+  const c = _rcCobertura(p, dias);
+  if (c < 7) return "critico";
+  if (c < 20) return "atencion";
+  return "ok";
+}
+
+/* Estado en memoria de la tabla semáforo, para poder re-filtrar sin volver a pedir datos */
+let _rcProductosActuales = [];
+let _rcDiasActuales = 30;
+
+const _RC_PALETA_CATEGORIAS = ["#2563eb","#16a34a","#d97706","#dc2626","#7c3aed","#0891b2","#db2777","#65a30d"];
+
+function _renderReporteCompras(productos, dias, tendenciaPorCategoria) {
+  _rcProductosActuales = productos || [];
+  _rcDiasActuales = dias;
+
+  if (!productos || productos.length === 0) {
+    document.getElementById("rcSemaforoTabla").innerHTML =
+      `<tr><td colspan="7" class="text-center text-muted py-3">Sin ventas para el rango elegido</td></tr>`;
+    ["rcKpiSinStock","rcKpiCritico"].forEach(id => actualizarElemento(id, 0));
+    ["rcKpiTicket","rcKpiPresupuesto"].forEach(id => actualizarElemento(id, "$0"));
+    Object.values(_rcCharts).forEach(c => c && c.destroy());
+    _rcCharts = {};
+    return;
+  }
+
+  /* ---- KPIs ---- */
+  const sinStockConDemanda = productos.filter(p => p.stock <= 0 && p.vendidos > 0);
+  const criticos = productos.filter(p => _rcEstado(p, dias) === "critico");
+  const totalIngresos = productos.reduce((a,p)=>a+p.ingresos,0);
+  const totalVendidos = productos.reduce((a,p)=>a+p.vendidos,0);
+  const ticketProm = totalVendidos > 0 ? totalIngresos / totalVendidos : 0;
+
+  // presupuesto sugerido: para productos en rojo/amarillo/sin stock, cubrir 30 días de venta al precio unitario estimado
+  const presupuesto = productos
+    .filter(p => ["critico","atencion","sinstock"].includes(_rcEstado(p, dias)))
+    .reduce((acc,p) => {
+      const precioUnit = p.vendidos > 0 ? p.ingresos / p.vendidos : 0;
+      const faltante = Math.max(0, (_rcVentaDiaria(p, dias) * 30) - p.stock);
+      return acc + faltante * precioUnit;
+    }, 0);
+
+  actualizarElemento("rcKpiSinStock",   sinStockConDemanda.length);
+  actualizarElemento("rcKpiCritico",    criticos.length);
+  actualizarElemento("rcKpiTicket",     "$" + Math.round(ticketProm).toLocaleString("es-AR"));
+  actualizarElemento("rcKpiPresupuesto","$" + Math.round(presupuesto).toLocaleString("es-AR"));
+
+  /* ---- Destruir gráficos previos antes de re-dibujar (evita fugas al cambiar de fecha) ---- */
+  Object.values(_rcCharts).forEach(c => c && c.destroy());
+  _rcCharts = {};
+
+  /* ---- Chart 1: Top productos, barras superpuestas (vendidos vs stock) ---- */
+  const top = [...productos].sort((a,b)=>b.vendidos-a.vendidos).slice(0,8);
+  _rcCharts.top = new Chart(document.getElementById("rcChartTop"), {
+    type: "bar",
+    data: {
+      labels: top.map(p=>p.nombre),
+      datasets: [
+        { label:"Vendidos", data: top.map(p=>p.vendidos), backgroundColor:"#2563eb", borderRadius:5 },
+        { label:"Stock actual", data: top.map(p=>p.stock), backgroundColor:"#cbd2dd", borderRadius:5 },
+      ]
+    },
+    options: {
+      indexAxis: "y",
+      plugins:{ legend:{ position:"bottom", labels:{ boxWidth:12, font:{size:11} } } },
+      scales:{ x:{ grid:{ color:"#eef1f6" } }, y:{ grid:{ display:false } } }
+    }
+  });
+
+  /* ---- Chart 2: Donut por categoría ---- */
+  const categorias = {};
+  productos.forEach(p => { categorias[p.categoria] = (categorias[p.categoria]||0) + p.ingresos; });
+  const totalCategorias = Object.values(categorias).reduce((a,b)=>a+b, 0);
+  _rcCharts.donut = new Chart(document.getElementById("rcChartDonut"), {
+    type:"doughnut",
+    data:{
+      labels:Object.keys(categorias),
+      datasets:[{ data:Object.values(categorias), backgroundColor:_RC_PALETA_CATEGORIAS, borderWidth:2, borderColor:"#fff" }]
+    },
+    options:{
+      plugins:{
+        legend:{ position:"bottom", labels:{ boxWidth:12, font:{size:11} } },
+        tooltip:{
+          callbacks:{
+            label: (ctx) => {
+              const valor = Number(ctx.raw || 0);
+              const pct = totalCategorias > 0 ? (valor / totalCategorias * 100) : 0;
+              return `${ctx.label}: $${Math.round(valor).toLocaleString("es-AR")} (${pct.toFixed(1)}%)`;
+            }
+          }
+        }
+      },
+      cutout:"62%"
+    }
+  });
+
+  /* ---- Chart 3: Tendencia — apilada por categoría, agrupada y simplificada ---- */
+  _rcTendenciaActual = tendenciaPorCategoria; // se guarda para poder redibujar al cambiar el selector Día/Semana
+  _rcRedibujarTendencia();
+
+  /* ---- Tabla semáforo ---- */
+  _rcAplicarFiltrosTabla();
+}
+
+/* Estado en memoria de la tendencia, para redibujar sin re-pedir datos al cambiar el selector */
+let _rcTendenciaActual = null;
+
+/** Agrupa los días en semanas (lunes a domingo), sumando cada categoría. */
+function _rcAgruparPorSemana(dias) {
+  const semanas = {}; // "yyyy-MM-dd" (lunes de esa semana) -> { categoria: total }
+  const ordenPrimeraFecha = {};
+  dias.forEach(d => {
+    const fecha = new Date(d.fecha + "T12:00:00"); // mediodía evita líos de huso horario al restar días
+    const diaSemana = fecha.getDay(); // 0=domingo … 6=sábado
+    const offsetHastaLunes = diaSemana === 0 ? 6 : diaSemana - 1;
+    const lunes = new Date(fecha);
+    lunes.setDate(fecha.getDate() - offsetHastaLunes);
+    const clave = lunes.toISOString().slice(0, 10);
+
+    if (!semanas[clave]) { semanas[clave] = {}; ordenPrimeraFecha[clave] = clave; }
+    Object.entries(d.valores || {}).forEach(([cat, val]) => {
+      semanas[clave][cat] = (semanas[clave][cat] || 0) + Number(val || 0);
+    });
+  });
+  return Object.keys(semanas).sort().map(clave => ({ fecha: clave, valores: semanas[clave] }));
+}
+
+/** Se queda con las categorías de mayor ingreso total y agrupa el resto en "Otras",
+ *  para no saturar el gráfico con demasiadas líneas/áreas finitas. */
+function _rcAplicarTopCategorias(dias, categorias, maxCategorias) {
+  const totalPorCategoria = {};
+  categorias.forEach(c => totalPorCategoria[c] = 0);
+  dias.forEach(d => Object.entries(d.valores || {}).forEach(([c, v]) => {
+    totalPorCategoria[c] = (totalPorCategoria[c] || 0) + Number(v || 0);
+  }));
+
+  const ordenadas = [...categorias].sort((a,b) => totalPorCategoria[b] - totalPorCategoria[a]);
+  if (ordenadas.length <= maxCategorias) return { categoriasFinal: ordenadas, dias };
+
+  const top = ordenadas.slice(0, maxCategorias);
+  const resto = ordenadas.slice(maxCategorias);
+
+  const diasFinal = dias.map(d => {
+    const valores = {};
+    top.forEach(c => { if (d.valores && d.valores[c] !== undefined) valores[c] = d.valores[c]; });
+    let otras = 0;
+    resto.forEach(c => { otras += Number((d.valores && d.valores[c]) || 0); });
+    if (otras > 0) valores["Otras"] = otras;
+    return { fecha: d.fecha, valores };
+  });
+
+  const categoriasFinal = [...top];
+  if (diasFinal.some(d => d.valores["Otras"] !== undefined)) categoriasFinal.push("Otras");
+  return { categoriasFinal, dias: diasFinal };
+}
+
+function _rcFormatoFechaLabel(fechaStr, esSemanal) {
+  const f = new Date(fechaStr + "T12:00:00");
+  const dd = String(f.getDate()).padStart(2,"0");
+  const mm = String(f.getMonth()+1).padStart(2,"0");
+  return esSemanal ? `Sem. ${dd}/${mm}` : `${dd}/${mm}`;
+}
+
+/** Redibuja el gráfico de tendencia a partir de los datos ya cargados, aplicando
+ *  la agrupación (día/semana/automático) elegida en el selector. No vuelve a
+ *  pedir datos al backend — solo re-procesa lo que ya está en memoria. */
+function _rcRedibujarTendencia() {
+  const canvasLinea = document.getElementById("rcChartLinea");
+  const aviso = document.getElementById("rcTendenciaAviso");
+  if (!canvasLinea) return;
+
+  const tendenciaPorCategoria = _rcTendenciaActual;
+
+  if (tendenciaPorCategoria && tendenciaPorCategoria.dias && tendenciaPorCategoria.dias.length) {
+    if (aviso) aviso.style.display = "none";
+
+    const modo = document.getElementById("rcTendenciaAgrupacion")?.value || "auto";
+    const esSemanal = modo === "semana" || (modo === "auto" && tendenciaPorCategoria.dias.length > 45);
+
+    let dias = tendenciaPorCategoria.dias;
+    if (esSemanal) dias = _rcAgruparPorSemana(dias);
+
+    const { categoriasFinal, dias: diasFinal } = _rcAplicarTopCategorias(dias, tendenciaPorCategoria.categorias || [], 6);
+
+    const labels = diasFinal.map(d => _rcFormatoFechaLabel(d.fecha, esSemanal));
+    const coloresBase = _RC_PALETA_CATEGORIAS;
+    const datasets = categoriasFinal.map((cat, i) => {
+      const esOtras = cat === "Otras";
+      const color = esOtras ? "#94a3b8" : coloresBase[i % coloresBase.length];
+      return {
+        label: cat,
+        data: diasFinal.map(d => Number((d.valores && d.valores[cat]) || 0)),
+        borderColor: color,
+        backgroundColor: "transparent",
+        fill: false, // sin apilar: cada línea muestra su propio valor real, para que una
+                     // categoría chica se vea claramente chata frente a una grande, y no
+                     // "infle" de tamaño por estar apoyada arriba de otra en un área apilada
+        tension: .3, pointRadius: 0, borderWidth: 2
+      };
+    });
+
+    if (_rcCharts.linea) _rcCharts.linea.destroy();
+    _rcCharts.linea = new Chart(canvasLinea, {
+      type:"line",
+      data:{ labels, datasets },
+      options:{
+        interaction:{ mode:"index", intersect:false },
+        plugins:{
+          legend:{ position:"bottom", labels:{ boxWidth:12, font:{size:11} } },
+          tooltip:{
+            callbacks:{
+              label: (ctx) => `${ctx.dataset.label}: $${Math.round(ctx.raw).toLocaleString("es-AR")}`
+            }
+          }
+        },
+        scales:{
+          x:{ grid:{ display:false }, ticks:{ maxTicksLimit:10 } },
+          y:{ grid:{ color:"#eef1f6" }, ticks:{ callback:(v)=>"$"+Number(v).toLocaleString("es-AR") } }
+        }
+      }
+    });
+  } else {
+    // Fallback: todavía no existe el endpoint por categoría — se avisa y se
+    // muestra una sola línea con el total (mejor que no mostrar nada).
+    if (aviso) {
+      aviso.style.display = "block";
+      aviso.textContent = "⚠️ Tu backend todavía no tiene el desglose diario por categoría — mostrando el total general. Pedime el código de Apps Script para agregarlo.";
+    }
+    _rcCargarVentasDelRango(document.getElementById("rcDesde").value, document.getElementById("rcHasta").value)
+      .then(ventasDelRango => {
+        const porDia = {};
+        (ventasDelRango || []).forEach(v => {
+          if (String(v.ANULADA || "").toUpperCase() === "SI") return;
+          if (!v.FECHA) return;
+          const f = String(v.FECHA).slice(0, 10);
+          porDia[f] = (porDia[f] || 0) + Number(v.TOTAL || 0);
+        });
+        const fechasOrdenadas = Object.keys(porDia).sort();
+        if (_rcCharts.linea) _rcCharts.linea.destroy();
+        _rcCharts.linea = new Chart(canvasLinea, {
+          type:"line",
+          data:{
+            labels: fechasOrdenadas.length ? fechasOrdenadas.map(f=>_rcFormatoFechaLabel(f,false)) : ["Sin datos"],
+            datasets:[{ label:"Ventas diarias (total)", data: fechasOrdenadas.length ? fechasOrdenadas.map(f=>porDia[f]) : [0],
+              borderColor:"#2563eb", backgroundColor:"rgba(37,99,235,.08)", fill:true, tension:.35, pointRadius:0, borderWidth:2 }]
+          },
+          options:{
+            plugins:{ legend:{ display:false } },
+            scales:{ x:{ grid:{ display:false }, ticks:{ maxTicksLimit:8 } }, y:{ grid:{ color:"#eef1f6" } } }
+          }
+        });
+      });
+  }
+}
+
+/** Re-renderiza SOLO la tabla semáforo aplicando los filtros de estado y cantidad,
+ *  sin volver a pedir datos ni redibujar los gráficos. */
+function _rcAplicarFiltrosTabla() {
+  const productos = _rcProductosActuales;
+  const dias = _rcDiasActuales;
+  const tbody = document.getElementById("rcSemaforoTabla");
+  if (!tbody) return;
+
+  if (!productos || productos.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-3">Sin ventas para el rango elegido</td></tr>`;
+    return;
+  }
+
+  const filtroEstado = document.getElementById("rcFiltroEstado")?.value || "todos";
+  const filtroCantidad = document.getElementById("rcFiltroCantidad")?.value || "10";
+
+  const estadoInfo = {
+    sinstock: { clase:"bg-danger",  texto:"Sin stock" },
+    critico:  { clase:"bg-danger",  texto:"Crítico" },
+    atencion: { clase:"bg-warning text-dark", texto:"Atención" },
+    ok:       { clase:"bg-success", texto:"OK" },
+  };
+
+  let filtrados = productos.filter(p => filtroEstado === "todos" || _rcEstado(p, dias) === filtroEstado);
+  let ordenados = filtrados.sort((a,b)=> _rcCobertura(a, dias) - _rcCobertura(b, dias));
+  if (filtroCantidad !== "todos") ordenados = ordenados.slice(0, Number(filtroCantidad));
+
+  if (ordenados.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-3">Ningún producto en ese estado</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = ordenados.map(p => {
+    const e = _rcEstado(p, dias);
+    const info = estadoInfo[e];
+    const cob = _rcCobertura(p, dias);
+    const cobTxt = cob === Infinity ? "—" : Math.round(cob) + " días";
+    return `
+      <tr>
+        <td class="mono">${escapeHtml(p.codigo)}</td>
+        <td>${escapeHtml(p.nombre)}</td>
+        <td>${escapeHtml(p.categoria)}</td>
+        <td class="money">${p.vendidos.toLocaleString("es-AR")}</td>
+        <td class="money">${p.stock.toLocaleString("es-AR")}</td>
+        <td class="money">${cobTxt}</td>
+        <td><span class="badge ${info.clase}">${info.texto}</span></td>
+      </tr>`;
+  }).join("");
+}
+
+/* =====================================================================
+   Backend: la acción "reporteVentasDiariasPorCategoria" ya está agregada
+   en code.gs (misma lógica que reporteVentasPorCategoria, agrupada
+   también por día). El fallback de más arriba queda como red de
+   seguridad por si alguna vez el deploy del backend queda desactualizado.
+===================================================================== */
 
 /* ===================================================================
    MOVIMIENTOS DE CAJA — ingresos y egresos manuales (no son ventas)

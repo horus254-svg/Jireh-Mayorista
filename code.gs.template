@@ -192,6 +192,9 @@ case "reporteProductosVendidos":
 case "reporteVentasPorCategoria":
   return getReporteVentasPorCategoria(e);
 
+case "reporteVentasDiariasPorCategoria":
+  return getReporteVentasDiariasPorCategoria(e);
+
 case "reporteFormasPago":
   return getReporteFormasPago(e);
 
@@ -1455,31 +1458,6 @@ function obtenerStockActualPorCodigo(codigos){
 
 function guardarPedido(data){
 
-  // Sin este lock, dos pedidos por el mismo producto llegando casi al
-  // mismo tiempo pueden leer el mismo stock disponible y aprobarse
-  // los dos (cada uno individualmente "alcanza", pero juntos no).
-  // Con el lock, el segundo pedido espera a que el primero termine de
-  // validar Y guardar antes de leer el stock, así que ve el stock ya
-  // actualizado si el primero lo hubiera descontado.
-  const lock = LockService.getScriptLock();
-  const obtuvoLock = lock.tryLock(10000);
-
-  if(!obtuvoLock){
-    return jsonResponse({
-      success:false,
-      message:"El sistema está procesando otro pedido en este momento. Probá de nuevo en unos segundos."
-    });
-  }
-
-  try{
-    return guardarPedidoInterno(data);
-  } finally {
-    lock.releaseLock();
-  }
-}
-
-function guardarPedidoInterno(data){
-
   const ss = getSS();
 
   const pedidosSheet =
@@ -1519,28 +1497,13 @@ function guardarPedidoInterno(data){
       data.carrito.map(item => item.CODIGO)
     );
 
-    // Un mismo CODIGO puede aparecer en más de una línea del carrito
-    // (por ejemplo, unidades sueltas + una caja del mismo producto,
-    // agregada con agregarCajaAlCarrito). Si se compara cada línea por
-    // separado contra el stock total, ambas pueden "pasar" aunque la
-    // suma de las dos supere el stock real. Por eso acá se suman
-    // primero las cantidades pedidas por CODIGO, y se valida el total.
-    const pedidoPorCodigo = {};
-    const productoPorCodigo = {};
-    data.carrito.forEach(item => {
-      const codigo = String(item.CODIGO).trim();
-      pedidoPorCodigo[codigo] = (pedidoPorCodigo[codigo] || 0) + Number(item.cantidad);
-      productoPorCodigo[codigo] = productoPorCodigo[codigo] || item.PRODUCTO;
-    });
-
     const faltantes = [];
-    Object.keys(pedidoPorCodigo).forEach(codigo => {
-      const cantidadPedida = pedidoPorCodigo[codigo];
-      const stockActual = stockPorCodigo[codigo];
-      if(stockActual === undefined || stockActual < cantidadPedida){
+    data.carrito.forEach(item => {
+      const stockActual = stockPorCodigo[String(item.CODIGO).trim()];
+      if(stockActual === undefined || stockActual < Number(item.cantidad)){
         faltantes.push({
-          producto: productoPorCodigo[codigo],
-          pedido: cantidadPedida,
+          producto: item.PRODUCTO,
+          pedido: Number(item.cantidad),
           disponible: Math.max(0, stockActual || 0)
         });
       }
@@ -1660,14 +1623,10 @@ function guardarPedidoInterno(data){
  * mismo formato de carrito que ya usa el POS para ventas normales:
  * [{ CODIGO, PRODUCTO, PRECIO, cantidad }, ...].
  *
- * Igual que un pedido del catálogo web, NO descuenta stock al crearse
- * — un pedido es una promesa de venta futura, no una venta concretada
- * todavía. El descuento de stock ocurre después, cuando el pedido pasa
- * a PREPARANDO (ver actualizarEstado), usando la misma lógica y las
- * mismas columnas (PEDIDOS/DETALLE_PEDIDOS/STOCK_DESCONTADO) que un
- * pedido creado desde el catálogo, porque ambos terminan en las mismas
- * hojas y pasan por el mismo actualizarEstado — no hay dos caminos de
- * código distintos para esto, así que no hace falta duplicar nada acá.
+ * A propósito, NO descuenta stock — un pedido es una promesa de venta
+ * futura, no una venta concretada. El stock se ajusta más adelante,
+ * cuando el pedido se entrega (a mano, o desde una venta real si en
+ * el futuro se conecta ese flujo).
  *
  * Reutiliza guardarPedido() para no duplicar la lógica de guardado en
  * PEDIDOS/DETALLE_PEDIDOS — solo adapta el formato de carrito del POS
@@ -2412,43 +2371,32 @@ for(let i=1;i<data.length;i++){
 
 if(String(data[i][0]) === String(pedidoId)){
 
-  const yaDescontado = String(data[i][13] || "").toUpperCase() === "SI";
-  const estadoUpper = String(estado).toUpperCase();
-
-  // El ajuste de stock se hace ANTES de tocar la fila del pedido, y
-  // el estado/STOCK_DESCONTADO solo se escriben si ese ajuste
-  // realmente funcionó. Antes se escribía el estado y la columna
-  // STOCK_DESCONTADO sin chequear el resultado de
-  // descontarStockPorPedido/devolverStockPorPedido — si esas
-  // funciones no conseguían el lock (alta concurrencia) fallaban en
-  // silencio, y el pedido quedaba marcado como "ya ajustado" aunque
-  // el stock real nunca se tocó. Eso generaba diferencias de stock
-  // exactas por la cantidad de ese pedido, sin ningún aviso.
-  if(estadoUpper === "PREPARANDO" && !yaDescontado){
-    const ok = descontarStockPorPedido(pedidoId);
-    if(!ok){
-      return jsonResponse({
-        success:false,
-        message:"No se pudo descontar el stock (el sistema estaba ocupado). El pedido sigue como estaba — probá de nuevo en unos segundos."
-      });
-    }
-    sheet.getRange(i + 1, 14).setValue("SI");
-  }
-
-  if(estadoUpper === "CANCELADO" && yaDescontado){
-    const ok = devolverStockPorPedido(pedidoId);
-    if(!ok){
-      return jsonResponse({
-        success:false,
-        message:"No se pudo devolver el stock (el sistema estaba ocupado). El pedido sigue como estaba — probá de nuevo en unos segundos."
-      });
-    }
-    sheet.getRange(i + 1, 14).setValue("NO");
-  }
-
   sheet
   .getRange(i + 1, 9)
   .setValue(estado);
+
+  const yaDescontado = String(data[i][13] || "").toUpperCase() === "SI";
+
+  // Al pasar a PREPARANDO por primera vez, se descuenta el stock de
+  // los productos del pedido — es el momento en que la mercadería
+  // efectivamente sale del depósito, no antes (un pedido NUEVO es
+  // solo una promesa de venta). La columna STOCK_DESCONTADO (índice
+  // 13) evita descontar dos veces si el pedido pasa por PREPARANDO
+  // más de una vez (ej. NUEVO → PREPARANDO → NUEVO → PREPARANDO).
+  if(String(estado).toUpperCase() === "PREPARANDO" && !yaDescontado){
+    descontarStockPorPedido(pedidoId);
+    sheet.getRange(i + 1, 14).setValue("SI");
+  }
+
+  // Si se cancela un pedido que ya tenía el stock descontado (porque
+  // pasó por PREPARANDO antes de cancelarse), esa mercadería nunca
+  // llegó a salir de verdad — se devuelve al stock, y se desmarca
+  // STOCK_DESCONTADO para que si en algún momento se reabre el pedido
+  // y vuelve a PREPARANDO, se pueda descontar de nuevo correctamente.
+  if(String(estado).toUpperCase() === "CANCELADO" && yaDescontado){
+    devolverStockPorPedido(pedidoId);
+    sheet.getRange(i + 1, 14).setValue("NO");
+  }
 
   return jsonResponse({
     success:true
@@ -2879,7 +2827,7 @@ function descontarStockPorPedido(pedidoId){
 
   const ss = getSS();
   const detalleSheet = getHoja("DETALLE_PEDIDOS");
-  if(!detalleSheet) return false;
+  if(!detalleSheet) return;
 
   const detalles = detalleSheet.getDataRange().getValues();
   detalles.shift(); // encabezados
@@ -2888,7 +2836,7 @@ function descontarStockPorPedido(pedidoId){
     .filter(row => String(row[0]) === String(pedidoId))
     .map(row => ({ CODIGO: row[1], cantidad: Number(row[3] || 0) }));
 
-  return descontarStockPorVenta(carrito);
+  descontarStockPorVenta(carrito);
 }
 
 /**
@@ -2903,7 +2851,7 @@ function devolverStockPorPedido(pedidoId){
 
   const ss = getSS();
   const detalleSheet = getHoja("DETALLE_PEDIDOS");
-  if(!detalleSheet) return false;
+  if(!detalleSheet) return;
 
   const detalles = detalleSheet.getDataRange().getValues();
   detalles.shift(); // encabezados
@@ -2912,7 +2860,7 @@ function devolverStockPorPedido(pedidoId){
     .filter(row => String(row[0]) === String(pedidoId))
     .map(row => ({ CODIGO: row[1], cantidad: -Number(row[3] || 0) }));
 
-  return descontarStockPorVenta(carrito);
+  descontarStockPorVenta(carrito);
 }
 function obtenerMetricas() {
 
@@ -4292,34 +4240,31 @@ function buscarVentaPorClienteVentaId(ventasSheet, clienteVentaId){
  */
 function descontarStockPorVenta(carrito){
 
-  if(!carrito || carrito.length === 0) return true;
+  if(!carrito || carrito.length === 0) return;
 
   const lock = LockService.getScriptLock();
   const obtuvoLock = lock.tryLock(10000); // espera hasta 10s si otra venta está actualizando stock
 
   if(!obtuvoLock){
-    // No se pudo descontar a tiempo (alta concurrencia). Antes esto
-    // devolvía undefined y quien llamaba (descontarStockPorPedido /
-    // devolverStockPorPedido) igual marcaba la operación como
-    // completada — así quedaban diferencias de stock silenciosas,
-    // exactamente por la cantidad del pedido que no se pudo ajustar.
-    // Ahora se devuelve false para que quien llama NO marque nada como
-    // hecho, y el admin pueda reintentar sabiendo que falló.
+    // No se pudo descontar a tiempo (alta concurrencia). La venta ya
+    // está guardada; el stock va a quedar desactualizado para este
+    // carrito puntual y hay que corregirlo a mano. Se loguea para
+    // poder diagnosticarlo si pasa seguido.
     console.error("No se pudo obtener el lock para descontar stock. Carrito: " + JSON.stringify(carrito));
-    return false;
+    return;
   }
 
   try{
 
     const sheet = getSheet();
-    if(!sheet) return false;
+    if(!sheet) return;
 
     const data = sheet.getDataRange().getValues();
     const headerRow = data[0];
 
     const idxCodigo = headerRow.indexOf("CODIGO");
     const idxStock  = headerRow.indexOf("STOCK");
-    if(idxCodigo === -1 || idxStock === -1) return false; // hoja sin esas columnas, no hay nada para hacer
+    if(idxCodigo === -1 || idxStock === -1) return; // hoja sin esas columnas, no hay nada para hacer
 
     // Cantidad total vendida por código (por si el mismo producto
     // aparece más de una vez en el carrito, aunque hoy el POS no lo hace)
@@ -4338,8 +4283,6 @@ function descontarStockPorVenta(carrito){
         sheet.getRange(fila + 1, idxStock + 1).setValue(stockNuevo);
       }
     }
-
-    return true;
 
   } finally {
     lock.releaseLock();
@@ -4544,15 +4487,6 @@ function eliminarVenta(e){
   for(let i = 1; i < dataVentas.length; i++){
     if(String(dataVentas[i][0]) === ventaId){
       const fila = i + 1;
-
-      // Evita devolver el stock dos veces si la venta ya estaba anulada
-      // (ej. doble clic, dos pestañas del panel abiertas, un reintento
-      // que le llega al servidor después de que ya se procesó la primera vez).
-      const yaAnulada = String(dataVentas[i][colAnulada] || "").toUpperCase() === "SI";
-      if(yaAnulada){
-        return jsonResponse({ success:false, message:"Esta venta ya estaba anulada." });
-      }
-
       ventasSheet.getRange(fila, colAnulada + 1, 1, 2).setValues([["SI", motivo]]);
 
       // Devuelve el stock igual que antes
@@ -5241,6 +5175,106 @@ function getReporteVentasPorCategoria(e){
     success:true,
     desde, hasta,
     categorias: ranking
+  });
+}
+
+/**
+ * REPORTE DE COMPRAS — Ventas diarias por categoría, para el gráfico de
+ * tendencia del panel "Reportes de Compras" (una línea de color por
+ * categoría, para detectar cambios de temporada por rubro).
+ *
+ * A diferencia de getReporteVentasPorCategoria (que solo cuenta pedidos
+ * ya COBRADOS), este reporte cuenta los pedidos en estado ENVIADO —
+ * refleja mejor la demanda real de mercadería por categoría, que es lo
+ * que importa para decidir compras de stock, sin esperar a que se cobren.
+ */
+function getReporteVentasDiariasPorCategoria(e){
+
+  const { desde, hasta } = resolverRangoReporte(e);
+  const zona = Session.getScriptTimeZone();
+
+  // Mapa CODIGO -> CATEGORIA
+  const productos = rowsToObjects(getHoja(SHEET_NAME).getDataRange().getValues());
+  const categoriaPorCodigo = {};
+  productos.forEach(p => {
+    categoriaPorCodigo[p.CODIGO] = (p.CATEGORIA || "Sin categoría").toString().trim() || "Sin categoría";
+  });
+
+  const porDia = {};        // "yyyy-MM-dd" -> { categoria -> total }
+  const categoriasSet = {}; // categorias vistas, para devolver la lista completa
+
+  function acumular(fechaPorIdVenta, sheetNameDetalle){
+    const hojaDetalle = getHoja(sheetNameDetalle);
+    if(!hojaDetalle) return;
+
+    const dataDetalle = hojaDetalle.getDataRange().getValues();
+    dataDetalle.shift();
+
+    dataDetalle.forEach(row => {
+      const idVenta = String(row[0]);
+      const fechaStr = fechaPorIdVenta[idVenta];
+      if(!fechaStr) return; // la venta no cae en el rango elegido
+
+      const codigo = row[1];
+      const cantidad = Number(row[3]) || 0;
+      const precio = Number(row[4]) || 0;
+      const categoria = categoriaPorCodigo[codigo] || "Sin categoría";
+
+      categoriasSet[categoria] = true;
+      if(!porDia[fechaStr]) porDia[fechaStr] = {};
+      porDia[fechaStr][categoria] = (porDia[fechaStr][categoria] || 0) + (cantidad * precio);
+    });
+  }
+
+  // ---- POS: VENTAS_LOCAL (excluye las filas de pedidos cobrados,
+  // cuyo detalle real vive en DETALLE_PEDIDOS, no en DETALLE_VENTAS)
+  const fechaPorIdVentaPOS = {};
+  const hojaPOS = getHoja("VENTAS_LOCAL");
+  if(hojaPOS){
+    const dataPOS = hojaPOS.getDataRange().getValues();
+    dataPOS.shift();
+    dataPOS.forEach(row => {
+      const esPedidoCobrado = String(row[4] || "").toUpperCase() === "PEDIDO WEB";
+      if(esPedidoCobrado) return;
+
+      const fecha = new Date(row[1]);
+      const fechaStr = Utilities.formatDate(fecha, zona, "yyyy-MM-dd");
+      if(fechaStr >= desde && fechaStr <= hasta) fechaPorIdVentaPOS[String(row[0])] = fechaStr;
+    });
+  }
+  acumular(fechaPorIdVentaPOS, "DETALLE_VENTAS");
+
+  // ---- Pedidos ENVIADOS: a diferencia de los otros reportes (que usan
+  // COBRADO=SI para no contar plata que todavía no entró), este gráfico
+  // de tendencia necesita ver el pedido en cuanto se despacha, sin
+  // esperar a que se cobre — así refleja mejor la demanda real por
+  // categoría para decidir compras. Se usa FECHA (fecha del pedido), ya
+  // que no existe una columna de "fecha de envío" separada.
+  const fechaPorIdPedidoEnviado = {};
+  const hojaPedidos = getHoja("PEDIDOS");
+  if(hojaPedidos){
+    const dataPedidos = rowsToObjects(hojaPedidos.getDataRange().getValues());
+    dataPedidos.forEach(p => {
+      const fueEnviado = String(p.ESTADO || "").toUpperCase() === "ENVIADO";
+      if(!fueEnviado) return;
+
+      const fecha = new Date(p.FECHA);
+      const fechaStr = Utilities.formatDate(fecha, zona, "yyyy-MM-dd");
+      if(fechaStr >= desde && fechaStr <= hasta) fechaPorIdPedidoEnviado[String(p.PEDIDO_ID)] = fechaStr;
+    });
+  }
+  acumular(fechaPorIdPedidoEnviado, "DETALLE_PEDIDOS");
+
+  const dias = Object.keys(porDia).sort().map(fecha => ({
+    fecha: fecha,
+    valores: porDia[fecha]
+  }));
+
+  return jsonResponse({
+    success:true,
+    desde, hasta,
+    categorias: Object.keys(categoriasSet).sort(),
+    dias: dias
   });
 }
 
