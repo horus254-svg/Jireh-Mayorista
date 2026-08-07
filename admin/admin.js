@@ -3947,41 +3947,41 @@ function imprimirEtiquetaEnvio(datos) {
 
       <!-- Franja frágil / cabecera -->
       <div style="background:#d32f2f; color:#fff; text-align:center; padding:6mm 4mm; border-radius:2mm; margin-bottom:6mm;">
-        <div style="font-size:18pt; font-weight:900; letter-spacing:2px; text-transform:uppercase;">POR FAVOR</div>
-        <div style="font-size:11pt; font-weight:700; letter-spacing:4px; text-transform:uppercase;">MANEJESE CON CUIDADO</div>
-        <div style="font-size:26pt; font-weight:900; letter-spacing:6px; margin:4px 0;">FRAGIL</div>
-        <div style="font-size:11pt; font-weight:700; letter-spacing:3px;">== GRACIAS ==</div>
+        <div style="font-size:26pt; font-weight:900; letter-spacing:2px; text-transform:uppercase;">POR FAVOR</div>
+        <div style="font-size:14pt; font-weight:700; letter-spacing:4px; text-transform:uppercase;">MANEJESE CON CUIDADO</div>
+        <div style="font-size:32pt; font-weight:900; letter-spacing:6px; margin:4px 0;">FRAGIL</div>
+        <div style="font-size:14pt; font-weight:700; letter-spacing:3px;">== GRACIAS ==</div>
       </div>
 
       <!-- Datos del destinatario -->
       <table style="width:100%; border-collapse:collapse; font-size:13pt;">
         <tr>
-          <td style="font-size:7pt; font-weight:700; text-transform:uppercase; color:#555; width:28mm; vertical-align:top; padding-top:4px;">Nombre:</td>
-          <td style="font-size:16pt; font-weight:900; text-transform:uppercase; letter-spacing:1px;">${escapeHtml(cliente)}</td>
+          <td style="font-size:12pt; font-weight:700; text-transform:uppercase; color:#555; width:28mm; vertical-align:top; padding-top:4px;">Nombre:</td>
+          <td style="font-size:32pt; font-weight:900; text-transform:uppercase; letter-spacing:1px;">${escapeHtml(cliente)}</td>
         </tr>
         ${telefono ? `<tr>
-          <td style="font-size:7pt; font-weight:700; text-transform:uppercase; color:#555; padding-top:4px;">Teléfono:</td>
-          <td style="font-size:14pt; font-weight:700;">${escapeHtml(telefono)}</td>
+          <td style="font-size:12pt; font-weight:700; text-transform:uppercase; color:#555; padding-top:4px;">Teléfono:</td>
+          <td style="font-size:32pt; font-weight:700;">${escapeHtml(telefono)}</td>
         </tr>` : ""}
         ${direccion ? `<tr>
-          <td style="font-size:7pt; font-weight:700; text-transform:uppercase; color:#555; padding-top:4px;">Dirección:</td>
-          <td style="font-size:14pt; font-weight:700; text-transform:uppercase;">${escapeHtml(direccion)}</td>
+          <td style="font-size:12pt; font-weight:700; text-transform:uppercase; color:#555; padding-top:4px;">Dirección:</td>
+          <td style="font-size:32pt; font-weight:700; text-transform:uppercase;">${escapeHtml(direccion)}</td>
         </tr>` : ""}
         ${localidadStr ? `<tr>
-          <td style="font-size:7pt; font-weight:700; text-transform:uppercase; color:#555; padding-top:4px;">Localidad:</td>
-          <td style="font-size:14pt; font-weight:700; text-transform:uppercase;">${escapeHtml(localidadStr)}</td>
+          <td style="font-size:12pt; font-weight:700; text-transform:uppercase; color:#555; padding-top:4px;">Localidad:</td>
+          <td style="font-size:32pt; font-weight:700; text-transform:uppercase;">${escapeHtml(localidadStr)}</td>
         </tr>` : ""}
         ${provincia ? `<tr>
-          <td style="font-size:7pt; font-weight:700; text-transform:uppercase; color:#555; padding-top:4px;">Provincia:</td>
-          <td style="font-size:14pt; font-weight:700; text-transform:uppercase;">${escapeHtml(provincia)}</td>
+          <td style="font-size:12pt; font-weight:700; text-transform:uppercase; color:#555; padding-top:4px;">Provincia:</td>
+          <td style="font-size:32pt; font-weight:700; text-transform:uppercase;">${escapeHtml(provincia)}</td>
         </tr>` : ""}
         ${dni ? `<tr>
-          <td style="font-size:7pt; font-weight:700; text-transform:uppercase; color:#555; padding-top:4px;">DNI:</td>
-          <td style="font-size:14pt; font-weight:700;">${escapeHtml(dni)}</td>
+          <td style="font-size:12pt; font-weight:700; text-transform:uppercase; color:#555; padding-top:4px;">DNI:</td>
+          <td style="font-size:32pt; font-weight:700;">${escapeHtml(dni)}</td>
         </tr>` : ""}
         ${transporte ? `<tr>
-          <td style="font-size:7pt; font-weight:700; text-transform:uppercase; color:#555; padding-top:4px;">Transporte:</td>
-          <td style="font-size:14pt; font-weight:700; text-transform:uppercase;">${escapeHtml(transporte)}</td>
+          <td style="font-size:12pt; font-weight:700; text-transform:uppercase; color:#555; padding-top:4px;">Transporte:</td>
+          <td style="font-size:32pt; font-weight:700; text-transform:uppercase;">${escapeHtml(transporte)}</td>
         </tr>` : ""}
       </table>
 
