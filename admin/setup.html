@@ -162,27 +162,21 @@ body{
 
     <div id="setupContent" style="display:none;">
       <h1>Conectá esta caja con tu negocio</h1>
-      <p class="sub">Esta es la primera vez que se abre VeekPOS en esta computadora. Completá estos datos para conectar esta caja con tu Google Sheets y activar tu licencia — solo hay que hacerlo una vez.</p>
+      <p class="sub">Esta es la primera vez que se abre VeekPOS en esta computadora. Completá estos datos para conectar esta caja con tu backend y activar tu licencia — solo hay que hacerlo una vez.</p>
 
       <form id="setupForm">
 
         <div class="step-block">
           <div class="field">
-            <div class="field-title"><span class="step-num">1</span> ID de la planilla (Sheet ID)</div>
-            <input type="text" id="sheetId" placeholder="1AbCdeFGhiJKlmNoPQRstuVWxyz0123456789ABCdef" autofocus required>
-            <div class="hint">Es la parte de la URL de tu Google Sheets entre <code>/d/</code> y <code>/edit</code>. Ej: en <code>docs.google.com/spreadsheets/d/<strong>ESTE_ID</strong>/edit</code>.</div>
-          </div>
-
-          <div class="field">
-            <div class="field-title"><span class="step-num">2</span> URL de Apps Script (API_URL)</div>
-            <input type="text" id="apiUrl" placeholder="https://script.google.com/macros/s/AKfycbw.../exec" required>
+            <div class="field-title"><span class="step-num">1</span> URL de Apps Script (API_URL)</div>
+            <input type="text" id="apiUrl" placeholder="https://script.google.com/macros/s/AKfycbw.../exec" autofocus required>
             <div class="hint">La conseguís en tu Apps Script: Implementar → Administrar implementaciones → "URL de la aplicación web". Si no la tenés a mano, pedísela a quien te entregó el sistema.</div>
           </div>
         </div>
 
         <div class="step-block">
           <div class="field">
-            <div class="field-title"><span class="step-num">3</span> Activar tu licencia</div>
+            <div class="field-title"><span class="step-num">2</span> Activar tu licencia</div>
             <input type="text" id="licenciaUrl" placeholder="URL del servidor de licencias — https://script.google.com/macros/s/AKfycbw.../exec" required style="margin-bottom:10px;">
             <input type="email" id="licenciaEmail" placeholder="Correo de la licencia" autocomplete="username" required style="margin-bottom:10px; font-family:var(--font-ui);">
             <input type="password" id="licenciaPassword" placeholder="Contraseña / PIN de la licencia" autocomplete="current-password" required style="font-family:var(--font-ui);">
@@ -213,11 +207,6 @@ body{
 // Mismo patrón de validación que usa el migrador: cualquier URL de
 // Apps Script válida, no una en particular.
 const PATRON_URL_APPS_SCRIPT = /^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec\/?$/;
-
-// ID de planilla de Google Sheets: alfanumérico + "-"/"_", sin espacios.
-// No validamos longitud exacta porque puede variar, pero un ID real
-// de Sheets siempre tiene al menos ~20 caracteres.
-const PATRON_SHEET_ID = /^[A-Za-z0-9_-]{20,}$/;
 
 function normalizarUrl(url){
   url = url.trim();
@@ -250,8 +239,8 @@ function obtenerBridge(){
  * Antes, cada vez que se abría setup.html (por ejemplo tras
  * actualizar los archivos de la app a una versión nueva) se volvía a
  * mostrar el formulario vacío, y si alguien lo completaba de nuevo
- * se pisaban el Sheet ID, la API URL y la licencia que ya estaban
- * guardados y funcionando para ese cliente.
+ * se pisaban la API URL y la licencia que ya estaban guardados y
+ * funcionando para ese cliente.
  *
  * Ahora, antes de mostrar el formulario, se chequea si esta caja ya
  * tiene una API URL guardada en el SQLite local. Si la tiene, esta
@@ -304,16 +293,10 @@ document.getElementById("setupForm").addEventListener("submit", async function(e
   e.preventDefault();
   ocultarError();
 
-  const sheetId    = document.getElementById("sheetId").value.trim();
   const apiUrl     = normalizarUrl(document.getElementById("apiUrl").value);
   const licenciaUrl        = normalizarUrl(document.getElementById("licenciaUrl").value);
   const licenciaEmail      = document.getElementById("licenciaEmail").value.trim();
   const licenciaPassword   = document.getElementById("licenciaPassword").value;
-
-  if(!PATRON_SHEET_ID.test(sheetId)){
-    mostrarError("Ese ID de planilla no parece válido. Copiá solo la parte entre /d/ y /edit de la URL de tu Google Sheets.");
-    return;
-  }
 
   if(!PATRON_URL_APPS_SCRIPT.test(apiUrl)){
     mostrarError("Esta URL de Apps Script no parece válida. Tiene que empezar con https://script.google.com/macros/s/ y terminar en /exec");
@@ -365,15 +348,17 @@ document.getElementById("setupForm").addEventListener("submit", async function(e
     }
 
     // Recién ahora que la API respondió bien y la licencia quedó
-    // activada, guardamos el resto de los datos de esta caja. api_url
-    // y sheet_id quedan como claves en la config local (SQLite) de
+    // activada, guardamos la API URL como config local (SQLite) de
     // esta caja, vía fijarConfigLocal — el bridge no tiene un método
-    // dedicado "fijarApiUrl".
+    // dedicado "fijarApiUrl". El Sheet ID no se guarda ni se pide
+    // acá: el cliente Electron nunca lo necesita en tiempo de
+    // ejecución — el Code.gs desplegado detrás de la API_URL ya tiene
+    // el SPREADSHEET_ID grabado del lado del servidor, y es lo único
+    // que realmente hace falta para conectar esta caja.
     if(!bridge.fijarConfigLocal){
       throw new Error("Esta versión de la app no puede guardar la configuración local. Actualizá VeekPOS e intentá de nuevo.");
     }
     await bridge.fijarConfigLocal("api_url", apiUrl);
-    await bridge.fijarConfigLocal("sheet_id", sheetId);
 
     window.location.href = "login.html";
 

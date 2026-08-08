@@ -279,7 +279,7 @@ async function resolverApiUrl(){
   if(bridge && typeof bridge.obtenerConfigLocal === "function"){
     // El bridge no expone un "obtenerApiUrl" dedicado — la API URL se
     // guarda como una clave más de la config local genérica (mismo
-    // lugar donde setup.html guarda sheet_id), vía obtenerConfigLocal.
+    // lugar donde setup.html guarda api_url), vía obtenerConfigLocal.
     const guardada = await bridge.obtenerConfigLocal("api_url", "");
     if(guardada){
       API_URL = guardada;

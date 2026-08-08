@@ -153,7 +153,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     if (bridge) {
       // App de escritorio (Electron) sin api_url guardada todavía: el
-      // flujo correcto es setup.html (pide Sheet ID, API URL y activa
+      // flujo correcto es setup.html (pide API URL y activa la
       // la licencia), no la sección "Instalador" de abajo — esa es
       // para el modo navegador/multi-cliente y genera un config.json
       // que en Electron no se usa para nada. Mandar ahí por error
