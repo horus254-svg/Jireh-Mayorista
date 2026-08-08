@@ -61,6 +61,31 @@ async function fetchAPI(url, opciones = {}, config = {}) {
 }
 
 async function cargarConfigCliente() {
+  // App de escritorio (Electron): la API URL vive en SQLite, guardada
+  // por setup.html vía fijarConfigLocal("api_url", ...) — nunca hay un
+  // config.json físico en este modo. Antes esta función solo miraba
+  // config.json, así que en Electron el fetch siempre fallaba y
+  // admin.js se quedaba con el default hardcodeado de arriba (la URL
+  // de OTRA instalación) sin ningún aviso — cualquier venta o cambio
+  // de stock se habría guardado en la planilla equivocada.
+  const bridge = window.posOffline || window.veekpos;
+  if (bridge && typeof bridge.obtenerConfigLocal === "function") {
+    try {
+      const guardada = await bridge.obtenerConfigLocal("api_url", "");
+      if (guardada) {
+        API_URL = guardada;
+        return true; // ya configurada vía Instalador (setup.html)
+      }
+    } catch (e) {
+      console.error("Error al leer api_url desde el almacenamiento local:", e);
+    }
+    // Estamos en Electron pero todavía no hay api_url guardada: no
+    // caer al config.json de navegador (no aplica en este modo) ni al
+    // default de otra instalación — se trata como no configurada.
+    return false;
+  }
+
+  // Navegador normal (sin Electron): mismo mecanismo de siempre.
   try {
     const res = await fetch("../config.json?_=" + Date.now(), { cache: "no-store" });
     if (res.ok) {
@@ -124,10 +149,25 @@ document.addEventListener("DOMContentLoaded", async () => {
   const yaConfigurado = await cargarConfigCliente();
 
   if (!yaConfigurado) {
-    // Instalación nueva, sin config.json propio todavía — no tiene
-    // sentido pedir login (no hay ninguna cuenta real detrás todavía,
-    // y menos la de otro cliente). Se muestra directo el Instalador,
-    // sin arrancar nada que dependa de un backend que no existe.
+    const bridge = window.posOffline || window.veekpos;
+
+    if (bridge) {
+      // App de escritorio (Electron) sin api_url guardada todavía: el
+      // flujo correcto es setup.html (pide Sheet ID, API URL y activa
+      // la licencia), no la sección "Instalador" de abajo — esa es
+      // para el modo navegador/multi-cliente y genera un config.json
+      // que en Electron no se usa para nada. Mandar ahí por error
+      // dejaría a la persona completando un formulario que no guarda
+      // los datos donde admin.js realmente los busca.
+      window.location.href = "../setup.html";
+      return;
+    }
+
+    // Instalación nueva en modo navegador, sin config.json propio
+    // todavía — no tiene sentido pedir login (no hay ninguna cuenta
+    // real detrás todavía, y menos la de otro cliente). Se muestra
+    // directo el Instalador, sin arrancar nada que dependa de un
+    // backend que no existe.
     document.querySelectorAll(".sidebar a[data-target], #bottomNavLinks a[data-target]").forEach(a => {
       if (a.getAttribute("data-target") !== "instalador") a.style.display = "none";
     });

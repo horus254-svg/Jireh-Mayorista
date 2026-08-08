@@ -276,8 +276,11 @@ let API_URL = API_URL_POR_DEFECTO;
 async function resolverApiUrl(){
   const bridge = window.posOffline || window.veekpos;
 
-  if(bridge && typeof bridge.obtenerApiUrl === "function"){
-    const guardada = await bridge.obtenerApiUrl();
+  if(bridge && typeof bridge.obtenerConfigLocal === "function"){
+    // El bridge no expone un "obtenerApiUrl" dedicado — la API URL se
+    // guarda como una clave más de la config local genérica (mismo
+    // lugar donde setup.html guarda sheet_id), vía obtenerConfigLocal.
+    const guardada = await bridge.obtenerConfigLocal("api_url", "");
     if(guardada){
       API_URL = guardada;
       return;
