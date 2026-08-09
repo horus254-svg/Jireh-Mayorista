@@ -1161,7 +1161,7 @@ async function checkoutWhatsapp(){
             return;
         }
 
-        let mensaje = `*PEDIDO JIREH MAYORISTA*
+        let mensaje = `*PEDIDO ${nombreNegocio.toUpperCase()}*
 
 🧾 Pedido: ${resultado.pedidoId}
 

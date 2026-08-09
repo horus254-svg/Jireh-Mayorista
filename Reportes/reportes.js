@@ -1,11 +1,13 @@
 /* ===================================================================
-   REPORTES PWA — Jireh Mayorista
+   REPORTES PWA
    Reusa los mismos endpoints del backend (Apps Script) que ya usa el
    panel admin completo. Esta página solo MUESTRA y EXPORTA reportes,
    no escribe nada en la base.
+   API_URL y el nombre del negocio se leen de config.js (index.html
+   ya carga ese script antes de este archivo).
 =================================================================== */
 
-const API_URL = "https://script.google.com/macros/s/AKfycbw1eY_mXImG503rU0Cqddx1WBuGIOhxaW_SXGoIMsug_CjsSC-HLsb2XzYwrovaGBU/exec";
+const API_URL = CONFIG_NEGOCIO.API_URL;
 
 /* ---- Sesión: requiere haber pasado por login.html ---- */
 if (sessionStorage.getItem("admin") !== "true") {
@@ -287,7 +289,7 @@ function exportarReportePDF(cardId, tituloReporte) {
     const hasta = document.getElementById("repHasta").value || "—";
 
     doc.setFontSize(14);
-    doc.text(`Jireh Mayorista — ${tituloReporte}`, 30, 30);
+    doc.text(`${CONFIG_NEGOCIO.NOMBRE_NEGOCIO} — ${tituloReporte}`, 30, 30);
     doc.setFontSize(10);
     doc.setTextColor(110, 110, 110);
     doc.text(`Período: ${desde} a ${hasta}  ·  Generado: ${new Date().toLocaleString("es-AR")}`, 30, 46);
