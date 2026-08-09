@@ -21,7 +21,7 @@ const CONFIG_NEGOCIO = {
   TEMA: "azul", // azul | verde | rojo (tema por defecto, se puede sobreescribir desde el panel)
 
   // ---- Usados en la tienda (index.html del catálogo) ----
-  URL_SITIO: "https://jireh-mayorista.netlify.app/",
+  URL_SITIO: "https://horus254-svg.github.io/Jireh-Mayorista/",
   WHATSAPP_NUMERO: "5491140975795", // solo números, con código de país, sin +
   WHATSAPP_ICONO_URL: "https://cdn-icons-png.flaticon.com/512/733/733585.png", // ícono del botón flotante de WhatsApp
   ICONO_URL: "icon-512.png", // usado como imagen al compartir en WhatsApp/Facebook (og:image) y en X/Twitter (twitter:image)
