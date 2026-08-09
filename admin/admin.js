@@ -830,7 +830,6 @@ function cargarAparienciaForm(cfg) {
 
   // Dominio del catálogo, nombre corto y SEO/redes
   const setIfExists = (id, valor) => { const el = document.getElementById(id); if(el) el.value = valor ?? ""; };
-  setIfExists("cfgUrlCatalogo", cfg.urlCatalogo ?? APARIENCIA_DEFAULT.urlCatalogo);
   setIfExists("cfgNombreCorto", cfg.nombreCorto ?? APARIENCIA_DEFAULT.nombreCorto);
   setIfExists("cfgIconoUrl", cfg.iconoUrl ?? APARIENCIA_DEFAULT.iconoUrl);
   setIfExists("cfgWhatsappIconoUrl", cfg.whatsappIconoUrl ?? APARIENCIA_DEFAULT.whatsappIconoUrl);
@@ -1062,7 +1061,6 @@ async function guardarAparienciaForm() {
   // Campos opcionales nuevos (URL del catálogo, nombre corto, íconos, SEO, footer)
   const getIfExists = (id) => { const el = document.getElementById(id); return el ? el.value.trim() : undefined; };
   const extra = {
-    urlCatalogo: getIfExists("cfgUrlCatalogo"),
     nombreCorto: getIfExists("cfgNombreCorto"),
     iconoUrl: getIfExists("cfgIconoUrl"),
     whatsappIconoUrl: getIfExists("cfgWhatsappIconoUrl"),
