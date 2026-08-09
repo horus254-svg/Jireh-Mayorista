@@ -24,9 +24,12 @@ function normalizarTextoTransporte(texto){
         .replace(/\s+/g, " ");
 }
 
-// API_URL se carga desde config.json para permitir instalaciones
-// multi-cliente sin modificar el código fuente.
-// Si config.json no existe o falla, usa la URL de respaldo.
+// API_URL viene de config.js (window.CONFIG_NEGOCIO.API_URL), que ya se
+// carga con <script src="config.js"> antes que este archivo en el HTML.
+// Es el único valor que sigue siendo fijo por instalación — todo lo
+// demás (nombre, WhatsApp, apariencia) se edita desde el panel admin.
+// Si por algún motivo config.js no llegó a cargar, se usa esta URL de
+// respaldo para que el catálogo nunca quede totalmente roto.
 let API_URL = "https://script.google.com/macros/s/AKfycbw1eY_mXImG503rU0Cqddx1WBuGIOhxaW_SXGoIMsug_CjsSC-HLsb2XzYwrovaGBU/exec";
 
 /**
@@ -70,16 +73,11 @@ async function fetchAPI(url, opciones = {}, config = {}) {
   throw ultimoError;
 }
 
-async function cargarConfigCliente() {
-  try {
-    const res = await fetch("../config.json?_=" + Date.now(), { cache: "no-store" });
-    if (res.ok) {
-      const cfg = await res.json();
-      if (cfg.apiUrl) API_URL = cfg.apiUrl;
-    }
-  } catch(e) {
-    // config.json no disponible — usar URL por defecto
-    console.log("config.json no encontrado, usando URL por defecto");
+function cargarConfigCliente() {
+  if (typeof CONFIG_NEGOCIO !== "undefined" && CONFIG_NEGOCIO.API_URL) {
+    API_URL = CONFIG_NEGOCIO.API_URL;
+  } else {
+    console.warn("config.js no está cargado o no define API_URL — usando la URL de respaldo.");
   }
 }
 
@@ -1826,10 +1824,10 @@ async function descargarCatalogoPDF(){
    INICIO
 ========================================================= */
 
-// Inicialización asíncrona: primero cargar config del cliente,
-// luego apariencia y productos para que API_URL ya esté lista.
+// Inicialización: primero fijar API_URL desde config.js, luego
+// apariencia y productos para que API_URL ya esté lista.
 (async () => {
-  await cargarConfigCliente();
+  cargarConfigCliente();
   apariencaCargadaPromise = aplicarApariencia();
   actualizarContador();
   cargarProductos();
