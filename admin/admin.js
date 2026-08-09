@@ -305,19 +305,26 @@ async function cargarConfigNegocioForm() {
 
   const cfg = await cargarConfigNegocioDesdeBackend();
 
-  document.getElementById("cfgNombreLocal").value = cfg.nombre;
-  document.getElementById("cfgSubtitulo").value   = cfg.subtitulo;
-  document.getElementById("cfgDireccion").value   = cfg.direccion;
-  document.getElementById("cfgTelefono1").value   = cfg.telefono1;
-  document.getElementById("cfgTelefono2").value   = cfg.telefono2;
-  document.getElementById("cfgPie").value         = cfg.pie;
+  // Setter seguro: si el input no existe en este HTML, no rompe el resto de la carga.
+  const setVal = (id, valor) => {
+    const el = document.getElementById(id);
+    if (el) el.value = valor ?? "";
+    else console.warn(`cargarConfigNegocioForm: no existe #${id} en este HTML, se omite.`);
+  };
+
+  setVal("cfgNombreLocal", cfg.nombre);
+  setVal("cfgSubtitulo", cfg.subtitulo);
+  setVal("cfgDireccion", cfg.direccion);
+  setVal("cfgTelefono1", cfg.telefono1);
+  setVal("cfgTelefono2", cfg.telefono2);
+  setVal("cfgPie", cfg.pie);
 
   cargarAparienciaForm(cfg);
   cargarBeneficiosForm(cfg);
-  document.getElementById("cfgCbuTransferencia").value = cfg.cbuTransferencia ?? CONFIG_NEGOCIO_DEFAULT.cbuTransferencia;
-  document.getElementById("cfgNombreTitularCbu").value = cfg.nombreTitularCbu ?? CONFIG_NEGOCIO_DEFAULT.nombreTitularCbu;
-  document.getElementById("cfgBannerTopMensajes").value = cfg.bannerTopMensajes ?? "";
-  document.getElementById("cfgTransportesNoDisponibles").value = cfg.transportesNoDisponibles ?? "";
+  setVal("cfgCbuTransferencia", cfg.cbuTransferencia ?? CONFIG_NEGOCIO_DEFAULT.cbuTransferencia);
+  setVal("cfgNombreTitularCbu", cfg.nombreTitularCbu ?? CONFIG_NEGOCIO_DEFAULT.nombreTitularCbu);
+  setVal("cfgBannerTopMensajes", cfg.bannerTopMensajes ?? "");
+  setVal("cfgTransportesNoDisponibles", cfg.transportesNoDisponibles ?? "");
   cargarSidebarForm(cfg);
   cargarDriveProductosForm(cfg);
   cargarDrivePedidosForm(cfg);
@@ -343,6 +350,11 @@ async function guardarConfigNegocioForm() {
     telefono2: document.getElementById("cfgTelefono2").value.trim(),
     pie:       document.getElementById("cfgPie").value.trim()
   };
+
+  const cbuEl = document.getElementById("cfgCbuTransferencia");
+  const titularEl = document.getElementById("cfgNombreTitularCbu");
+  if (cbuEl) cfg.cbuTransferencia = cbuEl.value.trim();
+  if (titularEl) cfg.nombreTitularCbu = titularEl.value.trim();
 
   const btn = document.getElementById("btnGuardarConfigNegocio");
   const textoOriginal = btn ? btn.innerHTML : "";
