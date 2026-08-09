@@ -18,7 +18,7 @@
     <meta property="og:url" content="https://jireh-mayorista.netlify.app/">
     <meta property="og:title" content="Jireh Mayorista — Juguetes y Artículos al por Mayor">
     <meta property="og:description" content="Catálogo mayorista online. Juguetes y artículos al por mayor con envíos a todo el país. Consultá precios y hacé tu pedido directamente por WhatsApp.">
-    <meta property="og:image" content="https://jireh-mayorista.netlify.app/icon-512.png">
+    <meta property="og:image" content="icon-512.png">
     <meta property="og:image:width" content="512">
     <meta property="og:image:height" content="512">
     <meta property="og:locale" content="es_AR">
@@ -28,7 +28,7 @@
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Jireh Mayorista — Juguetes y Artículos al por Mayor">
     <meta name="twitter:description" content="Catálogo mayorista online. Juguetes y artículos al por mayor con envíos a todo el país.">
-    <meta name="twitter:image" content="https://jireh-mayorista.netlify.app/icon-512.png">
+    <meta name="twitter:image" content="icon-512.png">
 
     <!-- ===== SCHEMA.ORG — datos estructurados para Google ===== -->
     <script type="application/ld+json">
@@ -38,8 +38,8 @@
       "name": "Jireh Mayorista",
       "description": "Catálogo mayorista de juguetes y artículos al por mayor con envíos a todo el país.",
       "url": "https://jireh-mayorista.netlify.app/",
-      "logo": "https://jireh-mayorista.netlify.app/icon-512.png",
-      "image": "https://jireh-mayorista.netlify.app/icon-512.png",
+      "logo": "icon-512.png",
+      "image": "icon-512.png",
       "priceRange": "$$",
       "currenciesAccepted": "ARS",
       "paymentAccepted": "Transferencia, Efectivo, Tarjeta",
@@ -773,7 +773,8 @@
         aria-label="Ayuda por WhatsApp">
 
         <img
-            src="https://cdn-icons-png.flaticon.com/512/733/733585.png"
+            id="whatsapp-float-icono"
+            src=""
             alt=""
             width="28"
             height="28"
@@ -825,6 +826,8 @@
 
       const whatsappBtn = document.getElementById("whatsapp-float-btn");
       if(whatsappBtn) whatsappBtn.href = "https://wa.me/" + c.WHATSAPP_NUMERO;
+      const whatsappIcono = document.getElementById("whatsapp-float-icono");
+      if(whatsappIcono) whatsappIcono.src = c.WHATSAPP_ICONO_URL;
 
       const f1t = document.getElementById("footer-titulo-1");
       if(f1t) f1t.textContent = c.FOOTER_TITULO_1;
