@@ -21,7 +21,7 @@ const CONFIG_NEGOCIO = {
   TEMA: "azul", // azul | verde | rojo (tema por defecto, se puede sobreescribir desde el panel)
 
   // ---- Usados en la tienda (index.html del catálogo) ----
-  URL_SITIO: "https://jireh-mayorista.netlify.app/",
+  URL_SITIO: "https://horus254-svg.github.io/Jireh-Mayorista//",
   WHATSAPP_NUMERO: "5491140975795", // solo números, con código de país, sin +
   ICONO_URL: "icon-512.png",
 
@@ -36,7 +36,7 @@ const CONFIG_NEGOCIO = {
   FOOTER_TEXTO_1: "Venta mayorista de juguetes y artículos al por mayor. Somos distribuidores con envíos a todo el país. Precios mayoristas, grandes cantidades y amplia variedad de productos para revendedores y comercios.",
   FOOTER_TEXTO_2: "Juguetes mayoristas · Artículos infantiles · Muñecos y peluches · Juegos de mesa · Juguetes educativos · Artículos de temporada · Productos para reventa",
   FOOTER_TEXTO_3: "Realizamos envíos a todo el país. Los pedidos se hacen directamente desde este catálogo online. Consultas y atención por WhatsApp. Pagos en efectivo, transferencia y tarjeta.",
-  FOOTER_COPYRIGHT: "© 2026 Jireh Mayorista — Venta mayorista de juguetes · Argentina"
+  FOOTER_COPYRIGHT: "© 2026 VeekPOS - Jireh Mayorista — Venta mayorista de juguetes · Argentina"
 };
 
 /**
