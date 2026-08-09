@@ -809,10 +809,14 @@
     </footer>
 
     <script>
-    // Aplica los textos del negocio configurados en config.js
-    // (se ejecuta como fallback; si app.js carga una config remota
-    // distinta desde el panel, esa puede sobreescribir estos valores).
-    (function aplicarDatosNegocio(){
+    // Aplica los textos del negocio (nombre, WhatsApp, footer, SEO) leídos
+    // desde Sheets vía config.js. app.js puede volver a pisar estos mismos
+    // elementos poco después con su propia carga — no hay conflicto, es
+    // la misma fuente de datos, esto solo evita que se vea vacío al inicio.
+    (async function aplicarDatosNegocio(){
+      await cargarConfigNegocio();
+      aplicarConfigSEO();
+
       const c = CONFIG_NEGOCIO;
 
       const brandTexto = document.getElementById("navbar-brand-texto");

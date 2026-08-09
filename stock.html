@@ -463,7 +463,9 @@ main{
 <script>
 
 const API_URL = CONFIG_NEGOCIO.API_URL;
-document.title = "Gestión de Stock · " + CONFIG_NEGOCIO.NOMBRE_NEGOCIO;
+cargarConfigNegocio().then(() => {
+  document.title = "Gestión de Stock · " + CONFIG_NEGOCIO.NOMBRE_NEGOCIO;
+});
 
 let productos = [];
 let guardadoPendiente = {}; // codigo -> timeoutId, para debounce por tarjeta

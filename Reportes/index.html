@@ -332,8 +332,11 @@ tbody tr:hover{ background:var(--slate-50); }
 <div class="toast" id="toastBox"></div>
 
 <script>
-document.getElementById("topbarNombreNegocio").textContent = CONFIG_NEGOCIO.NOMBRE_NEGOCIO;
-document.title = "Reportes · " + CONFIG_NEGOCIO.NOMBRE_NEGOCIO;
+(async function inicializar(){
+  await cargarConfigNegocio();
+  document.getElementById("topbarNombreNegocio").textContent = CONFIG_NEGOCIO.NOMBRE_NEGOCIO;
+  document.title = "Reportes · " + CONFIG_NEGOCIO.NOMBRE_NEGOCIO;
+})();
 </script>
 <script src="reportes.js"></script>
 </body>

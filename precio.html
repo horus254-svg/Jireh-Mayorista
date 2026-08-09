@@ -254,32 +254,21 @@ async function cargarPrecio(){
 /** Loads just the business name and color theme — no banner, no benefits, this page stays minimal on purpose */
 async function aplicarMarcaMinima(){
 
-    // Valores por defecto desde config.js, por si falla la config remota
+    // Valores de respaldo mientras carga, para que la página no quede en blanco
     document.getElementById("precioBrand").textContent = CONFIG_NEGOCIO.NOMBRE_NEGOCIO;
     document.title = "Precio · " + CONFIG_NEGOCIO.NOMBRE_NEGOCIO;
     if(CONFIG_NEGOCIO.TEMA){
         document.body.setAttribute("data-tema", CONFIG_NEGOCIO.TEMA.toLowerCase());
     }
 
-    try{
-        const res = await fetch(API_URL + "?action=configuracionNegocio");
-        const data = await res.json();
-        if(!data.success || !data.config) return;
+    // Carga la config real desde Sheets (nombre, tema, etc. — todo editable
+    // desde el panel admin) y actualiza los mismos elementos.
+    await cargarConfigNegocio();
 
-        const cfg = data.config;
-
-        if(cfg.tema){
-            document.body.setAttribute("data-tema", cfg.tema.toLowerCase());
-        }
-        if(cfg.nombre){
-            document.getElementById("precioBrand").textContent = cfg.nombre;
-            document.title = "Precio · " + cfg.nombre;
-        }
-
-    }catch(error){
-        // Si falla, la página sigue mostrando el nombre de config.js — nunca se
-        // queda en blanco por esto, lo importante es mostrar el precio.
-        console.error("No se pudo cargar la marca:", error);
+    document.getElementById("precioBrand").textContent = CONFIG_NEGOCIO.NOMBRE_NEGOCIO;
+    document.title = "Precio · " + CONFIG_NEGOCIO.NOMBRE_NEGOCIO;
+    if(CONFIG_NEGOCIO.TEMA){
+        document.body.setAttribute("data-tema", CONFIG_NEGOCIO.TEMA.toLowerCase());
     }
 }
 

@@ -1590,6 +1590,78 @@
         <button class="btn btn-success" id="btnGuardarApariencia" onclick="guardarAparienciaForm()">💾 Guardar apariencia</button>
       </div>
 
+      <!-- Datos generales, íconos y SEO del catálogo -->
+      <hr class="my-4">
+      <h6 style="margin-bottom:6px;">🌐 Datos generales, ícono y SEO</h6>
+      <p class="text-muted" style="font-size:13px;">Se usan al compartir el link del catálogo (WhatsApp, Facebook, X) y para buscadores como Google.</p>
+
+      <div class="mb-3">
+        <label class="form-label">URL del catálogo online <span class="text-muted" style="font-size:11px;">(sin / al final)</span></label>
+        <input type="url" class="form-control" id="cfgUrlCatalogo" placeholder="https://mi-negocio.netlify.app">
+        <div class="form-text" style="font-size:11.5px;">Se usa para armar los links de los QR y las URLs que se comparten en redes.</div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Nombre corto <span class="text-muted" style="font-size:11px;">(pantalla de acceso a Reportes)</span></label>
+        <input type="text" class="form-control" id="cfgNombreCorto" placeholder="Ej: JIREH">
+      </div>
+
+      <div class="row g-2 mb-3">
+        <div class="col-md-6">
+          <label class="form-label">Ícono del catálogo <span class="text-muted" style="font-size:11px;">(archivo icon-512.png o URL)</span></label>
+          <input type="text" class="form-control" id="cfgIconoUrl" placeholder="icon-512.png">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Ícono del botón flotante de WhatsApp</label>
+          <input type="url" class="form-control" id="cfgWhatsappIconoUrl" placeholder="https://...">
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Título SEO <span class="text-muted" style="font-size:11px;">(pestaña del navegador y buscadores)</span></label>
+        <input type="text" class="form-control" id="cfgSeoTitulo" placeholder="Ej: Mi Negocio — Venta mayorista">
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Descripción SEO</label>
+        <textarea class="form-control" id="cfgSeoDescripcion" rows="2" placeholder="Descripción corta que aparece en Google y al compartir el link"></textarea>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Palabras clave SEO <span class="text-muted" style="font-size:11px;">(separadas por coma)</span></label>
+        <input type="text" class="form-control" id="cfgSeoKeywords" placeholder="mayorista, juguetes, ...">
+      </div>
+
+      <!-- Footer del catálogo -->
+      <hr class="my-4">
+      <h6 style="margin-bottom:6px;">🦶 Pie de página del catálogo</h6>
+
+      <div class="mb-3">
+        <label class="form-label">Título de la primera columna</label>
+        <input type="text" class="form-control" id="cfgFooterTitulo1" placeholder="Ej: Mi Negocio">
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Texto de la primera columna</label>
+        <textarea class="form-control" id="cfgFooterTexto1" rows="2"></textarea>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Texto de la columna "Categorías"</label>
+        <textarea class="form-control" id="cfgFooterTexto2" rows="2"></textarea>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Texto de la columna "Envíos y pedidos"</label>
+        <textarea class="form-control" id="cfgFooterTexto3" rows="2"></textarea>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Copyright (línea final del footer)</label>
+        <input type="text" class="form-control" id="cfgFooterCopyright" placeholder="© 2026 Mi Negocio">
+      </div>
+
+      <div class="d-flex justify-content-end mt-3">
+        <button class="btn btn-success" onclick="guardarAparienciaForm()">💾 Guardar</button>
+      </div>
+
+
       <!-- Popup promocional -->
       <hr class="my-4">
       <h6 style="margin-bottom:6px;">🎯 Popup promocional (catálogo web)</h6>

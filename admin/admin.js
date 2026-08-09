@@ -767,7 +767,23 @@ const APARIENCIA_DEFAULT = {
   tema:            "navy",
   gradPersonalizado: false,
   gradA: "#241536",
-  gradB: "#3a2856"
+  gradB: "#3a2856",
+
+  urlCatalogo: "https://horus254-svg.github.io/Jireh-Mayorista",
+  nombreCorto: "JIREH",
+
+  iconoUrl: "icon-512.png",
+  whatsappIconoUrl: "https://cdn-icons-png.flaticon.com/512/733/733585.png",
+
+  seoTitulo: "",
+  seoDescripcion: "",
+  seoKeywords: "",
+
+  footerTitulo1: "",
+  footerTexto1: "",
+  footerTexto2: "",
+  footerTexto3: "",
+  footerCopyright: ""
 };
 
 /**
@@ -799,6 +815,21 @@ function cargarAparienciaForm(cfg) {
   document.getElementById("cfgGradA").value = cfg.gradA || APARIENCIA_DEFAULT.gradA;
   document.getElementById("cfgGradB").value = cfg.gradB || APARIENCIA_DEFAULT.gradB;
   document.getElementById("cfgGradWrap").style.display = gradActivo ? "" : "none";
+
+  // Dominio del catálogo, nombre corto y SEO/redes
+  const setIfExists = (id, valor) => { const el = document.getElementById(id); if(el) el.value = valor ?? ""; };
+  setIfExists("cfgUrlCatalogo", cfg.urlCatalogo ?? APARIENCIA_DEFAULT.urlCatalogo);
+  setIfExists("cfgNombreCorto", cfg.nombreCorto ?? APARIENCIA_DEFAULT.nombreCorto);
+  setIfExists("cfgIconoUrl", cfg.iconoUrl ?? APARIENCIA_DEFAULT.iconoUrl);
+  setIfExists("cfgWhatsappIconoUrl", cfg.whatsappIconoUrl ?? APARIENCIA_DEFAULT.whatsappIconoUrl);
+  setIfExists("cfgSeoTitulo", cfg.seoTitulo ?? APARIENCIA_DEFAULT.seoTitulo);
+  setIfExists("cfgSeoDescripcion", cfg.seoDescripcion ?? APARIENCIA_DEFAULT.seoDescripcion);
+  setIfExists("cfgSeoKeywords", cfg.seoKeywords ?? APARIENCIA_DEFAULT.seoKeywords);
+  setIfExists("cfgFooterTitulo1", cfg.footerTitulo1 ?? APARIENCIA_DEFAULT.footerTitulo1);
+  setIfExists("cfgFooterTexto1", cfg.footerTexto1 ?? APARIENCIA_DEFAULT.footerTexto1);
+  setIfExists("cfgFooterTexto2", cfg.footerTexto2 ?? APARIENCIA_DEFAULT.footerTexto2);
+  setIfExists("cfgFooterTexto3", cfg.footerTexto3 ?? APARIENCIA_DEFAULT.footerTexto3);
+  setIfExists("cfgFooterCopyright", cfg.footerCopyright ?? APARIENCIA_DEFAULT.footerCopyright);
 
   // Pedido mínimo
   const cfgPedidoMinimoEl = document.getElementById("cfgPedidoMinimo");
@@ -1015,6 +1046,25 @@ async function guardarAparienciaForm() {
     navbarTexto:     document.getElementById("cfgNavbarTexto").value.trim(),
     navbarIcono:     document.getElementById("cfgNavbarIcono").value.trim()
   };
+
+  // Campos opcionales nuevos (URL del catálogo, nombre corto, íconos, SEO, footer)
+  const getIfExists = (id) => { const el = document.getElementById(id); return el ? el.value.trim() : undefined; };
+  const extra = {
+    urlCatalogo: getIfExists("cfgUrlCatalogo"),
+    nombreCorto: getIfExists("cfgNombreCorto"),
+    iconoUrl: getIfExists("cfgIconoUrl"),
+    whatsappIconoUrl: getIfExists("cfgWhatsappIconoUrl"),
+    seoTitulo: getIfExists("cfgSeoTitulo"),
+    seoDescripcion: getIfExists("cfgSeoDescripcion"),
+    seoKeywords: getIfExists("cfgSeoKeywords"),
+    footerTitulo1: getIfExists("cfgFooterTitulo1"),
+    footerTexto1: getIfExists("cfgFooterTexto1"),
+    footerTexto2: getIfExists("cfgFooterTexto2"),
+    footerTexto3: getIfExists("cfgFooterTexto3"),
+    footerCopyright: getIfExists("cfgFooterCopyright")
+  };
+  Object.keys(extra).forEach(k => { if(extra[k] === undefined) delete extra[k]; });
+  Object.assign(cfg, extra);
 
   const btn = document.getElementById("btnGuardarApariencia");
   const textoOriginal = btn ? btn.innerHTML : "";
