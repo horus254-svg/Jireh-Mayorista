@@ -1101,30 +1101,12 @@ async function checkoutWhatsapp(){
         return;
     }
 
-    // Último chequeo antes de enviar: puede haber pasado tiempo (incluso
-    // horas) desde que se cargó la página, y el cliente puede haber ido
-    // agregando productos de a poco mientras tanto. estado.productos es
-    // el catálogo que se trajo UNA sola vez al entrar al sitio, así que
-    // compararse contra él ya no alcanza — hay que volver a pedirle los
-    // precios y el stock actuales al backend recién antes de enviar, y
-    // recién ahí validar el carrito contra eso.
-    const textoBtnCheckout = document.getElementById("btn-checkout-texto");
-    if(textoBtnCheckout) textoBtnCheckout.textContent = "Verificando precios y stock...";
-
-    try{
-        const resProductos = await fetchAPI(API_URL + "?action=productos");
-        const dataProductos = await resProductos.json();
-        estado.productos = (dataProductos.productos || [])
-            .filter(p => Number(String(p.STOCK).trim()) > 0);
-    }catch(err){
-        console.error("No se pudo revalidar el catálogo antes de enviar el pedido:", err);
-        mostrarToast("No pudimos confirmar los precios y el stock actuales. Revisá tu conexión e intentá de nuevo.", "error");
-        desactivarCargaCheckout();
-        return;
-    }
-
-    if(textoBtnCheckout) textoBtnCheckout.textContent = "Enviando pedido...";
-
+    // Último chequeo antes de enviar: puede haber pasado tiempo desde
+    // que se abrió el carrito (o directamente nunca se abrió si el
+    // cliente fue directo a completar sus datos con un carrito viejo
+    // guardado de una visita anterior). Si algo cambió, se corta acá
+    // y se le pide que revise el carrito ya actualizado, en vez de
+    // mandar un pedido con datos viejos.
     if(sincronizarCarritoConStockActual()){
         mostrarToast("Algunos productos de tu carrito cambiaron de stock — revisalo antes de enviar el pedido.", "error");
         desactivarCargaCheckout();

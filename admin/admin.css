@@ -1098,13 +1098,21 @@ html,body{
   padding:10px 14px; font-size:13px; color:var(--slate-600);
 }
 
+/* Flexbox en vez de CSS Grid a propósito: Chromium (el motor de
+   impresión de Electron/Chrome) no respeta de forma confiable
+   break-inside:avoid en hijos de un contenedor grid al paginar —
+   es una limitación conocida del motor, no del CSS en sí. El
+   resultado práctico era etiquetas cortadas a la mitad entre el
+   final de una hoja A4 y el principio de la siguiente. Con flexbox
+   + flex-wrap, break-inside:avoid sí se respeta consistentemente. */
 .etiquetas-grid{
-  display:grid;
+  display:flex;
+  flex-wrap:wrap;
   gap:3mm;
   width:100%;
 }
-.etiquetas-grid.cols-3{ grid-template-columns:repeat(3, 1fr); }
-.etiquetas-grid.cols-4{ grid-template-columns:repeat(4, 1fr); }
+.etiquetas-grid.cols-3 > *{ flex:0 0 calc((100% - 2*3mm)/3); max-width:calc((100% - 2*3mm)/3); }
+.etiquetas-grid.cols-4 > *{ flex:0 0 calc((100% - 3*3mm)/4); max-width:calc((100% - 3*3mm)/4); }
 
 .etiqueta-item{
   border:1px dashed #999;
@@ -1147,7 +1155,7 @@ html,body{
 }
 
 /* Variantes de columnas para la grilla de QR (más grandes que el código de barras) */
-.etiquetas-grid.cols-2{ grid-template-columns:repeat(2, 1fr); }
+.etiquetas-grid.cols-2 > *{ flex:0 0 calc((100% - 3mm)/2); max-width:calc((100% - 3mm)/2); }
 
 .qr-item{
   border:1px dashed #999;

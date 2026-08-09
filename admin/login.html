@@ -263,24 +263,15 @@ body{
 
 // En la app de escritorio (Electron), la URL de Apps Script se
 // configura una sola vez en setup.html y queda guardada en SQLite —
-// así el mismo instalador sirve para cualquier cliente.
-//
-// Fuera de Electron (panel admin corriendo en un navegador normal,
-// sin window.posOffline/window.veekpos), se usa la misma fuente que
-// admin.js: el config.json que dejó el Instalador junto a este HTML.
-// Solo si tampoco existe ese archivo (por ejemplo, abriendo login.html
-// suelto durante desarrollo) se cae a esta URL fija de referencia.
+// así el mismo instalador sirve para cualquier cliente. En el
+// navegador normal (sin window.posOffline) se usa esta URL fija,
+// como hasta ahora.
 const API_URL_POR_DEFECTO = "https://script.google.com/macros/s/AKfycbw1eY_mXImG503rU0Cqddx1WBuGIOhxaW_SXGoIMsug_CjsSC-HLsb2XzYwrovaGBU/exec";
 let API_URL = API_URL_POR_DEFECTO;
 
 async function resolverApiUrl(){
-  const bridge = window.posOffline || window.veekpos;
-
-  if(bridge && typeof bridge.obtenerConfigLocal === "function"){
-    // El bridge no expone un "obtenerApiUrl" dedicado — la API URL se
-    // guarda como una clave más de la config local genérica (mismo
-    // lugar donde setup.html guarda api_url), vía obtenerConfigLocal.
-    const guardada = await bridge.obtenerConfigLocal("api_url", "");
+  if(window.posOffline && typeof window.posOffline.obtenerApiUrl === "function"){
+    const guardada = await window.posOffline.obtenerApiUrl();
     if(guardada){
       API_URL = guardada;
       return;
@@ -289,19 +280,6 @@ async function resolverApiUrl(){
     // falló al decidir mostrar setup.html antes que login.html —
     // por las dudas, volvemos a setup en vez de quedar sin URL.
     window.location.href = "setup.html";
-    return;
-  }
-
-  // Navegador normal (sin Electron): buscar config.json, igual que
-  // hace admin.js al cargar el panel.
-  try{
-    const res = await fetch("config.json?_=" + Date.now(), { cache: "no-store" });
-    if(res.ok){
-      const cfg = await res.json();
-      if(cfg.apiUrl) API_URL = cfg.apiUrl;
-    }
-  }catch(error){
-    console.log("config.json no encontrado, usando URL de referencia");
   }
 }
 

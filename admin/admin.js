@@ -69,16 +69,19 @@ async function cargarConfigCliente() {
   // de OTRA instalación) sin ningún aviso — cualquier venta o cambio
   // de stock se habría guardado en la planilla equivocada.
   const bridge = window.posOffline || window.veekpos;
+  console.log("[cargarConfigCliente] bridge detectado:", bridge ? (window.posOffline ? "posOffline" : "veekpos") : "ninguno (modo navegador)");
   if (bridge && typeof bridge.obtenerConfigLocal === "function") {
     try {
       const guardada = await bridge.obtenerConfigLocal("api_url", "");
+      console.log("[cargarConfigCliente] api_url leída de SQLite:", JSON.stringify(guardada));
       if (guardada) {
         API_URL = guardada;
         return true; // ya configurada vía Instalador (setup.html)
       }
     } catch (e) {
-      console.error("Error al leer api_url desde el almacenamiento local:", e);
+      console.error("[cargarConfigCliente] Error al leer api_url desde el almacenamiento local:", e);
     }
+    console.log("[cargarConfigCliente] Sin api_url guardada — se considera instalación nueva.");
     // Estamos en Electron pero todavía no hay api_url guardada: no
     // caer al config.json de navegador (no aplica en este modo) ni al
     // default de otra instalación — se trata como no configurada.
@@ -159,7 +162,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       // que en Electron no se usa para nada. Mandar ahí por error
       // dejaría a la persona completando un formulario que no guarda
       // los datos donde admin.js realmente los busca.
-      window.location.href = "../setup.html";
+      window.location.href = "setup.html";
       return;
     }
 

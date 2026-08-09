@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="config.js"></script>
 
 <style>
 
@@ -180,7 +181,7 @@ body{
 
 <script>
 
-const API_URL = "https://script.google.com/macros/s/AKfycbw1eY_mXImG503rU0Cqddx1WBuGIOhxaW_SXGoIMsug_CjsSC-HLsb2XzYwrovaGBU/exec";
+const API_URL = CONFIG_NEGOCIO.API_URL;
 
 function formatearPrecio(valor){
     return Number(valor || 0).toLocaleString("es-AR");
@@ -252,6 +253,14 @@ async function cargarPrecio(){
 
 /** Loads just the business name and color theme — no banner, no benefits, this page stays minimal on purpose */
 async function aplicarMarcaMinima(){
+
+    // Valores por defecto desde config.js, por si falla la config remota
+    document.getElementById("precioBrand").textContent = CONFIG_NEGOCIO.NOMBRE_NEGOCIO;
+    document.title = "Precio · " + CONFIG_NEGOCIO.NOMBRE_NEGOCIO;
+    if(CONFIG_NEGOCIO.TEMA){
+        document.body.setAttribute("data-tema", CONFIG_NEGOCIO.TEMA.toLowerCase());
+    }
+
     try{
         const res = await fetch(API_URL + "?action=configuracionNegocio");
         const data = await res.json();
@@ -268,7 +277,7 @@ async function aplicarMarcaMinima(){
         }
 
     }catch(error){
-        // Si falla, la página sigue mostrando "Catálogo" fijo — nunca se
+        // Si falla, la página sigue mostrando el nombre de config.js — nunca se
         // queda en blanco por esto, lo importante es mostrar el precio.
         console.error("No se pudo cargar la marca:", error);
     }

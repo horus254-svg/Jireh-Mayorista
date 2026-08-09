@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Reportes · Jireh Mayorista</title>
+<title>Reportes</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0b1633">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -13,6 +13,7 @@
 <!-- jsPDF + autoTable, para exportar cada reporte -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="config.js"></script>
 
 <style>
 
@@ -215,7 +216,7 @@ tbody tr:hover{ background:var(--slate-50); }
     <div class="mark">📊</div>
     <div class="label">
       <strong>Reportes</strong>
-      <small>JIREH MAYORISTA</small>
+      <small id="topbarNombreNegocio">JIREH MAYORISTA</small>
     </div>
   </div>
   <button class="btn-salir" onclick="cerrarSesion()">Salir</button>
@@ -330,6 +331,10 @@ tbody tr:hover{ background:var(--slate-50); }
 
 <div class="toast" id="toastBox"></div>
 
+<script>
+document.getElementById("topbarNombreNegocio").textContent = CONFIG_NEGOCIO.NOMBRE_NEGOCIO;
+document.title = "Reportes · " + CONFIG_NEGOCIO.NOMBRE_NEGOCIO;
+</script>
 <script src="reportes.js"></script>
 </body>
 </html>
