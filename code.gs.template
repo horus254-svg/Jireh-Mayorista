@@ -963,7 +963,31 @@ const CONFIG_NEGOCIO_DEFAULTS = {
   // ---- URL pública del catálogo online (sin / al final). Se usa para
   // armar el link de los QR de "consultar precio" desde las etiquetas
   // del panel admin (apunta a precio.html en esa misma carpeta) ----
-  URL_CATALOGO: "https://horus254-svg.github.io/Jireh-Mayorista"
+  URL_CATALOGO: "https://horus254-svg.github.io/Jireh-Mayorista",
+
+  // ---- Nombre corto del negocio, usado en la pantalla de acceso del
+  // panel de Reportes (login.html) — separado de SIDEBAR_TEXTO por si
+  // el negocio quiere un nombre distinto ahí ----
+  NOMBRE_CORTO: "JIREH",
+
+  // ---- Íconos usados en el catálogo web y al compartir el link
+  // (redes sociales, WhatsApp, buscadores) ----
+  ICONO_URL:          "icon-512.png",
+  WHATSAPP_ICONO_URL: "https://cdn-icons-png.flaticon.com/512/733/733585.png",
+
+  // ---- SEO del catálogo web (título de pestaña, meta description,
+  // palabras clave, y lo que se muestra al compartir el link en
+  // WhatsApp/Facebook/X) ----
+  SEO_TITULO:       "Jireh Mayorista — Juguetes y Artículos Mayoristas | Envíos a todo el país",
+  SEO_DESCRIPCION:  "Catálogo mayorista de juguetes y artículos al por mayor. Comprá online con envíos a todo el país. Precios mayoristas, grandes cantidades y variedad de productos.",
+  SEO_KEYWORDS:     "juguetes mayoristas, mayorista juguetes, juguetes al por mayor, compra mayorista, artículos mayoristas, juguetes baratos, mayorista argentina, envíos todo el país",
+
+  // ---- Footer del catálogo web (pie de página con 3 columnas + copyright) ----
+  FOOTER_TITULO_1:   "Jireh Mayorista",
+  FOOTER_TEXTO_1:    "Venta mayorista de juguetes y artículos al por mayor. Somos distribuidores con envíos a todo el país. Precios mayoristas, grandes cantidades y amplia variedad de productos para revendedores y comercios.",
+  FOOTER_TEXTO_2:    "Juguetes mayoristas · Artículos infantiles · Muñecos y peluches · Juegos de mesa · Juguetes educativos · Artículos de temporada · Productos para reventa",
+  FOOTER_TEXTO_3:    "Realizamos envíos a todo el país. Los pedidos se hacen directamente desde este catálogo online. Consultas y atención por WhatsApp. Pagos en efectivo, transferencia y tarjeta.",
+  FOOTER_COPYRIGHT:  "© 2026 Jireh Mayorista — Venta mayorista de juguetes · Argentina"
 };
 
 // Temas de color válidos para el catálogo web. Si en la hoja se guarda
@@ -1242,7 +1266,21 @@ function getConfiguracionNegocio(){
       pedidoPdfSubtitulo: config.PEDIDO_PDF_SUBTITULO,
       pedidoPdfPie:       config.PEDIDO_PDF_PIE,
 
-      urlCatalogo: config.URL_CATALOGO
+      urlCatalogo: config.URL_CATALOGO,
+      nombreCorto: config.NOMBRE_CORTO,
+
+      iconoUrl: config.ICONO_URL,
+      whatsappIconoUrl: config.WHATSAPP_ICONO_URL,
+
+      seoTitulo: config.SEO_TITULO,
+      seoDescripcion: config.SEO_DESCRIPCION,
+      seoKeywords: config.SEO_KEYWORDS,
+
+      footerTitulo1: config.FOOTER_TITULO_1,
+      footerTexto1: config.FOOTER_TEXTO_1,
+      footerTexto2: config.FOOTER_TEXTO_2,
+      footerTexto3: config.FOOTER_TEXTO_3,
+      footerCopyright: config.FOOTER_COPYRIGHT
     }
   });
 
@@ -1344,6 +1382,20 @@ function guardarConfiguracionNegocio(e){
     PEDIDO_PDF_PIE:       valorOPreservado("pedidoPdfPie", "PEDIDO_PDF_PIE", "Gracias por su compra."),
 
     URL_CATALOGO: valorOPreservado("urlCatalogo", "URL_CATALOGO", "https://horus254-svg.github.io/Jireh-Mayorista"),
+    NOMBRE_CORTO: valorOPreservado("nombreCorto", "NOMBRE_CORTO", "JIREH"),
+
+    ICONO_URL:          valorOPreservado("iconoUrl", "ICONO_URL", "icon-512.png"),
+    WHATSAPP_ICONO_URL: valorOPreservado("whatsappIconoUrl", "WHATSAPP_ICONO_URL", "https://cdn-icons-png.flaticon.com/512/733/733585.png"),
+
+    SEO_TITULO:      valorOPreservado("seoTitulo", "SEO_TITULO"),
+    SEO_DESCRIPCION: valorOPreservado("seoDescripcion", "SEO_DESCRIPCION"),
+    SEO_KEYWORDS:    valorOPreservado("seoKeywords", "SEO_KEYWORDS"),
+
+    FOOTER_TITULO_1:  valorOPreservado("footerTitulo1", "FOOTER_TITULO_1"),
+    FOOTER_TEXTO_1:   valorOPreservado("footerTexto1", "FOOTER_TEXTO_1"),
+    FOOTER_TEXTO_2:   valorOPreservado("footerTexto2", "FOOTER_TEXTO_2"),
+    FOOTER_TEXTO_3:   valorOPreservado("footerTexto3", "FOOTER_TEXTO_3"),
+    FOOTER_COPYRIGHT: valorOPreservado("footerCopyright", "FOOTER_COPYRIGHT"),
 
     POPUP_IMAGEN: valorOPreservado("popupImagen", "POPUP_IMAGEN", ""),
     POPUP_ACTIVO: valorOPreservado("popupActivo", "POPUP_ACTIVO", "NO"),
