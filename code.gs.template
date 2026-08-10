@@ -298,6 +298,10 @@ if (data.action === "crearDeudaExtra") {
   return crearDeudaExtra(data);
 }
 
+if (data.action === "eliminarPedidosCancelados") {
+  return eliminarPedidosCancelados();
+}
+
 return jsonResponse({
   success: false,
   message: "Acción POST no válida"
@@ -3449,15 +3453,57 @@ function editarCliente(data){
 }
 
 /**
- * Elimina un cliente de la hoja CLIENTES. NO borra sus pedidos
- * (siguen en PEDIDOS, vinculados solo por DNI, no por CLIENTE_ID) ni
- * sus pagos (quedan en PAGOS_CREDITO) — esto es a propósito, para no
- * perder el historial real de ventas/cobros del negocio solo porque
- * se borra la ficha. Si el cliente tenía saldo pendiente, se pide
- * confirmación extra antes de borrar (ver el frontend).
+ * Elimina permanentemente TODOS los pedidos en estado CANCELADO: borra
+ * sus filas de PEDIDOS y todas las filas relacionadas (por PEDIDO_ID)
+ * en DETALLE_PEDIDOS. Es una limpieza manual — nada llama a esto
+ * automáticamente, el usuario la dispara a mano desde el botón
+ * "Eliminar cancelados" en la sección Pedidos del panel.
  *
- * Parámetro esperado: clienteId
+ * No toca el stock: un pedido CANCELADO ya devolvió su stock al
+ * cancelarse (ver actualizarEstado / devolverStockPorPedido), así que
+ * borrarlo de la planilla ahora no debe volver a tocar el inventario.
+ *
+ * Devuelve cuántos pedidos se borraron, para poder avisarle al usuario.
  */
+function eliminarPedidosCancelados(){
+
+  const pedidosSheet = getHoja("PEDIDOS");
+  if(!pedidosSheet){
+    return jsonResponse({ success:false, message:"No se encontró la hoja 'PEDIDOS'." });
+  }
+
+  const dataPedidos = pedidosSheet.getDataRange().getValues();
+  const idsACancelar = new Set();
+
+  // Recorrer de abajo hacia arriba para poder borrar filas sin que se
+  // corran los índices de las filas que todavía faltan revisar.
+  for(let i = dataPedidos.length - 1; i >= 1; i--){
+    const estado = String(dataPedidos[i][8] || "").toUpperCase(); // columna 9 = ESTADO
+    if(estado === "CANCELADO"){
+      idsACancelar.add(String(dataPedidos[i][0]));
+      pedidosSheet.deleteRow(i + 1);
+    }
+  }
+
+  if(idsACancelar.size === 0){
+    return jsonResponse({ success:true, eliminados:0, message:"No hay pedidos cancelados para eliminar." });
+  }
+
+  // Borrar en DETALLE_PEDIDOS todas las filas de esos pedidos — puede
+  // haber varias filas (una por ítem) por cada PEDIDO_ID.
+  const detalleSheet = getHoja("DETALLE_PEDIDOS");
+  if(detalleSheet){
+    const dataDetalle = detalleSheet.getDataRange().getValues();
+    for(let i = dataDetalle.length - 1; i >= 1; i--){
+      if(idsACancelar.has(String(dataDetalle[i][0]))){
+        detalleSheet.deleteRow(i + 1);
+      }
+    }
+  }
+
+  return jsonResponse({ success:true, eliminados: idsACancelar.size });
+}
+
 function eliminarCliente(data){
 
   const clienteId = String(data.clienteId || "").trim();
@@ -5110,9 +5156,15 @@ function getReporteProductosVendidos(e){
   const idsPOSEnRango = new Set();
   const hojaPOS = getHoja("VENTAS_LOCAL");
   if(hojaPOS){
-    const dataPOS = hojaPOS.getDataRange().getValues();
-    dataPOS.shift();
-    dataPOS.forEach(row => {
+    const dataPOSRaw = hojaPOS.getDataRange().getValues();
+    const headerPOS = dataPOSRaw.shift();
+    const idxAnuladaPOS = headerPOS.indexOf("ANULADA");
+    dataPOSRaw.forEach(row => {
+      // Ventas anuladas: nunca deben contar en ninguna estadística de
+      // ventas, igual que un pedido cancelado.
+      const estaAnulada = idxAnuladaPOS !== -1 && String(row[idxAnuladaPOS] || "").toUpperCase() === "SI";
+      if(estaAnulada) return;
+
       // Las filas creadas por un pedido cobrado (VENDEDOR="PEDIDO WEB")
       // no tienen detalle en DETALLE_VENTAS — su detalle real está en
       // DETALLE_PEDIDOS, así que se excluyen de este set para no
@@ -5127,15 +5179,27 @@ function getReporteProductosVendidos(e){
   }
   acumular(idsPOSEnRango, "DETALLE_VENTAS");
 
-  // ---- Pedidos cobrados: PEDIDOS (filtrados por COBRADO=SI, con la
-  // fecha real de cobro) + su detalle real en DETALLE_PEDIDOS.
+  // ---- Pedidos: PEDIDOS + su detalle real en DETALLE_PEDIDOS.
+  // Cuenta un pedido como "vendido" si:
+  //   a) ya se cobró (COBRADO=SI) — se usa la fecha real de cobro, o
+  //   b) todavía no se cobró pero la mercadería YA SE ENTREGÓ
+  //      (STOCK_DESCONTADO=SI, es decir pasó por PREPARANDO) — este es
+  //      el caso de una venta a crédito: el producto salió del depósito
+  //      aunque el cliente todavía deba esa plata, así que cuenta como
+  //      vendido igual. Se usa la fecha del pedido como referencia.
+  // Los pedidos CANCELADOS se excluyen siempre, sin importar lo anterior
+  // — nunca deben figurar en ninguna estadística de ventas.
   const idsPedidosCobradosEnRango = new Set();
   const hojaPedidos = getHoja("PEDIDOS");
   if(hojaPedidos){
     const dataPedidos = rowsToObjects(hojaPedidos.getDataRange().getValues());
     dataPedidos.forEach(p => {
+      const estado = String(p.ESTADO || "").toUpperCase();
+      if(estado === "CANCELADO") return;
+
       const yaCobrado = String(p.COBRADO || "").toUpperCase() === "SI";
-      if(!yaCobrado) return;
+      const yaEntregado = String(p.STOCK_DESCONTADO || "").toUpperCase() === "SI";
+      if(!yaCobrado && !yaEntregado) return; // ni cobrado ni entregado todavía: no cuenta
 
       const fecha = new Date(p.FECHA_COBRO || p.FECHA);
       const fechaStr = Utilities.formatDate(fecha, zona, "yyyy-MM-dd");
