@@ -1070,15 +1070,13 @@ html,body{
     size:80mm auto;
     margin:0;
   }
-
-  @page etiquetas{
-    size:A4;
-    margin:8mm;
-  }
-
-  #etiquetasPrintArea{
-    page:etiquetas;
-  }
+  /* El tamaño A4 para #etiquetasPrintArea ya NO se define acá con
+     "page:etiquetas" — el soporte de @page con nombre es poco confiable
+     en Chromium/Electron y hacía que el label se imprimiera con el
+     tamaño de página por defecto (80mm, como un ticket térmico).
+     En su lugar, admin.js inyecta un <style id="dynamicPrintPageSize">
+     con el @page correcto justo antes de cada impresión — ver
+     _setPrintPageSize() en admin.js. */
 }
 
 #thermalPrintFrame{
@@ -1144,7 +1142,7 @@ html,body{
 
 .etiqueta-precio{
   font-family:Arial, sans-serif;
-  font-size:12pt; font-weight:800; color:#000;
+  font-size:32pt; font-weight:800; color:#000;
   margin-top:0.5mm;
 }
 

@@ -452,6 +452,7 @@ function vistaPreviaTicketConfig() {
 
   frame.innerHTML = buildThermalHTML("PREVIEW", itemsEjemplo, total, "EFECTIVO", new Date(), null, cfgPreview);
 
+  _setPrintPageSize("80mm");
   setTimeout(() => { window.print(); }, 120);
 }
 
@@ -2515,8 +2516,15 @@ function imprimirNotaPedidoA4() {
       <div style="text-align:center; font-size:8pt; color:#aaa; margin-top:4mm;">Impreso el ${ahora}</div>
     </div>`;
 
+  // Por si quedó contenido de una impresión de ticket térmico anterior
+  // a medio camino, se limpia el otro contenedor de impresión para que
+  // el CSS de :empty/:not(:empty) elija el correcto sin ambigüedad.
+  const thermalFrameNota = document.getElementById("thermalPrintFrame");
+  if (thermalFrameNota) thermalFrameNota.innerHTML = "";
+
   const area = document.getElementById("etiquetasPrintArea");
   area.innerHTML = html;
+  _setPrintPageSize("A4");
   setTimeout(() => window.print(), 120);
 }
 
@@ -4064,8 +4072,15 @@ function imprimirInformeCliente() {
     </div>
   `;
 
+  // Por si quedó contenido de una impresión de ticket térmico anterior
+  // a medio camino, se limpia el otro contenedor de impresión para que
+  // el CSS de :empty/:not(:empty) elija el correcto sin ambigüedad.
+  const thermalFrameInforme = document.getElementById("thermalPrintFrame");
+  if (thermalFrameInforme) thermalFrameInforme.innerHTML = "";
+
   document.getElementById("etiquetasPrintArea").innerHTML = html;
 
+  _setPrintPageSize("A4");
   setTimeout(() => {
     window.print();
   }, 100);
@@ -4144,8 +4159,15 @@ function imprimirEtiquetaEnvio(datos) {
     </div>
   `;
 
+  // Por si quedó contenido de una impresión de ticket térmico anterior
+  // a medio camino, se limpia el otro contenedor de impresión para que
+  // el CSS de :empty/:not(:empty) elija el correcto sin ambigüedad.
+  const thermalFrameEnvio = document.getElementById("thermalPrintFrame");
+  if (thermalFrameEnvio) thermalFrameEnvio.innerHTML = "";
+
   const area = document.getElementById("etiquetasPrintArea");
   area.innerHTML = html;
+  _setPrintPageSize("A4");
 
   // Generar el código de barras después de que el DOM esté listo
   setTimeout(() => {
@@ -5619,6 +5641,25 @@ function buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, cf
 const USB_PRINT_PREF_KEY = "jireh_usb_print_enabled";
 const ANCHO_TICKET_USB = 42; // columnas para fuente normal en 80mm (12 cpl aprox.)
 
+// Inyecta un <style> con el @page correcto justo antes de imprimir.
+// No usamos "@page nombreDePagina" + "page: nombreDePagina" en el CSS
+// porque el soporte de páginas con nombre es poco confiable en
+// Chromium/Electron: sin esto, el navegador cae al @page por defecto
+// (80mm, pensado para el ticket térmico) incluso al imprimir una
+// etiqueta o un A4, dando como resultado una impresión con forma de
+// ticket térmico en vez del tamaño esperado.
+function _setPrintPageSize(size) {
+  let tag = document.getElementById("dynamicPrintPageSize");
+  if (!tag) {
+    tag = document.createElement("style");
+    tag.id = "dynamicPrintPageSize";
+    document.head.appendChild(tag);
+  }
+  tag.textContent = size === "A4"
+    ? "@media print { @page { size:A4; margin:8mm; } }"
+    : "@media print { @page { size:80mm auto; margin:0; } }";
+}
+
 let puertoImpresoraUSB = null; // SerialPort activo, o null si no hay conexión
 
 /** Whether the browser supports Web Serial at all */
@@ -6125,6 +6166,11 @@ async function _imprimirConDialogo(html) {
   // en la práctica. Se vuelve a un alto fijo, simple y sin trucos:
   // menos veloz en teoría, pero nunca corta ni desalinea un ticket.
   const altoMicrones = 297000; // 297mm (largo A4) — margen de sobra para cualquier ticket, incluido el de cierre de caja
+
+  // Asegura que, si se cae al diálogo normal (window.print más abajo),
+  // la página tenga el tamaño térmico (80mm) y no el A4 que pudo haber
+  // quedado configurado por una impresión de etiqueta anterior.
+  _setPrintPageSize("80mm");
 
   // En Electron: impresión silenciosa sin diálogo del sistema
   const bridge = window.veekpos || window.posOffline;
@@ -8026,6 +8072,7 @@ function imprimirEtiquetas() {
 
   cerrarModalEtiquetas();
 
+  _setPrintPageSize("A4");
   // Pequeño delay para asegurar que los SVG ya se pintaron en el DOM
   // antes de que el navegador capture el contenido para imprimir.
   setTimeout(() => {
@@ -8149,6 +8196,7 @@ function imprimirQR() {
 
   cerrarModalQR();
 
+  _setPrintPageSize("A4");
   setTimeout(() => {
     window.print();
   }, 200);
@@ -8250,6 +8298,7 @@ function imprimirQROffline() {
 
   cerrarModalQROffline();
 
+  _setPrintPageSize("A4");
   setTimeout(() => {
     window.print();
   }, 200);
