@@ -7066,6 +7066,8 @@ function _aplicarReporteVentas(data, tbody, resumenWrap) {
 }
 
 /* ---- Reporte 2: Productos más vendidos ---- */
+let _repProductosDatosActuales = []; // último set de productos cargado, para filtrar sin re-pedir al backend
+
 async function cargarReporteProductos() {
   const _ck_repProductos = "reporteProductosVendidos" + obtenerRangoReportes();
   const _cd_repProductos = _getCacheReporte(_ck_repProductos);
@@ -7077,25 +7079,63 @@ async function cargarReporteProductos() {
     const data = await response.json();
     if (!data.success) return;
 
-    sincronizarRangoReportes(data.desde, data.hasta);
-
-    if (!data.productos || data.productos.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-3">Sin ventas para el rango elegido</td></tr>`;
-      return;
-    }
-
-    tbody.innerHTML = data.productos.map(p => `
-      <tr>
-        <td class="mono">${escapeHtml(p.CODIGO)}</td>
-        <td>${escapeHtml(p.PRODUCTO)}</td>
-        <td class="money">${Number(p.VENDIDOS || 0).toLocaleString("es-AR")}</td>
-        <td class="money">$${Number(p.INGRESOS || 0).toLocaleString("es-AR")}</td>
-      </tr>`).join("");
+    _cacheReporte(_ck_repProductos, data);
+    _aplicar_cargarReporteProductos(data);
 
   } catch (error) {
     console.error("Error al cargar reporte de productos vendidos:", error);
     tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-3">Error al cargar el reporte</td></tr>`;
   }
+}
+
+/** Aplica los datos del reporte (desde backend o caché) a la tabla, y guarda la lista
+ *  completa en _repProductosDatosActuales para que el buscador pueda filtrar localmente
+ *  sin tener que volver a pedirle nada al servidor. */
+function _aplicar_cargarReporteProductos(data) {
+  sincronizarRangoReportes(data.desde, data.hasta);
+  _repProductosDatosActuales = data.productos || [];
+
+  // Si había algo tipeado en el buscador, se respeta al recargar/cambiar de rango
+  const buscador = document.getElementById("repProductosBuscador");
+  const filtro = buscador ? buscador.value : "";
+  renderReporteProductos(_repProductosDatosActuales, filtro);
+}
+
+/** Renderiza la tabla de productos más vendidos, opcionalmente filtrada por texto
+ *  (coincidencia parcial, sin distinguir mayúsculas/minúsculas, contra código o nombre). */
+function renderReporteProductos(productos, filtro = "") {
+  const tbody = document.getElementById("repProductosTabla");
+  if (!tbody) return;
+
+  const texto = filtro.trim().toLowerCase();
+  const lista = texto
+    ? productos.filter(p =>
+        String(p.PRODUCTO || "").toLowerCase().includes(texto) ||
+        String(p.CODIGO || "").toLowerCase().includes(texto))
+    : productos;
+
+  if (!productos || productos.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-3">Sin ventas para el rango elegido</td></tr>`;
+    return;
+  }
+
+  if (lista.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-3">Ningún producto coincide con "${escapeHtml(filtro)}"</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = lista.map(p => `
+    <tr>
+      <td class="mono">${escapeHtml(p.CODIGO)}</td>
+      <td>${escapeHtml(p.PRODUCTO)}</td>
+      <td class="money">${Number(p.VENDIDOS || 0).toLocaleString("es-AR")}</td>
+      <td class="money">$${Number(p.INGRESOS || 0).toLocaleString("es-AR")}</td>
+    </tr>`).join("");
+}
+
+/** Llamado por el input del buscador (oninput) en la tabla de productos más vendidos. */
+function filtrarReporteProductos(texto) {
+  renderReporteProductos(_repProductosDatosActuales, texto);
 }
 
 /* ---- Reporte 3: Ventas por categoría ---- */
