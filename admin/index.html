@@ -509,7 +509,10 @@
   <div id="pedidos" class="seccion">
     <div class="page-header">
       <div><h1>Pedidos</h1><div class="sub">Seguimiento y estado de pedidos del catálogo web</div></div>
-      <button class="btn btn-outline-secondary btn-sm" onclick="recargarPedidos()">↻ Actualizar</button>
+      <div class="d-flex gap-2">
+        <button class="btn btn-outline-danger btn-sm" onclick="eliminarPedidosCancelados()">🗑️ Eliminar cancelados</button>
+        <button class="btn btn-outline-secondary btn-sm" onclick="recargarPedidos()">↻ Actualizar</button>
+      </div>
     </div>
     <div class="card p-3">
       <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">

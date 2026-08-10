@@ -1956,6 +1956,50 @@ function recargarPedidos() {
   cargarPedidos();
 }
 
+/** Botón "Eliminar cancelados" en la sección Pedidos — borra
+ *  permanentemente todos los pedidos en estado CANCELADO junto con su
+ *  detalle en DETALLE_PEDIDOS. Acción destructiva, por eso pide
+ *  confirmación antes de mandar nada al backend. */
+function eliminarPedidosCancelados() {
+  confirmarAccion(
+    "¿Eliminar todos los pedidos cancelados? Se van a borrar de forma permanente, junto con el detalle de sus productos. Esta acción no se puede deshacer.",
+    _eliminarPedidosCanceladosConfirmado,
+    "🗑️ Eliminar pedidos cancelados"
+  );
+}
+
+async function _eliminarPedidosCanceladosConfirmado() {
+  try {
+    const response = await fetchAPI(
+      API_URL,
+      {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ action: "eliminarPedidosCancelados" })
+      },
+      { timeoutMs: 20000 }
+    );
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudieron eliminar los pedidos cancelados", "error");
+      return;
+    }
+
+    if (data.eliminados === 0) {
+      toast("No había pedidos cancelados para eliminar", "info");
+      return;
+    }
+
+    toast(`✓ Se eliminaron ${data.eliminados} pedido(s) cancelado(s)`, "success");
+    recargarPedidos();
+
+  } catch (error) {
+    console.error("Error al eliminar pedidos cancelados:", error);
+    toast("Error de conexión al eliminar los pedidos cancelados", "error");
+  }
+}
+
 function recargarVentasPOSHistorial() {
   invalidarCache("ventasPOS");
   delete ULTIMA_CARGA_SECCION["ventasPOS"];
