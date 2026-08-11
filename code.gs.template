@@ -174,6 +174,15 @@ case "sumarStockProducto":
 case "eliminarProducto":
   return eliminarProductoPorCodigo(e);
 
+case "ingresosProductos":
+  return getIngresosProductos(e);
+
+case "generarCodigoProducto":
+  return jsonResponse({ success:true, codigo: generarCodigoProductoNuevo() });
+
+case "usuarios":
+  return getUsuarios();
+
 case "configuracionNegocio":
   return getConfiguracionNegocio();
 
@@ -299,7 +308,23 @@ if (data.action === "crearDeudaExtra") {
 }
 
 if (data.action === "eliminarPedidosCancelados") {
-  return eliminarPedidosCancelados();
+  return eliminarPedidosCancelados(data);
+}
+
+if (data.action === "registrarIngresoProducto") {
+  return registrarIngresoProducto(data);
+}
+
+if (data.action === "crearUsuario") {
+  return crearUsuario(data);
+}
+
+if (data.action === "editarUsuario") {
+  return editarUsuario(data);
+}
+
+if (data.action === "eliminarUsuario") {
+  return eliminarUsuario(data);
 }
 
 return jsonResponse({
@@ -387,6 +412,12 @@ function inicializarHojasNuevoNegocio(){
     "FECHA_REGISTRO", "FORMA_PAGO"
   ]);
 
+  asegurarHojaConEncabezados("INGRESOS_PRODUCTOS", [
+    "INGRESO_ID", "FECHA", "CODIGO", "PRODUCTO", "CATEGORIA",
+    "CANTIDAD", "PRECIO_ANTERIOR", "PRECIO_NUEVO", "PROVEEDOR",
+    "PROVEEDOR_CONTACTO", "OBSERVACIONES", "ES_PRODUCTO_NUEVO", "USUARIO"
+  ]);
+
   // Estas ya se auto-crean solas al primer uso (getOrCrearHoja*), pero
   // se fuerza acá también para que el instalador las deje todas listas
   // de una — no depende de qué pantalla se abra primero en el panel.
@@ -395,6 +426,8 @@ function inicializarHojasNuevoNegocio(){
   getOrCrearHojaClientes();
   getOrCrearHojaPagosCredito();
   getOrCrearHojaDeudasExtra();
+  getOrCrearHojaIngresosProductos();
+  getOrCrearHojaUsuarios();
 
   return jsonResponse({
     success: true,
@@ -568,6 +601,15 @@ function asegurarColumnasProductoCaja(sheet){
 
 function guardarProducto(e){
 
+  const params = (e && e.parameter) || {};
+
+  if(String(params.rol || "").trim().toLowerCase() === "vendedor"){
+    return jsonResponse({
+      success:false,
+      message:"Tu usuario (Vendedor) no tiene permiso para crear o modificar productos."
+    });
+  }
+
   const sheet = getSheet();
 
   if(!sheet){
@@ -576,8 +618,6 @@ function guardarProducto(e){
       message:"No se encontró la hoja 'PRODUCTOS'."
     });
   }
-
-  const params = (e && e.parameter) || {};
 
   asegurarColumnasProductoCaja(sheet);
 
@@ -655,6 +695,15 @@ function guardarProducto(e){
  */
 function actualizarProducto(e){
 
+  const params = (e && e.parameter) || {};
+
+  if(String(params.rol || "").trim().toLowerCase() === "vendedor"){
+    return jsonResponse({
+      success:false,
+      message:"Tu usuario (Vendedor) no tiene permiso para modificar precio o stock de productos."
+    });
+  }
+
   const sheet = getSheet();
 
   if(!sheet){
@@ -663,8 +712,6 @@ function actualizarProducto(e){
       message:"No se encontró la hoja 'PRODUCTOS'."
     });
   }
-
-  const params = (e && e.parameter) || {};
 
   asegurarColumnasProductoCaja(sheet);
 
@@ -765,6 +812,13 @@ function actualizarProducto(e){
 function sumarStockProducto(e){
 
   const params = (e && e.parameter) || {};
+
+  if(String(params.rol || "").trim().toLowerCase() === "vendedor"){
+    return jsonResponse({
+      success:false,
+      message:"Tu usuario (Vendedor) no tiene permiso para modificar el stock de productos."
+    });
+  }
 
   const codigo = (params.codigo || "").toString().trim();
   if(!codigo){
@@ -873,6 +927,263 @@ function eliminarProductoPorCodigo(e){
     message:"No se encontró un producto con el código '" + codigo + "'."
   });
 
+}
+
+/* =====================================================================
+   INGRESO DE PRODUCTOS (recepción de mercadería con proveedor)
+   Sección nueva del panel: permite escanear/tipear un código de barras.
+   - Si el producto YA existe en PRODUCTOS: recupera nombre/categoría/
+     precio actual, suma la cantidad recibida al stock y, si se indicó
+     un precio nuevo, lo actualiza.
+   - Si el producto NO existe: lo crea (con el código escaneado, o uno
+     generado automáticamente si no se escaneó nada) usando el nombre,
+     categoría, precio y stock inicial que se completen en el formulario.
+   En ambos casos deja un registro en la hoja INGRESOS_PRODUCTOS con
+   fecha, código, precio y proveedor, para poder armar el informe/PDF.
+===================================================================== */
+
+function getOrCrearHojaIngresosProductos(){
+  const ss = getSS();
+  let sheet = getHoja("INGRESOS_PRODUCTOS");
+  if(!sheet){
+    sheet = ss.insertSheet("INGRESOS_PRODUCTOS");
+    sheet.appendRow([
+      "INGRESO_ID", "FECHA", "CODIGO", "PRODUCTO", "CATEGORIA",
+      "CANTIDAD", "PRECIO_ANTERIOR", "PRECIO_NUEVO", "PROVEEDOR",
+      "PROVEEDOR_CONTACTO", "OBSERVACIONES", "ES_PRODUCTO_NUEVO", "USUARIO"
+    ]);
+    sheet.setFrozenRows(1);
+    _hojaCache["INGRESOS_PRODUCTOS"] = sheet;
+  }
+  return sheet;
+}
+
+/**
+ * Genera un código de producto nuevo, corto y sin repetir contra los
+ * códigos ya usados en PRODUCTOS. Se usa cuando en "Ingreso de
+ * Productos" el producto no existe y no se escaneó/tipeó ningún
+ * código de barras propio.
+ */
+function generarCodigoProductoNuevo(){
+  const sheet = getSheet();
+  const data = sheet ? sheet.getDataRange().getValues() : [];
+  data.shift();
+  const existentes = new Set(data.map(row => String(row[0]).trim()));
+  let codigo;
+  do {
+    codigo = "PRD-" + Date.now() + "-" + Math.floor(Math.random() * 900 + 100);
+  } while (existentes.has(codigo));
+  return codigo;
+}
+
+/**
+ * Registra un ingreso de mercadería (POST). Recibe:
+ *   codigo, producto, categoria, cantidad, precio, proveedor,
+ *   proveedorContacto, observaciones, usuario (opcional)
+ * Si "codigo" ya existe en PRODUCTOS: suma "cantidad" al stock y,
+ * si "precio" viene distinto del actual, lo actualiza.
+ * Si no existe: crea el producto con ese código (o genera uno si vino
+ * vacío) usando producto/categoria/precio, con stock inicial = cantidad.
+ */
+function registrarIngresoProducto(data){
+
+  if(String((data && data.rol) || "").trim().toLowerCase() === "vendedor"){
+    return jsonResponse({
+      success:false,
+      message:"Tu usuario (Vendedor) no tiene permiso para registrar ingresos de productos."
+    });
+  }
+
+  const lock = LockService.getScriptLock();
+  const obtuvoLock = lock.tryLock(10000);
+  if(!obtuvoLock){
+    return jsonResponse({
+      success:false,
+      message:"El sistema está ocupado en este momento. Probá de nuevo en unos segundos."
+    });
+  }
+
+  try{
+
+    const sheet = getSheet();
+    if(!sheet){
+      return jsonResponse({ success:false, message:"No se encontró la hoja 'PRODUCTOS'." });
+    }
+
+    const nombre = (data.producto || "").toString().trim();
+    const cantidad = Number(data.cantidad || 0);
+    const precioNuevo = data.precio !== undefined && data.precio !== ""
+      ? Number(data.precio) : null;
+
+    if(!cantidad || cantidad <= 0){
+      return jsonResponse({ success:false, message:"Ingresá una cantidad recibida válida, mayor a 0." });
+    }
+
+    let codigo = (data.codigo || "").toString().trim();
+
+    const filas = sheet.getDataRange().getValues();
+    const headerRow = filas[0];
+    const idxCodigo = headerRow.indexOf("CODIGO");
+    const idxProducto = headerRow.indexOf("PRODUCTO");
+    const idxCategoria = headerRow.indexOf("CATEGORIA");
+    const idxPrecio = headerRow.indexOf("PRECIO");
+    const idxStock = headerRow.indexOf("STOCK");
+
+    let filaIndex = -1;
+    if(codigo){
+      for(let i = 1; i < filas.length; i++){
+        if(String(filas[i][idxCodigo]).trim() === codigo){
+          filaIndex = i;
+          break;
+        }
+      }
+    }
+
+    let esProductoNuevo = false;
+    let precioAnterior = "";
+    let productoFinal = nombre;
+    let categoriaFinal = (data.categoria || "").toString().trim();
+
+    if(filaIndex !== -1){
+      // ---- Producto existente: sumar stock y, si corresponde, precio ----
+      precioAnterior = Number(filas[filaIndex][idxPrecio] || 0);
+      const stockActual = Number(filas[filaIndex][idxStock] || 0);
+      sheet.getRange(filaIndex + 1, idxStock + 1).setValue(stockActual + cantidad);
+
+      if(precioNuevo !== null && !isNaN(precioNuevo) && precioNuevo !== precioAnterior){
+        sheet.getRange(filaIndex + 1, idxPrecio + 1).setValue(precioNuevo);
+      }
+
+      productoFinal = filas[filaIndex][idxProducto];
+      categoriaFinal = filas[filaIndex][idxCategoria];
+
+    } else {
+      // ---- Producto nuevo: se crea ----
+      if(!nombre){
+        return jsonResponse({ success:false, message:"El producto no existe todavía — indicá el nombre para crearlo." });
+      }
+      if(!codigo){
+        codigo = generarCodigoProductoNuevo();
+      } else {
+        // Por seguridad, evitar duplicar si justo coincide con otro código existente
+        const yaExiste = filas.slice(1).some(row => String(row[idxCodigo]).trim() === codigo);
+        if(yaExiste){
+          return jsonResponse({ success:false, message:"Ya existe un producto con el código '" + codigo + "'." });
+        }
+      }
+
+      esProductoNuevo = true;
+      precioAnterior = "";
+
+      const valoresPorColumna = {
+        CODIGO: codigo,
+        PRODUCTO: nombre,
+        CATEGORIA: categoriaFinal,
+        PRECIO: precioNuevo !== null && !isNaN(precioNuevo) ? precioNuevo : 0,
+        STOCK: cantidad,
+        PUBLICADO: "SI",
+        DESTACADO: "NO",
+        OFERTA: "NO",
+        DESCRIPCION: "",
+        IMAGEN: ""
+      };
+
+      const fila = headerRow.map(header => {
+        const key = String(header || "").trim();
+        return valoresPorColumna.hasOwnProperty(key) ? valoresPorColumna[key] : "";
+      });
+
+      sheet.appendRow(fila);
+      productoFinal = nombre;
+    }
+
+    // ---- Registrar el ingreso en el historial ----
+    const hojaIngresos = getOrCrearHojaIngresosProductos();
+    const ingresoId = "ING-" + Date.now();
+    const fecha = data.fecha ? data.fecha : Utilities.formatDate(new Date(), Session.getScriptTimeZone() || "GMT-3", "yyyy-MM-dd");
+
+    hojaIngresos.appendRow([
+      ingresoId,
+      fecha,
+      codigo,
+      productoFinal,
+      categoriaFinal,
+      cantidad,
+      precioAnterior,
+      (precioNuevo !== null && !isNaN(precioNuevo)) ? precioNuevo : precioAnterior,
+      (data.proveedor || "").toString().trim(),
+      (data.proveedorContacto || "").toString().trim(),
+      (data.observaciones || "").toString().trim(),
+      esProductoNuevo ? "SI" : "NO",
+      (data.usuario || "").toString().trim()
+    ]);
+
+    return jsonResponse({
+      success: true,
+      codigo: codigo,
+      producto: productoFinal,
+      esProductoNuevo: esProductoNuevo,
+      ingresoId: ingresoId
+    });
+
+  } catch(error){
+    return jsonResponse({ success:false, error: error.toString() });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * Devuelve el historial de ingresos de mercadería, más nuevos primero.
+ * Filtros opcionales por querystring: desde, hasta (yyyy-MM-dd),
+ * proveedor (contiene, sin importar mayúsculas) y codigo (exacto).
+ */
+function getIngresosProductos(e){
+
+  const hoja = getOrCrearHojaIngresosProductos();
+  const data = hoja.getDataRange().getValues();
+  let ingresos = rowsToObjects(data);
+
+  const params = (e && e.parameter) || {};
+  const desde = (params.desde || "").toString().trim();
+  const hasta = (params.hasta || "").toString().trim();
+  const proveedor = (params.proveedor || "").toString().trim().toLowerCase();
+  const codigo = (params.codigo || "").toString().trim();
+
+  if(desde){
+    ingresos = ingresos.filter(i => String(i.FECHA) >= desde);
+  }
+  if(hasta){
+    ingresos = ingresos.filter(i => String(i.FECHA) <= hasta);
+  }
+  if(proveedor){
+    ingresos = ingresos.filter(i => String(i.PROVEEDOR || "").toLowerCase().indexOf(proveedor) !== -1);
+  }
+  if(codigo){
+    ingresos = ingresos.filter(i => String(i.CODIGO || "").trim() === codigo);
+  }
+
+  ingresos.sort((a, b) => String(b.FECHA).localeCompare(String(a.FECHA)) || String(b.INGRESO_ID).localeCompare(String(a.INGRESO_ID)));
+
+  // Google Sheets guarda "2026-08-10" como un valor de fecha real (no
+  // texto) — al leerlo, Apps Script lo devuelve como objeto Date, y
+  // JSON.stringify lo serializa con hora y zona incluida (ej:
+  // "2026-08-10T03:00:00.000Z"). Para que en el panel se muestre solo
+  // la fecha, cada FECHA se normaliza a "yyyy-MM-dd" antes de responder.
+  const tz = Session.getScriptTimeZone() || "GMT-3";
+  ingresos.forEach(i => {
+    if(i.FECHA instanceof Date){
+      i.FECHA = Utilities.formatDate(i.FECHA, tz, "yyyy-MM-dd");
+    } else if(i.FECHA){
+      i.FECHA = String(i.FECHA).substring(0, 10);
+    }
+  });
+
+  return jsonResponse({
+    success: true,
+    total: ingresos.length,
+    ingresos: ingresos
+  });
 }
 
 /* =====================================================================
@@ -2219,17 +2530,29 @@ function login(e){
 
   const creds = leerCredencialesAdmin();
 
-  const ok =
-    usuario === creds.USUARIO &&
-    password === creds.PASSWORD;
+  // 1) Usuario/contraseña del admin "clásico" (compatibilidad con
+  //    instalaciones existentes) — siempre tiene rol admin, acceso total.
+  if(usuario === creds.USUARIO && password === creds.PASSWORD){
+    return jsonResponse({
+      success: true,
+      rol: "admin",
+      nombre: "Administrador",
+      usuario: creds.USUARIO
+    });
+  }
 
-  return ContentService
-    .createTextOutput(
-      JSON.stringify({
-        success: ok
-      })
-    )
-    .setMimeType(ContentService.MimeType.JSON);
+  // 2) Usuarios cargados en la hoja USUARIOS, cada uno con su rol.
+  const usuarioEncontrado = buscarUsuarioPorCredenciales(usuario, password);
+  if(usuarioEncontrado){
+    return jsonResponse({
+      success: true,
+      rol: usuarioEncontrado.ROL,
+      nombre: usuarioEncontrado.NOMBRE,
+      usuario: usuarioEncontrado.USERNAME
+    });
+  }
+
+  return jsonResponse({ success:false });
 
 }
 
@@ -2303,6 +2626,157 @@ function guardarPasswordStock(e){
   }
 
   return jsonResponse({ success:true });
+}
+
+/* =====================================================================
+   USUARIOS Y ROLES
+   Hoja "USUARIOS": permite crear varios accesos al panel, cada uno con
+   un rol que determina qué secciones puede ver/usar. El usuario/
+   contraseña "clásico" (ADMIN_CREDENCIALES) sigue funcionando igual,
+   siempre con rol "admin" — esto es un agregado, no un reemplazo.
+
+   Roles disponibles:
+   - admin:     acceso total (incluye esta pantalla de Usuarios).
+   - vendedor:  Punto de Venta, Ventas POS, Cierre de Caja, Pedidos,
+                Clientes. Sin Configuración ni Usuarios.
+   - deposito:  Productos, Ingreso de Productos, Reportes de Compras.
+                Sin ventas, clientes ni configuración.
+===================================================================== */
+
+const ROLES_VALIDOS = ["admin", "vendedor", "deposito"];
+
+function getOrCrearHojaUsuarios(){
+  const ss = getSS();
+  let sheet = getHoja("USUARIOS");
+  if(!sheet){
+    sheet = ss.insertSheet("USUARIOS");
+    sheet.appendRow(["USUARIO_ID", "NOMBRE", "USERNAME", "PASSWORD", "ROL", "ACTIVO"]);
+    sheet.setFrozenRows(1);
+    _hojaCache["USUARIOS"] = sheet;
+  }
+  return sheet;
+}
+
+function buscarUsuarioPorCredenciales(username, password){
+  if(!username || !password) return null;
+  const sheet = getOrCrearHojaUsuarios();
+  const data = rowsToObjects(sheet.getDataRange().getValues());
+  const encontrado = data.find(u =>
+    String(u.USERNAME || "").trim().toLowerCase() === String(username).trim().toLowerCase() &&
+    String(u.PASSWORD || "") === String(password) &&
+    String(u.ACTIVO || "SI").toUpperCase() !== "NO"
+  );
+  return encontrado || null;
+}
+
+/** Lista de usuarios para la pantalla de administración (sin exponer la contraseña) */
+function getUsuarios(){
+  const sheet = getOrCrearHojaUsuarios();
+  const data = rowsToObjects(sheet.getDataRange().getValues());
+  const usuarios = data
+    .filter(u => String(u.USUARIO_ID || "").trim() !== "")
+    .map(u => ({
+      USUARIO_ID: u.USUARIO_ID,
+      NOMBRE: u.NOMBRE,
+      USERNAME: u.USERNAME,
+      ROL: u.ROL,
+      ACTIVO: u.ACTIVO
+    }));
+  return jsonResponse({ success:true, usuarios });
+}
+
+function crearUsuario(data){
+  const nombre = (data.nombre || "").toString().trim();
+  const username = (data.username || "").toString().trim();
+  const password = (data.password || "").toString();
+  const rol = (data.rol || "").toString().trim();
+
+  if(!nombre || !username || !password){
+    return jsonResponse({ success:false, message:"Nombre, usuario y contraseña son obligatorios." });
+  }
+  if(password.length < 4){
+    return jsonResponse({ success:false, message:"La contraseña debe tener al menos 4 caracteres." });
+  }
+  if(ROLES_VALIDOS.indexOf(rol) === -1){
+    return jsonResponse({ success:false, message:"Rol no válido." });
+  }
+
+  const sheet = getOrCrearHojaUsuarios();
+  const existentes = rowsToObjects(sheet.getDataRange().getValues());
+
+  const yaExiste = existentes.some(u => String(u.USERNAME || "").trim().toLowerCase() === username.toLowerCase());
+  if(yaExiste){
+    return jsonResponse({ success:false, message:"Ya existe un usuario con ese nombre de usuario." });
+  }
+
+  const usuarioId = "USR-" + Date.now();
+  sheet.appendRow([usuarioId, nombre, username, password, rol, "SI"]);
+
+  return jsonResponse({ success:true, usuarioId });
+}
+
+function editarUsuario(data){
+  const usuarioId = (data.usuarioId || "").toString().trim();
+  if(!usuarioId){
+    return jsonResponse({ success:false, message:"Falta el ID del usuario a editar." });
+  }
+
+  const sheet = getOrCrearHojaUsuarios();
+  const filas = sheet.getDataRange().getValues();
+  const headerRow = filas[0];
+  const idxId = headerRow.indexOf("USUARIO_ID");
+  const idxNombre = headerRow.indexOf("NOMBRE");
+  const idxUsername = headerRow.indexOf("USERNAME");
+  const idxPassword = headerRow.indexOf("PASSWORD");
+  const idxRol = headerRow.indexOf("ROL");
+  const idxActivo = headerRow.indexOf("ACTIVO");
+
+  let filaIndex = -1;
+  for(let i = 1; i < filas.length; i++){
+    if(String(filas[i][idxId]).trim() === usuarioId){ filaIndex = i; break; }
+  }
+  if(filaIndex === -1){
+    return jsonResponse({ success:false, message:"No se encontró ese usuario." });
+  }
+
+  if(data.nombre) sheet.getRange(filaIndex + 1, idxNombre + 1).setValue(String(data.nombre).trim());
+  if(data.username) sheet.getRange(filaIndex + 1, idxUsername + 1).setValue(String(data.username).trim());
+  if(data.password) {
+    if(String(data.password).length < 4){
+      return jsonResponse({ success:false, message:"La contraseña debe tener al menos 4 caracteres." });
+    }
+    sheet.getRange(filaIndex + 1, idxPassword + 1).setValue(String(data.password));
+  }
+  if(data.rol){
+    if(ROLES_VALIDOS.indexOf(data.rol) === -1){
+      return jsonResponse({ success:false, message:"Rol no válido." });
+    }
+    sheet.getRange(filaIndex + 1, idxRol + 1).setValue(String(data.rol));
+  }
+  if(data.activo !== undefined){
+    sheet.getRange(filaIndex + 1, idxActivo + 1).setValue(data.activo ? "SI" : "NO");
+  }
+
+  return jsonResponse({ success:true });
+}
+
+function eliminarUsuario(data){
+  const usuarioId = (data.usuarioId || "").toString().trim();
+  if(!usuarioId){
+    return jsonResponse({ success:false, message:"Falta el ID del usuario a eliminar." });
+  }
+
+  const sheet = getOrCrearHojaUsuarios();
+  const filas = sheet.getDataRange().getValues();
+
+  for(let i = 1; i < filas.length; i++){
+    if(String(filas[i][0]).trim() === usuarioId){
+      sheet.deleteRow(i + 1);
+      return jsonResponse({ success:true });
+    }
+  }
+
+  return jsonResponse({ success:false, message:"No se encontró ese usuario." });
 }
 
 /**
@@ -3465,7 +3939,15 @@ function editarCliente(data){
  *
  * Devuelve cuántos pedidos se borraron, para poder avisarle al usuario.
  */
-function eliminarPedidosCancelados(){
+function eliminarPedidosCancelados(data){
+
+  const rol = ((data && data.rol) || "").toString().trim().toLowerCase();
+  if(rol === "vendedor"){
+    return jsonResponse({
+      success:false,
+      message:"Tu usuario (Vendedor) no tiene permiso para eliminar pedidos."
+    });
+  }
 
   const pedidosSheet = getHoja("PEDIDOS");
   if(!pedidosSheet){
@@ -5774,8 +6256,18 @@ function autoMigrarMovimientosCaja() {
   }
 }
 
-/** GET ?action=eliminarMovimientoCaja&movimientoId=... */
+/** GET ?action=eliminarMovimientoCaja&movimientoId=...&rol=... */
 function eliminarMovimientoCaja(e){
+
+  const params = (e && e.parameter) || {};
+  const rol = (params.rol || "").toString().trim().toLowerCase();
+
+  if(rol === "vendedor"){
+    return jsonResponse({
+      success:false,
+      message:"Tu usuario (Vendedor) no tiene permiso para eliminar movimientos de caja."
+    });
+  }
 
   const ss = getSS();
   const sheet = getHoja("MOVIMIENTOS_CAJA");
@@ -5787,7 +6279,7 @@ function eliminarMovimientoCaja(e){
     });
   }
 
-  const movimientoId = (e && e.parameter && e.parameter.movimientoId || "").toString().trim();
+  const movimientoId = (params.movimientoId || "").toString().trim();
   if(!movimientoId){
     return jsonResponse({ success:false, message:"Falta el ID del movimiento a eliminar." });
   }
