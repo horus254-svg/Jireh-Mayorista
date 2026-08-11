@@ -1969,6 +1969,10 @@ function recargarPedidos() {
  *  detalle en DETALLE_PEDIDOS. Acción destructiva, por eso pide
  *  confirmación antes de mandar nada al backend. */
 function eliminarPedidosCancelados() {
+  if (obtenerRolActual() === "vendedor") {
+    toast("Tu usuario (Vendedor) no tiene permiso para eliminar pedidos", "error");
+    return;
+  }
   confirmarAccion(
     "¿Eliminar todos los pedidos cancelados? Se van a borrar de forma permanente, junto con el detalle de sus productos. Esta acción no se puede deshacer.",
     _eliminarPedidosCanceladosConfirmado,
@@ -1983,7 +1987,7 @@ async function _eliminarPedidosCanceladosConfirmado() {
       {
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ action: "eliminarPedidosCancelados" })
+        body: JSON.stringify({ action: "eliminarPedidosCancelados", rol: obtenerRolActual() })
       },
       { timeoutMs: 20000 }
     );
@@ -3105,7 +3109,8 @@ async function confirmarAgregarStock() {
     const params = new URLSearchParams({
       action: "sumarStockProducto",
       codigo: codigo,
-      cantidad: cantidad
+      cantidad: cantidad,
+      rol: obtenerRolActual()
     });
 
     const response = await fetchAPI(API_URL + "?" + params.toString());
@@ -3322,6 +3327,7 @@ async function guardarProductoForm() {
   try {
     const params = new URLSearchParams({
       action: esEdicion ? "actualizarProducto" : "guardarProducto",
+      rol: obtenerRolActual(),
       CODIGO: codigo,
       PRODUCTO: nombre,
       CATEGORIA: categoria,
@@ -4472,7 +4478,7 @@ function renderPosGrid(filtroTexto) {
           <span class="tile-price">$${Number(p.PRECIO || 0).toLocaleString("es-AR")}</span>
           ${stockBadge}
         </div>
-        <button type="button" class="tile-edit" data-idx="${idx}" title="Editar precio y stock" onclick="event.stopPropagation(); abrirEdicionRapidaPOS('${escapeHtml(p.CODIGO)}');">✏️</button>
+        ${obtenerRolActual() === "vendedor" ? "" : `<button type="button" class="tile-edit" data-idx="${idx}" title="Editar precio y stock" onclick="event.stopPropagation(); abrirEdicionRapidaPOS('${escapeHtml(p.CODIGO)}');">✏️</button>`}
         ${Number(p.UNIDADES_POR_CAJA) > 0 ? `<button type="button" class="tile-caja" title="Agregar 1 caja (${p.UNIDADES_POR_CAJA} uds) a $${Number(p.PRECIO_CAJA || 0).toLocaleString("es-AR")}" onclick="event.stopPropagation(); agregarCajaAlTicket(productosPOS.find(x => String(x.CODIGO)==='${escapeHtml(p.CODIGO)}'));">📦x${p.UNIDADES_POR_CAJA}</button>` : ""}
         <span class="tile-add">+</span>
       </div>`;
@@ -4577,6 +4583,10 @@ function agregarCajaAlTicket(producto) {
 let _codigoEdicionRapidaPOS = null;
 
 function abrirEdicionRapidaPOS(codigo) {
+  if (obtenerRolActual() === "vendedor") {
+    toast("Tu usuario (Vendedor) no tiene permiso para modificar precio o stock", "error");
+    return;
+  }
   const producto = productosPOS.find(p => String(p.CODIGO).trim() === String(codigo).trim());
   if (!producto) { toast("Producto no encontrado", "error"); return; }
 
@@ -4627,6 +4637,7 @@ async function guardarEdicionRapidaPOS() {
     // caja, que este modal no permite editar pero tampoco debe borrar.
     const params = new URLSearchParams({
       action: "actualizarProducto",
+      rol: obtenerRolActual(),
       codigoOriginal: producto.CODIGO,
       CODIGO: codigoNuevo,
       PRODUCTO: producto.PRODUCTO,
@@ -7910,6 +7921,7 @@ function renderTablaMovimientosCaja(lista) {
     const fpIcon = iconoFormaPago[fp] || "💵";
     const fpLabel = fp.charAt(0) + fp.slice(1).toLowerCase();
 
+    const esVendedorRol = obtenerRolActual() === "vendedor";
     html += `
     <tr>
       <td>${hora}</td>
@@ -7920,8 +7932,8 @@ function renderTablaMovimientosCaja(lista) {
         ${esIngreso ? "+" : "-"}$${Number(m.MONTO || 0).toLocaleString("es-AR")}
       </td>
       <td>${escapeHtml(m.VENDEDOR || "—")}</td>
-      <td><button class="btn btn-outline-danger btn-sm"
-        onclick="confirmarEliminarMovimiento('${escapeHtml(m.MOVIMIENTO_ID)}', '${escapeHtml(m.MOTIVO || "")}')">✕</button></td>
+      <td>${esVendedorRol ? "" : `<button class="btn btn-outline-danger btn-sm"
+        onclick="confirmarEliminarMovimiento('${escapeHtml(m.MOVIMIENTO_ID)}', '${escapeHtml(m.MOTIVO || "")}')">✕</button>`}</td>
     </tr>`;
   });
 
@@ -7952,8 +7964,13 @@ async function eliminarMovimientoCajaForm(movimientoId) {
   cerrarModalEliminarMov();
   if (!id) return;
 
+  if (obtenerRolActual() === "vendedor") {
+    toast("Tu usuario (Vendedor) no tiene permiso para eliminar movimientos de caja", "error");
+    return;
+  }
+
   try {
-    const response = await fetchAPI(API_URL + "?action=eliminarMovimientoCaja&movimientoId=" + encodeURIComponent(id));
+    const response = await fetchAPI(API_URL + "?action=eliminarMovimientoCaja&movimientoId=" + encodeURIComponent(id) + "&rol=" + encodeURIComponent(obtenerRolActual()));
     const data = await response.json();
 
     if (!data.success) {
@@ -7988,12 +8005,14 @@ async function guardarMovimientoCajaForm() {
   btn.innerHTML = "Guardando...";
 
   try {
+    const nombreUsuarioActual = sessionStorage.getItem("nombreUsuario") || sessionStorage.getItem("usuarioLogueado") || "ADMIN";
     const params = new URLSearchParams({
       action: "guardarMovimientoCaja",
       tipo: tipoMovimientoCajaActivo,
       monto: monto,
       motivo: motivo,
-      formaPago: formaPago
+      formaPago: formaPago,
+      vendedor: nombreUsuarioActual
     });
 
     const response = await fetchAPI(API_URL + "?" + params.toString());
@@ -9306,6 +9325,7 @@ async function confirmarIngresoProducto() {
       method: "POST",
       body: JSON.stringify({
         action: "registrarIngresoProducto",
+        rol: obtenerRolActual(),
         codigo, producto: nombre, categoria, precio, cantidad,
         proveedor, proveedorContacto, observaciones, fecha
       })
@@ -9467,6 +9487,15 @@ function aplicarPermisosPorRol() {
     const target = a.getAttribute("data-target");
     if (!permitidas.includes(target)) a.style.display = "none";
   });
+
+  // El rol vendedor ve la sección Pedidos y Movimientos de Caja, pero
+  // no puede eliminar pedidos cancelados ni movimientos de caja — esos
+  // botones se ocultan puntualmente (el backend también rechaza estas
+  // acciones si llega el rol "vendedor", por si alguien fuerza el llamado).
+  if (rol === "vendedor") {
+    const btnPed = document.getElementById("btnEliminarPedidosCancelados");
+    if (btnPed) btnPed.style.display = "none";
+  }
 }
 
 /* ===================== GESTIÓN DE USUARIOS (solo admin) ===================== */
