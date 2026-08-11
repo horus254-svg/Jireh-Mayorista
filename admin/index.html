@@ -293,10 +293,12 @@
     <a href="#" data-target="movimientosCaja"   onclick="mostrarSeccion('movimientosCaja')"><span class="ic">💸</span> Movimientos de Caja</a>
     <a href="#" data-target="pedidos"          onclick="mostrarSeccion('pedidos')"><span class="ic">📦</span> Pedidos</a>
     <a href="#" data-target="productos"        onclick="mostrarSeccion('productos')"><span class="ic">🛒</span> Productos</a>
+    <a href="#" data-target="ingresoProductos" onclick="mostrarSeccion('ingresoProductos')"><span class="ic">📥</span> Ingreso de Productos</a>
     <a href="#" data-target="clientes"         onclick="mostrarSeccion('clientes'); cargarClientes();"><span class="ic">👥</span> Clientes</a>
     <a href="#" data-target="reportes"         onclick="mostrarSeccion('reportes')"><span class="ic">📈</span> Reportes</a>
     <a href="#" data-target="reportesCompras"  onclick="mostrarSeccion('reportesCompras')"><span class="ic">📦</span> Reportes de Compras</a>
     <a href="#" data-target="configuracion"    onclick="mostrarSeccion('configuracion')"><span class="ic">⚙️</span> Configuración</a>
+    <a href="#" data-target="usuarios"         onclick="mostrarSeccion('usuarios'); cargarUsuarios();"><span class="ic">🔐</span> Usuarios</a>
     <a href="#" data-target="instalador"       onclick="mostrarSeccion('instalador')" style="display:none;" title="Oculto — descomentar el style para volver a mostrarlo"><span class="ic">🛠️</span> Instalador</a>
   </nav>
   <button class="logout-btn" onclick="logout()">⏻ Cerrar sesión</button>
@@ -584,6 +586,118 @@
             <th style="width:56px;">Foto</th><th>Código</th><th>Producto</th><th>Categoría</th><th>Precio</th><th>Stock</th><th>Estado</th><th>Acciones</th>
           </tr></thead>
           <tbody id="tablaProductos"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== INGRESO DE PRODUCTOS (recepción de mercadería) ===== -->
+  <div id="ingresoProductos" class="seccion">
+    <div class="page-header">
+      <div><h1>Ingreso de Productos</h1><div class="sub">Recepción de mercadería con proveedor</div></div>
+      <div class="d-flex gap-2">
+        <button class="btn btn-outline-secondary btn-sm" onclick="cargarHistorialIngresos()">↻ Actualizar</button>
+        <button class="btn btn-outline-dark" onclick="exportarIngresosPDF()">📄 Informe PDF</button>
+      </div>
+    </div>
+
+    <div class="card p-3 mb-3">
+      <label class="form-label">Escaneá o tipeá el código de barras del producto que llegó</label>
+      <div class="d-flex gap-2 flex-wrap">
+        <input type="text" id="ipCodigoScan" class="form-control" autocomplete="off"
+          placeholder="Código de barras — Enter para buscar"
+          style="max-width:340px; font-size:16px;"
+          onkeydown="if(event.key==='Enter'){ event.preventDefault(); buscarProductoParaIngreso(); }">
+        <button class="btn btn-primary" onclick="buscarProductoParaIngreso()">🔍 Buscar</button>
+        <button class="btn btn-outline-secondary" onclick="generarCodigoIngresoAutomatico()" title="Para productos sin código de barras propio">🔢 Generar código</button>
+        <span class="text-muted align-self-center" id="ipEstadoBusqueda" style="font-size:13px;"></span>
+      </div>
+    </div>
+
+    <div class="card p-3 mb-3" id="ipFormularioWrap" style="display:none;">
+      <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
+        <h6 class="mb-0" id="ipTituloProducto">Producto</h6>
+        <span class="badge" id="ipBadgeEstado"></span>
+      </div>
+
+      <input type="hidden" id="ipCodigo">
+
+      <div class="row g-2">
+        <div class="col-md-4">
+          <label class="form-label">Código</label>
+          <input type="text" class="form-control" id="ipCodigoMostrado" readonly>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Nombre del producto *</label>
+          <input type="text" class="form-control" id="ipNombre" placeholder="Ej: Coca Cola 500ml">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Categoría</label>
+          <input type="text" class="form-control" id="ipCategoria" list="ipCategoriasList" placeholder="Ej: Bebidas">
+          <datalist id="ipCategoriasList"></datalist>
+        </div>
+      </div>
+
+      <div class="row g-2 mt-2">
+        <div class="col-md-4">
+          <label class="form-label">Precio actual / nuevo</label>
+          <input type="number" class="form-control" id="ipPrecio" min="0" step="1" placeholder="0">
+          <div class="form-text" style="font-size:11px;" id="ipPrecioHint"></div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Cantidad que llega *</label>
+          <input type="number" class="form-control" id="ipCantidad" min="1" step="1" placeholder="Ej: 24">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Fecha de recepción</label>
+          <input type="date" class="form-control" id="ipFecha">
+        </div>
+      </div>
+
+      <div class="row g-2 mt-2">
+        <div class="col-md-6">
+          <label class="form-label">Proveedor *</label>
+          <input type="text" class="form-control" id="ipProveedor" list="ipProveedoresList" placeholder="Nombre del proveedor">
+          <datalist id="ipProveedoresList"></datalist>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Contacto del proveedor</label>
+          <input type="text" class="form-control" id="ipProveedorContacto" placeholder="Teléfono / email (opcional)">
+        </div>
+      </div>
+
+      <div class="mt-2">
+        <label class="form-label">Observaciones</label>
+        <input type="text" class="form-control" id="ipObservaciones" placeholder="Ej: Remito N° 0001-000123 (opcional)">
+      </div>
+
+      <div class="d-flex gap-2 mt-3">
+        <button class="btn btn-outline-secondary" onclick="cancelarIngresoProducto()">Cancelar</button>
+        <button class="btn btn-success" id="btnConfirmarIngreso" onclick="confirmarIngresoProducto()">📥 Registrar ingreso</button>
+      </div>
+    </div>
+
+    <div style="position:sticky; top:-26px; z-index:10; background:var(--slate-50); padding:8px 0 6px; margin:-26px -30px 0; padding-left:30px; padding-right:30px;">
+      <div class="card p-2">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <input type="text" id="ipBuscarHistorial" class="form-control form-control-sm" style="max-width:220px"
+            placeholder="Buscar por código o producto..." oninput="filtrarHistorialIngresos()">
+          <input type="text" id="ipFiltroProveedor" class="form-control form-control-sm" style="max-width:200px"
+            placeholder="Filtrar por proveedor..." oninput="filtrarHistorialIngresos()">
+          <input type="date" id="ipFiltroDesde" class="form-control form-control-sm" style="max-width:150px" onchange="filtrarHistorialIngresos()">
+          <input type="date" id="ipFiltroHasta" class="form-control form-control-sm" style="max-width:150px" onchange="filtrarHistorialIngresos()">
+        </div>
+      </div>
+    </div>
+
+    <div class="card p-3">
+      <div class="table-responsive">
+        <table class="table table-striped" id="tablaIngresosProductos">
+          <thead><tr>
+            <th>Fecha</th><th>Código</th><th>Producto</th><th>Categoría</th>
+            <th>Cantidad</th><th>Precio</th><th>Proveedor</th><th>Contacto</th><th>Obs.</th>
+          </tr></thead>
+          <tbody id="tablaIngresosBody"><tr><td colspan="9" class="text-center text-muted py-4">Cargando...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -1052,6 +1166,76 @@
           <thead><tr><th>Cliente</th><th>Transporte</th><th>Pedidos</th><th>Total comprado</th></tr></thead>
           <tbody id="repClientesTabla"><tr><td colspan="4" class="text-center text-muted py-3">Sin datos para el rango elegido</td></tr></tbody>
         </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== USUARIOS Y ROLES ===== -->
+  <div id="usuarios" class="seccion">
+    <div class="page-header">
+      <div><h1>Usuarios</h1><div class="sub">Accesos al panel y sus permisos</div></div>
+      <button class="btn btn-success" onclick="nuevoUsuario()">+ Nuevo Usuario</button>
+    </div>
+
+    <div class="card p-3 mb-3">
+      <div class="d-flex flex-wrap gap-3" style="font-size:13px;">
+        <div><strong>👑 Admin:</strong> acceso a todo el panel, incluida esta pantalla.</div>
+        <div><strong>🏪 Vendedor:</strong> Punto de Venta, Ventas, Cierre de Caja, Pedidos y Clientes.</div>
+        <div><strong>📦 Depósito:</strong> Productos, Ingreso de Productos y Reportes de Compras.</div>
+      </div>
+    </div>
+
+    <div class="card p-3">
+      <div class="table-responsive">
+        <table class="table table-striped">
+          <thead><tr><th>Nombre</th><th>Usuario</th><th>Rol</th><th>Estado</th><th>Acciones</th></tr></thead>
+          <tbody id="tablaUsuarios"><tr><td colspan="5" class="text-center text-muted py-4">Cargando...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== MODAL USUARIO ===== -->
+  <div class="product-modal-backdrop" id="usuarioModalBackdrop">
+    <div class="product-modal">
+      <div class="product-modal-header">
+        <h6 id="usuarioModalTitle">+ Nuevo Usuario</h6>
+        <button onclick="cerrarModalUsuario()">✕</button>
+      </div>
+      <div class="product-modal-body">
+        <input type="hidden" id="umUsuarioId">
+        <div class="mt-2">
+          <label class="form-label">Nombre *</label>
+          <input type="text" class="form-control" id="umNombre" placeholder="Ej: Juan Pérez">
+        </div>
+        <div class="mt-2">
+          <label class="form-label">Nombre de usuario *</label>
+          <input type="text" class="form-control" id="umUsername" placeholder="Ej: juan">
+        </div>
+        <div class="mt-2">
+          <label class="form-label">Contraseña <span class="text-muted" id="umPasswordHint" style="font-size:11px;">*</span></label>
+          <input type="text" class="form-control" id="umPassword" placeholder="Mínimo 4 caracteres">
+        </div>
+        <div class="row g-2 mt-2">
+          <div class="col-8">
+            <label class="form-label">Rol *</label>
+            <select class="form-select" id="umRol">
+              <option value="admin">👑 Admin — acceso total</option>
+              <option value="vendedor">🏪 Vendedor — ventas y clientes</option>
+              <option value="deposito">📦 Depósito — productos y stock</option>
+            </select>
+          </div>
+          <div class="col-4 d-flex align-items-end">
+            <label class="pm-switch">
+              <input type="checkbox" id="umActivo" checked>
+              <span>Activo</span>
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="product-modal-actions">
+        <button class="btn btn-outline-secondary" onclick="cerrarModalUsuario()">Cancelar</button>
+        <button class="btn btn-success" id="btnGuardarUsuario" onclick="guardarUsuarioForm()">💾 Guardar Usuario</button>
       </div>
     </div>
   </div>

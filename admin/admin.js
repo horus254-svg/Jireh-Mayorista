@@ -187,6 +187,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
+  aplicarPermisosPorRol();
+
   // Verificar licencia (solo en Electron con window.veekpos disponible)
   aplicarEstadoLicencia();
 
@@ -1665,6 +1667,11 @@ function cargarSiVencido(clave, fn) {
 }
 
 function mostrarSeccion(id) {
+  if (!seccionPermitidaParaRol(id)) {
+    toast("No tenés permiso para acceder a esta sección", "error");
+    id = "dashboard";
+  }
+
   document.querySelectorAll(".seccion").forEach(sec => { sec.style.display = "none"; });
 
   const seccion = document.getElementById(id);
@@ -9415,5 +9422,180 @@ function exportarIngresosPDF() {
   } catch (error) {
     console.error("Error al exportar ingresos a PDF:", error);
     toast("No se pudo generar el PDF", "error");
+  }
+}
+
+/* ===================================================================
+   ROLES Y PERMISOS
+   El login (login.html) guarda en sessionStorage: "admin"="true" (ya
+   existía) y, además, "rol", "nombreUsuario" y "usuarioLogueado" —
+   estos tres son nuevos. Instalaciones que todavía tengan un
+   login.html viejo (sin mandar el rol) siguen funcionando: sin rol
+   guardado, se asume "admin" (acceso total), igual que siempre.
+=================================================================== */
+
+const PERMISOS_POR_ROL = {
+  admin: null, // null = acceso a todas las secciones
+  vendedor: ["dashboard", "pos", "ventasPOS", "cierreCaja", "movimientosCaja", "pedidos", "clientes"],
+  deposito: ["dashboard", "productos", "ingresoProductos", "reportesCompras"]
+};
+
+function obtenerRolActual() {
+  return sessionStorage.getItem("rol") || "admin";
+}
+
+function seccionPermitidaParaRol(id) {
+  const permitidas = PERMISOS_POR_ROL[obtenerRolActual()];
+  if (!permitidas) return true; // admin, o rol desconocido -> no restringe
+  return permitidas.includes(id);
+}
+
+/** Oculta del menú (desktop y mobile) las secciones que el rol logueado no puede ver */
+function aplicarPermisosPorRol() {
+  const rol = obtenerRolActual();
+  const permitidas = PERMISOS_POR_ROL[rol];
+
+  const nombre = sessionStorage.getItem("nombreUsuario");
+  if (nombre) {
+    const label = document.getElementById("sidebarLabelSub");
+    if (label) label.textContent = nombre + (rol !== "admin" ? " · " + rol : "");
+  }
+
+  if (!permitidas) return; // admin: ve todo, no se toca el menú
+
+  document.querySelectorAll("#navLinks a[data-target], #bottomNavLinks a[data-target]").forEach(a => {
+    const target = a.getAttribute("data-target");
+    if (!permitidas.includes(target)) a.style.display = "none";
+  });
+}
+
+/* ===================== GESTIÓN DE USUARIOS (solo admin) ===================== */
+
+let usuariosGlobal = [];
+
+async function cargarUsuarios() {
+  const tbody = document.getElementById("tablaUsuarios");
+  try {
+    const res = await fetchAPI(API_URL + "?action=usuarios");
+    const data = await res.json();
+    usuariosGlobal = data.usuarios || [];
+
+    if (usuariosGlobal.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-3">Todavía no creaste ningún usuario adicional</td></tr>`;
+      return;
+    }
+
+    const etiquetaRol = { admin: "👑 Admin", vendedor: "🏪 Vendedor", deposito: "📦 Depósito" };
+
+    tbody.innerHTML = usuariosGlobal.map(u => `
+      <tr>
+        <td>${escapeHtml(u.NOMBRE || "—")}</td>
+        <td class="mono">${escapeHtml(u.USERNAME || "—")}</td>
+        <td>${etiquetaRol[u.ROL] || escapeHtml(u.ROL || "—")}</td>
+        <td>${String(u.ACTIVO || "SI").toUpperCase() === "NO" ? '<span class="badge bg-secondary">Inactivo</span>' : '<span class="badge bg-success">Activo</span>'}</td>
+        <td>
+          <button class="btn btn-sm btn-outline-primary" onclick="abrirModalEditarUsuario('${u.USUARIO_ID}')">✏️</button>
+          <button class="btn btn-sm btn-outline-danger" onclick="eliminarUsuarioClick('${u.USUARIO_ID}', '${escapeHtml(u.NOMBRE || "")}')">🗑️</button>
+        </td>
+      </tr>`).join("");
+
+  } catch (error) {
+    console.error("Error al cargar usuarios:", error);
+    if (tbody) tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-3">Error al cargar los usuarios</td></tr>`;
+  }
+}
+
+function nuevoUsuario() {
+  document.getElementById("usuarioModalTitle").textContent = "+ Nuevo Usuario";
+  document.getElementById("umUsuarioId").value = "";
+  document.getElementById("umNombre").value = "";
+  document.getElementById("umUsername").value = "";
+  document.getElementById("umPassword").value = "";
+  document.getElementById("umPasswordHint").textContent = "*";
+  document.getElementById("umRol").value = "vendedor";
+  document.getElementById("umActivo").checked = true;
+  document.getElementById("usuarioModalBackdrop").classList.add("show");
+  setTimeout(() => document.getElementById("umNombre").focus(), 80);
+}
+
+function abrirModalEditarUsuario(usuarioId) {
+  const u = usuariosGlobal.find(x => String(x.USUARIO_ID) === String(usuarioId));
+  if (!u) { toast("No se encontró el usuario", "error"); return; }
+
+  document.getElementById("usuarioModalTitle").textContent = "✏️ Editar Usuario";
+  document.getElementById("umUsuarioId").value = u.USUARIO_ID;
+  document.getElementById("umNombre").value = u.NOMBRE || "";
+  document.getElementById("umUsername").value = u.USERNAME || "";
+  document.getElementById("umPassword").value = "";
+  document.getElementById("umPasswordHint").textContent = "(dejar vacío para no cambiarla)";
+  document.getElementById("umRol").value = u.ROL || "vendedor";
+  document.getElementById("umActivo").checked = String(u.ACTIVO || "SI").toUpperCase() !== "NO";
+  document.getElementById("usuarioModalBackdrop").classList.add("show");
+}
+
+function cerrarModalUsuario() {
+  document.getElementById("usuarioModalBackdrop").classList.remove("show");
+}
+
+async function guardarUsuarioForm() {
+  const usuarioId = document.getElementById("umUsuarioId").value.trim();
+  const nombre = document.getElementById("umNombre").value.trim();
+  const username = document.getElementById("umUsername").value.trim();
+  const password = document.getElementById("umPassword").value;
+  const rol = document.getElementById("umRol").value;
+  const activo = document.getElementById("umActivo").checked;
+
+  if (!nombre || !username) {
+    toast("Nombre y nombre de usuario son obligatorios", "error");
+    return;
+  }
+  if (!usuarioId && !password) {
+    toast("La contraseña es obligatoria para un usuario nuevo", "error");
+    return;
+  }
+
+  const btn = document.getElementById("btnGuardarUsuario");
+  const textoOriginal = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = "Guardando...";
+
+  try {
+    const body = usuarioId
+      ? { action: "editarUsuario", usuarioId, nombre, username, password, rol, activo }
+      : { action: "crearUsuario", nombre, username, password, rol };
+
+    const res = await fetchAPI(API_URL, { method: "POST", body: JSON.stringify(body) });
+    const data = await res.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo guardar el usuario", "error");
+      return;
+    }
+
+    toast(usuarioId ? "Usuario actualizado" : "Usuario creado", "success");
+    cerrarModalUsuario();
+    cargarUsuarios();
+
+  } catch (error) {
+    console.error("Error al guardar usuario:", error);
+    toast("Error de conexión al guardar el usuario", "error");
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = textoOriginal;
+  }
+}
+
+async function eliminarUsuarioClick(usuarioId, nombre) {
+  if (!confirm(`¿Eliminar el usuario "${nombre}"? Esta acción no se puede deshacer.`)) return;
+
+  try {
+    const res = await fetchAPI(API_URL, { method: "POST", body: JSON.stringify({ action: "eliminarUsuario", usuarioId }) });
+    const data = await res.json();
+    if (!data.success) { toast(data.message || "No se pudo eliminar el usuario", "error"); return; }
+    toast("Usuario eliminado", "success");
+    cargarUsuarios();
+  } catch (error) {
+    console.error("Error al eliminar usuario:", error);
+    toast("Error de conexión al eliminar el usuario", "error");
   }
 }
