@@ -1682,6 +1682,7 @@ function mostrarSeccion(id) {
 
   if (id === "pedidos")   cargarSiVencido("pedidos", cargarPedidos);
   if (id === "productos") cargarSiVencido("productos", cargarProductos);
+  if (id === "ingresoProductos") { cargarProductos(); cargarHistorialIngresos(); setTimeout(() => document.getElementById("ipCodigoScan")?.focus(), 100); }
   if (id === "ventasPOS") cargarSiVencido("ventasPOS", cargarVentasPOSHistorial);
   if (id === "configuracion") {
     cargarConfigNegocioForm();
@@ -9158,5 +9159,261 @@ async function ejecutarMigracionFormaPago() {
   } catch(e) {
     if (status) status.textContent = "Error de conexión";
     toast("Error al ejecutar migración", "error");
+  }
+}
+
+/* ===================================================================
+   INGRESO DE PRODUCTOS — recepción de mercadería con proveedor
+   Escanea/tipea un código: si el producto existe recupera nombre y
+   categoría (desde productosAdminGlobal, ya en memoria); si no
+   existe, permite crearlo. En ambos casos deja registro con fecha,
+   precio y proveedor, y permite exportar el historial a PDF.
+=================================================================== */
+
+let ingresosProductosGlobal = [];
+let ipProductoActualEsNuevo = false;
+
+function _hoyISO() {
+  const d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+
+/** Busca el código escaneado/tipeado en productosAdminGlobal; si no está, abre el formulario en modo "producto nuevo" */
+function buscarProductoParaIngreso() {
+  const input = document.getElementById("ipCodigoScan");
+  const codigo = (input.value || "").trim();
+  const estado = document.getElementById("ipEstadoBusqueda");
+
+  if (!codigo) {
+    toast("Escaneá o escribí un código de barras", "error");
+    return;
+  }
+
+  const producto = (productosAdminGlobal || []).find(p => String(p.CODIGO) === codigo);
+
+  poblarDatalistCategoriasIngreso();
+  poblarDatalistProveedoresIngreso();
+
+  document.getElementById("ipFormularioWrap").style.display = "";
+  document.getElementById("ipCodigo").value = codigo;
+  document.getElementById("ipCodigoMostrado").value = codigo;
+  document.getElementById("ipFecha").value = _hoyISO();
+  document.getElementById("ipCantidad").value = "";
+  document.getElementById("ipCantidad").focus();
+  document.getElementById("ipProveedorContacto").value = "";
+  document.getElementById("ipObservaciones").value = "";
+
+  if (producto) {
+    ipProductoActualEsNuevo = false;
+    document.getElementById("ipTituloProducto").textContent = "✏️ " + (producto.PRODUCTO || codigo);
+    document.getElementById("ipBadgeEstado").textContent = "Producto existente";
+    document.getElementById("ipBadgeEstado").className = "badge bg-success";
+    document.getElementById("ipNombre").value = producto.PRODUCTO || "";
+    document.getElementById("ipNombre").readOnly = true;
+    document.getElementById("ipCategoria").value = producto.CATEGORIA || "";
+    document.getElementById("ipPrecio").value = Number(producto.PRECIO || 0);
+    document.getElementById("ipPrecioHint").textContent = "Dejalo así si no cambió, o corregilo si vino con un precio nuevo.";
+    if (estado) { estado.textContent = "✓ Producto encontrado: " + (producto.PRODUCTO || ""); estado.style.color = "var(--green-600, green)"; }
+  } else {
+    ipProductoActualEsNuevo = true;
+    document.getElementById("ipTituloProducto").textContent = "+ Producto nuevo";
+    document.getElementById("ipBadgeEstado").textContent = "No existe — se va a crear";
+    document.getElementById("ipBadgeEstado").className = "badge bg-warning text-dark";
+    document.getElementById("ipNombre").value = "";
+    document.getElementById("ipNombre").readOnly = false;
+    document.getElementById("ipCategoria").value = "";
+    document.getElementById("ipPrecio").value = "";
+    document.getElementById("ipPrecioHint").textContent = "Precio de venta con el que se va a dar de alta.";
+    if (estado) { estado.textContent = "No existe todavía — completá los datos para crearlo"; estado.style.color = "var(--amber-600, #b45309)"; }
+    document.getElementById("ipNombre").focus();
+  }
+}
+
+/** Genera un código automático (pide uno al backend) para un producto sin código de barras */
+async function generarCodigoIngresoAutomatico() {
+  try {
+    const res = await fetchAPI(API_URL + "?action=generarCodigoProducto");
+    const data = await res.json();
+    if (data.success) {
+      document.getElementById("ipCodigoScan").value = data.codigo;
+      buscarProductoParaIngreso();
+    }
+  } catch (e) {
+    toast("No se pudo generar el código", "error");
+  }
+}
+
+function cancelarIngresoProducto() {
+  document.getElementById("ipFormularioWrap").style.display = "none";
+  document.getElementById("ipCodigoScan").value = "";
+  document.getElementById("ipEstadoBusqueda").textContent = "";
+  document.getElementById("ipCodigoScan").focus();
+}
+
+function poblarDatalistCategoriasIngreso() {
+  const dl = document.getElementById("ipCategoriasList");
+  if (!dl) return;
+  const categorias = [...new Set((productosAdminGlobal || []).map(p => p.CATEGORIA).filter(Boolean))];
+  dl.innerHTML = categorias.map(c => `<option value="${escapeHtml(c)}">`).join("");
+}
+
+function poblarDatalistProveedoresIngreso() {
+  const dl = document.getElementById("ipProveedoresList");
+  if (!dl) return;
+  const proveedores = [...new Set((ingresosProductosGlobal || []).map(i => i.PROVEEDOR).filter(Boolean))];
+  dl.innerHTML = proveedores.map(p => `<option value="${escapeHtml(p)}">`).join("");
+}
+
+/** Envía el ingreso al backend: crea el producto si es nuevo, o suma stock/actualiza precio si ya existe */
+async function confirmarIngresoProducto() {
+  const codigo = document.getElementById("ipCodigo").value.trim();
+  const nombre = document.getElementById("ipNombre").value.trim();
+  const categoria = document.getElementById("ipCategoria").value.trim();
+  const precio = document.getElementById("ipPrecio").value;
+  const cantidad = document.getElementById("ipCantidad").value;
+  const proveedor = document.getElementById("ipProveedor").value.trim();
+  const proveedorContacto = document.getElementById("ipProveedorContacto").value.trim();
+  const observaciones = document.getElementById("ipObservaciones").value.trim();
+  const fecha = document.getElementById("ipFecha").value || _hoyISO();
+
+  if (ipProductoActualEsNuevo && !nombre) {
+    toast("Ingresá el nombre del producto para poder crearlo", "error");
+    return;
+  }
+  if (!cantidad || Number(cantidad) <= 0) {
+    toast("Ingresá una cantidad válida, mayor a 0", "error");
+    return;
+  }
+  if (!proveedor) {
+    toast("Ingresá el proveedor de esta mercadería", "error");
+    return;
+  }
+
+  const btn = document.getElementById("btnConfirmarIngreso");
+  const textoOriginal = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = "Guardando...";
+
+  try {
+    const res = await fetchAPI(API_URL, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "registrarIngresoProducto",
+        codigo, producto: nombre, categoria, precio, cantidad,
+        proveedor, proveedorContacto, observaciones, fecha
+      })
+    });
+    const data = await res.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo registrar el ingreso", "error");
+      return;
+    }
+
+    toast(data.esProductoNuevo
+      ? `Producto creado y stock cargado (${cantidad} u.)`
+      : `Stock actualizado (+${cantidad} u.)`, "success");
+
+    try { localStorage.removeItem("vpos_cache_productosAdmin"); } catch(e) {}
+    await cargarProductos();
+    await cargarHistorialIngresos();
+    cancelarIngresoProducto();
+
+  } catch (error) {
+    console.error("Error al registrar ingreso:", error);
+    toast("Error de conexión al registrar el ingreso", "error");
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = textoOriginal;
+  }
+}
+
+/** Carga el historial de ingresos (recepciones) desde el backend */
+async function cargarHistorialIngresos() {
+  const tbody = document.getElementById("tablaIngresosBody");
+  try {
+    const res = await fetchAPI(API_URL + "?action=ingresosProductos");
+    const data = await res.json();
+    ingresosProductosGlobal = data.ingresos || [];
+    filtrarHistorialIngresos();
+  } catch (error) {
+    console.error("Error al cargar historial de ingresos:", error);
+    if (tbody) tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-3">Error al cargar el historial</td></tr>`;
+  }
+}
+
+function filtrarHistorialIngresos() {
+  const tbody = document.getElementById("tablaIngresosBody");
+  if (!tbody) return;
+
+  const texto = (document.getElementById("ipBuscarHistorial")?.value || "").trim().toLowerCase();
+  const proveedor = (document.getElementById("ipFiltroProveedor")?.value || "").trim().toLowerCase();
+  const desde = document.getElementById("ipFiltroDesde")?.value || "";
+  const hasta = document.getElementById("ipFiltroHasta")?.value || "";
+
+  let lista = ingresosProductosGlobal || [];
+
+  if (texto) {
+    lista = lista.filter(i =>
+      String(i.CODIGO || "").toLowerCase().includes(texto) ||
+      String(i.PRODUCTO || "").toLowerCase().includes(texto));
+  }
+  if (proveedor) {
+    lista = lista.filter(i => String(i.PROVEEDOR || "").toLowerCase().includes(proveedor));
+  }
+  if (desde) lista = lista.filter(i => String(i.FECHA) >= desde);
+  if (hasta) lista = lista.filter(i => String(i.FECHA) <= hasta);
+
+  if (lista.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-3">Sin ingresos registrados para este filtro</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = lista.map(i => `
+    <tr>
+      <td>${escapeHtml(i.FECHA || "—")}</td>
+      <td class="mono">${escapeHtml(i.CODIGO || "—")}</td>
+      <td>${escapeHtml(i.PRODUCTO || "—")}</td>
+      <td>${escapeHtml(i.CATEGORIA || "—")}</td>
+      <td class="money">${Number(i.CANTIDAD || 0).toLocaleString("es-AR")}</td>
+      <td class="money">$${Number(i.PRECIO_NUEVO || i.PRECIO_ANTERIOR || 0).toLocaleString("es-AR")}</td>
+      <td>${escapeHtml(i.PROVEEDOR || "—")}</td>
+      <td>${escapeHtml(i.PROVEEDOR_CONTACTO || "—")}</td>
+      <td>${escapeHtml(i.OBSERVACIONES || "—")}</td>
+    </tr>`).join("");
+}
+
+/** Exporta el historial de ingresos (según los filtros aplicados) a PDF, con jsPDF + autoTable */
+function exportarIngresosPDF() {
+  try {
+    const tabla = document.getElementById("tablaIngresosProductos");
+    if (!tabla) return;
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+
+    const nombreLocal = (obtenerConfigNegocio().nombre || "Reporte").toString();
+    const desde = document.getElementById("ipFiltroDesde").value || "—";
+    const hasta = document.getElementById("ipFiltroHasta").value || "—";
+
+    doc.setFontSize(14);
+    doc.text(`${nombreLocal} — Ingreso de Productos (Recepción de mercadería)`, 30, 30);
+    doc.setFontSize(10);
+    doc.setTextColor(110, 110, 110);
+    doc.text(`Período: ${desde} a ${hasta}  ·  Generado: ${new Date().toLocaleString("es-AR")}`, 30, 46);
+
+    doc.autoTable({
+      html: tabla,
+      startY: 58,
+      theme: "grid",
+      styles: { fontSize: 9, cellPadding: 5 },
+      headStyles: { fillColor: [18, 32, 71], textColor: [255, 255, 255] }
+    });
+
+    doc.save(`Ingreso_Productos_${desde}_a_${hasta}.pdf`);
+
+  } catch (error) {
+    console.error("Error al exportar ingresos a PDF:", error);
+    toast("No se pudo generar el PDF", "error");
   }
 }
