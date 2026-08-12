@@ -312,7 +312,65 @@ async function aplicarMarcaDesdeBackend(){
 
 resolverApiUrl().then(aplicarMarcaDesdeBackend);
 
-function togglePassword(){
+/**
+ * Login offline (solo Electron) ---------------------------------
+ *
+ * Antes, si fallaba el fetch a Apps Script (sin internet), no había
+ * ningún otro camino: la persona quedaba trabada en este login por
+ * más que la licencia todavía esté en su período de gracia y toda la
+ * base de datos local esté lista para trabajar sin conexión. Esto
+ * pasa siempre que se reabre la app entera (no solo recargar la
+ * ventana) sin internet — sessionStorage se borra en cada arranque
+ * nuevo, así que hay que loguearse de nuevo.
+ *
+ * La solución: cada vez que un login online sale bien, se guarda acá
+ * (config local en SQLite, vía el mismo bridge que ya usa el resto de
+ * la app) un hash de usuario+contraseña junto con el rol — nunca la
+ * contraseña en texto plano. Si el próximo login falla puntualmente
+ * porque no hay conexión (no por usuario/contraseña incorrectos,
+ * evidentemente, porque ni siquiera se pudo consultar), y las
+ * credenciales ingresadas coinciden con el hash guardado la última
+ * vez que sí se validó con éxito, se deja entrar en "modo offline".
+ */
+
+async function hashCredencial(usuario, password){
+  const datos = new TextEncoder().encode("veekpos:" + usuario.toLowerCase() + ":" + password);
+  const buffer = await crypto.subtle.digest("SHA-256", datos);
+  return Array.from(new Uint8Array(buffer)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function guardarLoginOfflineCache(usuario, password, data){
+  if(!window.posOffline) return; // solo tiene sentido en la app de escritorio
+  try{
+    const hash = await hashCredencial(usuario, password);
+    await window.posOffline.fijarConfigLocal("login_offline_" + usuario.toLowerCase(), JSON.stringify({
+      hash,
+      rol: data.rol || "admin",
+      nombre: data.nombre || "",
+      usuario: data.usuario || usuario
+    }));
+  }catch(error){
+    console.error("No se pudo guardar el login offline:", error);
+  }
+}
+
+/** Devuelve los datos de sesión si usuario/contraseña coinciden con el último login válido guardado, o null. */
+async function intentarLoginOffline(usuario, password){
+  if(!window.posOffline) return null;
+  try{
+    const guardado = await window.posOffline.obtenerConfigLocal("login_offline_" + usuario.toLowerCase(), null);
+    if(!guardado) return null;
+    const cache = JSON.parse(guardado);
+    const hash = await hashCredencial(usuario, password);
+    if(hash !== cache.hash) return null;
+    return cache;
+  }catch(error){
+    console.error("Error al validar login offline:", error);
+    return null;
+  }
+}
+
+
   const input = document.getElementById("password");
   const btn = document.getElementById("btnTogglePass");
   const mostrando = input.type === "text";
@@ -364,6 +422,7 @@ document.getElementById("loginForm").addEventListener("submit", async function(e
       sessionStorage.setItem("rol", data.rol || "admin");
       sessionStorage.setItem("nombreUsuario", data.nombre || "");
       sessionStorage.setItem("usuarioLogueado", data.usuario || usuario);
+      await guardarLoginOfflineCache(usuario, password, data);
       window.location.href = "index.html";
     }else{
       mostrarErrorLogin("Usuario o contraseña incorrectos.");
@@ -373,7 +432,25 @@ document.getElementById("loginForm").addEventListener("submit", async function(e
 
   }catch(error){
     console.error("Error de conexión al iniciar sesión:", error);
-    mostrarErrorLogin("No se pudo conectar. Revisá tu conexión e intentá de nuevo.");
+
+    // El fetch en sí falló (sin internet, no un usuario/contraseña
+    // rechazado por el servidor) — antes de rendirse, se prueba con
+    // el último login que sí validó bien estando online.
+    const cache = await intentarLoginOffline(usuario, password);
+    if(cache){
+      sessionStorage.setItem("admin", "true");
+      sessionStorage.setItem("rol", cache.rol || "admin");
+      sessionStorage.setItem("nombreUsuario", cache.nombre || "");
+      sessionStorage.setItem("usuarioLogueado", cache.usuario || usuario);
+      window.location.href = "index.html";
+      return;
+    }
+
+    mostrarErrorLogin(
+      window.posOffline
+        ? "No se pudo conectar y no hay un ingreso offline guardado para este usuario. Conectate a internet al menos una vez con este usuario y contraseña para habilitar el acceso sin conexión."
+        : "No se pudo conectar. Revisá tu conexión e intentá de nuevo."
+    );
     btn.disabled = false;
     btn.classList.remove("loading");
   }
