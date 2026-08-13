@@ -1953,26 +1953,59 @@ document.addEventListener("DOMContentLoaded", () => {
    POPUP PROMOCIONAL
 ========================================================= */
 
-function mostrarPopupPromo(url) {
+// Extensiones que se consideran video. Si la URL no tiene ninguna
+// de estas extensiones (por ej. viene de Google Drive sin .mp4 al final),
+// se puede forzar el tipo con el 2do parámetro ("imagen" | "video").
+const EXTENSIONES_VIDEO_POPUP = [".mp4", ".webm", ".ogg", ".mov", ".m4v"];
+
+function esUrlDeVideo(url) {
+  const limpia = String(url || "").split("?")[0].toLowerCase();
+  return EXTENSIONES_VIDEO_POPUP.some(ext => limpia.endsWith(ext));
+}
+
+function mostrarPopupPromo(url, tipo) {
   if (!url) return;
   const popup = document.getElementById("popupPromo");
   const img = document.getElementById("popupPromoImg");
-  if (!popup || !img) return;
-  img.src = url;
+  const video = document.getElementById("popupPromoVideo");
+  if (!popup || !img || !video) return;
+
+  const esVideo = tipo ? tipo === "video" : esUrlDeVideo(url);
+
+  if (esVideo) {
+    img.style.display = "none";
+    img.src = "";
+    video.src = url;
+    video.style.display = "block";
+    video.currentTime = 0;
+    video.play().catch(() => {}); // algunos navegadores bloquean autoplay con sonido
+  } else {
+    video.style.display = "none";
+    video.pause();
+    video.src = "";
+    img.src = url;
+    img.style.display = "block";
+  }
+
   popup.style.display = "flex";
   document.body.style.overflow = "hidden";
 }
 
 function cerrarPopupPromo() {
   const popup = document.getElementById("popupPromo");
+  const video = document.getElementById("popupPromoVideo");
   if (popup) popup.style.display = "none";
+  if (video) video.pause();
   document.body.style.overflow = "";
 }
 
 // Cargar popup si está activo — se llama desde aplicarApariencia
+// Soporta config.popupImagen (imagen o video, se detecta por extensión)
+// y opcionalmente config.popupTipo ("imagen" | "video") para forzar el tipo
+// cuando la URL no tiene extensión reconocible (ej: enlaces de Drive/Sheets).
 function cargarPopupPromo(config) {
   if (config && config.popupActivo && config.popupImagen) {
     // Pequeña espera para que el catálogo cargue primero
-    setTimeout(() => mostrarPopupPromo(config.popupImagen), 800);
+    setTimeout(() => mostrarPopupPromo(config.popupImagen, config.popupTipo), 800);
   }
 }
