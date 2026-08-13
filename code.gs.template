@@ -1203,10 +1203,12 @@ const CONFIG_NEGOCIO_DEFAULTS = {
   PIE:        "¡Gracias por su compra!",
 
   // ---- Popup promocional del catálogo web ----
-  // POPUP_IMAGEN: URL de la imagen (Drive o externa). Vacío = sin popup.
+  // POPUP_IMAGEN: URL de la imagen o video (Drive o externa). Vacío = sin popup.
   // POPUP_ACTIVO: "SI" para mostrar, "NO" para ocultar sin borrar la imagen.
+  // POPUP_TIPO: "imagen" o "video" — indica cómo interpretar POPUP_IMAGEN.
   POPUP_IMAGEN:  "",
   POPUP_ACTIVO:  "NO",
+  POPUP_TIPO:    "imagen",
   PEDIDO_MINIMO: 100000,
 
   // ---- Banner y tema del catálogo web (sección "Apariencia") ----
@@ -1556,6 +1558,7 @@ function getConfiguracionNegocio(){
 
       popupImagen:     config.POPUP_IMAGEN,
       popupActivo:     String(config.POPUP_ACTIVO || "NO").toUpperCase() === "SI",
+      popupTipo:       String(config.POPUP_TIPO || "imagen").toLowerCase() === "video" ? "video" : "imagen",
       pedidoMinimo:    Number(config.PEDIDO_MINIMO) || 100000,
 
       beneficioWhatsappNumero: config.BENEFICIO_WHATSAPP_NUMERO,
@@ -1714,6 +1717,10 @@ function guardarConfiguracionNegocio(e){
 
     POPUP_IMAGEN: valorOPreservado("popupImagen", "POPUP_IMAGEN", ""),
     POPUP_ACTIVO: valorOPreservado("popupActivo", "POPUP_ACTIVO", "NO"),
+    POPUP_TIPO:   (function(){
+      const v = valorOPreservado("popupTipo", "POPUP_TIPO", "imagen").toLowerCase();
+      return v === "video" ? "video" : "imagen";
+    })(),
     PEDIDO_MINIMO: valorOPreservado("pedidoMinimo", "PEDIDO_MINIMO", "100000")
   };
 
@@ -2934,7 +2941,14 @@ if(String(data[i][0]) === String(pedidoId)){
   // llegó a salir de verdad — se devuelve al stock, y se desmarca
   // STOCK_DESCONTADO para que si en algún momento se reabre el pedido
   // y vuelve a PREPARANDO, se pueda descontar de nuevo correctamente.
-  if(String(estado).toUpperCase() === "CANCELADO" && yaDescontado){
+  //
+  // El mismo criterio aplica si el pedido vuelve a NUEVO (por ejemplo,
+  // para poder editarle los ítems — editarItemsPedido solo permite
+  // editar en estado NUEVO): si no se devolviera el stock acá, quedaría
+  // descontado según los ítems VIEJOS para siempre, porque al volver a
+  // PREPARANDO la columna STOCK_DESCONTADO ya diría "SI" y el bloque de
+  // arriba no lo descontaría de nuevo con los ítems editados.
+  if((String(estado).toUpperCase() === "CANCELADO" || String(estado).toUpperCase() === "NUEVO") && yaDescontado){
     devolverStockPorPedido(pedidoId);
     sheet.getRange(i + 1, 14).setValue("NO");
   }
@@ -3422,69 +3436,22 @@ function obtenerMetricas() {
       : [];
 
   let pedidosNuevos      = 0;
-  let ventasPedidosHoy   = 0;
-  let ventasPedidosMes   = 0;
   let totalPedidos       = 0;
 
   const clientes = new Set();
-
-  // Las columnas COBRADO y FECHA_COBRO se agregan dinámicamente al
-  // final de PEDIDOS (ver marcarPedidoCobrado) la primera vez que se
-  // marca un pedido como cobrado en caja — por eso se busca su
-  // posición por nombre de encabezado en vez de asumir un índice fijo.
-  const headerPedidos = pedidos.length > 0 ? pedidos[0] : [];
-  const headerIndexCobrado = headerPedidos.indexOf("COBRADO");
-  const headerIndexFechaCobro = headerPedidos.indexOf("FECHA_COBRO");
 
   for(let i = 1; i < pedidos.length; i++){
 
     const cliente =
       pedidos[i][2];
 
-    const total =
-      Number(pedidos[i][7]) || 0;
-
     const estado =
       String(pedidos[i][8] || "")
       .toLowerCase();
 
-    // "Ventas Pedidos" mide plata REAL que entró por pedidos del
-    // catálogo web — eso solo pasa cuando el pedido se marca como
-    // cobrado en caja (ver marcarPedidoCobrado). Un pedido sin cobrar
-    // todavía es solo una promesa de venta, no entra en esta métrica.
-    // Se usa la fecha real del cobro (FECHA_COBRO), no la fecha en
-    // que se hizo el pedido, para que coincida con el día real en que
-    // entró el dinero — igual criterio que los reportes.
-    const yaCobrado =
-      String(pedidos[i][headerIndexCobrado] || "").toUpperCase() === "SI";
-
     totalPedidos++;
 
     clientes.add(cliente);
-
-    if(yaCobrado){
-
-      const fechaCobro =
-        headerIndexFechaCobro !== -1 && pedidos[i][headerIndexFechaCobro]
-          ? new Date(pedidos[i][headerIndexFechaCobro])
-          : new Date(pedidos[i][1]); // respaldo: fecha del pedido, por si faltara FECHA_COBRO
-
-      if(
-        fechaCobro.getDate() === hoy.getDate() &&
-        fechaCobro.getMonth() === hoy.getMonth() &&
-        fechaCobro.getFullYear() === hoy.getFullYear()
-      ){
-        ventasPedidosHoy += total;
-      }
-
-      if(
-        fechaCobro.getMonth() === hoy.getMonth() &&
-        fechaCobro.getFullYear() === hoy.getFullYear()
-      ){
-        ventasPedidosMes += total;
-      }
-
-    }
 
     if(estado === "nuevo"){
       pedidosNuevos++;
@@ -3493,7 +3460,13 @@ function obtenerMetricas() {
   }
 
   /* =========================================================
-     VENTAS POS (mostrador — hoja "VENTAS_LOCAL")
+     VENTAS POS (mostrador) y VENTAS — PEDIDOS, ambas desde la
+     hoja "VENTAS_LOCAL". Un pedido cobrado entero al retirarlo
+     (ver marcarPedidoCobrado) o pagado en cuotas por un cliente a
+     crédito (ver registrarPagoCredito) generan ahí una fila con
+     VENDEDOR="PEDIDO WEB"; todo lo demás es venta real de
+     mostrador. Mismo criterio que usa el reporte de Ventas por
+     Período, para que dashboard y reportes siempre coincidan.
   ========================================================= */
 
   const hojaVentasPOS =
@@ -3508,18 +3481,20 @@ function obtenerMetricas() {
   let ventasPOSMes    = 0;
   let totalVentasPOS  = 0;
 
+  let ventasPedidosHoy = 0;
+  let ventasPedidosMes = 0;
+
   const idxAnuladaPOS = ventasLocal.length > 0 ? ventasLocal[0].indexOf("ANULADA") : -1;
 
   for(let i = 1; i < ventasLocal.length; i++){
 
-    const esPedidoCobrado =
-      String(ventasLocal[i][4] || "").toUpperCase() === "PEDIDO WEB";
-    if(esPedidoCobrado) continue;
-
-    // Excluir ventas anuladas del dashboard
+    // Excluir ventas anuladas, tanto de mostrador como de pedidos.
     const esAnulada = idxAnuladaPOS !== -1 &&
       String(ventasLocal[i][idxAnuladaPOS] || "").toUpperCase() === "SI";
     if(esAnulada) continue;
+
+    const esPedidoCobrado =
+      String(ventasLocal[i][4] || "").toUpperCase() === "PEDIDO WEB";
 
     const fecha =
       new Date(ventasLocal[i][1]);
@@ -3527,21 +3502,22 @@ function obtenerMetricas() {
     const total =
       Number(ventasLocal[i][2]) || 0;
 
-    totalVentasPOS++;
-
-    if(
+    const esHoy =
       fecha.getDate() === hoy.getDate() &&
       fecha.getMonth() === hoy.getMonth() &&
-      fecha.getFullYear() === hoy.getFullYear()
-    ){
-      ventasPOSHoy += total;
-    }
+      fecha.getFullYear() === hoy.getFullYear();
 
-    if(
+    const esEsteMes =
       fecha.getMonth() === hoy.getMonth() &&
-      fecha.getFullYear() === hoy.getFullYear()
-    ){
-      ventasPOSMes += total;
+      fecha.getFullYear() === hoy.getFullYear();
+
+    if(esPedidoCobrado){
+      if(esHoy) ventasPedidosHoy += total;
+      if(esEsteMes) ventasPedidosMes += total;
+    } else {
+      totalVentasPOS++;
+      if(esHoy) ventasPOSHoy += total;
+      if(esEsteMes) ventasPOSMes += total;
     }
 
   }
@@ -4305,6 +4281,34 @@ function registrarPagoCredito(data){
       }
     } catch(e) {
       Logger.log("Error registrando movimiento de caja por pago de crédito: " + e.message);
+    }
+  }
+
+  // Además del movimiento de caja, este pago tiene que sumar a las
+  // estadísticas de "Ventas — Pedidos" (dashboard y reportes), igual
+  // que cuando un pedido se cobra entero en el momento (ver
+  // marcarPedidoCobrado). Por eso se agrega una fila en VENTAS_LOCAL
+  // con VENDEDOR="PEDIDO WEB" — es el mismo criterio que ya usan el
+  // dashboard (obtenerMetricas) y el reporte de ventas por período
+  // para identificar plata real que entró por pedidos/cuenta corriente,
+  // sin importar si se cobró todo junto o en cuotas.
+  if (montoEnCajaArs > 0) {
+    try {
+      const ventasSheet = getHoja("VENTAS_LOCAL");
+      if (ventasSheet) {
+        const nombreCliente = String(cliente.NOMBRE || cliente.RAZON_SOCIAL || clienteId);
+        const nuevoVentaId = generarIdCorto("VEN", ventasSheet);
+        ventasSheet.appendRow([
+          nuevoVentaId,
+          new Date(),
+          montoEnCajaArs,
+          String(data.formaPago || "EFECTIVO").toUpperCase(),
+          "PEDIDO WEB",
+          "Pago de crédito — " + nombreCliente + (data.observaciones ? " (" + data.observaciones + ")" : "")
+        ]);
+      }
+    } catch(e) {
+      Logger.log("Error registrando venta por pago de crédito: " + e.message);
     }
   }
 
@@ -5173,6 +5177,23 @@ function getCierreCajaResumen(e){
     // Las ventas anuladas no cuentan para el cierre de caja
     const anulada = idxAnulada !== -1 && String(row[idxAnulada] || "").toUpperCase() === "SI";
     if(anulada) return;
+
+    // registrarPagoCredito() crea, en VENTAS_LOCAL, una fila
+    // VENDEDOR="PEDIDO WEB" con descripción "Pago de crédito — <cliente>"
+    // por cada pago que un cliente hace en la sección Clientes — es lo
+    // que permite que el dashboard y el reporte de ventas por período
+    // (que leen VENTAS_LOCAL) cuenten esa plata como "Ventas — Pedidos".
+    // Pero esa misma plata YA se suma más abajo vía "pagosClientes"
+    // (leído directo de PAGOS_CREDITO, en getPagosCreditoDelDia). Si
+    // también se cuenta acá, en el "esperado" del cierre de caja se
+    // sumaría dos veces — una como venta, otra como pago de cliente.
+    // Por eso se excluye de este total (sigue contando igual en el
+    // dashboard y en los reportes de ventas, que no la suman por
+    // separado como "pagosClientes").
+    const esPagoCreditoDesdeClientes =
+      String(row[4] || "").toUpperCase() === "PEDIDO WEB" &&
+      /^Pago de cr[eé]dito\s*—/.test(String(row[5] || "").trim());
+    if(esPagoCreditoDesdeClientes) return;
 
     const fechaVenta = new Date(row[1]);
 
