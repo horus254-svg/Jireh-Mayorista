@@ -90,7 +90,7 @@
         cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.3);
         display:flex; align-items:center; justify-content:center;
       ">✕</button>
-      <img id="popupPromoImg" src="" alt="Promoción"
+      <img id="popupPromoImg" src="" alt="Promoción" loading="lazy"
         style="width:100%; border-radius:12px; display:block;
         max-height:90vh; object-fit:contain; box-shadow:0 8px 32px rgba(0,0,0,.4);">
       <video id="popupPromoVideo" src="" style="display:none; width:100%; border-radius:12px;
@@ -395,6 +395,16 @@
 
     </nav>
 
+    <!-- INDICADOR DE PEDIDO MÍNIMO -->
+    <div id="minimo-progress" class="minimo-progress d-none">
+        <div class="container minimo-progress-inner">
+            <span id="minimo-progress-texto" class="minimo-progress-texto"></span>
+            <div class="minimo-progress-track">
+                <div id="minimo-progress-fill" class="minimo-progress-fill"></div>
+            </div>
+        </div>
+    </div>
+
     <!-- HERO -->
 
     <section class="hero" id="hero">
@@ -501,6 +511,17 @@
 
     <section class="container categorias-section">
         <div id="categoria-chips" class="chip-scroll" role="tablist" aria-label="Filtrar por categoría"></div>
+
+        <div class="orden-filtro-wrap">
+            <label for="orden-select" class="orden-filtro-label">Ordenar</label>
+            <select id="orden-select" class="orden-select" onchange="ordenarProductos()">
+                <option value="relevancia">Relevancia</option>
+                <option value="precio-asc">Precio: menor a mayor</option>
+                <option value="precio-desc">Precio: mayor a menor</option>
+                <option value="nombre-asc">Nombre: A-Z</option>
+                <option value="nombre-desc">Nombre: Z-A</option>
+            </select>
+        </div>
 
         <div class="precio-filtro-wrap">
 
@@ -708,7 +729,9 @@
                     <div class="qv-layout">
 
                         <div class="qv-col-imagen">
-                            <img id="qv-imagen" src="" alt="" class="qv-img">
+                            <div id="qv-imagen-zoom-wrap" class="qv-imagen-zoom-wrap">
+                                <img id="qv-imagen" src="" alt="" class="qv-img" loading="lazy">
+                            </div>
                         </div>
 
                         <div class="qv-col-info">
@@ -733,6 +756,13 @@
                         </div>
 
                     </div>
+
+                    <!-- PRODUCTOS RELACIONADOS (misma categoría) -->
+                    <div id="qv-relacionados-wrap" class="qv-relacionados-wrap d-none">
+                        <p class="qv-relacionados-titulo">También te puede interesar</p>
+                        <div id="qv-relacionados" class="qv-relacionados-scroll"></div>
+                    </div>
+
                 </div>
 
             </div>

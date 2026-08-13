@@ -95,7 +95,8 @@ const estado = {
     busqueda: "",
     categoria: "",
     precioMin: null,
-    precioMax: null
+    precioMax: null,
+    orden: "relevancia"
 };
 
 // Número de WhatsApp usado por el botón flotante y por el checkout.
@@ -344,11 +345,60 @@ function aplicarFiltros(){
         lista = lista.filter(p => Number(p.PRECIO) <= estado.precioMax);
     }
 
+    lista = ordenarLista(lista);
+
     // Se guarda la lista visible actual, para que el botón de descarga
     // de PDF siempre tome exactamente lo que se está mostrando en pantalla.
     estado.productosVisibles = lista;
 
     mostrarProductos(lista);
+}
+
+/* =========================================================
+   ORDEN DE RESULTADOS
+========================================================= */
+
+/**
+ * Aplica el criterio de orden elegido sobre una copia de la lista
+ * (nunca sobre estado.productos directamente, para no perder el
+ * orden original de "destacados primero" con el que llega del server).
+ */
+function ordenarLista(lista){
+
+    const criterio = estado.orden || "relevancia";
+
+    if(criterio === "relevancia") return lista;
+
+    const copia = [...lista];
+
+    switch(criterio){
+
+        case "precio-asc":
+            copia.sort((a,b) => Number(a.PRECIO) - Number(b.PRECIO));
+            break;
+
+        case "precio-desc":
+            copia.sort((a,b) => Number(b.PRECIO) - Number(a.PRECIO));
+            break;
+
+        case "nombre-asc":
+            copia.sort((a,b) => String(a.PRODUCTO || "").localeCompare(String(b.PRODUCTO || ""), "es", { sensitivity: "base" }));
+            break;
+
+        case "nombre-desc":
+            copia.sort((a,b) => String(b.PRODUCTO || "").localeCompare(String(a.PRODUCTO || ""), "es", { sensitivity: "base" }));
+            break;
+    }
+
+    return copia;
+}
+
+function ordenarProductos(){
+
+    const select = document.getElementById("orden-select");
+    estado.orden = select ? select.value : "relevancia";
+
+    aplicarFiltros();
 }
 
 function buscarProductos(){
@@ -602,9 +652,73 @@ function abrirQuickView(producto){
 
     document.getElementById("qv-cantidad").value = 1;
 
+    renderRelacionados(producto);
+
     const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById("quickViewModal"));
     modal.show();
 }
+
+/**
+ * Muestra hasta 8 productos de la misma categoría (con stock) en el
+ * Quick View, para incentivar que el cliente agregue más de un
+ * producto al pedido antes de cerrar el modal. Si la categoría no
+ * tiene más productos, la sección se oculta directamente.
+ */
+function renderRelacionados(producto){
+
+    const wrap = document.getElementById("qv-relacionados-wrap");
+    const cont = document.getElementById("qv-relacionados");
+    if(!wrap || !cont) return;
+
+    const categoria = String(producto.CATEGORIA || "").trim();
+
+    const relacionados = categoria
+        ? estado.productos
+            .filter(p =>
+                String(p.CATEGORIA || "").trim() === categoria &&
+                String(p.CODIGO) !== String(producto.CODIGO) &&
+                (Number(String(p.STOCK ?? "").trim()) || 0) > 0
+            )
+            .slice(0, 8)
+        : [];
+
+    if(relacionados.length === 0){
+        wrap.classList.add("d-none");
+        cont.innerHTML = "";
+        return;
+    }
+
+    cont.innerHTML = relacionados.map(p => `
+        <button
+            type="button"
+            class="qv-relacionado-card"
+            data-code="${escapeHtml(p.CODIGO)}"
+            aria-label="Ver ${escapeHtml(p.PRODUCTO)}">
+            <img
+                src="${p.IMAGEN || ""}"
+                alt="${escapeHtml(p.PRODUCTO)}"
+                loading="lazy"
+                onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'">
+            <span class="qv-relacionado-nombre">${escapeHtml(p.PRODUCTO)}</span>
+            <span class="qv-relacionado-precio">$${formatearPrecio(p.PRECIO)}</span>
+        </button>
+    `).join("");
+
+    wrap.classList.remove("d-none");
+}
+
+// Al hacer click en un producto relacionado, se abre su propio Quick
+// View — reemplaza al actual sin cerrar el modal, así el cliente
+// puede seguir explorando la categoría sin perder el lugar.
+document.getElementById("qv-relacionados").addEventListener("click", function(e){
+
+    const card = e.target.closest(".qv-relacionado-card");
+    if(!card) return;
+
+    const codigo = card.dataset.code;
+    const producto = estado.productos.find(p => String(p.CODIGO) === String(codigo));
+    if(producto) abrirQuickView(producto);
+});
 
 document.getElementById("qv-agregar").addEventListener("click", function(){
 
@@ -615,6 +729,42 @@ document.getElementById("qv-agregar").addEventListener("click", function(){
     const modal = bootstrap.Modal.getInstance(document.getElementById("quickViewModal"));
     if(modal) modal.hide();
 });
+
+/**
+ * Zoom estilo Amazon sobre la imagen del Quick View: al mover el
+ * mouse, la imagen se agranda y el punto bajo el cursor queda como
+ * centro de la ampliación. Solo se activa en dispositivos con mouse
+ * (matchMedia "hover: hover") para no dejar el zoom trabado en
+ * celulares, donde no tiene sentido este gesto.
+ */
+(function initZoomQuickView(){
+
+    const wrap = document.getElementById("qv-imagen-zoom-wrap");
+    const img = document.getElementById("qv-imagen");
+    if(!wrap || !img) return;
+
+    const tieneHover = window.matchMedia && window.matchMedia("(hover: hover)").matches;
+    if(!tieneHover) return;
+
+    wrap.addEventListener("mouseenter", function(){
+        wrap.classList.add("zoom-activo");
+    });
+
+    wrap.addEventListener("mousemove", function(e){
+
+        const rect = wrap.getBoundingClientRect();
+        const xPorc = ((e.clientX - rect.left) / rect.width) * 100;
+        const yPorc = ((e.clientY - rect.top) / rect.height) * 100;
+
+        img.style.transformOrigin =
+            `${Math.max(0, Math.min(100, xPorc))}% ${Math.max(0, Math.min(100, yPorc))}%`;
+    });
+
+    wrap.addEventListener("mouseleave", function(){
+        wrap.classList.remove("zoom-activo");
+        img.style.transformOrigin = "center";
+    });
+})();
 
 /* =========================================================
    CARRITO
@@ -737,6 +887,55 @@ function actualizarContador(){
 
         mcb.classList.add("d-none");
     }
+
+    actualizarBarraMinimo(totalPrecio);
+}
+
+/**
+ * Barra de progreso hacia el pedido mínimo, visible en la parte
+ * superior del catálogo (debajo del navbar) apenas hay algo en el
+ * carrito. Se oculta sola cuando ya se llegó al mínimo o cuando el
+ * carrito está vacío, para no ocupar espacio innecesariamente.
+ */
+function actualizarBarraMinimo(totalPrecio){
+
+    const cont = document.getElementById("minimo-progress");
+    if(!cont) return;
+
+    if(totalPrecio <= 0){
+        cont.classList.add("d-none");
+        document.documentElement.style.setProperty("--minimo-bar-h", "0px");
+        return;
+    }
+
+    const fill = document.getElementById("minimo-progress-fill");
+    const texto = document.getElementById("minimo-progress-texto");
+
+    if(totalPrecio >= pedidoMinimo){
+
+        fill.style.width = "100%";
+        cont.classList.add("minimo-progress-completo");
+        texto.innerHTML = `✅ Pedido mínimo alcanzado — Total: <b>$${formatearPrecio(totalPrecio)}</b>`;
+
+    }else{
+
+        const porcentaje = Math.max(0, Math.min(100, (totalPrecio / pedidoMinimo) * 100));
+        const falta = pedidoMinimo - totalPrecio;
+
+        cont.classList.remove("minimo-progress-completo");
+        fill.style.width = porcentaje + "%";
+        texto.innerHTML =
+            `🛒 Te faltan <b>$${formatearPrecio(falta)}</b> para llegar al pedido mínimo de $${formatearPrecio(pedidoMinimo)}`;
+    }
+
+    cont.classList.remove("d-none");
+
+    // La barra es "position:fixed", así que reserva su espacio real
+    // (--minimo-bar-h) para que el contenido no quede tapado detrás
+    // de ella — mismo patrón que --top-banner-h.
+    requestAnimationFrame(()=>{
+        document.documentElement.style.setProperty("--minimo-bar-h", cont.offsetHeight + "px");
+    });
 }
 
 function cambiarCantidad(codigo, cambio){
@@ -1241,6 +1440,17 @@ window.addEventListener("pageshow", function(){
     actualizarContador();
 });
 
+// Recalcula la altura reservada para la barra del pedido mínimo si
+// cambia el ancho de pantalla (p. ej. al rotar el celular), ya que
+// el texto puede pasar de una a dos líneas y cambiar su alto real.
+window.addEventListener("resize", function(){
+
+    const cont = document.getElementById("minimo-progress");
+    if(cont && !cont.classList.contains("d-none")){
+        document.documentElement.style.setProperty("--minimo-bar-h", cont.offsetHeight + "px");
+    }
+});
+
 /* =========================================================
    APARIENCIA (BANNER + TEMA) — DESDE GOOGLE SHEETS
    Se trae de la misma hoja CONFIGURACION que usa el panel
@@ -1432,6 +1642,11 @@ function aplicarBeneficios(cfg){
     if(!isNaN(minimoConfigurado) && minimoConfigurado >= 0){
         pedidoMinimo = minimoConfigurado;
     }
+
+    // Recalcula la barra de progreso del mínimo por si el carrito ya
+    // traía productos de una visita anterior (localStorage) antes de
+    // que llegara este valor configurado del negocio.
+    actualizarContador();
 
     // Transportes que el negocio no trabaja — el cliente no puede
     // escribirlos en el campo "Transporte" del carrito (ver

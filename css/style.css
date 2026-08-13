@@ -51,6 +51,7 @@
 
     --navbar-h:128px;
     --top-banner-h:0px;
+    --minimo-bar-h:0px;
     --mobile-cart-bar-h:60px;
 }
 
@@ -60,7 +61,7 @@
 
 body{
     background:var(--paper);
-    padding-top:calc(var(--navbar-h) + var(--top-banner-h));
+    padding-top:calc(var(--navbar-h) + var(--top-banner-h) + var(--minimo-bar-h));
     font-family:var(--font-body);
     color:var(--ink-900);
 }
@@ -235,6 +236,76 @@ select:focus-visible{
 }
 
 /* =========================================================
+   INDICADOR DE PEDIDO MÍNIMO
+========================================================= */
+
+.minimo-progress{
+    position:fixed;
+    top:calc(var(--navbar-h) + var(--top-banner-h));
+    left:0;
+    right:0;
+    z-index:1025; /* debajo del navbar (1030) pero por encima del contenido */
+    background:#fff8e6;
+    border-bottom:1px solid #f2e2ad;
+}
+
+.minimo-progress-inner{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    padding:10px 24px;
+}
+
+.minimo-progress-texto{
+    font-size:.82rem;
+    font-weight:600;
+    color:#7a5b06;
+}
+
+.minimo-progress-track{
+    width:100%;
+    height:6px;
+    border-radius:var(--radius-pill);
+    background:#f0e3bb;
+    overflow:hidden;
+}
+
+.minimo-progress-fill{
+    height:100%;
+    border-radius:var(--radius-pill);
+    background:var(--indigo-600);
+    transition:width .35s ease;
+}
+
+.minimo-progress-completo{
+    background:#e7f7ec;
+    border-bottom:1px solid #b9e6c6;
+}
+
+.minimo-progress-completo .minimo-progress-texto{
+    color:var(--green-ok-text, #1c7a3c);
+}
+
+.minimo-progress-completo .minimo-progress-track{
+    background:#cdeed9;
+}
+
+.minimo-progress-completo .minimo-progress-fill{
+    background:#1c7a3c;
+}
+
+@media (min-width:769px){
+    .minimo-progress-inner{
+        flex-direction:row;
+        align-items:center;
+        gap:16px;
+    }
+    .minimo-progress-track{
+        max-width:260px;
+    }
+}
+
+/* =========================================================
    HERO
    Signature: zigzag "torn price-tag" edge at the bottom.
 ========================================================= */
@@ -374,6 +445,44 @@ select:focus-visible{
 .chip.active::before{
     background:var(--indigo-600);
     border-color:rgba(255,255,255,.6);
+}
+
+/* =========================================================
+   ORDENAR RESULTADOS
+========================================================= */
+
+.orden-filtro-wrap{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:2px 2px 14px;
+    margin-top:6px;
+}
+
+.orden-filtro-label{
+    font-size:.84rem;
+    font-weight:600;
+    color:var(--ink-900);
+    white-space:nowrap;
+}
+
+.orden-select{
+    border:1px solid #e4e0d3;
+    background:#fff;
+    border-radius:var(--radius-pill);
+    padding:7px 14px;
+    font-size:.84rem;
+    font-weight:600;
+    color:var(--ink-900);
+    font-family:var(--font-body);
+    transition:.2s;
+    cursor:pointer;
+}
+
+.orden-select:focus{
+    outline:none;
+    border-color:var(--indigo-600);
+    box-shadow:0 0 0 3px rgba(61,90,254,.18);
 }
 
 /* =========================================================
@@ -789,6 +898,28 @@ select:focus-visible{
     border-radius:14px;
 }
 
+/* ---- Zoom estilo Amazon: el mouse mueve el punto de ampliación ---- */
+
+.qv-imagen-zoom-wrap{
+    position:relative;
+    overflow:hidden;
+    border-radius:14px;
+    background:#fff;
+}
+
+.qv-imagen-zoom-wrap.zoom-activo{
+    cursor:zoom-in;
+}
+
+.qv-imagen-zoom-wrap.zoom-activo .qv-img{
+    transform:scale(2.2);
+}
+
+.qv-imagen-zoom-wrap .qv-img{
+    transition:transform .06s linear;
+    will-change:transform;
+}
+
 .qv-titulo{
     font-weight:700;
     color:var(--ink-900);
@@ -810,6 +941,86 @@ select:focus-visible{
 
 @media (max-width:576px){
     .qv-precio-grande{ font-size:1.6rem; }
+}
+
+/* ---- Productos relacionados dentro del Quick View ---- */
+
+.qv-relacionados-wrap{
+    margin-top:26px;
+    padding-top:20px;
+    border-top:1px solid var(--paper-line);
+}
+
+.qv-relacionados-titulo{
+    font-size:.9rem;
+    font-weight:700;
+    color:var(--ink-900);
+    margin:0 0 12px;
+}
+
+.qv-relacionados-scroll{
+    display:flex;
+    gap:12px;
+    overflow-x:auto;
+    padding-bottom:6px;
+    scrollbar-width:thin;
+    -webkit-overflow-scrolling:touch;
+}
+
+.qv-relacionados-scroll::-webkit-scrollbar{
+    height:5px;
+}
+
+.qv-relacionados-scroll::-webkit-scrollbar-thumb{
+    background:#dcd7c8;
+    border-radius:10px;
+}
+
+.qv-relacionado-card{
+    flex:0 0 auto;
+    width:118px;
+    display:flex;
+    flex-direction:column;
+    align-items:flex-start;
+    gap:4px;
+    background:#fff;
+    border:1px solid var(--paper-line);
+    border-radius:14px;
+    padding:8px;
+    cursor:pointer;
+    text-align:left;
+    transition:.2s;
+}
+
+.qv-relacionado-card:hover{
+    border-color:var(--indigo-600);
+    transform:translateY(-2px);
+}
+
+.qv-relacionado-card img{
+    width:100%;
+    height:80px;
+    object-fit:contain;
+    background:var(--paper);
+    border-radius:8px;
+}
+
+.qv-relacionado-nombre{
+    font-size:.74rem;
+    font-weight:600;
+    color:var(--ink-900);
+    line-height:1.25;
+    display:-webkit-box;
+    -webkit-line-clamp:2;
+    -webkit-box-orient:vertical;
+    overflow:hidden;
+}
+
+.qv-relacionado-precio{
+    font-size:.8rem;
+    font-weight:700;
+    color:var(--indigo-600);
+    font-family:var(--font-price, inherit);
 }
 
 /* =========================================================
