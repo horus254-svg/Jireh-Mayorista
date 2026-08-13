@@ -1880,8 +1880,22 @@
         </div>
       </div>
 
+      <!-- Tipo de contenido del popup -->
+      <div class="mb-3 d-flex align-items-center gap-3">
+        <div class="form-check form-check-inline mb-0">
+          <input class="form-check-input" type="radio" name="cfgPopupTipo" id="cfgPopupTipoImagen" value="imagen" checked
+            onchange="onCambiarTipoPopup()">
+          <label class="form-check-label" for="cfgPopupTipoImagen">🖼️ Imagen</label>
+        </div>
+        <div class="form-check form-check-inline mb-0">
+          <input class="form-check-input" type="radio" name="cfgPopupTipo" id="cfgPopupTipoVideo" value="video"
+            onchange="onCambiarTipoPopup()">
+          <label class="form-check-label" for="cfgPopupTipoVideo">🎬 Video</label>
+        </div>
+      </div>
+
       <!-- Preview de imagen del popup -->
-      <div class="pm-image-wrap mb-2" style="max-width:320px;">
+      <div class="pm-image-wrap mb-2" style="max-width:320px;" id="popupImagenWrap">
         <div class="pm-image-preview" id="popupImagenPreview" style="height:160px;">
           <span class="pm-image-placeholder">Sin imagen</span>
         </div>
@@ -1895,6 +1909,21 @@
         </div>
         <div class="pm-image-status" id="popupImagenStatus"></div>
         <input type="hidden" id="cfgPopupImagen">
+      </div>
+
+      <!-- URL de video del popup (oculto salvo que se elija "Video") -->
+      <div class="mb-2" id="popupVideoWrap" style="max-width:420px; display:none;">
+        <label class="form-label" style="font-size:13px;" for="cfgPopupVideoUrl">URL directa del video (.mp4, .webm)</label>
+        <input type="url" class="form-control form-control-sm" id="cfgPopupVideoUrl"
+          placeholder="https://.../promo.mp4" oninput="onCambiarUrlVideoPopup()">
+        <div class="pm-image-status" id="popupVideoStatus"></div>
+        <p class="text-muted mt-1" style="font-size:12px;">
+          Subí el video a Drive, Firebase Storage o un CDN y pegá acá el enlace directo al archivo
+          (que termine en .mp4/.webm). No se puede subir el video desde acá.
+        </p>
+        <div class="pm-image-preview mt-2" id="popupVideoPreview" style="height:160px; display:none;">
+          <video id="popupVideoPreviewTag" src="" muted loop autoplay playsinline style="width:100%;height:100%;object-fit:contain;"></video>
+        </div>
       </div>
 
       <div class="mt-2">

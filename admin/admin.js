@@ -853,12 +853,76 @@ function cargarAparienciaForm(cfg) {
   const popupActivo = document.getElementById("cfgPopupActivo");
   const popupImagen = document.getElementById("cfgPopupImagen");
   if (popupActivo) popupActivo.checked = !!cfg.popupActivo;
-  if (popupImagen) popupImagen.value = cfg.popupImagen || "";
+
+  const tipo = cfg.popupTipo === "video" ? "video" : "imagen";
+  const radioImagen = document.getElementById("cfgPopupTipoImagen");
+  const radioVideo = document.getElementById("cfgPopupTipoVideo");
+  if (radioImagen) radioImagen.checked = tipo === "imagen";
+  if (radioVideo) radioVideo.checked = tipo === "video";
+
+  if (tipo === "video") {
+    if (popupImagen) popupImagen.value = "";
+    const videoUrlEl = document.getElementById("cfgPopupVideoUrl");
+    if (videoUrlEl) videoUrlEl.value = cfg.popupImagen || "";
+  } else {
+    if (popupImagen) popupImagen.value = cfg.popupImagen || "";
+    const videoUrlEl = document.getElementById("cfgPopupVideoUrl");
+    if (videoUrlEl) videoUrlEl.value = "";
+  }
+
+  onCambiarTipoPopup();
+
   // Mostrar preview si ya hay imagen guardada
   const popupPreviewEl = document.getElementById("popupImagenPreview");
-  if (popupPreviewEl && cfg.popupImagen) {
+  if (popupPreviewEl && tipo === "imagen" && cfg.popupImagen) {
     popupPreviewEl.innerHTML = `<img src="${cfg.popupImagen}" alt="" style="width:100%;height:100%;object-fit:contain;">`;
   }
+
+  // Mostrar preview de video si corresponde
+  if (tipo === "video" && cfg.popupImagen) {
+    const videoPreview = document.getElementById("popupVideoPreview");
+    const videoPreviewTag = document.getElementById("popupVideoPreviewTag");
+    if (videoPreview && videoPreviewTag) {
+      videoPreviewTag.src = cfg.popupImagen;
+      videoPreview.style.display = "block";
+    }
+  }
+}
+
+/** Alterna entre el bloque de "Imagen" y el de "Video" según el radio elegido */
+function onCambiarTipoPopup() {
+  const esVideo = document.getElementById("cfgPopupTipoVideo")?.checked;
+  const wrapImagen = document.getElementById("popupImagenWrap");
+  const wrapVideo = document.getElementById("popupVideoWrap");
+  if (wrapImagen) wrapImagen.style.display = esVideo ? "none" : "";
+  if (wrapVideo) wrapVideo.style.display = esVideo ? "" : "none";
+}
+
+/** Previsualiza el video pegado por URL, sin subir nada */
+function onCambiarUrlVideoPopup() {
+  const url = (document.getElementById("cfgPopupVideoUrl")?.value || "").trim();
+  const statusEl = document.getElementById("popupVideoStatus");
+  const preview = document.getElementById("popupVideoPreview");
+  const previewTag = document.getElementById("popupVideoPreviewTag");
+  if (!preview || !previewTag) return;
+
+  if (!url) {
+    preview.style.display = "none";
+    previewTag.src = "";
+    if (statusEl) { statusEl.className = "pm-image-status"; statusEl.textContent = ""; }
+    return;
+  }
+
+  const pareceVideo = /\.(mp4|webm|ogg|mov|m4v)(\?.*)?$/i.test(url);
+  if (!pareceVideo) {
+    if (statusEl) { statusEl.className = "pm-image-status error"; statusEl.textContent = "⚠️ La URL debería terminar en .mp4, .webm, etc."; }
+  } else if (statusEl) {
+    statusEl.className = "pm-image-status success";
+    statusEl.textContent = "✓ URL de video lista";
+  }
+
+  previewTag.src = url;
+  preview.style.display = "block";
 }
 
 async function guardarPedidoMinimoForm() {
@@ -957,6 +1021,15 @@ function quitarImagenPopup() {
   if (preview) preview.innerHTML = `<span class="pm-image-placeholder">Sin imagen</span>`;
   const status = document.getElementById("popupImagenStatus");
   if (status) { status.className = "pm-image-status"; status.textContent = ""; }
+
+  const videoUrlEl = document.getElementById("cfgPopupVideoUrl");
+  if (videoUrlEl) videoUrlEl.value = "";
+  const videoPreview = document.getElementById("popupVideoPreview");
+  if (videoPreview) videoPreview.style.display = "none";
+  const videoPreviewTag = document.getElementById("popupVideoPreviewTag");
+  if (videoPreviewTag) videoPreviewTag.src = "";
+  const videoStatus = document.getElementById("popupVideoStatus");
+  if (videoStatus) { videoStatus.className = "pm-image-status"; videoStatus.textContent = ""; }
 }
 
 async function onSeleccionarImagenPopup(event) {
@@ -1010,9 +1083,25 @@ async function subirImagenPopup() {}  // legacy
 
 async function guardarPopupPromoForm() {
   const activo = document.getElementById("cfgPopupActivo")?.checked ? "SI" : "NO";
-  const imagen = (document.getElementById("cfgPopupImagen")?.value || "").trim();
+  const esVideo = document.getElementById("cfgPopupTipoVideo")?.checked;
+  const tipo = esVideo ? "video" : "imagen";
+
+  const imagen = esVideo
+    ? (document.getElementById("cfgPopupVideoUrl")?.value || "").trim()
+    : (document.getElementById("cfgPopupImagen")?.value || "").trim();
+
+  if (esVideo && imagen && !/\.(mp4|webm|ogg|mov|m4v)(\?.*)?$/i.test(imagen)) {
+    toast("La URL del video debería terminar en .mp4, .webm, etc.", "error");
+    return;
+  }
+
   try {
-    const params = new URLSearchParams({ action: "guardarConfiguracionNegocio", popupImagen: imagen, popupActivo: activo });
+    const params = new URLSearchParams({
+      action: "guardarConfiguracionNegocio",
+      popupImagen: imagen,
+      popupActivo: activo,
+      popupTipo: tipo
+    });
     const res = await fetchAPI(API_URL + "?" + params.toString());
     const data = await res.json();
     if (data.success) toast("Popup guardado correctamente", "success");
