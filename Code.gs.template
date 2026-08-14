@@ -395,9 +395,9 @@ function inicializarHojasNuevoNegocio(){
   ]);
 
   asegurarHojaConEncabezados("PEDIDOS", [
-    "PEDIDO_ID", "FECHA", "NOMBRE", "EMPRESA", "DIRECCION", "TELEFONO", "DNI",
+    "PEDIDO_ID", "FECHA", "CLIENTE", "EMPRESA", "DIRECCION", "TELEFONO", "DNI",
     "TOTAL", "ESTADO", "PDF_URL", "CODIGO_POSTAL", "LOCALIDAD", "PROVINCIA",
-    "STOCK_DESCONTADO", "MONEDA", "TIPO_CAMBIO", "SUBTOTAL", "DESCUENTO", "DESCUENTO_ETIQUETA"
+    "STOCK_DESCONTADO", "MONEDA", "COBRADO", "FORMA_PAGO_COBRO", "VENTA_ID_VINCULADA", "FECHA_COBRO"
   ]);
 
   asegurarHojaConEncabezados("DETALLE_PEDIDOS", [
@@ -405,8 +405,7 @@ function inicializarHojasNuevoNegocio(){
   ]);
 
   asegurarHojaConEncabezados("VENTAS_LOCAL", [
-    "VENTA_ID", "FECHA", "TOTAL", "FORMA_PAGO", "VENDEDOR", "OBSERVACIONES",
-    "CLIENTE_VENTA_ID", "ANULADA", "MOTIVO_ANULACION"
+    "VENTA_ID", "FECHA", "TOTAL", "FORMA_PAGO", "VENDEDOR", "OBSERVACIONES", "ANULADA", "MOTIVO_ANULACION"
   ]);
 
   asegurarHojaConEncabezados("DETALLE_VENTAS", [
