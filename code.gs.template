@@ -235,6 +235,12 @@ case "reporteClientes":
     case "imagenProxy":
       return getImagenProxy(e);
 
+    case "catalogoPDFInfo":
+      return getCatalogoPDFInfo();
+
+    case "generarCatalogoPDFAhora":
+      return generarCatalogoPDFAhoraPorLotes();
+
     default:
       return jsonResponse({
         success: false,
@@ -1506,6 +1512,868 @@ function getImagenProxy(e){
       message:"Error al descargar la imagen: " + error.toString()
     });
   }
+}
+
+/* =========================================================
+   CATÁLOGO PDF DIARIO
+   -----------------------------------------------------------
+   Antes, el botón "Descargar Catálogo PDF" armaba el PDF en el
+   navegador del cliente en el momento (jsPDF + proxy de imágenes),
+   lo cual era lento porque tenía que descargar todas las fotos una
+   por una a través del backend antes de poder dibujarlas.
+
+   Ahora el PDF se genera UNA VEZ POR DÍA, del lado del servidor
+   (generarCatalogoPDFDiario, pensada para correr con un trigger de
+   tiempo a las 3 AM — ver instalarTriggerCatalogoDiario más abajo),
+   con los productos que tengan stock a esa hora. El archivo se guarda
+   en Drive y su link de descarga directa se guarda en CONFIGURACION.
+
+   El botón del cliente (descargarCatalogoPDF en app.js) solo pide ese
+   link ya generado (?action=catalogoPDFInfo) y lo abre — no genera
+   nada en el momento, por eso es instantáneo.
+
+   Cada corrida borra el PDF del día anterior antes de crear el nuevo
+   (mismo nombre de archivo lógico, un solo archivo vivo a la vez), así
+   no se va acumulando uno por día en la carpeta de Drive.
+========================================================= */
+
+/** Carpeta de Drive donde vive el catálogo PDF. Configurable desde CONFIGURACION (clave DRIVE_CARPETA_CATALOGO_ID); si nunca se configuró, usa la misma carpeta que ya existe para los PDF de pedidos. */
+function getCarpetaCatalogoId(){
+  return extraerIdCarpetaDrive(
+    leerClaveConfiguracion("DRIVE_CARPETA_CATALOGO_ID", "1T4k00L3LIIyq0jId0A5mf6YOAWYngWmo")
+  );
+}
+
+/**
+ * Devuelve los productos que entran al catálogo público: publicados
+ * y con stock disponible en este momento. Se usa tanto para la
+ * generación diaria automática como para una regeneración manual.
+ */
+function obtenerProductosParaCatalogoPDF(){
+
+  const data = getSheet().getDataRange().getValues();
+  const productos = rowsToObjects(data);
+
+  return productos.filter(p =>
+    String(p.PUBLICADO).toUpperCase() === "SI" &&
+    Number(p.STOCK || 0) > 0
+  );
+}
+
+/**
+ * Punto de entrada que corre solo, todos los días a las 3 AM, via
+ * trigger instalado con instalarTriggerCatalogoDiario(). Genera el PDF
+ * del catálogo con el stock de ese momento y actualiza el link
+ * guardado en CONFIGURACION. No devuelve nada (no hay quien lo lea:
+ * la ejecuta el trigger, no una request), pero deja registro en Logs.
+ */
+function generarCatalogoPDFDiario(){
+
+  try{
+
+    const productos = obtenerProductosParaCatalogoPDF();
+
+    if(productos.length === 0){
+      Logger.log("Catálogo PDF: no hay productos publicados con stock, no se generó nada.");
+      return;
+    }
+
+    const carpeta = DriveApp.getFolderById(getCarpetaCatalogoId());
+
+    // Borra el/los PDF anteriores ANTES de crear el nuevo, para que la
+    // carpeta de Drive nunca acumule más de un catálogo a la vez.
+    borrarCatalogoPDFAnterior(carpeta);
+
+    // Descarga TODAS las fotos primero, en lotes paralelos (ver
+    // precargarImagenesProductosCatalogo) — esto es lo que antes hacía
+    // que el script se quedara sin tiempo: bajaba una foto por
+    // producto, una por una y en serie, dentro del mismo loop que
+    // arma el documento. Con catálogos grandes (80-100+ productos) eso
+    // solo, sumado, ya se comía los 6 minutos de límite de ejecución.
+    const imagenesPrecargadas = precargarImagenesProductosCatalogo(productos);
+
+    // Método principal: arma un HTML completo en memoria (sin ninguna
+    // llamada a servicios de Google) y lo convierte a PDF en UNA sola
+    // llamada a la API de Drive. Si por lo que sea falla (por ejemplo,
+    // el servicio avanzado "Drive API" todavía no está habilitado en
+    // el proyecto — ver instrucciones más abajo), cae al método viejo
+    // con DocumentApp como respaldo, más lento pero funciona sin
+    // configuración extra.
+    let pdfBlob;
+    try{
+      pdfBlob = construirPDFCatalogoHTML(productos, imagenesPrecargadas);
+    }catch(errorHtml){
+      Logger.log("Conversión HTML→PDF falló, usando método de respaldo (más lento): " + errorHtml.toString());
+      pdfBlob = construirPDFCatalogo(productos, imagenesPrecargadas);
+    }
+
+    pdfBlob.setName("catalogo.pdf");
+
+    const archivo = carpeta.createFile(pdfBlob);
+    archivo.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+    const urlDescarga = "https://drive.google.com/uc?export=download&id=" + archivo.getId();
+
+    fijarClaveConfiguracion("CATALOGO_PDF_URL", urlDescarga);
+    fijarClaveConfiguracion("CATALOGO_PDF_FILE_ID", archivo.getId());
+    fijarClaveConfiguracion("CATALOGO_PDF_FECHA", new Date().toISOString());
+    fijarClaveConfiguracion("CATALOGO_PDF_TOTAL_PRODUCTOS", String(productos.length));
+
+    Logger.log("Catálogo PDF generado con " + productos.length + " productos: " + urlDescarga);
+
+  }catch(error){
+    Logger.log("Error generando el catálogo PDF diario: " + error.toString());
+  }
+}
+
+/**
+ * Descarga las fotos de todos los productos ANTES de armar el
+ * documento, en lotes de a TAMANO_LOTE con UrlFetchApp.fetchAll —
+ * una sola llamada que dispara todo el lote junto, en vez de una
+ * llamada (y una espera de red) por cada foto en serie. Con esto,
+ * bajar 100 fotos deja de ser "100 esperas de red seguidas" y pasa a
+ * ser "2 o 3 lotes", que es lo que realmente arregla el timeout.
+ *
+ * Devuelve un array del mismo largo y orden que `productos`, con el
+ * blob de la imagen ya descargada en cada posición, o null si ese
+ * producto no tenía foto o la descarga falló (el catálogo se arma
+ * igual, esa tarjeta queda sin imagen).
+ */
+function precargarImagenesProductosCatalogo(productos){
+
+  const TAMANO_LOTE = 40;
+  const resultados = new Array(productos.length).fill(null);
+
+  for(let i = 0; i < productos.length; i += TAMANO_LOTE){
+
+    const finLote = Math.min(i + TAMANO_LOTE, productos.length);
+
+    // Arma las requests del lote, guardando a qué posición del array
+    // final corresponde cada una (los productos sin IMAGEN se saltean,
+    // no tiene sentido pedirle a fetchAll una URL vacía).
+    const posicionesConImagen = [];
+    const requests = [];
+
+    for(let idx = i; idx < finLote; idx++){
+      const url = String(productos[idx].IMAGEN || "").trim();
+      if(url){
+        posicionesConImagen.push(idx);
+        requests.push({ url: url, muteHttpExceptions: true });
+      }
+    }
+
+    if(requests.length === 0) continue;
+
+    try{
+
+      const respuestas = UrlFetchApp.fetchAll(requests);
+
+      respuestas.forEach((respuesta, j) => {
+        try{
+          if(respuesta.getResponseCode() === 200){
+            resultados[posicionesConImagen[j]] = respuesta.getBlob();
+          }
+        }catch(e){
+          // Esa respuesta puntual vino rota — esa tarjeta queda sin imagen, sigue el resto.
+        }
+      });
+
+    }catch(error){
+      // Si el lote entero falla (ej. una sola URL inválida puede tirar
+      // abajo todo el fetchAll), esos productos quedan sin imagen —
+      // no se interrumpe la generación del catálogo por eso.
+      Logger.log("Lote de imágenes falló (" + i + "-" + finLote + "): " + error.toString());
+    }
+  }
+
+  return resultados;
+}
+
+/**
+ * Borra el PDF del catálogo generado en la corrida anterior: primero
+ * por el ID guardado en CONFIGURACION (rápido, un solo archivo), y de
+ * paso revisa la carpeta por si quedó algún "catalogo.pdf" suelto
+ * (por ejemplo, generado a mano antes de que existiera esta lógica).
+ * Intenta un borrado definitivo (no ocupa la papelera); si el
+ * servicio avanzado de Drive no está habilitado en el proyecto, lo
+ * manda a la papelera como respaldo — igual deja de estar en la
+ * carpeta y no se sigue acumulando ahí.
+ */
+function borrarCatalogoPDFAnterior(carpeta){
+
+  const idAnterior = leerClaveConfiguracion("CATALOGO_PDF_FILE_ID", "");
+
+  if(idAnterior){
+    try{
+      eliminarArchivoDriveDefinitivo(DriveApp.getFileById(idAnterior));
+    }catch(e){
+      // El archivo ya no existe o el ID guardado quedó viejo — no pasa nada, se sigue.
+    }
+  }
+
+  const iter = carpeta.getFilesByName("catalogo.pdf");
+  while(iter.hasNext()){
+    const archivo = iter.next();
+    if(archivo.getId() !== idAnterior){
+      eliminarArchivoDriveDefinitivo(archivo);
+    }
+  }
+}
+
+/**
+ * Borra un archivo de Drive de forma definitiva (sin pasar por la
+ * papelera) usando el servicio avanzado de Drive, si está habilitado
+ * en el proyecto (Servicios → Drive API). Si no está habilitado, cae
+ * de vuelta a mandarlo a la papelera — funciona igual para el
+ * propósito de "no acumular archivos", solo que libera el espacio
+ * unos días después en vez de al instante.
+ */
+function eliminarArchivoDriveDefinitivo(archivo){
+  try{
+    // v3 del servicio avanzado de Drive usa "delete"; v2 usa "remove".
+    // Se prueba el que exista en el proyecto; si ninguno está
+    // disponible (el servicio no está habilitado), va a la papelera.
+    if(typeof Drive.Files.delete === "function"){
+      Drive.Files.delete(archivo.getId());
+    } else if(typeof Drive.Files.remove === "function"){
+      Drive.Files.remove(archivo.getId());
+    } else {
+      archivo.setTrashed(true);
+    }
+  }catch(e){
+    archivo.setTrashed(true);
+  }
+}
+
+/**
+ * MÉTODO PRINCIPAL — mucho más rápido que DocumentApp para catálogos
+ * grandes. Arma el catálogo entero como un string HTML en memoria (sin
+ * hacer ninguna llamada a Google mientras se arma: las fotos van
+ * embebidas en base64, tomadas de `imagenesPrecargadas`, no se piden
+ * de nuevo) y recién al final hace UNA sola llamada a la API de Drive
+ * para convertir ese HTML en un Google Doc, del que se exporta el PDF.
+ *
+ * Antes (con DocumentApp) armar el documento eran cientos de llamadas
+ * al servidor (una por cada celda, párrafo, imagen insertada...); acá
+ * es una sola, así que el tiempo ya no depende de cuántos productos
+ * tenga el catálogo.
+ *
+ * IMPORTANTE: esto necesita el servicio avanzado "Drive API" habilitado
+ * en el proyecto de Apps Script (Editor → Servicios (+) → buscar
+ * "Drive API" → Añadir). Si no está habilitado, esta función tira
+ * error y generarCatalogoPDFDiario cae solo al método de respaldo con
+ * DocumentApp (más lento, pero no requiere esa configuración extra).
+ */
+function construirPDFCatalogoHTML(productos, imagenesPrecargadas){
+
+  const nombreNegocio = leerClaveConfiguracion("NOMBRE", "JIREH MAYORISTA");
+
+  const fechaTexto = "Catálogo actualizado el " +
+    Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy 'a las' HH:mm");
+
+  let filasHtml = "";
+  for(let i = 0; i < productos.length; i += 2){
+    filasHtml += "<tr>";
+    filasHtml += celdaProductoHTMLCatalogo(productos[i], imagenesPrecargadas[i]);
+    filasHtml += productos[i + 1]
+      ? celdaProductoHTMLCatalogo(productos[i + 1], imagenesPrecargadas[i + 1])
+      : "<td style='width:50%;'></td>";
+    filasHtml += "</tr>";
+  }
+
+  const html =
+    "<!DOCTYPE html><html><head><meta charset='utf-8'></head>" +
+    "<body style='font-family:Arial,Helvetica,sans-serif;margin:20px;'>" +
+    "<h1 style='text-align:center;font-size:22px;margin-bottom:4px;'>" + escaparHtmlCatalogo(nombreNegocio) + "</h1>" +
+    "<p style='text-align:center;font-size:11px;color:#666;margin-top:0;'>" + escaparHtmlCatalogo(fechaTexto) + "</p>" +
+    "<hr/>" +
+    "<table style='width:100%;border-collapse:collapse;'>" + filasHtml + "</table>" +
+    "</body></html>";
+
+  const htmlBlob = Utilities.newBlob(html, "text/html", "catalogo_tmp.html");
+
+  // El servicio avanzado de Drive puede estar en v3 (método "create",
+  // campo "name") o en v2 (método "insert", campo "title") según cómo
+  // haya quedado habilitado en el proyecto — se detecta cuál hay y se
+  // usa ese, en vez de asumir uno solo.
+  const esV3 = typeof Drive.Files.create === "function";
+
+  const recurso = esV3
+    ? { name: "catalogo_tmp_" + new Date().getTime(), mimeType: MimeType.GOOGLE_DOCS }
+    : { title: "catalogo_tmp_" + new Date().getTime(), mimeType: MimeType.GOOGLE_DOCS };
+
+  // Una sola llamada: sube el HTML y lo convierte a Google Doc del
+  // lado del servidor (el "convert: true" es lo que dispara la
+  // conversión, en vez de subirlo tal cual como un archivo .html).
+  const archivoDoc = esV3
+    ? Drive.Files.create(recurso, htmlBlob, { convert: true })
+    : Drive.Files.insert(recurso, htmlBlob, { convert: true });
+
+  const pdfBlob = DriveApp.getFileById(archivoDoc.id).getAs(MimeType.PDF);
+
+  DriveApp.getFileById(archivoDoc.id).setTrashed(true);
+
+  return pdfBlob;
+}
+
+/** Arma el HTML de una celda de producto (foto en base64 + categoría + nombre + precio) para construirPDFCatalogoHTML */
+function celdaProductoHTMLCatalogo(producto, blobImagen){
+
+  let imgTag = "";
+  if(blobImagen){
+    try{
+      const base64 = Utilities.base64Encode(blobImagen.getBytes());
+      const tipoMime = blobImagen.getContentType() || "image/jpeg";
+      imgTag = "<img src='data:" + tipoMime + ";base64," + base64 + "' width='150' height='150' style='object-fit:cover;'/>";
+    }catch(e){
+      // Blob roto — la celda sigue solo con el texto.
+    }
+  }
+
+  const categoria = String(producto.CATEGORIA || "").trim();
+  const nombre = String(producto.PRODUCTO || "").trim();
+  const precio = "$" + Number(producto.PRECIO || 0).toLocaleString("es-AR");
+
+  return (
+    "<td style='width:50%;padding:10px;vertical-align:top;'>" +
+    imgTag +
+    (categoria ? "<div style='font-size:8px;color:#8c91a0;margin-top:6px;'>" + escaparHtmlCatalogo(categoria.toUpperCase()) + "</div>" : "") +
+    "<div style='font-weight:bold;font-size:11px;margin-top:2px;'>" + escaparHtmlCatalogo(nombre) + "</div>" +
+    "<div style='font-weight:bold;font-size:13px;color:#148A5A;margin-top:2px;'>" + escaparHtmlCatalogo(precio) + "</div>" +
+    "</td>"
+  );
+}
+
+/** Escapa texto para insertarlo seguro dentro del HTML del catálogo */
+function escaparHtmlCatalogo(texto){
+  return String(texto)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+/**
+ * MÉTODO DE RESPALDO — el original, con DocumentApp. Más lento (cada
+ * celda/imagen es una llamada al servidor), pero no necesita el
+ * servicio avanzado de Drive habilitado. Se usa solo si
+ * construirPDFCatalogoHTML falla.
+ */
+function construirPDFCatalogo(productos, imagenesPrecargadas){
+
+  const nombreNegocio = leerClaveConfiguracion("NOMBRE", "JIREH MAYORISTA");
+
+  const docTemporal = DocumentApp.create("catalogo_tmp_" + new Date().getTime());
+  const body = docTemporal.getBody();
+
+  body.setMarginTop(28).setMarginBottom(28).setMarginLeft(28).setMarginRight(28);
+
+  body.appendParagraph(nombreNegocio)
+      .setHeading(DocumentApp.ParagraphHeading.HEADING1)
+      .setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+
+  body.appendParagraph(
+    "Catálogo actualizado el " +
+    Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy 'a las' HH:mm")
+  ).setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+
+  body.appendHorizontalRule();
+
+  // Tabla de 2 columnas, una fila por par de productos.
+  const filas = Math.ceil(productos.length / 2);
+  const datosVacios = [];
+  for(let r = 0; r < filas; r++) datosVacios.push(["", ""]);
+
+  const tabla = body.appendTable(datosVacios);
+  tabla.setBorderWidth(0);
+
+  productos.forEach((producto, idx) => {
+    const fila = Math.floor(idx / 2);
+    const col = idx % 2;
+    const celda = tabla.getRow(fila).getCell(col);
+    celda.setWidth(250);
+    llenarCeldaProductoCatalogoPDF(celda, producto, imagenesPrecargadas[idx]);
+  });
+
+  docTemporal.saveAndClose();
+
+  const pdfBlob = DriveApp.getFileById(docTemporal.getId()).getAs(MimeType.PDF);
+
+  DriveApp.getFileById(docTemporal.getId()).setTrashed(true);
+
+  return pdfBlob;
+}
+
+/** Llena una celda de la tabla del catálogo con la foto (ya descargada de antes), categoría, nombre y precio de un producto */
+function llenarCeldaProductoCatalogoPDF(celda, producto, blobImagen){
+
+  if(blobImagen){
+    try{
+      const imagen = celda.appendImage(blobImagen);
+      // Tamaño fijo (150x150), SIN preguntarle a la imagen su ancho/alto
+      // original: cada consulta de tamaño es otra ida y vuelta al
+      // servicio de Documentos, y con cientos de productos eso también
+      // suma bastante tiempo. Se pierde el respetar la proporción
+      // exacta de cada foto, pero se gana velocidad — que era el
+      // problema real acá.
+      imagen.setWidth(150);
+      imagen.setHeight(150);
+    }catch(e){
+      // Blob roto o formato no soportado — la celda sigue solo con el texto.
+    }
+  }
+
+  const categoria = String(producto.CATEGORIA || "").trim();
+  if(categoria){
+    celda.appendParagraph(categoria.toUpperCase())
+         .editAsText().setFontSize(8).setForegroundColor("#8c91a0");
+  }
+
+  celda.appendParagraph(String(producto.PRODUCTO || ""))
+       .editAsText().setBold(true).setFontSize(11);
+
+  celda.appendParagraph("$" + Number(producto.PRECIO || 0).toLocaleString("es-AR"))
+       .editAsText().setBold(true).setFontSize(13).setForegroundColor("#148A5A");
+}
+
+/**
+ * Instala (una sola vez, corriéndola a mano desde el editor de Apps
+ * Script) el trigger de tiempo que dispara generarCatalogoPDFDiario()
+ * todos los días entre las 3:00 y las 4:00 AM (hora del proyecto). Se
+ * puede volver a correr sin miedo a duplicar el trigger: borra
+ * cualquier trigger anterior de esta misma función antes de crear el
+ * nuevo.
+ */
+function instalarTriggerCatalogoDiario(){
+
+  ScriptApp.getProjectTriggers().forEach(t => {
+    if(t.getHandlerFunction() === "generarCatalogoPDFDiario") ScriptApp.deleteTrigger(t);
+  });
+
+  ScriptApp.newTrigger("generarCatalogoPDFDiario")
+    .timeBased()
+    .atHour(3)
+    .everyDays(1)
+    .create();
+
+  Logger.log("Trigger instalado: generarCatalogoPDFDiario correrá todos los días entre las 3 y las 4 AM.");
+}
+
+/**
+ * Devuelve el link de descarga del catálogo PDF ya generado (lectura
+ * rápida de CONFIGURACION, no genera nada) — esto es lo que llama el
+ * botón "Descargar Catálogo PDF" del sitio público.
+ */
+function getCatalogoPDFInfo(){
+
+  const url = leerClaveConfiguracion("CATALOGO_PDF_URL", "");
+  const fecha = leerClaveConfiguracion("CATALOGO_PDF_FECHA", "");
+  const totalProductos = leerClaveConfiguracion("CATALOGO_PDF_TOTAL_PRODUCTOS", "");
+
+  if(!url){
+    return jsonResponse({
+      success: false,
+      message: "El catálogo en PDF todavía no se generó. Se genera automáticamente todos los días a las 3 AM."
+    });
+  }
+
+  return jsonResponse({
+    success: true,
+    url: url,
+    fecha: fecha,
+    totalProductos: totalProductos
+  });
+}
+
+/**
+ * Generación manual, a demanda (?action=generarCatalogoPDFAhora) — útil
+ * para el primer uso (todavía no pasaron las 3 AM ninguna vez) o si el
+ * admin quiere forzar una actualización sin esperar al trigger diario.
+ * Tarda unos segundos (descarga y arma el PDF en el momento); por eso
+ * el botón del cliente NUNCA llama esta acción, solo catalogoPDFInfo.
+ */
+function generarCatalogoPDFAhora(){
+  generarCatalogoPDFDiario();
+  return getCatalogoPDFInfo();
+}
+
+/* =====================================================================
+   CATÁLOGO PDF POR LOTES (evita el timeout de 6 min de Apps Script)
+   -----------------------------------------------------------------
+   generarCatalogoPDFDiario() (arriba) arma el catálogo entero en una
+   sola ejecución — con muchos productos eso supera el límite de
+   tiempo de Apps Script, aunque el método HTML→PDF falle y caiga al
+   método de respaldo con DocumentApp (una llamada al servidor por
+   cada imagen insertada, en serie).
+
+   Esto lo parte en lotes: cada ejecución procesa TAMANO_LOTE_CATALOGO
+   productos y, si quedan más, programa un trigger de una sola vez
+   para seguir en ~1 minuto. Así, sin importar cuántos productos haya
+   en total, ninguna ejecución individual se acerca al límite de tiempo.
+
+   PUNTOS DE ENTRADA:
+     - generarCatalogoPDFPorLotes()       -> arranca el proceso desde cero
+     - continuarCatalogoPDFPorLotes()     -> la llama el trigger, retoma
+     - generarCatalogoPDFAhoraPorLotes()  -> versión para el botón
+                                              "Generar ahora" del panel
+                                              (?action=generarCatalogoPDFAhora)
+     - instalarTriggerCatalogoDiarioPorLotes() -> instalar UNA VEZ a mano,
+                                              reemplaza el trigger diario
+                                              de las 3 AM
+===================================================================== */
+
+const TAMANO_LOTE_CATALOGO = 30; // productos por ejecución — bajar a 15-20 si igual da timeout
+const CLAVE_PROGRESO_CATALOGO = "CATALOGO_PDF_PROGRESO"; // clave en PropertiesService
+
+/**
+ * Punto de entrada — arranca el catálogo por lotes desde cero. Si ya
+ * había un proceso a medio hacer (por ejemplo, quedó colgado de una
+ * corrida anterior que falló a mitad de camino), lo descarta primero.
+ */
+function generarCatalogoPDFPorLotes(){
+
+  try{
+
+    limpiarProcesoCatalogoAnterior();
+
+    const productos = obtenerProductosParaCatalogoPDF();
+
+    if(productos.length === 0){
+      Logger.log("Catálogo PDF: no hay productos publicados con stock, no se generó nada.");
+      return;
+    }
+
+    const nombreNegocio = leerClaveConfiguracion("NOMBRE", "JIREH MAYORISTA");
+
+    // Crea el Doc que se va a ir llenando a lo largo de los lotes
+    const docTemporal = DocumentApp.create("catalogo_tmp_" + new Date().getTime());
+    const body = docTemporal.getBody();
+
+    body.setMarginTop(28).setMarginBottom(28).setMarginLeft(28).setMarginRight(28);
+
+    body.appendParagraph(nombreNegocio)
+        .setHeading(DocumentApp.ParagraphHeading.HEADING1)
+        .setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+
+    body.appendParagraph(
+      "Catálogo actualizado el " +
+      Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy 'a las' HH:mm")
+    ).setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+
+    body.appendHorizontalRule();
+
+    // Tabla de 2 columnas, ya con todas las filas vacías reservadas de
+    // una — una sola llamada al servidor, más rápido que ir agregando
+    // filas sueltas en cada lote.
+    const filas = Math.ceil(productos.length / 2);
+    const datosVacios = [];
+    for(let r = 0; r < filas; r++) datosVacios.push(["", ""]);
+
+    const tabla = body.appendTable(datosVacios);
+    tabla.setBorderWidth(0);
+
+    docTemporal.saveAndClose();
+
+    // Guarda el progreso: doc en construcción, próximo índice a
+    // procesar (0), y la LISTA de códigos de producto en el orden en
+    // que se van a ir agregando (no se guarda el array completo de
+    // productos en Properties, que tiene límite de tamaño por valor —
+    // cada lote vuelve a leer la hoja PRODUCTOS y filtra por códigos).
+    const progreso = {
+      docId: docTemporal.getId(),
+      codigos: productos.map(p => p.CODIGO),
+      siguienteIndice: 0,
+      totalProductos: productos.length
+    };
+
+    PropertiesService.getScriptProperties()
+      .setProperty(CLAVE_PROGRESO_CATALOGO, JSON.stringify(progreso));
+
+    Logger.log("Catálogo PDF por lotes: iniciado con " + productos.length + " productos, Doc " + docTemporal.getId());
+
+    // Procesa el primer lote ya mismo (no hace falta esperar al
+    // trigger para el primero) y programa la continuación si hace falta.
+    procesarLoteCatalogoPDF();
+
+  }catch(error){
+    Logger.log("Error iniciando el catálogo PDF por lotes: " + error.toString());
+    limpiarProcesoCatalogoAnterior();
+  }
+}
+
+/**
+ * Llamada por el trigger de continuación — retoma el proceso guardado
+ * en Properties y sigue procesando lotes.
+ */
+function continuarCatalogoPDFPorLotes(){
+  try{
+    procesarLoteCatalogoPDF();
+  }catch(error){
+    Logger.log("Error continuando el catálogo PDF por lotes: " + error.toString());
+    limpiarProcesoCatalogoAnterior();
+  }
+}
+
+/**
+ * Procesa UN lote de productos (TAMANO_LOTE_CATALOGO productos): los
+ * descarga en paralelo (fetchAll), los inserta en la tabla del Doc en
+ * construcción, actualiza el progreso guardado, y:
+ *   - si quedan más productos: programa un trigger de una sola vez
+ *     para seguir en ~1 minuto.
+ *   - si no quedan más: exporta el Doc a PDF, lo publica, limpia todo.
+ */
+function procesarLoteCatalogoPDF(){
+
+  const propiedades = PropertiesService.getScriptProperties();
+  const progresoRaw = propiedades.getProperty(CLAVE_PROGRESO_CATALOGO);
+
+  if(!progresoRaw){
+    Logger.log("procesarLoteCatalogoPDF: no hay ningún proceso de catálogo en curso.");
+    return;
+  }
+
+  const progreso = JSON.parse(progresoRaw);
+  const docId = progreso.docId;
+  const codigos = progreso.codigos;
+  const siguienteIndice = progreso.siguienteIndice;
+  const totalProductos = progreso.totalProductos;
+
+  const desde = siguienteIndice;
+  const hasta = Math.min(desde + TAMANO_LOTE_CATALOGO, codigos.length);
+  const codigosDeEsteLote = codigos.slice(desde, hasta);
+
+  Logger.log("Catálogo PDF por lotes: procesando productos " + (desde + 1) + " a " + hasta + " de " + totalProductos);
+
+  // Traer los datos completos SOLO de los productos de este lote
+  // (más liviano que traer todo el catálogo de nuevo en cada lote).
+  const todosLosProductos = rowsToObjects(getSheet().getDataRange().getValues());
+  const mapaPorCodigo = {};
+  todosLosProductos.forEach(p => { mapaPorCodigo[p.CODIGO] = p; });
+
+  const productosDeEsteLote = codigosDeEsteLote
+    .map(codigo => mapaPorCodigo[codigo])
+    .filter(Boolean); // por si algún producto se borró entre que arrancó el proceso y ahora
+
+  const imagenesDeEsteLote = precargarImagenesProductosCatalogo(productosDeEsteLote);
+
+  // Insertar este lote en la tabla del Doc, en las filas que le
+  // corresponden (fila = índice global / 2, columna = índice global % 2).
+  const docTemporal = DocumentApp.openById(docId);
+  const tabla = docTemporal.getBody().getTables()[0];
+
+  productosDeEsteLote.forEach(function(producto, i){
+    const indiceGlobal = desde + i;
+    const fila = Math.floor(indiceGlobal / 2);
+    const col = indiceGlobal % 2;
+    const celda = tabla.getRow(fila).getCell(col);
+    celda.setWidth(250);
+    llenarCeldaProductoCatalogoPDF(celda, producto, imagenesDeEsteLote[i]);
+  });
+
+  docTemporal.saveAndClose();
+
+  const quedanMas = hasta < codigos.length;
+
+  if(quedanMas){
+
+    // Actualizar progreso y programar el siguiente lote
+    progreso.siguienteIndice = hasta;
+    propiedades.setProperty(CLAVE_PROGRESO_CATALOGO, JSON.stringify(progreso));
+
+    // Trigger de una sola vez, dispara en ~1 minuto. Se borra
+    // cualquier trigger de continuación anterior primero, para no
+    // acumular triggers duplicados si por algo se llama dos veces.
+    ScriptApp.getProjectTriggers().forEach(function(t){
+      if(t.getHandlerFunction() === "continuarCatalogoPDFPorLotes") ScriptApp.deleteTrigger(t);
+    });
+
+    ScriptApp.newTrigger("continuarCatalogoPDFPorLotes")
+      .timeBased()
+      .after(60 * 1000) // 1 minuto
+      .create();
+
+    Logger.log("Catálogo PDF por lotes: lote guardado, quedan " + (codigos.length - hasta) + " productos. Próximo lote en ~1 min.");
+
+  } else {
+
+    // Era el último lote — exportar a PDF y publicar.
+    // Cada paso queda con su propio try/catch y su propio Logger.log
+    // ANTES de ejecutarse — así, si algo vuelve a fallar, el registro
+    // de ejecución va a mostrar exactamente hasta dónde llegó, en vez
+    // de un solo "Access denied: DriveApp" genérico sin poder saber
+    // en qué línea pasó.
+    Logger.log("Catálogo PDF por lotes: último lote insertado, exportando a PDF...");
+
+    let carpeta;
+    try{
+      Logger.log("Paso 1/6: abriendo carpeta de destino...");
+      carpeta = DriveApp.getFolderById(getCarpetaCatalogoId());
+      Logger.log("Paso 1/6 OK — carpeta: " + carpeta.getName());
+    }catch(errPaso1){
+      Logger.log("Paso 1/6 FALLÓ (abrir carpeta): " + errPaso1.toString());
+      throw errPaso1;
+    }
+
+    try{
+      Logger.log("Paso 2/6: borrando catálogo PDF anterior (por nombre, no por ID guardado)...");
+      // OJO: a propósito NO se usa borrarCatalogoPDFAnterior() acá, que
+      // intenta primero DriveApp.getFileById(CATALOGO_PDF_FILE_ID) — si
+      // ese ID quedó guardado de una corrida vieja que usó el método
+      // HTML→PDF (servicio AVANZADO de Drive, Drive.Files.create), tocar
+      // ese mismo archivo con DriveApp es justo el error "Access denied:
+      // DriveApp" que ya está documentado más arriba en este código,
+      // para construirPDFCatalogoHTML. Acá se borra directo por NOMBRE
+      // dentro de la carpeta, usando solo DriveApp de punta a punta.
+      const iterAnterior = carpeta.getFilesByName("catalogo.pdf");
+      let borrados = 0;
+      while(iterAnterior.hasNext()){
+        const archivoViejo = iterAnterior.next();
+        archivoViejo.setTrashed(true);
+        borrados++;
+      }
+      Logger.log("Paso 2/6 OK — " + borrados + " archivo(s) 'catalogo.pdf' anterior(es) enviado(s) a la papelera.");
+    }catch(errPaso2){
+      // No es crítico: si falla el borrado del anterior, seguimos —
+      // peor caso, queda un catalogo.pdf viejo de sobra en la carpeta.
+      Logger.log("Paso 2/6 falló (no crítico, se sigue igual): " + errPaso2.toString());
+    }
+
+    let pdfBlob;
+    try{
+      Logger.log("Paso 3/6: exportando el Doc " + docId + " a PDF...");
+      pdfBlob = DriveApp.getFileById(docId).getAs(MimeType.PDF);
+      pdfBlob.setName("catalogo.pdf");
+      Logger.log("Paso 3/6 OK — PDF exportado en memoria.");
+    }catch(errPaso3){
+      Logger.log("Paso 3/6 FALLÓ (exportar Doc a PDF): " + errPaso3.toString());
+      throw errPaso3;
+    }
+
+    let archivo;
+    try{
+      Logger.log("Paso 4a/6: creando el archivo PDF en la carpeta...");
+      archivo = carpeta.createFile(pdfBlob);
+      Logger.log("Paso 4a/6 OK — archivo creado: " + archivo.getId());
+    }catch(errPaso4a){
+      Logger.log("Paso 4a/6 FALLÓ (crear el archivo PDF en la carpeta): " + errPaso4a.toString());
+      throw errPaso4a;
+    }
+
+    try{
+      Logger.log("Paso 4b/6: haciendo el archivo público por link...");
+      archivo.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      Logger.log("Paso 4b/6 OK.");
+    }catch(errPaso4b){
+      // NO se corta acá: el archivo YA se creó (paso 4a OK). Si esto
+      // falla, es casi seguro una política del dominio de Google
+      // Workspace que restringe compartir por link a "cualquiera con
+      // el link" — el archivo existe igual, pero puede no ser
+      // descargable públicamente hasta que se ajuste esa política
+      // (Admin Console → Drive y Documentos → Uso compartido) o se
+      // comparta manualmente. Se sigue con el resto del proceso.
+      Logger.log("Paso 4b/6 FALLÓ (no crítico — el archivo ya está creado, pero puede no ser público): " + errPaso4b.toString());
+    }
+
+    const urlDescarga = "https://drive.google.com/uc?export=download&id=" + archivo.getId();
+
+    try{
+      Logger.log("Paso 5/6: guardando el link en CONFIGURACION...");
+      fijarClaveConfiguracion("CATALOGO_PDF_URL", urlDescarga);
+      fijarClaveConfiguracion("CATALOGO_PDF_FILE_ID", archivo.getId());
+      fijarClaveConfiguracion("CATALOGO_PDF_FECHA", new Date().toISOString());
+      fijarClaveConfiguracion("CATALOGO_PDF_TOTAL_PRODUCTOS", String(totalProductos));
+      Logger.log("Paso 5/6 OK.");
+    }catch(errPaso5){
+      Logger.log("Paso 5/6 FALLÓ (guardar en CONFIGURACION): " + errPaso5.toString());
+      throw errPaso5;
+    }
+
+    try{
+      Logger.log("Paso 6/6: limpiando Doc temporal, progreso y trigger...");
+      DriveApp.getFileById(docId).setTrashed(true);
+      propiedades.deleteProperty(CLAVE_PROGRESO_CATALOGO);
+      ScriptApp.getProjectTriggers().forEach(function(t){
+        if(t.getHandlerFunction() === "continuarCatalogoPDFPorLotes") ScriptApp.deleteTrigger(t);
+      });
+      Logger.log("Paso 6/6 OK.");
+    }catch(errPaso6){
+      // No crítico: el PDF ya quedó publicado (pasos 1-5 OK). Peor
+      // caso, queda el Doc temporal sin borrar o el progreso sin
+      // limpiar — no afecta al catálogo ya generado.
+      Logger.log("Paso 6/6 falló (no crítico, el PDF ya está publicado igual): " + errPaso6.toString());
+    }
+
+    Logger.log("Catálogo PDF generado con " + totalProductos + " productos: " + urlDescarga);
+  }
+}
+
+/**
+ * Descarta cualquier proceso de catálogo por lotes que haya quedado a
+ * medio hacer (por ejemplo, si una corrida anterior falló a mitad de
+ * camino): borra el Doc temporal, el progreso guardado y el trigger
+ * de continuación. Se llama automáticamente al arrancar un proceso
+ * nuevo, para no acumular basura en Drive ni triggers duplicados.
+ */
+function limpiarProcesoCatalogoAnterior(){
+
+  const propiedades = PropertiesService.getScriptProperties();
+  const progresoRaw = propiedades.getProperty(CLAVE_PROGRESO_CATALOGO);
+
+  if(progresoRaw){
+    try{
+      const progreso = JSON.parse(progresoRaw);
+      if(progreso.docId){
+        DriveApp.getFileById(progreso.docId).setTrashed(true);
+      }
+    }catch(e){
+      // El Doc ya no existía o el progreso estaba corrupto — no importa, se sigue limpiando igual.
+    }
+    propiedades.deleteProperty(CLAVE_PROGRESO_CATALOGO);
+  }
+
+  ScriptApp.getProjectTriggers().forEach(function(t){
+    if(t.getHandlerFunction() === "continuarCatalogoPDFPorLotes") ScriptApp.deleteTrigger(t);
+  });
+}
+
+/**
+ * Reemplaza a instalarTriggerCatalogoDiario() — instala el trigger de
+ * las 3 AM apuntando a generarCatalogoPDFPorLotes en vez de a
+ * generarCatalogoPDFDiario. Correr UNA VEZ a mano desde el editor.
+ */
+function instalarTriggerCatalogoDiarioPorLotes(){
+
+  ScriptApp.getProjectTriggers().forEach(function(t){
+    const fn = t.getHandlerFunction();
+    if(fn === "generarCatalogoPDFDiario" || fn === "generarCatalogoPDFPorLotes"){
+      ScriptApp.deleteTrigger(t);
+    }
+  });
+
+  ScriptApp.newTrigger("generarCatalogoPDFPorLotes")
+    .timeBased()
+    .atHour(3)
+    .everyDays(1)
+    .create();
+
+  Logger.log("Trigger instalado: generarCatalogoPDFPorLotes correrá todos los días entre las 3 y las 4 AM.");
+}
+
+/**
+ * Reemplaza a generarCatalogoPDFAhora() como acción del panel
+ * (?action=generarCatalogoPDFAhora, ver doGet más arriba). Arranca el
+ * proceso por lotes y devuelve enseguida un mensaje de "en progreso"
+ * — el proceso real sigue corriendo en segundo plano vía triggers, y
+ * puede tardar varios minutos si hay muchos productos. El botón del
+ * cliente sigue consultando catalogoPDFInfo para ver cuándo está listo.
+ */
+function generarCatalogoPDFAhoraPorLotes(){
+  generarCatalogoPDFPorLotes();
+  return jsonResponse({
+    success: true,
+    enProgreso: true,
+    message: "La generación del catálogo empezó — con muchos productos puede tardar varios minutos (se procesa en lotes). Volvé a consultar en un rato."
+  });
 }
 
 /**
