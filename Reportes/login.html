@@ -169,7 +169,7 @@ body{
   <div class="login-brand">
     <div class="mark">📊</div>
     <div class="label">
-      <strong id="loginNombreCorto">JIREH</strong>
+      <strong id="loginNombreCorto"></strong>
       <small>REPORTES</small>
     </div>
   </div>
@@ -216,12 +216,20 @@ body{
 
 <script>
 
-const API_URL = CONFIG_NEGOCIO.API_URL;
+let API_URL = "";
 
 (async function inicializar(){
   await cargarConfigNegocio();
+  API_URL = CONFIG_NEGOCIO.API_URL;
+
   document.getElementById("loginNombreCorto").textContent = CONFIG_NEGOCIO.NOMBRE_CORTO;
   document.title = "Acceso · " + CONFIG_NEGOCIO.NOMBRE_CORTO;
+
+  if(!API_URL){
+    mostrarErrorLogin("Esta instalación todavía no tiene configurada la API URL del backend (falta config.json).");
+    const btn = document.getElementById("btnLogin");
+    if(btn) btn.disabled = true;
+  }
 })();
 
 function togglePassword(){
@@ -252,6 +260,11 @@ document.getElementById("loginForm").addEventListener("submit", async function(e
 
   if(!usuario || !password){
     mostrarErrorLogin("Completá usuario y contraseña.");
+    return;
+  }
+
+  if(!API_URL){
+    mostrarErrorLogin("Esta instalación todavía no tiene configurada la API URL del backend (falta config.json).");
     return;
   }
 
