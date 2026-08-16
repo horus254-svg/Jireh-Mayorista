@@ -81,13 +81,15 @@ async function resolverApiUrlBase(){
  * respaldo genéricos.
  */
 async function cargarConfigNegocio(){
-  try{
-    const apiUrl = await resolverApiUrlBase();
-    if(!apiUrl){
-      console.error("Esta instalación todavía no tiene configurada la API URL del backend (falta config.json). Se usan los valores de respaldo.");
-      return CONFIG_NEGOCIO;
-    }
+  const apiUrl = await resolverApiUrlBase();
+  CONFIG_NEGOCIO.API_URL = apiUrl; // disponible ya mismo, sin esperar a Sheets
 
+  if(!apiUrl){
+    console.error("Esta instalación todavía no tiene configurada la API URL del backend (falta config.json). Se usan los valores de respaldo.");
+    return CONFIG_NEGOCIO;
+  }
+
+  try{
     const res = await fetch(apiUrl + "?action=configuracionNegocio");
     const data = await res.json();
     if(!data.success || !data.config) return CONFIG_NEGOCIO;

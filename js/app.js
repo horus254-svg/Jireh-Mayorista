@@ -72,11 +72,14 @@ async function fetchAPI(url, opciones = {}, config = {}) {
   throw ultimoError;
 }
 
-function cargarConfigCliente() {
+async function cargarConfigCliente() {
+  if (typeof cargarConfigNegocio === "function") {
+    await cargarConfigNegocio(); // de config.js — resuelve config.json y trae el resto de Sheets
+  }
   if (typeof CONFIG_NEGOCIO !== "undefined" && CONFIG_NEGOCIO.API_URL) {
     API_URL = CONFIG_NEGOCIO.API_URL;
   } else {
-    console.error("config.js no está cargado o no define API_URL — este catálogo no puede conectarse a ningún backend.");
+    console.error("No se pudo obtener la API URL (falta config.js o config.json) — este catálogo no puede conectarse a ningún backend.");
   }
 }
 
@@ -1841,7 +1844,7 @@ async function descargarCatalogoPDF(){
 // Inicialización: primero fijar API_URL desde config.js, luego
 // apariencia y productos para que API_URL ya esté lista.
 (async () => {
-  cargarConfigCliente();
+  await cargarConfigCliente();
   apariencaCargadaPromise = aplicarApariencia();
   actualizarContador();
   cargarProductos();
