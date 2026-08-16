@@ -26,11 +26,10 @@ function normalizarTextoTransporte(texto){
 
 // API_URL viene de config.js (window.CONFIG_NEGOCIO.API_URL), que ya se
 // carga con <script src="config.js"> antes que este archivo en el HTML.
-// Es el único valor que sigue siendo fijo por instalación — todo lo
-// demás (nombre, WhatsApp, apariencia) se edita desde el panel admin.
-// Si por algún motivo config.js no llegó a cargar, se usa esta URL de
-// respaldo para que el catálogo nunca quede totalmente roto.
-let API_URL = "https://script.google.com/macros/s/AKfycbw1eY_mXImG503rU0Cqddx1WBuGIOhxaW_SXGoIMsug_CjsSC-HLsb2XzYwrovaGBU/exec";
+// Sin valor de respaldo a propósito: si config.js no define API_URL,
+// este catálogo no tiene forma de saber a qué backend pertenece, así
+// que no debe intentar hablar con el de otra instalación.
+let API_URL = "";
 
 /**
  * Reemplazo de fetch() para las llamadas al backend, con timeout
@@ -77,7 +76,7 @@ function cargarConfigCliente() {
   if (typeof CONFIG_NEGOCIO !== "undefined" && CONFIG_NEGOCIO.API_URL) {
     API_URL = CONFIG_NEGOCIO.API_URL;
   } else {
-    console.warn("config.js no está cargado o no define API_URL — usando la URL de respaldo.");
+    console.error("config.js no está cargado o no define API_URL — este catálogo no puede conectarse a ningún backend.");
   }
 }
 
@@ -1534,10 +1533,46 @@ async function aplicarApariencia(){
             heroEl.classList.toggle("hero--sin-degradado", tituloVacio);
         }
 
-        // --- Título de la pestaña del navegador ---
+        // --- Título de la pestaña del navegador + metadatos SEO/redes ---
+        // Estos vienen hardcodeados en el HTML como placeholder (para que
+        // la página nunca se vea vacía si falla esta llamada), pero el
+        // nombre real del negocio es el que está en Sheets — nunca un
+        // nombre de cliente fijo en el código.
         if(cfg.nombre){
             document.title = cfg.nombre;
             nombreNegocio = cfg.nombre;
+
+            const setMeta = (selector, valor) => {
+                const el = document.querySelector(selector);
+                if(el) el.setAttribute("content", valor);
+            };
+            setMeta('meta[name="author"]', cfg.nombre);
+            setMeta('meta[property="og:site_name"]', cfg.nombre);
+
+            const tituloSeo = cfg.seoTitulo && cfg.seoTitulo.trim() ? cfg.seoTitulo : cfg.nombre;
+            setMeta('meta[property="og:title"]', tituloSeo);
+            setMeta('meta[name="twitter:title"]', tituloSeo);
+
+            if(cfg.seoDescripcion && cfg.seoDescripcion.trim()){
+                setMeta('meta[name="description"]', cfg.seoDescripcion);
+                setMeta('meta[property="og:description"]', cfg.seoDescripcion);
+                setMeta('meta[name="twitter:description"]', cfg.seoDescripcion);
+            }
+            if(cfg.seoKeywords && cfg.seoKeywords.trim()){
+                setMeta('meta[name="keywords"]', cfg.seoKeywords);
+            }
+
+            const schemaEl = document.getElementById("schema-negocio");
+            if(schemaEl){
+                try{
+                    const schema = JSON.parse(schemaEl.textContent);
+                    schema.name = cfg.nombre;
+                    if(cfg.seoDescripcion && cfg.seoDescripcion.trim()) schema.description = cfg.seoDescripcion;
+                    schemaEl.textContent = JSON.stringify(schema);
+                }catch(err){
+                    console.error("No se pudo actualizar el schema.org con el nombre del negocio:", err);
+                }
+            }
         }
 
         // --- Sección "Beneficios" (chips bajo el banner) ---
