@@ -280,6 +280,25 @@ async function resolverApiUrl(){
     // falló al decidir mostrar setup.html antes que login.html —
     // por las dudas, volvemos a setup en vez de quedar sin URL.
     window.location.href = "setup.html";
+    return;
+  }
+
+  // Navegador normal (sin Electron): mismo mecanismo que usa admin.js
+  // (cargarConfigCliente) — leer config.json de esta instalación. Antes
+  // este bloque no existía acá, así que login.html se quedaba siempre
+  // con API_URL_POR_DEFECTO (la URL de la instalación original) en modo
+  // navegador, mientras que admin.js sí leía config.json correctamente.
+  // Resultado: el login se validaba contra el backend equivocado.
+  try{
+    const res = await fetch("config.json?_=" + Date.now(), { cache: "no-store" });
+    if(res.ok){
+      const cfg = await res.json();
+      if(cfg.apiUrl){
+        API_URL = cfg.apiUrl;
+      }
+    }
+  }catch(error){
+    console.log("config.json no encontrado, usando URL por defecto");
   }
 }
 
