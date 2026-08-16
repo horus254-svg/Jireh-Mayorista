@@ -1533,46 +1533,14 @@ async function aplicarApariencia(){
             heroEl.classList.toggle("hero--sin-degradado", tituloVacio);
         }
 
-        // --- Título de la pestaña del navegador + metadatos SEO/redes ---
-        // Estos vienen hardcodeados en el HTML como placeholder (para que
-        // la página nunca se vea vacía si falla esta llamada), pero el
-        // nombre real del negocio es el que está en Sheets — nunca un
-        // nombre de cliente fijo en el código.
+        // --- Título de la pestaña del navegador ---
+        // El resto de los metadatos SEO/OG/Twitter/schema.org los aplica
+        // aplicarConfigSEO() en config.js (ver el script inline al final
+        // de index.html) — no se duplica acá para evitar dos fetches y
+        // dos escrituras compitiendo sobre los mismos meta tags.
         if(cfg.nombre){
             document.title = cfg.nombre;
             nombreNegocio = cfg.nombre;
-
-            const setMeta = (selector, valor) => {
-                const el = document.querySelector(selector);
-                if(el) el.setAttribute("content", valor);
-            };
-            setMeta('meta[name="author"]', cfg.nombre);
-            setMeta('meta[property="og:site_name"]', cfg.nombre);
-
-            const tituloSeo = cfg.seoTitulo && cfg.seoTitulo.trim() ? cfg.seoTitulo : cfg.nombre;
-            setMeta('meta[property="og:title"]', tituloSeo);
-            setMeta('meta[name="twitter:title"]', tituloSeo);
-
-            if(cfg.seoDescripcion && cfg.seoDescripcion.trim()){
-                setMeta('meta[name="description"]', cfg.seoDescripcion);
-                setMeta('meta[property="og:description"]', cfg.seoDescripcion);
-                setMeta('meta[name="twitter:description"]', cfg.seoDescripcion);
-            }
-            if(cfg.seoKeywords && cfg.seoKeywords.trim()){
-                setMeta('meta[name="keywords"]', cfg.seoKeywords);
-            }
-
-            const schemaEl = document.getElementById("schema-negocio");
-            if(schemaEl){
-                try{
-                    const schema = JSON.parse(schemaEl.textContent);
-                    schema.name = cfg.nombre;
-                    if(cfg.seoDescripcion && cfg.seoDescripcion.trim()) schema.description = cfg.seoDescripcion;
-                    schemaEl.textContent = JSON.stringify(schema);
-                }catch(err){
-                    console.error("No se pudo actualizar el schema.org con el nombre del negocio:", err);
-                }
-            }
         }
 
         // --- Sección "Beneficios" (chips bajo el banner) ---

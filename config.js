@@ -8,16 +8,21 @@
  *
  * La única excepción es API_URL: como es la dirección de la API
  * que hay que llamar para traer el resto de la configuración,
- * no puede a su vez guardarse en esa misma API. Es lo único que
- * hay que pegar a mano al instalar para un cliente nuevo.
+ * no puede a su vez guardarse en esa misma API. En vez de tenerla
+ * escrita a mano acá (lo que la dejaba fija a un solo cliente),
+ * se lee de config.json — el mismo archivo por-instalación que ya
+ * usan login.html y admin.js — así este archivo queda igual para
+ * todos los clientes y lo único que cambia por instalación es
+ * config.json.
  * ---------------------------------------------------------
  */
 
-const API_URL_BASE = "https://script.google.com/macros/s/AKfycbw1eY_mXImG503rU0Cqddx1WBuGIOhxaW_SXGoIMsug_CjsSC-HLsb2XzYwrovaGBU/exec";
+let API_URL_BASE = "";
 
 // Valores de respaldo, usados únicamente si falla la conexión con
 // Sheets (sin internet, la API caída, etc.) — así ninguna página
-// se queda en blanco o rota.
+// se queda en blanco o rota. Genéricos a propósito: no deben tener
+// el nombre ni la URL de ningún cliente en particular.
 const CONFIG_NEGOCIO_RESPALDO = {
   API_URL: API_URL_BASE,
   NOMBRE_NEGOCIO: "Catálogo",
@@ -26,7 +31,7 @@ const CONFIG_NEGOCIO_RESPALDO = {
 
   URL_SITIO: "",
   WHATSAPP_NUMERO: "",
-  WHATSAPP_ICONO_URL: "https://cdn-icons-png.flaticon.com/512/733/733585.png",
+  WHATSAPP_ICONO_URL: "",
   ICONO_URL: "icon-512.png",
 
   SEO_TITULO: "Catálogo",
@@ -49,6 +54,26 @@ const CONFIG_NEGOCIO_RESPALDO = {
 let CONFIG_NEGOCIO = { ...CONFIG_NEGOCIO_RESPALDO };
 
 /**
+ * Lee la API URL de esta instalación desde config.json (una sola vez,
+ * cacheada en API_URL_BASE). Es el mismo archivo que ya genera el
+ * Instalador del panel admin y que usa login.html — evita tener que
+ * pegar la URL a mano en este archivo para cada cliente nuevo.
+ */
+async function resolverApiUrlBase(){
+  if(API_URL_BASE) return API_URL_BASE;
+  try{
+    const res = await fetch("config.json?_=" + Date.now(), { cache: "no-store" });
+    if(res.ok){
+      const cfg = await res.json();
+      if(cfg.apiUrl) API_URL_BASE = cfg.apiUrl;
+    }
+  }catch(error){
+    console.error("No se pudo leer config.json para obtener la API URL:", error);
+  }
+  return API_URL_BASE;
+}
+
+/**
  * Trae la configuración real desde Sheets (a través de la API) y
  * actualiza CONFIG_NEGOCIO. Devuelve una Promise — cada página debe
  * esperarla (await cargarConfigNegocio()) antes de usar los datos
@@ -57,14 +82,20 @@ let CONFIG_NEGOCIO = { ...CONFIG_NEGOCIO_RESPALDO };
  */
 async function cargarConfigNegocio(){
   try{
-    const res = await fetch(API_URL_BASE + "?action=configuracionNegocio");
+    const apiUrl = await resolverApiUrlBase();
+    if(!apiUrl){
+      console.error("Esta instalación todavía no tiene configurada la API URL del backend (falta config.json). Se usan los valores de respaldo.");
+      return CONFIG_NEGOCIO;
+    }
+
+    const res = await fetch(apiUrl + "?action=configuracionNegocio");
     const data = await res.json();
     if(!data.success || !data.config) return CONFIG_NEGOCIO;
 
     const cfg = data.config;
 
     CONFIG_NEGOCIO = {
-      API_URL: API_URL_BASE,
+      API_URL: apiUrl,
       NOMBRE_NEGOCIO: cfg.nombre || CONFIG_NEGOCIO_RESPALDO.NOMBRE_NEGOCIO,
       NOMBRE_CORTO: cfg.nombreCorto || CONFIG_NEGOCIO_RESPALDO.NOMBRE_CORTO,
       TEMA: cfg.tema || CONFIG_NEGOCIO_RESPALDO.TEMA,
