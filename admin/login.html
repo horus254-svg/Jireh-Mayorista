@@ -212,9 +212,9 @@ body{
 <div class="login-wrap">
 
   <div class="login-brand">
-    <div class="mark" id="loginMark">J</div>
+    <div class="mark" id="loginMark"></div>
     <div class="label">
-      <strong id="loginLabelTexto">JIREH</strong>
+      <strong id="loginLabelTexto"></strong>
       <small>PANEL ADMIN</small>
     </div>
   </div>
@@ -266,8 +266,12 @@ body{
 // así el mismo instalador sirve para cualquier cliente. En el
 // navegador normal (sin window.posOffline) se usa esta URL fija,
 // como hasta ahora.
-const API_URL_POR_DEFECTO = "https://script.google.com/macros/s/AKfycbw1eY_mXImG503rU0Cqddx1WBuGIOhxaW_SXGoIMsug_CjsSC-HLsb2XzYwrovaGBU/exec";
-let API_URL = API_URL_POR_DEFECTO;
+// Sin URL por defecto a propósito: cada instalación tiene su propio
+// backend (config.json en modo navegador, o api_url guardada en SQLite
+// en Electron). Si ninguna de las dos existe todavía, esta instalación
+// no está configurada y login.html no debe poder validar credenciales
+// contra el backend de otro cliente por error.
+let API_URL = "";
 
 async function resolverApiUrl(){
   if(window.posOffline && typeof window.posOffline.obtenerApiUrl === "function"){
@@ -284,11 +288,7 @@ async function resolverApiUrl(){
   }
 
   // Navegador normal (sin Electron): mismo mecanismo que usa admin.js
-  // (cargarConfigCliente) — leer config.json de esta instalación. Antes
-  // este bloque no existía acá, así que login.html se quedaba siempre
-  // con API_URL_POR_DEFECTO (la URL de la instalación original) en modo
-  // navegador, mientras que admin.js sí leía config.json correctamente.
-  // Resultado: el login se validaba contra el backend equivocado.
+  // (cargarConfigCliente) — leer config.json de esta instalación.
   try{
     const res = await fetch("config.json?_=" + Date.now(), { cache: "no-store" });
     if(res.ok){
@@ -298,7 +298,13 @@ async function resolverApiUrl(){
       }
     }
   }catch(error){
-    console.log("config.json no encontrado, usando URL por defecto");
+    console.log("config.json no encontrado");
+  }
+
+  if(!API_URL){
+    mostrarErrorLogin("Esta instalación todavía no tiene configurada la API URL del backend (falta config.json).");
+    const btn = document.getElementById("btnLogin");
+    if(btn) btn.disabled = true;
   }
 }
 
@@ -422,6 +428,11 @@ document.getElementById("loginForm").addEventListener("submit", async function(e
 
   if(!usuario || !password){
     mostrarErrorLogin("Completá usuario y contraseña.");
+    return;
+  }
+
+  if(!API_URL){
+    mostrarErrorLogin("Esta instalación todavía no tiene configurada la API URL del backend (falta config.json).");
     return;
   }
 

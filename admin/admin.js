@@ -6,11 +6,13 @@
    • Responsive mobile nav sync added
 =================================================================== */
 
-// API_URL dinámica — se carga desde config.json al iniciar.
-// Permite instalar el mismo código para distintos clientes
-// sin modificar nada manualmente.
-let API_URL =
-  "https://script.google.com/macros/s/AKfycbw1eY_mXImG503rU0Cqddx1WBuGIOhxaW_SXGoIMsug_CjsSC-HLsb2XzYwrovaGBU/exec";
+// API_URL dinámica — se carga desde config.json (o SQLite en Electron)
+// al iniciar. Permite instalar el mismo código para distintos clientes
+// sin modificar nada manualmente. Sin valor por defecto a propósito:
+// si no hay config.json ni api_url guardada, esta instalación todavía
+// no está configurada y no debe poder hablar con el backend de otro
+// cliente por error (ver comentario más abajo, cerca de DOMContentLoaded).
+let API_URL = "";
 
 /**
  * Reemplazo de fetch() para las llamadas al backend, con timeout
@@ -255,23 +257,25 @@ function actualizarElemento(id, valor) {
 
 /* ===================== CONFIGURACIÓN DEL NEGOCIO (encabezado del ticket) ===================== */
 
-// Valores por defecto — son los que ya venía usando el ticket, así que
-// si todavía no cargó la config del servidor, todo se imprime igual que antes.
+// Valores por defecto — genéricos a propósito, sin ningún nombre de
+// cliente hardcodeado. Solo se usan como placeholder mientras todavía
+// no cargó la config real desde el backend (hoja CONFIGURACION); una
+// vez que carga, siempre gana lo que esté guardado ahí.
 const CONFIG_NEGOCIO_DEFAULT = {
-  nombre:     "JIREH",
+  nombre:     "",
   subtitulo:  "Punto de Venta",
   direccion:  "",
   telefono1:  "",
   telefono2:  "",
   pie:        "¡Gracias por su compra!",
 
-  bannerTitulo:    "Mayorista Jireh",
-  bannerSubtitulo: "Catálogo Mayorista Online",
+  bannerTitulo:    "",
+  bannerSubtitulo: "",
   bannerImagen:    "",
   tema:            "navy",
 
-  cbuTransferencia:  "1910249655024901554778",
-  nombreTitularCbu:  "ESCALERA CARBAJAL DANIEL"
+  cbuTransferencia:  "",
+  nombreTitularCbu:  ""
 };
 
 // Caché en memoria de la config, para que imprimir un ticket no tenga
@@ -332,7 +336,7 @@ async function cargarConfigNegocioForm() {
   cargarDrivePedidosForm(cfg);
   cargarUrlCatalogoForm(cfg);
 
-  if (form) form.placeholder = "Ej: JIREH";
+  if (form) form.placeholder = "Ej: Mi Negocio";
 }
 
 /** Reads the form fields and saves them to the backend (hoja CONFIGURACION) */
@@ -413,7 +417,7 @@ function _ejecutarAccionConfirmada() {
   if (typeof fn === "function") fn();
 }
 
-/** Resets the form (and the saved sheet values) back to the original JIREH defaults */
+/** Resets the form (and the saved sheet values) back to the generic empty defaults */
 function restablecerConfigNegocio() {
   confirmarAccion(
     "¿Restablecer los datos del local a los valores originales?",
@@ -461,8 +465,8 @@ function vistaPreviaTicketConfig() {
 /* ===================== APARIENCIA DEL PANEL ADMIN (letra + nombre del sidebar) ===================== */
 
 const SIDEBAR_BRAND_DEFAULT = {
-  sidebarMark:  "J",
-  sidebarTexto: "JIREH"
+  sidebarMark:  "",
+  sidebarTexto: ""
 };
 
 /** Applies the saved letter/name to the sidebar in the DOM — runs on every page load, not just inside Configuración */
@@ -774,21 +778,21 @@ async function guardarPasswordStockForm() {
 /* ===================== APARIENCIA DEL CATÁLOGO WEB (banner + tema) ===================== */
 
 const APARIENCIA_DEFAULT = {
-  navbarTexto:     "Jireh Mayorista",
+  navbarTexto:     "",
   navbarIcono:     "🏬",
-  bannerTitulo:    "Mayorista Jireh",
-  bannerSubtitulo: "Catálogo Mayorista Online",
+  bannerTitulo:    "",
+  bannerSubtitulo: "",
   bannerImagen:    "",
   tema:            "navy",
   gradPersonalizado: false,
   gradA: "#241536",
   gradB: "#3a2856",
 
-  urlCatalogo: "https://horus254-svg.github.io/Jireh-Mayorista",
-  nombreCorto: "JIREH",
+  urlCatalogo: "",
+  nombreCorto: "",
 
   iconoUrl: "icon-512.png",
-  whatsappIconoUrl: "https://cdn-icons-png.flaticon.com/512/733/733585.png",
+  whatsappIconoUrl: "",
 
   seoTitulo: "",
   seoDescripcion: "",
@@ -2615,7 +2619,7 @@ function imprimirNotaPedidoA4() {
   const html = `
     <div style="font-family:Arial,Helvetica,sans-serif; width:190mm; margin:10mm auto; padding:8mm; box-sizing:border-box; border:2px solid #000; border-radius:4mm;">
       <div style="text-align:center; margin-bottom:6mm;">
-        <div style="font-size:20pt; font-weight:900;">Jireh Mayorista</div>
+        <div style="font-size:20pt; font-weight:900;">${escapeHtml(obtenerConfigNegocio().nombre || "")}</div>
       </div>
       <div style="background:#0b1633; color:#fff; text-align:center; padding:4mm; border-radius:2mm; margin-bottom:6mm;">
         <div style="font-size:14pt; font-weight:900; letter-spacing:2px;">NOTA DE PEDIDO</div>
