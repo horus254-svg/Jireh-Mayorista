@@ -1782,7 +1782,13 @@ function mostrarSeccion(id) {
 
   if (id === "pedidos")   cargarSiVencido("pedidos", cargarPedidos);
   if (id === "productos") cargarSiVencido("productos", cargarProductos);
-  if (id === "ingresoProductos") { cargarProductos(); cargarHistorialIngresos(); setTimeout(() => document.getElementById("ipCodigoScan")?.focus(), 100); }
+  if (id === "ingresoProductos") {
+    cargarProductos();
+    cargarHistorialIngresos();
+    const ipbFecha = document.getElementById("ipbFecha");
+    if (ipbFecha && !ipbFecha.value) ipbFecha.value = _hoyISO();
+    setTimeout(() => document.getElementById("ipCodigoScan")?.focus(), 100);
+  }
   if (id === "ventasPOS") cargarSiVencido("ventasPOS", cargarVentasPOSHistorial);
   if (id === "configuracion") {
     cargarConfigNegocioForm();
@@ -9292,9 +9298,48 @@ async function ejecutarMigracionFormaPago() {
 let ingresosProductosGlobal = [];
 let ipProductoActualEsNuevo = false;
 
+// Carrito de la boleta que se está armando: cada ítem escaneado se
+// acumula acá y recién se manda todo junto al backend al tocar
+// "Guardar boleta" — así todos los productos quedan agrupados en UN
+// solo documento (BOLETA_ID) por proveedor/día/N° de boleta.
+let ipCarritoBoleta = [];
+
+// ID de la boleta que está abierta en el modal de detalle/pago
+let boletaProveedorIdActual = null;
+
+// true cuando el modal de detalle de boleta se abrió desde "Ver boletas"
+// de un proveedor (en vez de desde la sección Ingreso de Productos) —
+// controla si hay que volver a mostrar esa ventana al cerrar el detalle.
+let detalleBoletaAbiertoDesdeProveedor = false;
+
 function _hoyISO() {
   const d = new Date();
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+
+/** Refleja en pantalla si ya hay una boleta con este proveedor/fecha/N° (se le sumarían los ítems) o si es una boleta nueva */
+function actualizarEstadoBoletaActual() {
+  const estado = document.getElementById("ipbEstadoBoleta");
+  if (!estado) return;
+  const proveedor = document.getElementById("ipbProveedor").value.trim().toLowerCase();
+  const fecha = document.getElementById("ipbFecha").value;
+  const numero = document.getElementById("ipbNumeroBoleta").value.trim();
+
+  if (!proveedor) { estado.textContent = ""; return; }
+
+  const existente = (ingresosProductosGlobal || []).find(i =>
+    String(i.PROVEEDOR || "").trim().toLowerCase() === proveedor &&
+    String(i.FECHA || "") === fecha &&
+    String(i.NUMERO_BOLETA || "").trim() === numero
+  );
+
+  if (existente) {
+    estado.innerHTML = `⚠️ Ya existe una boleta con estos datos (Total actual: $${Number(existente.TOTAL || 0).toLocaleString("es-AR")}) — lo que agregues se va a sumar a esa misma boleta.`;
+    estado.style.color = "var(--amber-600, #b45309)";
+  } else {
+    estado.textContent = "✓ Se va a crear una boleta nueva con estos datos.";
+    estado.style.color = "var(--green-600, green)";
+  }
 }
 
 /** Busca el código escaneado/tipeado en productosAdminGlobal; si no está, abre el formulario en modo "producto nuevo" */
@@ -9316,11 +9361,7 @@ function buscarProductoParaIngreso() {
   document.getElementById("ipFormularioWrap").style.display = "";
   document.getElementById("ipCodigo").value = codigo;
   document.getElementById("ipCodigoMostrado").value = codigo;
-  document.getElementById("ipFecha").value = _hoyISO();
   document.getElementById("ipCantidad").value = "";
-  document.getElementById("ipCantidad").focus();
-  document.getElementById("ipProveedorContacto").value = "";
-  document.getElementById("ipObservaciones").value = "";
 
   if (producto) {
     ipProductoActualEsNuevo = false;
@@ -9330,8 +9371,10 @@ function buscarProductoParaIngreso() {
     document.getElementById("ipNombre").value = producto.PRODUCTO || "";
     document.getElementById("ipNombre").readOnly = true;
     document.getElementById("ipCategoria").value = producto.CATEGORIA || "";
-    document.getElementById("ipPrecio").value = Number(producto.PRECIO || 0);
-    document.getElementById("ipPrecioHint").textContent = "Dejalo así si no cambió, o corregilo si vino con un precio nuevo.";
+    document.getElementById("ipPrecio").value = "";
+    document.getElementById("ipPrecioHint").textContent = "Lo que le pagás al proveedor por esta entrega — con esto se calcula el saldo que se le debe.";
+    document.getElementById("ipPrecioVenta").value = Number(producto.PRECIO || 0);
+    document.getElementById("ipPrecioVentaHint").textContent = "Dejalo así si no cambió, o corregilo si el precio al público cambió.";
     if (estado) { estado.textContent = "✓ Producto encontrado: " + (producto.PRODUCTO || ""); estado.style.color = "var(--green-600, green)"; }
   } else {
     ipProductoActualEsNuevo = true;
@@ -9342,7 +9385,9 @@ function buscarProductoParaIngreso() {
     document.getElementById("ipNombre").readOnly = false;
     document.getElementById("ipCategoria").value = "";
     document.getElementById("ipPrecio").value = "";
-    document.getElementById("ipPrecioHint").textContent = "Precio de venta con el que se va a dar de alta.";
+    document.getElementById("ipPrecioHint").textContent = "Lo que le pagás al proveedor por esta entrega.";
+    document.getElementById("ipPrecioVenta").value = "";
+    document.getElementById("ipPrecioVentaHint").textContent = "Precio de venta al público con el que se va a publicar en el POS y en la página. Si lo dejás vacío, se usa el precio de ingreso.";
     if (estado) { estado.textContent = "No existe todavía — completá los datos para crearlo"; estado.style.color = "var(--amber-600, #b45309)"; }
     document.getElementById("ipNombre").focus();
   }
@@ -9365,6 +9410,8 @@ async function generarCodigoIngresoAutomatico() {
 function cancelarIngresoProducto() {
   document.getElementById("ipFormularioWrap").style.display = "none";
   document.getElementById("ipCodigoScan").value = "";
+  document.getElementById("ipPrecio").value = "";
+  document.getElementById("ipPrecioVenta").value = "";
   document.getElementById("ipEstadoBusqueda").textContent = "";
   document.getElementById("ipCodigoScan").focus();
 }
@@ -9383,32 +9430,113 @@ function poblarDatalistProveedoresIngreso() {
   dl.innerHTML = proveedores.map(p => `<option value="${escapeHtml(p)}">`).join("");
 }
 
-/** Envía el ingreso al backend: crea el producto si es nuevo, o suma stock/actualiza precio si ya existe */
-async function confirmarIngresoProducto() {
+/** Agrega el producto del formulario al carrito de la boleta (todavía no lo manda al backend) */
+function agregarItemABoleta() {
+  const proveedor = document.getElementById("ipbProveedor").value.trim();
+  if (!proveedor) {
+    toast("Completá el proveedor de la boleta (arriba) antes de agregar productos", "error");
+    document.getElementById("ipbProveedor").focus();
+    return;
+  }
+
   const codigo = document.getElementById("ipCodigo").value.trim();
   const nombre = document.getElementById("ipNombre").value.trim();
   const categoria = document.getElementById("ipCategoria").value.trim();
-  const precio = document.getElementById("ipPrecio").value;
-  const cantidad = document.getElementById("ipCantidad").value;
-  const proveedor = document.getElementById("ipProveedor").value.trim();
-  const proveedorContacto = document.getElementById("ipProveedorContacto").value.trim();
-  const observaciones = document.getElementById("ipObservaciones").value.trim();
-  const fecha = document.getElementById("ipFecha").value || _hoyISO();
+  const precio = Number(document.getElementById("ipPrecio").value || 0);
+  const precioVentaInput = document.getElementById("ipPrecioVenta").value;
+  const precioVenta = precioVentaInput !== "" ? Number(precioVentaInput) : null;
+  const cantidad = Number(document.getElementById("ipCantidad").value || 0);
 
   if (ipProductoActualEsNuevo && !nombre) {
     toast("Ingresá el nombre del producto para poder crearlo", "error");
     return;
   }
-  if (!cantidad || Number(cantidad) <= 0) {
+  if (!cantidad || cantidad <= 0) {
     toast("Ingresá una cantidad válida, mayor a 0", "error");
     return;
   }
-  if (!proveedor) {
-    toast("Ingresá el proveedor de esta mercadería", "error");
+  if (!precio || precio <= 0) {
+    toast("Ingresá el precio de ingreso (costo) — se usa para calcular el saldo al proveedor", "error");
     return;
   }
 
-  const btn = document.getElementById("btnConfirmarIngreso");
+  ipCarritoBoleta.push({
+    codigo, producto: nombre || codigo, categoria, precio,
+    precioVenta: precioVenta !== null && !isNaN(precioVenta) ? precioVenta : null,
+    cantidad,
+    esNuevo: ipProductoActualEsNuevo
+  });
+
+  renderCarritoBoleta();
+  toast("Agregado a la boleta", "success");
+  cancelarIngresoProducto();
+}
+
+function renderCarritoBoleta() {
+  const tbody = document.getElementById("ipCarritoBody");
+  const totalEl = document.getElementById("ipCarritoTotal");
+  if (!tbody) return;
+
+  if (ipCarritoBoleta.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted py-3">Todavía no agregaste productos</td></tr>`;
+    if (totalEl) totalEl.textContent = "$0";
+    return;
+  }
+
+  let total = 0;
+  tbody.innerHTML = ipCarritoBoleta.map((it, idx) => {
+    // El subtotal de la boleta (lo que se le debe al proveedor) se
+    // calcula con el precio de INGRESO (costo), nunca con el de venta.
+    const subtotal = it.precio * it.cantidad;
+    total += subtotal;
+    const precioVentaTexto = (it.precioVenta !== null && it.precioVenta !== undefined)
+      ? "$" + Number(it.precioVenta).toLocaleString("es-AR")
+      : "—";
+    return `
+      <tr>
+        <td class="mono">${escapeHtml(it.codigo || "—")}</td>
+        <td>${escapeHtml(it.producto)} ${it.esNuevo ? '<span class="badge bg-warning text-dark">nuevo</span>' : ""}</td>
+        <td>${escapeHtml(it.categoria || "—")}</td>
+        <td class="money">${Number(it.cantidad).toLocaleString("es-AR")}</td>
+        <td class="money">$${Number(it.precio).toLocaleString("es-AR")}</td>
+        <td class="money">${precioVentaTexto}</td>
+        <td class="money">$${subtotal.toLocaleString("es-AR")}</td>
+        <td><button class="btn btn-outline-danger btn-sm" onclick="quitarItemCarrito(${idx})">✕</button></td>
+      </tr>`;
+  }).join("");
+
+  if (totalEl) totalEl.textContent = "$" + total.toLocaleString("es-AR");
+}
+
+function quitarItemCarrito(idx) {
+  ipCarritoBoleta.splice(idx, 1);
+  renderCarritoBoleta();
+}
+
+function vaciarCarritoBoleta() {
+  if (ipCarritoBoleta.length && !confirm("¿Vaciar todos los productos cargados en esta boleta?")) return;
+  ipCarritoBoleta = [];
+  renderCarritoBoleta();
+}
+
+/** Manda TODA la boleta (cabecera + todos los productos del carrito) al backend en un solo documento */
+async function guardarBoletaCompleta() {
+  const proveedor = document.getElementById("ipbProveedor").value.trim();
+  const proveedorContacto = document.getElementById("ipbProveedorContacto").value.trim();
+  const numeroBoleta = document.getElementById("ipbNumeroBoleta").value.trim();
+  const observaciones = document.getElementById("ipbObservaciones").value.trim();
+  const fecha = document.getElementById("ipbFecha").value || _hoyISO();
+
+  if (!proveedor) {
+    toast("Ingresá el proveedor de esta boleta", "error");
+    return;
+  }
+  if (ipCarritoBoleta.length === 0) {
+    toast("Agregá al menos un producto a la boleta antes de guardar", "error");
+    return;
+  }
+
+  const btn = document.getElementById("btnGuardarBoleta");
   const textoOriginal = btn.innerHTML;
   btn.disabled = true;
   btn.innerHTML = "Guardando...";
@@ -9419,47 +9547,59 @@ async function confirmarIngresoProducto() {
       body: JSON.stringify({
         action: "registrarIngresoProducto",
         rol: obtenerRolActual(),
-        codigo, producto: nombre, categoria, precio, cantidad,
-        proveedor, proveedorContacto, observaciones, fecha
+        usuario: (sessionStorage.getItem("nombreUsuario") || sessionStorage.getItem("vendedor") || "ADMIN"),
+        proveedor, proveedorContacto, numeroBoleta, observaciones, fecha,
+        items: ipCarritoBoleta.map(it => ({
+          codigo: it.codigo, producto: it.producto, categoria: it.categoria,
+          precio: it.precio, precioVenta: it.precioVenta, cantidad: it.cantidad
+        }))
       })
     });
     const data = await res.json();
 
     if (!data.success) {
-      toast(data.message || "No se pudo registrar el ingreso", "error");
+      toast(data.message || "No se pudo guardar la boleta", "error");
       return;
     }
 
-    toast(data.esProductoNuevo
-      ? `Producto creado y stock cargado (${cantidad} u.)`
-      : `Stock actualizado (+${cantidad} u.)`, "success");
+    toast(`Boleta guardada — ${ipCarritoBoleta.length} producto(s), total $${Number(data.totalBoleta || 0).toLocaleString("es-AR")}`, "success");
 
     try { localStorage.removeItem("vpos_cache_productosAdmin"); } catch(e) {}
+    ipCarritoBoleta = [];
+    renderCarritoBoleta();
+    document.getElementById("ipbNumeroBoleta").value = "";
+    document.getElementById("ipbObservaciones").value = "";
     await cargarProductos();
     await cargarHistorialIngresos();
-    cancelarIngresoProducto();
 
   } catch (error) {
-    console.error("Error al registrar ingreso:", error);
-    toast("Error de conexión al registrar el ingreso", "error");
+    console.error("Error al guardar la boleta:", error);
+    toast("Error de conexión al guardar la boleta", "error");
   } finally {
     btn.disabled = false;
     btn.innerHTML = textoOriginal;
   }
 }
 
-/** Carga el historial de ingresos (recepciones) desde el backend */
+/** Carga el listado de boletas de proveedor (una fila = una boleta, con total/pagado/saldo) desde el backend */
 async function cargarHistorialIngresos() {
   const tbody = document.getElementById("tablaIngresosBody");
   try {
-    const res = await fetchAPI(API_URL + "?action=ingresosProductos");
+    const res = await fetchAPI(API_URL + "?action=boletasProveedores");
     const data = await res.json();
-    ingresosProductosGlobal = data.ingresos || [];
+    ingresosProductosGlobal = data.boletas || [];
+    poblarDatalistProveedoresIngreso();
     filtrarHistorialIngresos();
   } catch (error) {
-    console.error("Error al cargar historial de ingresos:", error);
+    console.error("Error al cargar boletas de proveedores:", error);
     if (tbody) tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-3">Error al cargar el historial</td></tr>`;
   }
+}
+
+function _badgeEstadoBoleta(estado) {
+  if (estado === "PAGADA") return `<span class="badge bg-success">Pagada</span>`;
+  if (estado === "PARCIAL") return `<span class="badge bg-warning text-dark">Pago parcial</span>`;
+  return `<span class="badge bg-danger">Pendiente</span>`;
 }
 
 function filtrarHistorialIngresos() {
@@ -9470,40 +9610,197 @@ function filtrarHistorialIngresos() {
   const proveedor = (document.getElementById("ipFiltroProveedor")?.value || "").trim().toLowerCase();
   const desde = document.getElementById("ipFiltroDesde")?.value || "";
   const hasta = document.getElementById("ipFiltroHasta")?.value || "";
+  const estadoFiltro = document.getElementById("ipFiltroEstado")?.value || "";
 
   let lista = ingresosProductosGlobal || [];
 
   if (texto) {
-    lista = lista.filter(i =>
-      String(i.CODIGO || "").toLowerCase().includes(texto) ||
-      String(i.PRODUCTO || "").toLowerCase().includes(texto));
+    lista = lista.filter(i => String(i.NUMERO_BOLETA || "").toLowerCase().includes(texto));
   }
   if (proveedor) {
     lista = lista.filter(i => String(i.PROVEEDOR || "").toLowerCase().includes(proveedor));
   }
   if (desde) lista = lista.filter(i => String(i.FECHA) >= desde);
   if (hasta) lista = lista.filter(i => String(i.FECHA) <= hasta);
+  if (estadoFiltro) lista = lista.filter(i => i.ESTADO === estadoFiltro);
 
   if (lista.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-3">Sin ingresos registrados para este filtro</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-3">Sin boletas registradas para este filtro</td></tr>`;
     return;
   }
 
   tbody.innerHTML = lista.map(i => `
     <tr>
       <td>${escapeHtml(i.FECHA || "—")}</td>
-      <td class="mono">${escapeHtml(i.CODIGO || "—")}</td>
-      <td>${escapeHtml(i.PRODUCTO || "—")}</td>
-      <td>${escapeHtml(i.CATEGORIA || "—")}</td>
-      <td class="money">${Number(i.CANTIDAD || 0).toLocaleString("es-AR")}</td>
-      <td class="money">$${Number(i.PRECIO_NUEVO || i.PRECIO_ANTERIOR || 0).toLocaleString("es-AR")}</td>
+      <td class="mono">${escapeHtml(i.NUMERO_BOLETA || "—")}</td>
       <td>${escapeHtml(i.PROVEEDOR || "—")}</td>
       <td>${escapeHtml(i.PROVEEDOR_CONTACTO || "—")}</td>
-      <td>${escapeHtml(i.OBSERVACIONES || "—")}</td>
+      <td class="money">$${Number(i.TOTAL || 0).toLocaleString("es-AR")}</td>
+      <td class="money" style="color:var(--green-600);">$${Number(i.PAGADO || 0).toLocaleString("es-AR")}</td>
+      <td class="money" style="color:var(--red-500);">$${Number(i.SALDO || 0).toLocaleString("es-AR")}</td>
+      <td>${_badgeEstadoBoleta(i.ESTADO)}</td>
+      <td><button class="btn btn-outline-primary btn-sm" onclick="abrirModalDetalleBoleta('${i.BOLETA_ID}')">Ver / Pagar</button></td>
     </tr>`).join("");
 }
 
-/** Exporta el historial de ingresos (según los filtros aplicados) a PDF, con jsPDF + autoTable */
+/** Abre el modal de detalle de una boleta: items, pagos, y el formulario para registrar un pago nuevo */
+async function abrirModalDetalleBoleta(boletaId) {
+  // Si este modal se abrió desde "Ver boletas" de un proveedor, esa
+  // ventana queda abierta atrás — se oculta mientras se ve el detalle
+  // para que no se superpongan dos modales a la vez, y se vuelve a
+  // mostrar al cerrar este (ver cerrarModalDetalleBoleta).
+  const modalProveedor = document.getElementById("boletasProveedorModalBackdrop");
+  detalleBoletaAbiertoDesdeProveedor = !!(modalProveedor && modalProveedor.classList.contains("show"));
+  if (detalleBoletaAbiertoDesdeProveedor) modalProveedor.classList.remove("show");
+
+  document.getElementById("detalleBoletaModalBackdrop").classList.add("show");
+  document.getElementById("detalleBoletaTitulo").textContent = "Cargando...";
+  document.getElementById("pagoProveedorMonto").value = "";
+  document.getElementById("pagoProveedorObservaciones").value = "";
+  document.getElementById("pagoProveedorFormaPago").value = "EFECTIVO";
+  const btnPago = document.getElementById("btnRegistrarPagoProveedor");
+  if (btnPago) { btnPago.disabled = false; btnPago.textContent = "💾 Pagar"; }
+  boletaProveedorIdActual = boletaId;
+
+  try {
+    const res = await fetchAPI(API_URL + "?action=detalleBoletaProveedor&boletaId=" + encodeURIComponent(boletaId));
+    const data = await res.json();
+    if (!data.success) {
+      toast(data.message || "No se pudo cargar la boleta", "error");
+      cerrarModalDetalleBoleta();
+      return;
+    }
+
+    const b = data.boleta;
+    document.getElementById("detalleBoletaTitulo").textContent =
+      `${b.PROVEEDOR}${b.NUMERO_BOLETA ? " — Boleta " + b.NUMERO_BOLETA : ""} (${b.FECHA})`;
+    document.getElementById("detalleBoletaTotal").textContent = "$" + Number(b.TOTAL || 0).toLocaleString("es-AR");
+    document.getElementById("detalleBoletaPagado").textContent = "$" + Number(b.PAGADO || 0).toLocaleString("es-AR");
+    document.getElementById("detalleBoletaSaldo").textContent = "$" + Number(b.SALDO || 0).toLocaleString("es-AR");
+
+    const datosWrap = document.getElementById("detalleBoletaDatos");
+    if (datosWrap) {
+      const filasDatos = [
+        ["N° de boleta / remito", b.NUMERO_BOLETA || "—"],
+        ["Proveedor", b.PROVEEDOR || "—"],
+        ["Contacto del proveedor", b.PROVEEDOR_CONTACTO || "—"],
+        ["Fecha de recepción", b.FECHA || "—"],
+        ["Cargada por", b.USUARIO || "—"],
+        ["Observaciones", b.OBSERVACIONES || "—"]
+      ];
+      datosWrap.innerHTML = filasDatos.map(([label, valor]) =>
+        `<div class="d-flex justify-content-between gap-2"><span class="text-muted">${escapeHtml(label)}</span><span class="text-end">${escapeHtml(String(valor))}</span></div>`
+      ).join("");
+    }
+
+    const formWrap = document.getElementById("cardFormularioPagoProveedor");
+    if (formWrap) formWrap.style.display = b.SALDO > 0 ? "" : "none";
+
+    const items = data.items || [];
+    const resumenEl = document.getElementById("detalleBoletaResumenItems");
+    if (resumenEl) {
+      const totalUnidades = items.reduce((acc, it) => acc + (Number(it.CANTIDAD) || 0), 0);
+      const cantidadNuevos = items.filter(it => String(it.ES_PRODUCTO_NUEVO || "").toUpperCase() === "SI").length;
+      resumenEl.textContent = `${items.length} producto${items.length === 1 ? "" : "s"} · ${totalUnidades.toLocaleString("es-AR")} unidad${totalUnidades === 1 ? "" : "es"}${cantidadNuevos > 0 ? ` · ${cantidadNuevos} nuevo${cantidadNuevos === 1 ? "" : "s"}` : ""}`;
+    }
+
+    document.getElementById("detalleBoletaItemsBody").innerHTML = items.map(it => {
+      // El precio que compone el TOTAL de la boleta (lo que se le paga
+      // al proveedor) es siempre PRECIO_INGRESO — nunca el de venta.
+      // Los ingresos guardados antes de esta separación no tienen
+      // PRECIO_INGRESO cargado; en ese caso se usa el precio de venta
+      // como referencia, igual que hacía el sistema antes.
+      const tieneCosto = it.PRECIO_INGRESO !== undefined && it.PRECIO_INGRESO !== "" && it.PRECIO_INGRESO !== null;
+      const precioCosto = tieneCosto ? Number(it.PRECIO_INGRESO) : Number(it.PRECIO_NUEVO || it.PRECIO_ANTERIOR || 0);
+      const precioVenta = Number(it.PRECIO_NUEVO || it.PRECIO_ANTERIOR || 0);
+      const subtotalCosto = Number(it.CANTIDAD || 0) * precioCosto;
+      return `
+      <tr>
+        <td class="mono">${escapeHtml(it.CODIGO || "—")}</td>
+        <td>${escapeHtml(it.PRODUCTO || "—")}</td>
+        <td class="money">${Number(it.CANTIDAD || 0).toLocaleString("es-AR")}</td>
+        <td class="money">$${precioCosto.toLocaleString("es-AR")}${!tieneCosto ? ' <span class="text-muted" style="font-size:10px;" title="Este ingreso es de antes de separar costo/venta — se muestra el precio de venta como referencia">(ref.)</span>' : ""}</td>
+        <td class="money" style="color:var(--slate-500, #64748b);">$${precioVenta.toLocaleString("es-AR")}</td>
+        <td class="money">$${subtotalCosto.toLocaleString("es-AR")}</td>
+      </tr>`;
+    }).join("") || `<tr><td colspan="6" class="text-center text-muted py-2">Sin productos</td></tr>`;
+
+    const pagos = data.pagos || [];
+    document.getElementById("detalleBoletaPagosBody").innerHTML = pagos.length
+      ? pagos.map(p => `
+        <tr>
+          <td>${escapeHtml(p.FECHA || "—")}</td>
+          <td class="money">$${Number(p.MONTO || 0).toLocaleString("es-AR")}</td>
+          <td>${escapeHtml(p.FORMA_PAGO || "—")}</td>
+          <td>${escapeHtml(p.OBSERVACIONES || "—")}</td>
+        </tr>`).join("")
+      : `<tr><td colspan="4" class="text-center text-muted py-2">Todavía no hay pagos registrados</td></tr>`;
+
+  } catch (error) {
+    console.error("Error al cargar el detalle de la boleta:", error);
+    toast("Error de conexión al cargar la boleta", "error");
+    cerrarModalDetalleBoleta();
+  }
+}
+
+function cerrarModalDetalleBoleta() {
+  document.getElementById("detalleBoletaModalBackdrop").classList.remove("show");
+  boletaProveedorIdActual = null;
+
+  // Si este modal se había abierto desde "Ver boletas" de un proveedor,
+  // esa ventana se ocultó temporalmente al abrir el detalle — se vuelve
+  // a mostrar ahora, para volver al listado tal como estaba.
+  if (detalleBoletaAbiertoDesdeProveedor) {
+    const modalProveedor = document.getElementById("boletasProveedorModalBackdrop");
+    if (modalProveedor) modalProveedor.classList.add("show");
+    detalleBoletaAbiertoDesdeProveedor = false;
+  }
+}
+
+/** Registra un pago contra la boleta abierta en el modal, y refresca el detalle y el listado */
+async function registrarPagoProveedorForm() {
+  if (!boletaProveedorIdActual) return;
+
+  const monto = Number(document.getElementById("pagoProveedorMonto").value);
+  if (!monto || monto <= 0) { toast("Ingresá un monto válido", "error"); return; }
+
+  const btn = document.getElementById("btnRegistrarPagoProveedor");
+  if (btn) { btn.disabled = true; btn.textContent = "Registrando..."; }
+
+  try {
+    const res = await fetchAPI(API_URL, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "registrarPagoProveedor",
+        rol: obtenerRolActual(),
+        boletaId: boletaProveedorIdActual,
+        monto,
+        formaPago: document.getElementById("pagoProveedorFormaPago").value,
+        observaciones: document.getElementById("pagoProveedorObservaciones").value.trim(),
+        usuario: (sessionStorage.getItem("nombreUsuario") || sessionStorage.getItem("vendedor") || "ADMIN")
+      })
+    });
+    const data = await res.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo registrar el pago", "error");
+      if (btn) { btn.disabled = false; btn.textContent = "💾 Pagar"; }
+      return;
+    }
+
+    toast("Pago registrado", "success");
+    await abrirModalDetalleBoleta(boletaProveedorIdActual);
+    await cargarHistorialIngresos();
+    if (document.getElementById("tablaProveedores")) cargarProveedores();
+
+  } catch (error) {
+    console.error("Error al registrar el pago a proveedor:", error);
+    toast("Error de conexión al registrar el pago", "error");
+    if (btn) { btn.disabled = false; btn.textContent = "💾 Pagar"; }
+  }
+}
+
+/** Exporta el listado de boletas (según los filtros aplicados) a PDF, con jsPDF + autoTable */
 function exportarIngresosPDF() {
   try {
     const tabla = document.getElementById("tablaIngresosProductos");
@@ -9517,7 +9814,7 @@ function exportarIngresosPDF() {
     const hasta = document.getElementById("ipFiltroHasta").value || "—";
 
     doc.setFontSize(14);
-    doc.text(`${nombreLocal} — Ingreso de Productos (Recepción de mercadería)`, 30, 30);
+    doc.text(`${nombreLocal} — Ingreso de Productos y Pagos a Proveedores`, 30, 30);
     doc.setFontSize(10);
     doc.setTextColor(110, 110, 110);
     doc.text(`Período: ${desde} a ${hasta}  ·  Generado: ${new Date().toLocaleString("es-AR")}`, 30, 46);
@@ -9530,12 +9827,135 @@ function exportarIngresosPDF() {
       headStyles: { fillColor: [18, 32, 71], textColor: [255, 255, 255] }
     });
 
-    doc.save(`Ingreso_Productos_${desde}_a_${hasta}.pdf`);
+    doc.save(`Boletas_Proveedores_${desde}_a_${hasta}.pdf`);
 
   } catch (error) {
-    console.error("Error al exportar ingresos a PDF:", error);
+    console.error("Error al exportar boletas a PDF:", error);
     toast("No se pudo generar el PDF", "error");
   }
+}
+
+/* ===================================================================
+   PROVEEDORES — resumen de boletas y saldos pendientes por proveedor
+   (mismo espíritu que "Clientes a crédito", pero de este lado del
+   mostrador: cuánto se le compró a cada proveedor, cuánto se le pagó
+   y cuánto se le debe todavía).
+=================================================================== */
+
+let proveedoresGlobal = [];
+
+async function cargarProveedores() {
+  const cont = document.getElementById("tablaProveedores");
+  try {
+    const res = await fetchAPI(API_URL + "?action=proveedoresConSaldo");
+    const data = await res.json();
+    proveedoresGlobal = data.proveedores || [];
+    filtrarProveedores();
+  } catch (error) {
+    console.error("Error al cargar proveedores:", error);
+    if (cont) cont.innerHTML = `<div class="text-center text-muted py-5" style="font-size:14px;">Error al cargar los proveedores</div>`;
+  }
+}
+
+function renderTablaProveedores(lista) {
+  const cont = document.getElementById("tablaProveedores");
+  if (!cont) return;
+
+  if (!lista || lista.length === 0) {
+    cont.innerHTML = `<div class="text-center text-muted py-5" style="font-size:14px;">No se encontraron proveedores</div>`;
+    return;
+  }
+
+  cont.innerHTML = lista.map(p => {
+    const saldo = Number(p.SALDO || 0);
+    const tieneSaldo = saldo > 0.01;
+    const bordeClase = tieneSaldo ? "cliente-card-deuda" : "cliente-card-credito";
+
+    return `
+    <div class="pedido-card ${bordeClase}">
+      <div class="pedido-card-top">
+        <div style="flex:1; min-width:0;">
+          <div class="pedido-card-cliente">${escapeHtml(p.PROVEEDOR)}</div>
+          <div class="pedido-card-dir" style="margin-top:4px; display:flex; flex-wrap:wrap; gap:10px;">
+            ${p.PROVEEDOR_CONTACTO ? `<span>📞 ${escapeHtml(p.PROVEEDOR_CONTACTO)}</span>` : ""}
+            ${p.ULTIMA_FECHA ? `<span>🗓️ Última boleta: ${escapeHtml(p.ULTIMA_FECHA)}</span>` : ""}
+          </div>
+        </div>
+        <div class="text-end" style="flex-shrink:0;">
+          <div class="pedido-card-total" style="font-size:15px;">$${Number(p.TOTAL || 0).toLocaleString("es-AR")}</div>
+          <div style="font-size:11px;color:var(--slate-500);margin-top:1px;">${p.BOLETAS || 0} boleta${p.BOLETAS !== 1 ? "s" : ""}${p.BOLETAS_PENDIENTES ? ` · ${p.BOLETAS_PENDIENTES} pendiente${p.BOLETAS_PENDIENTES !== 1 ? "s" : ""}` : ""}</div>
+          <div class="mt-1" style="font-size:12px;">
+            <span class="cliente-dato-label">Saldo</span>
+            ${tieneSaldo
+              ? `<span style="color:var(--red-500);font-weight:700;">$${saldo.toLocaleString("es-AR")}</span>`
+              : `<span class="text-muted" style="font-size:12px;">Sin deuda</span>`}
+          </div>
+        </div>
+      </div>
+      <div class="pedido-card-controls">
+        <button class="btn btn-outline-secondary btn-sm" onclick="abrirModalBoletasProveedor('${escapeHtml(p.PROVEEDOR).replace(/'/g, "\\'")}')">Ver boletas</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function filtrarProveedores() {
+  const input = document.getElementById("buscarProveedor");
+  const soloConSaldo = document.getElementById("filtroSoloConSaldoProveedor");
+  const termino = (input ? input.value : "").toLowerCase().trim();
+
+  let filtrados = proveedoresGlobal;
+
+  if (termino) {
+    filtrados = filtrados.filter(p => String(p.PROVEEDOR || "").toLowerCase().includes(termino));
+  }
+  if (soloConSaldo && soloConSaldo.checked) {
+    filtrados = filtrados.filter(p => Number(p.SALDO || 0) > 0.01);
+  }
+
+  renderTablaProveedores(filtrados);
+}
+
+/** Abre el modal con todas las boletas de un proveedor puntual (con acceso directo a "Ver / Pagar" de cada una) */
+async function abrirModalBoletasProveedor(proveedor) {
+  document.getElementById("boletasProveedorModalBackdrop").classList.add("show");
+  document.getElementById("boletasProveedorTitulo").textContent = proveedor;
+  document.getElementById("boletasProveedorBody").innerHTML = `<tr><td colspan="7" class="text-center text-muted py-3">Cargando...</td></tr>`;
+
+  try {
+    const res = await fetchAPI(API_URL + "?action=boletasProveedores&proveedorExacto=" + encodeURIComponent(proveedor));
+    const data = await res.json();
+    const boletas = data.boletas || [];
+
+    const total = boletas.reduce((acc, b) => acc + Number(b.TOTAL || 0), 0);
+    const pagado = boletas.reduce((acc, b) => acc + Number(b.PAGADO || 0), 0);
+    const saldo = boletas.reduce((acc, b) => acc + Number(b.SALDO || 0), 0);
+
+    document.getElementById("boletasProveedorTotal").textContent = "$" + total.toLocaleString("es-AR");
+    document.getElementById("boletasProveedorPagado").textContent = "$" + pagado.toLocaleString("es-AR");
+    document.getElementById("boletasProveedorSaldo").textContent = "$" + saldo.toLocaleString("es-AR");
+
+    document.getElementById("boletasProveedorBody").innerHTML = boletas.length
+      ? boletas.map(b => `
+        <tr>
+          <td>${escapeHtml(b.FECHA || "—")}</td>
+          <td class="mono">${escapeHtml(b.NUMERO_BOLETA || "—")}</td>
+          <td class="money">$${Number(b.TOTAL || 0).toLocaleString("es-AR")}</td>
+          <td class="money" style="color:var(--green-600);">$${Number(b.PAGADO || 0).toLocaleString("es-AR")}</td>
+          <td class="money" style="color:var(--red-500);">$${Number(b.SALDO || 0).toLocaleString("es-AR")}</td>
+          <td>${_badgeEstadoBoleta(b.ESTADO)}</td>
+          <td><button class="btn btn-outline-primary btn-sm" onclick="abrirModalDetalleBoleta('${b.BOLETA_ID}')">Ver / Pagar</button></td>
+        </tr>`).join("")
+      : `<tr><td colspan="7" class="text-center text-muted py-3">Este proveedor no tiene boletas cargadas</td></tr>`;
+
+  } catch (error) {
+    console.error("Error al cargar las boletas del proveedor:", error);
+    toast("Error de conexión al cargar las boletas", "error");
+  }
+}
+
+function cerrarModalBoletasProveedor() {
+  document.getElementById("boletasProveedorModalBackdrop").classList.remove("show");
 }
 
 /* ===================================================================
@@ -9550,7 +9970,7 @@ function exportarIngresosPDF() {
 const PERMISOS_POR_ROL = {
   admin: null, // null = acceso a todas las secciones
   vendedor: ["dashboard", "pos", "ventasPOS", "cierreCaja", "movimientosCaja", "pedidos", "clientes"],
-  deposito: ["dashboard", "productos", "ingresoProductos", "reportesCompras"]
+  deposito: ["dashboard", "productos", "ingresoProductos", "proveedores", "reportesCompras"]
 };
 
 function obtenerRolActual() {

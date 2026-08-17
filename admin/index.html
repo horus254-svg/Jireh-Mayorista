@@ -294,6 +294,7 @@
     <a href="#" data-target="pedidos"          onclick="mostrarSeccion('pedidos')"><span class="ic">📦</span> Pedidos</a>
     <a href="#" data-target="productos"        onclick="mostrarSeccion('productos')"><span class="ic">🛒</span> Productos</a>
     <a href="#" data-target="ingresoProductos" onclick="mostrarSeccion('ingresoProductos')"><span class="ic">📥</span> Ingreso de Productos</a>
+    <a href="#" data-target="proveedores" onclick="mostrarSeccion('proveedores'); cargarProveedores();"><span class="ic">🚚</span> Proveedores</a>
     <a href="#" data-target="clientes"         onclick="mostrarSeccion('clientes'); cargarClientes();"><span class="ic">👥</span> Clientes</a>
     <a href="#" data-target="reportes"         onclick="mostrarSeccion('reportes')"><span class="ic">📈</span> Reportes</a>
     <a href="#" data-target="reportesCompras"  onclick="mostrarSeccion('reportesCompras')"><span class="ic">📦</span> Reportes de Compras</a>
@@ -594,15 +595,45 @@
   <!-- ===== INGRESO DE PRODUCTOS (recepción de mercadería) ===== -->
   <div id="ingresoProductos" class="seccion">
     <div class="page-header">
-      <div><h1>Ingreso de Productos</h1><div class="sub">Recepción de mercadería con proveedor</div></div>
+      <div><h1>Ingreso de Productos</h1><div class="sub">Recepción de mercadería con proveedor — un documento por boleta</div></div>
       <div class="d-flex gap-2">
         <button class="btn btn-outline-secondary btn-sm" onclick="cargarHistorialIngresos()">↻ Actualizar</button>
         <button class="btn btn-outline-dark" onclick="exportarIngresosPDF()">📄 Informe PDF</button>
       </div>
     </div>
 
+    <!-- ===== Cabecera de la boleta: proveedor / fecha / N° de boleta, común a todos los productos que se van a cargar ===== -->
     <div class="card p-3 mb-3">
-      <label class="form-label">Escaneá o tipeá el código de barras del producto que llegó</label>
+      <h6 class="mb-2">1) Datos de la boleta / remito</h6>
+      <div class="row g-2">
+        <div class="col-md-4">
+          <label class="form-label">Proveedor *</label>
+          <input type="text" class="form-control" id="ipbProveedor" list="ipProveedoresList" placeholder="Nombre del proveedor" oninput="actualizarEstadoBoletaActual()">
+          <datalist id="ipProveedoresList"></datalist>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Contacto del proveedor</label>
+          <input type="text" class="form-control" id="ipbProveedorContacto" placeholder="Teléfono / email (opcional)">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Fecha de recepción</label>
+          <input type="date" class="form-control" id="ipbFecha" onchange="actualizarEstadoBoletaActual()">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">N° de boleta / remito</label>
+          <input type="text" class="form-control" id="ipbNumeroBoleta" placeholder="Ej: 0001-000123" oninput="actualizarEstadoBoletaActual()">
+        </div>
+      </div>
+      <div class="mt-2">
+        <label class="form-label">Observaciones de la boleta</label>
+        <input type="text" class="form-control" id="ipbObservaciones" placeholder="Opcional">
+      </div>
+      <div class="mt-2" style="font-size:12.5px;" id="ipbEstadoBoleta"></div>
+    </div>
+
+    <!-- ===== Alta de cada producto de la boleta: se van acumulando en el carrito de abajo ===== -->
+    <div class="card p-3 mb-3">
+      <h6 class="mb-2">2) Escaneá cada producto que llegó</h6>
       <div class="d-flex gap-2 flex-wrap">
         <input type="text" id="ipCodigoScan" class="form-control" autocomplete="off"
           placeholder="Código de barras — Enter para buscar"
@@ -639,41 +670,53 @@
       </div>
 
       <div class="row g-2 mt-2">
-        <div class="col-md-4">
-          <label class="form-label">Precio actual / nuevo</label>
+        <div class="col-md-3">
+          <label class="form-label">Precio de ingreso (costo)</label>
           <input type="number" class="form-control" id="ipPrecio" min="0" step="1" placeholder="0">
-          <div class="form-text" style="font-size:11px;" id="ipPrecioHint"></div>
+          <div class="form-text" style="font-size:11px;" id="ipPrecioHint">Lo que se le paga al proveedor — con esto se calcula el saldo que se le debe.</div>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
+          <label class="form-label">Precio de venta (público)</label>
+          <input type="number" class="form-control" id="ipPrecioVenta" min="0" step="1" placeholder="0">
+          <div class="form-text" style="font-size:11px;" id="ipPrecioVentaHint">El que ve el cliente en el POS y en la página.</div>
+        </div>
+        <div class="col-md-3">
           <label class="form-label">Cantidad que llega *</label>
-          <input type="number" class="form-control" id="ipCantidad" min="1" step="1" placeholder="Ej: 24">
+          <input type="number" class="form-control" id="ipCantidad" min="1" step="1" placeholder="Ej: 24"
+            onkeydown="if(event.key==='Enter'){ event.preventDefault(); agregarItemABoleta(); }">
         </div>
-        <div class="col-md-4">
-          <label class="form-label">Fecha de recepción</label>
-          <input type="date" class="form-control" id="ipFecha">
-        </div>
-      </div>
-
-      <div class="row g-2 mt-2">
-        <div class="col-md-6">
-          <label class="form-label">Proveedor *</label>
-          <input type="text" class="form-control" id="ipProveedor" list="ipProveedoresList" placeholder="Nombre del proveedor">
-          <datalist id="ipProveedoresList"></datalist>
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">Contacto del proveedor</label>
-          <input type="text" class="form-control" id="ipProveedorContacto" placeholder="Teléfono / email (opcional)">
+        <div class="col-md-3 d-flex align-items-end">
+          <button class="btn btn-success w-100" id="btnConfirmarIngreso" onclick="agregarItemABoleta()">➕ Agregar a la boleta</button>
         </div>
       </div>
 
-      <div class="mt-2">
-        <label class="form-label">Observaciones</label>
-        <input type="text" class="form-control" id="ipObservaciones" placeholder="Ej: Remito N° 0001-000123 (opcional)">
+      <div class="d-flex gap-2 mt-2">
+        <button class="btn btn-outline-secondary btn-sm" onclick="cancelarIngresoProducto()">Cancelar</button>
       </div>
+    </div>
 
-      <div class="d-flex gap-2 mt-3">
-        <button class="btn btn-outline-secondary" onclick="cancelarIngresoProducto()">Cancelar</button>
-        <button class="btn btn-success" id="btnConfirmarIngreso" onclick="confirmarIngresoProducto()">📥 Registrar ingreso</button>
+    <!-- ===== Carrito: productos ya agregados a la boleta actual, todavía sin guardar ===== -->
+    <div class="card p-3 mb-3">
+      <h6 class="mb-2">3) Productos cargados en esta boleta</h6>
+      <div class="table-responsive">
+        <table class="table table-sm table-striped">
+          <thead><tr>
+            <th>Código</th><th>Producto</th><th>Categoría</th>
+            <th>Cantidad</th><th>Precio ingreso</th><th>Precio venta</th><th>Subtotal (a proveedor)</th><th></th>
+          </tr></thead>
+          <tbody id="ipCarritoBody"><tr><td colspan="8" class="text-center text-muted py-3">Todavía no agregaste productos</td></tr></tbody>
+          <tfoot>
+            <tr>
+              <td colspan="6" class="text-end fw-bold">Total de la boleta (lo que se le debe al proveedor)</td>
+              <td class="money fw-bold" id="ipCarritoTotal">$0</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <div class="d-flex gap-2 justify-content-end">
+        <button class="btn btn-outline-danger btn-sm" onclick="vaciarCarritoBoleta()">🗑️ Vaciar</button>
+        <button class="btn btn-success" id="btnGuardarBoleta" onclick="guardarBoletaCompleta()">💾 Guardar boleta</button>
       </div>
     </div>
 
@@ -681,11 +724,17 @@
       <div class="card p-2">
         <div class="d-flex align-items-center gap-2 flex-wrap">
           <input type="text" id="ipBuscarHistorial" class="form-control form-control-sm" style="max-width:220px"
-            placeholder="Buscar por código o producto..." oninput="filtrarHistorialIngresos()">
+            placeholder="Buscar por N° boleta..." oninput="filtrarHistorialIngresos()">
           <input type="text" id="ipFiltroProveedor" class="form-control form-control-sm" style="max-width:200px"
             placeholder="Filtrar por proveedor..." oninput="filtrarHistorialIngresos()">
           <input type="date" id="ipFiltroDesde" class="form-control form-control-sm" style="max-width:150px" onchange="filtrarHistorialIngresos()">
           <input type="date" id="ipFiltroHasta" class="form-control form-control-sm" style="max-width:150px" onchange="filtrarHistorialIngresos()">
+          <select id="ipFiltroEstado" class="form-select form-select-sm" style="max-width:160px" onchange="filtrarHistorialIngresos()">
+            <option value="">Todos los estados</option>
+            <option value="PENDIENTE">Pendiente</option>
+            <option value="PARCIAL">Pago parcial</option>
+            <option value="PAGADA">Pagada</option>
+          </select>
         </div>
       </div>
     </div>
@@ -694,11 +743,157 @@
       <div class="table-responsive">
         <table class="table table-striped" id="tablaIngresosProductos">
           <thead><tr>
-            <th>Fecha</th><th>Código</th><th>Producto</th><th>Categoría</th>
-            <th>Cantidad</th><th>Precio</th><th>Proveedor</th><th>Contacto</th><th>Obs.</th>
+            <th>Fecha</th><th>N° Boleta</th><th>Proveedor</th><th>Contacto</th>
+            <th>Total</th><th>Pagado</th><th>Saldo</th><th>Estado</th><th>Acciones</th>
           </tr></thead>
           <tbody id="tablaIngresosBody"><tr><td colspan="9" class="text-center text-muted py-4">Cargando...</td></tr></tbody>
         </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== MODAL: DETALLE DE BOLETA DE PROVEEDOR / REGISTRAR PAGO ===== -->
+  <div class="product-modal-backdrop" id="detalleBoletaModalBackdrop">
+    <div class="product-modal" style="max-width:780px; width:94vw;">
+      <div class="product-modal-header">
+        <h6 id="detalleBoletaTitulo">Boleta</h6>
+        <button onclick="cerrarModalDetalleBoleta()">✕</button>
+      </div>
+      <div class="product-modal-body" style="max-height:80vh; overflow-y:auto;">
+
+        <div class="row g-2 mb-3">
+          <div class="col-4">
+            <div class="card p-2 text-center" style="background:var(--slate-50);">
+              <div class="text-muted" style="font-size:10.5px;">Total</div>
+              <div style="font-size:15px; font-weight:700;" id="detalleBoletaTotal">$0</div>
+            </div>
+          </div>
+          <div class="col-4">
+            <div class="card p-2 text-center" style="background:var(--slate-50);">
+              <div class="text-muted" style="font-size:10.5px;">Pagado</div>
+              <div style="font-size:15px; font-weight:700; color:var(--green-600);" id="detalleBoletaPagado">$0</div>
+            </div>
+          </div>
+          <div class="col-4">
+            <div class="card p-2 text-center" style="background:var(--slate-50);">
+              <div class="text-muted" style="font-size:10.5px;">Saldo pendiente</div>
+              <div style="font-size:15px; font-weight:700; color:var(--red-500);" id="detalleBoletaSaldo">$0</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card p-2 mb-3" style="font-size:12.5px;" id="detalleBoletaDatos"></div>
+
+        <div class="card p-3 mb-3" id="cardFormularioPagoProveedor" style="background:var(--slate-50);">
+          <h6 style="font-size:13px;" class="mb-2">Registrar pago a proveedor</h6>
+          <div class="row g-2">
+            <div class="col-md-3">
+              <label class="form-label" style="font-size:12px;">Monto a pagar</label>
+              <input type="number" class="form-control form-control-sm" id="pagoProveedorMonto" placeholder="0">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label" style="font-size:12px;">Forma de pago</label>
+              <select class="form-select form-select-sm" id="pagoProveedorFormaPago">
+                <option value="EFECTIVO">Efectivo</option>
+                <option value="TRANSFERENCIA">Transferencia</option>
+                <option value="TARJETA">Tarjeta</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" style="font-size:12px;">Observaciones</label>
+              <input type="text" class="form-control form-control-sm" id="pagoProveedorObservaciones" placeholder="opcional">
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+              <button class="btn btn-success btn-sm w-100" id="btnRegistrarPagoProveedor" onclick="registrarPagoProveedorForm()">💾 Pagar</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h6 style="font-size:13px;" class="mb-0">Productos de esta boleta</h6>
+          <span class="text-muted" style="font-size:12px;" id="detalleBoletaResumenItems"></span>
+        </div>
+        <div class="table-responsive mb-3" style="max-height:200px; overflow-y:auto;">
+          <table class="table table-sm table-striped">
+            <thead><tr><th>Código</th><th>Producto</th><th>Cant.</th><th>Precio de costo (a proveedor)</th><th>Precio de venta (ref.)</th><th>Subtotal</th></tr></thead>
+            <tbody id="detalleBoletaItemsBody"></tbody>
+          </table>
+        </div>
+
+        <h6 style="font-size:13px;" class="mb-2">Pagos registrados</h6>
+        <div class="table-responsive" style="max-height:180px; overflow-y:auto;">
+          <table class="table table-sm table-striped">
+            <thead><tr><th>Fecha</th><th>Monto</th><th>Forma de pago</th><th>Obs.</th></tr></thead>
+            <tbody id="detalleBoletaPagosBody"><tr><td colspan="4" class="text-center text-muted py-2">Todavía no hay pagos registrados</td></tr></tbody>
+          </table>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== PROVEEDORES ===== -->
+  <div id="proveedores" class="seccion">
+    <div class="page-header">
+      <div><h1>Proveedores</h1><div class="sub">Boletas cargadas y saldos pendientes de pago, por proveedor</div></div>
+      <div class="d-flex gap-2">
+        <button class="btn btn-outline-secondary" onclick="cargarProveedores()">🔄 Actualizar</button>
+      </div>
+    </div>
+
+    <div class="card p-3 mb-3">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <input type="text" id="buscarProveedor" class="form-control" style="max-width:300px"
+          placeholder="Buscar por nombre de proveedor..." oninput="filtrarProveedores()">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="filtroSoloConSaldoProveedor" onchange="filtrarProveedores()">
+          <label class="form-check-label" for="filtroSoloConSaldoProveedor" style="font-size:13px;">Mostrar solo proveedores con saldo pendiente</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="card p-3">
+      <div id="tablaProveedores"></div>
+    </div>
+  </div>
+
+  <!-- ===== MODAL: BOLETAS DE UN PROVEEDOR ===== -->
+  <div class="product-modal-backdrop" id="boletasProveedorModalBackdrop">
+    <div class="product-modal" style="max-width:800px; width:94vw;">
+      <div class="product-modal-header">
+        <h6 id="boletasProveedorTitulo">Proveedor</h6>
+        <button onclick="cerrarModalBoletasProveedor()">✕</button>
+      </div>
+      <div class="product-modal-body" style="max-height:80vh; overflow-y:auto;">
+        <div class="row g-2 mb-3">
+          <div class="col-4">
+            <div class="card p-2 text-center" style="background:var(--slate-50);">
+              <div class="text-muted" style="font-size:10.5px;">Total comprado</div>
+              <div style="font-size:15px; font-weight:700;" id="boletasProveedorTotal">$0</div>
+            </div>
+          </div>
+          <div class="col-4">
+            <div class="card p-2 text-center" style="background:var(--slate-50);">
+              <div class="text-muted" style="font-size:10.5px;">Pagado</div>
+              <div style="font-size:15px; font-weight:700; color:var(--green-600);" id="boletasProveedorPagado">$0</div>
+            </div>
+          </div>
+          <div class="col-4">
+            <div class="card p-2 text-center" style="background:var(--slate-50);">
+              <div class="text-muted" style="font-size:10.5px;">Saldo pendiente</div>
+              <div style="font-size:15px; font-weight:700; color:var(--red-500);" id="boletasProveedorSaldo">$0</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="table table-sm table-striped">
+            <thead><tr>
+              <th>Fecha</th><th>N° Boleta</th><th>Total</th><th>Pagado</th><th>Saldo</th><th>Estado</th><th></th>
+            </tr></thead>
+            <tbody id="boletasProveedorBody"></tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
