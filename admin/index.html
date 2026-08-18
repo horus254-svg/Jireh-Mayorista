@@ -757,7 +757,10 @@
     <div class="product-modal" style="max-width:780px; width:94vw;">
       <div class="product-modal-header">
         <h6 id="detalleBoletaTitulo">Boleta</h6>
-        <button onclick="cerrarModalDetalleBoleta()">✕</button>
+        <div class="d-flex align-items-center gap-2">
+          <button class="btn btn-outline-secondary btn-sm" onclick="imprimirBoletaProveedor()">🖨️ Imprimir</button>
+          <button onclick="cerrarModalDetalleBoleta()">✕</button>
+        </div>
       </div>
       <div class="product-modal-body" style="max-height:80vh; overflow-y:auto;">
 

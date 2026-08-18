@@ -9307,6 +9307,11 @@ let ipCarritoBoleta = [];
 // ID de la boleta que está abierta en el modal de detalle/pago
 let boletaProveedorIdActual = null;
 
+// Datos completos (cabecera + items + pagos) de la boleta actualmente
+// abierta en el modal de detalle — se guardan acá para poder armar el
+// comprobante imprimible sin tener que volver a pedirlos al backend.
+let detalleBoletaDatosActual = null;
+
 // true cuando el modal de detalle de boleta se abrió desde "Ver boletas"
 // de un proveedor (en vez de desde la sección Ingreso de Productos) —
 // controla si hay que volver a mostrar esa ventana al cerrar el detalle.
@@ -9672,6 +9677,7 @@ async function abrirModalDetalleBoleta(boletaId) {
     }
 
     const b = data.boleta;
+    detalleBoletaDatosActual = { boleta: b, items: data.items || [], pagos: data.pagos || [] };
     document.getElementById("detalleBoletaTitulo").textContent =
       `${b.PROVEEDOR}${b.NUMERO_BOLETA ? " — Boleta " + b.NUMERO_BOLETA : ""} (${b.FECHA})`;
     document.getElementById("detalleBoletaTotal").textContent = "$" + Number(b.TOTAL || 0).toLocaleString("es-AR");
@@ -9743,9 +9749,122 @@ async function abrirModalDetalleBoleta(boletaId) {
   }
 }
 
+/** Arma e imprime (A4) el comprobante de la boleta de proveedor que está abierta en el modal de detalle */
+function imprimirBoletaProveedor() {
+  if (!detalleBoletaDatosActual) { toast("No hay una boleta cargada para imprimir", "error"); return; }
+
+  const { boleta: b, items, pagos } = detalleBoletaDatosActual;
+  const cfg = obtenerConfigNegocio();
+
+  const printArea = document.getElementById("etiquetasPrintArea");
+  const thermalFrame = document.getElementById("thermalPrintFrame");
+  if (thermalFrame) thermalFrame.innerHTML = "";
+
+  const filasItems = items.map(it => {
+    const tieneCosto = it.PRECIO_INGRESO !== undefined && it.PRECIO_INGRESO !== "" && it.PRECIO_INGRESO !== null;
+    const precioCosto = tieneCosto ? Number(it.PRECIO_INGRESO) : Number(it.PRECIO_NUEVO || it.PRECIO_ANTERIOR || 0);
+    const subtotal = Number(it.CANTIDAD || 0) * precioCosto;
+    return `
+      <tr>
+        <td style="padding:5px 6px; border-bottom:1px solid #e2e8f0;">${escapeHtml(it.CODIGO || "—")}</td>
+        <td style="padding:5px 6px; border-bottom:1px solid #e2e8f0;">${escapeHtml(it.PRODUCTO || "—")}</td>
+        <td style="padding:5px 6px; border-bottom:1px solid #e2e8f0; text-align:right;">${Number(it.CANTIDAD || 0).toLocaleString("es-AR")}</td>
+        <td style="padding:5px 6px; border-bottom:1px solid #e2e8f0; text-align:right;">$${precioCosto.toLocaleString("es-AR")}</td>
+        <td style="padding:5px 6px; border-bottom:1px solid #e2e8f0; text-align:right;">$${subtotal.toLocaleString("es-AR")}</td>
+      </tr>`;
+  }).join("") || `<tr><td colspan="5" style="padding:8px; text-align:center; color:#64748b;">Sin productos</td></tr>`;
+
+  const filasPagos = pagos.length
+    ? pagos.map(p => `
+      <tr>
+        <td style="padding:5px 6px; border-bottom:1px solid #e2e8f0;">${escapeHtml(p.FECHA || "—")}</td>
+        <td style="padding:5px 6px; border-bottom:1px solid #e2e8f0; text-align:right;">$${Number(p.MONTO || 0).toLocaleString("es-AR")}</td>
+        <td style="padding:5px 6px; border-bottom:1px solid #e2e8f0;">${escapeHtml(p.FORMA_PAGO || "—")}</td>
+        <td style="padding:5px 6px; border-bottom:1px solid #e2e8f0;">${escapeHtml(p.OBSERVACIONES || "—")}</td>
+      </tr>`).join("")
+    : `<tr><td colspan="4" style="padding:8px; text-align:center; color:#64748b;">Sin pagos registrados</td></tr>`;
+
+  const totalUnidades = items.reduce((acc, it) => acc + (Number(it.CANTIDAD) || 0), 0);
+
+  const html = `
+    <div style="font-family:Arial, sans-serif; color:#1e293b; padding:10mm; font-size:12px;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #1e293b; padding-bottom:10px; margin-bottom:14px;">
+        <div>
+          <div style="font-size:18px; font-weight:800;">${escapeHtml(cfg.nombre || "")}</div>
+          <div style="color:#64748b;">Comprobante de ingreso de mercadería</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:15px; font-weight:700;">Boleta ${escapeHtml(b.NUMERO_BOLETA || "—")}</div>
+          <div style="color:#64748b;">${escapeHtml(b.FECHA || "—")}</div>
+        </div>
+      </div>
+
+      <table style="width:100%; border-collapse:collapse; margin-bottom:16px;">
+        <tr>
+          <td style="padding:3px 0; color:#64748b; width:150px;">Proveedor</td>
+          <td style="padding:3px 0; font-weight:600;">${escapeHtml(b.PROVEEDOR || "—")}</td>
+        </tr>
+        <tr>
+          <td style="padding:3px 0; color:#64748b;">Contacto</td>
+          <td style="padding:3px 0;">${escapeHtml(b.PROVEEDOR_CONTACTO || "—")}</td>
+        </tr>
+        <tr>
+          <td style="padding:3px 0; color:#64748b;">Cargada por</td>
+          <td style="padding:3px 0;">${escapeHtml(b.USUARIO || "—")}</td>
+        </tr>
+        <tr>
+          <td style="padding:3px 0; color:#64748b; vertical-align:top;">Observaciones</td>
+          <td style="padding:3px 0;">${escapeHtml(b.OBSERVACIONES || "—")}</td>
+        </tr>
+      </table>
+
+      <table style="width:100%; border-collapse:collapse; margin-bottom:10px;">
+        <thead>
+          <tr style="background:#f1f5f9;">
+            <th style="padding:6px; text-align:left;">Código</th>
+            <th style="padding:6px; text-align:left;">Producto</th>
+            <th style="padding:6px; text-align:right;">Cant.</th>
+            <th style="padding:6px; text-align:right;">Precio costo</th>
+            <th style="padding:6px; text-align:right;">Subtotal</th>
+          </tr>
+        </thead>
+        <tbody>${filasItems}</tbody>
+      </table>
+      <div style="text-align:right; color:#64748b; margin-bottom:16px;">${items.length} producto${items.length === 1 ? "" : "s"} · ${totalUnidades.toLocaleString("es-AR")} unidad${totalUnidades === 1 ? "" : "es"}</div>
+
+      <div style="display:flex; justify-content:flex-end; gap:24px; border-top:2px solid #1e293b; padding-top:10px; margin-bottom:18px;">
+        <div style="text-align:right;"><div style="color:#64748b;">Total</div><div style="font-size:15px; font-weight:800;">$${Number(b.TOTAL || 0).toLocaleString("es-AR")}</div></div>
+        <div style="text-align:right;"><div style="color:#64748b;">Pagado</div><div style="font-size:15px; font-weight:800; color:#16a34a;">$${Number(b.PAGADO || 0).toLocaleString("es-AR")}</div></div>
+        <div style="text-align:right;"><div style="color:#64748b;">Saldo</div><div style="font-size:15px; font-weight:800; color:#dc2626;">$${Number(b.SALDO || 0).toLocaleString("es-AR")}</div></div>
+      </div>
+
+      <div style="font-weight:700; margin-bottom:6px;">Pagos registrados</div>
+      <table style="width:100%; border-collapse:collapse;">
+        <thead>
+          <tr style="background:#f1f5f9;">
+            <th style="padding:6px; text-align:left;">Fecha</th>
+            <th style="padding:6px; text-align:right;">Monto</th>
+            <th style="padding:6px; text-align:left;">Forma de pago</th>
+            <th style="padding:6px; text-align:left;">Observaciones</th>
+          </tr>
+        </thead>
+        <tbody>${filasPagos}</tbody>
+      </table>
+
+      <div style="margin-top:26px; color:#94a3b8; font-size:10.5px;">Impreso el ${new Date().toLocaleString("es-AR")}</div>
+    </div>`;
+
+  printArea.innerHTML = html;
+  _setPrintPageSize("A4");
+  setTimeout(() => {
+    window.print();
+  }, 150);
+}
+
 function cerrarModalDetalleBoleta() {
   document.getElementById("detalleBoletaModalBackdrop").classList.remove("show");
   boletaProveedorIdActual = null;
+  detalleBoletaDatosActual = null;
 
   // Si este modal se había abierto desde "Ver boletas" de un proveedor,
   // esa ventana se ocultó temporalmente al abrir el detalle — se vuelve
