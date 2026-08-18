@@ -2926,6 +2926,14 @@ function renderTablaProductos(lista) {
     return;
   }
 
+  // El arrastre para reordenar solo tiene sentido si la tabla muestra
+  // TODOS los productos, sin ningún filtro/búsqueda activo — si no, el
+  // orden visual de un subconjunto filtrado no representa el orden
+  // real del catálogo completo, y guardarlo así lo desordenaría.
+  const ordenamientoHabilitado = _puedeReordenarProductos();
+  const aviso = document.getElementById("avisoOrdenProductos");
+  if (aviso) aviso.style.display = (ordenamientoHabilitado && lista.length > 1) ? "flex" : "none";
+
   // Renderizar en chunks para no bloquear el hilo principal
   // con 829 productos generando DOM de golpe
   const CHUNK = 80;
@@ -2962,19 +2970,33 @@ function renderTablaProductos(lista) {
         : "🛒";
 
       const tr = document.createElement("tr");
+      tr.dataset.codigo = p.CODIGO;
+      if (ordenamientoHabilitado) {
+        tr.draggable = true;
+        tr.classList.add("fila-arrastrable");
+        tr.addEventListener("dragstart", _dragStartFilaProducto);
+        tr.addEventListener("dragover", _dragOverFilaProducto);
+        tr.addEventListener("drop", _dropFilaProducto);
+        tr.addEventListener("dragend", _dragEndFilaProducto);
+      }
       tr.innerHTML = `
-        <td><input type="checkbox" class="check-producto-etiqueta" value="${escapeHtml(p.CODIGO)}" onchange="actualizarSeleccionEtiquetas()"></td>
-        <td><div class="tabla-producto-thumb">${fotoHtml}</div></td>
+        <td class="celda-check-orden">
+          <span class="check-orden-inner">
+            <span class="drag-handle-producto" title="${ordenamientoHabilitado ? "Arrastrá para reordenar" : "Limpiá la búsqueda y los filtros para poder reordenar"}">${ordenamientoHabilitado ? "⠿" : ""}</span>
+            <input type="checkbox" class="check-producto-etiqueta" value="${escapeHtml(p.CODIGO)}" onchange="actualizarSeleccionEtiquetas()">
+          </span>
+        </td>
+        <td class="celda-foto-producto"><div class="tabla-producto-thumb">${fotoHtml}</div></td>
         <td class="mono">${escapeHtml(p.CODIGO)}</td>
         <td>${escapeHtml(p.PRODUCTO)}</td>
         <td>${escapeHtml(p.CATEGORIA || "—")}</td>
         <td class="money">$${Number(p.PRECIO || 0).toLocaleString("es-AR")}</td>
         <td>${stockBadge}</td>
         <td><span class="badge ${publicado ? "bg-success" : "bg-secondary"}">${publicado ? "Publicado" : "Oculto"}</span></td>
-        <td>
-          <button class="btn btn-outline-success btn-sm btn-accion-producto" onclick="abrirModalStock('${escapeHtml(p.CODIGO)}')" title="Sumar stock">📦 Stock</button>
-          <button class="btn btn-primary btn-sm btn-accion-producto ms-2" onclick="editarProducto('${escapeHtml(p.CODIGO)}')">Editar</button>
-          <button class="btn btn-danger btn-sm btn-accion-producto ms-2" onclick="eliminarProducto('${escapeHtml(p.CODIGO)}')">Eliminar</button>
+        <td class="celda-acciones-producto">
+          <button class="btn btn-outline-success btn-sm btn-accion-producto" onclick="abrirModalStock('${escapeHtml(p.CODIGO)}')" title="Sumar stock">📦 <span class="btn-accion-texto">Stock</span></button>
+          <button class="btn btn-primary btn-sm btn-accion-producto ms-2" onclick="editarProducto('${escapeHtml(p.CODIGO)}')" title="Editar">✏️ <span class="btn-accion-texto">Editar</span></button>
+          <button class="btn btn-danger btn-sm btn-accion-producto ms-2" onclick="eliminarProducto('${escapeHtml(p.CODIGO)}')" title="Eliminar">🗑️ <span class="btn-accion-texto">Eliminar</span></button>
         </td>`;
       frag.appendChild(tr);
     }
@@ -2993,6 +3015,90 @@ function renderTablaProductos(lista) {
   };
 
   requestAnimationFrame(renderChunk);
+}
+
+/** True solo si la tabla está mostrando TODOS los productos, sin ninguna búsqueda/filtro activo — condición para poder arrastrar y reordenar filas. */
+function _puedeReordenarProductos() {
+  const termino = document.getElementById("buscarProducto")?.value.trim() || "";
+  const categoria = document.getElementById("filtroCategoriaProductos")?.value || "";
+  const estado = document.getElementById("filtroEstadoProducto")?.value || "";
+  return !termino && !categoria && !estado;
+}
+
+let _filaArrastrada = null;
+
+function _dragStartFilaProducto(ev) {
+  _filaArrastrada = ev.currentTarget;
+  ev.currentTarget.classList.add("arrastrando");
+  ev.dataTransfer.effectAllowed = "move";
+  // Firefox necesita datos seteados en dataTransfer para permitir el arrastre
+  ev.dataTransfer.setData("text/plain", ev.currentTarget.dataset.codigo || "");
+}
+
+function _dragOverFilaProducto(ev) {
+  ev.preventDefault();
+  if (!_filaArrastrada || _filaArrastrada === ev.currentTarget) return;
+
+  const tbody = ev.currentTarget.parentNode;
+  const filas = [...tbody.querySelectorAll("tr")];
+  const idxArrastrada = filas.indexOf(_filaArrastrada);
+  const idxDestino = filas.indexOf(ev.currentTarget);
+
+  if (idxArrastrada < idxDestino) {
+    ev.currentTarget.after(_filaArrastrada);
+  } else {
+    ev.currentTarget.before(_filaArrastrada);
+  }
+}
+
+function _dropFilaProducto(ev) {
+  ev.preventDefault();
+}
+
+async function _dragEndFilaProducto(ev) {
+  ev.currentTarget.classList.remove("arrastrando");
+  if (!_filaArrastrada) return;
+  _filaArrastrada = null;
+
+  const tbody = document.getElementById("tablaProductos");
+  const nuevoOrdenCodigos = [...tbody.querySelectorAll("tr")].map(tr => tr.dataset.codigo).filter(Boolean);
+  await guardarNuevoOrdenProductos(nuevoOrdenCodigos);
+}
+
+/** Persiste en el backend el nuevo orden de productos (array de CODIGO, en el orden deseado) y actualiza la caché local para que no vuelva al orden viejo al recargar. */
+async function guardarNuevoOrdenProductos(codigos) {
+  try {
+    const response = await fetchAPI(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action: "reordenarProductos", codigos })
+    }, { timeoutMs: 20000 });
+    const data = await response.json();
+
+    if (!data.success) {
+      toast(data.message || "No se pudo guardar el nuevo orden", "error");
+      cargarProductos();
+      return;
+    }
+
+    // Reordenar en memoria (y en la caché local) según lo recién guardado,
+    // así el orden se ve correcto sin esperar un nuevo pedido al servidor.
+    const posicion = new Map(codigos.map((c, i) => [c, i]));
+    productosAdminGlobal = [...productosAdminGlobal].sort((a, b) => {
+      const pa = posicion.has(a.CODIGO) ? posicion.get(a.CODIGO) : Infinity;
+      const pb = posicion.has(b.CODIGO) ? posicion.get(b.CODIGO) : Infinity;
+      return pa - pb;
+    });
+    try {
+      localStorage.setItem("vpos_cache_productosAdmin", JSON.stringify({ ts: Date.now(), data: productosAdminGlobal }));
+    } catch (e) {}
+
+    toast("Orden guardado", "success");
+  } catch (error) {
+    console.error("Error al guardar el orden de productos:", error);
+    toast("Error de conexión al guardar el orden", "error");
+    cargarProductos();
+  }
 }
 
 /** Fills the category <select> filter with the distinct categories currently in use */
