@@ -587,10 +587,14 @@ html,body{
      impares (no toda la fila de una — celda por celda), y esa clase
      sigue puesta en la tabla. Sumado al fondo gris propio de la
      miniatura, esto es lo que se ve como "manchones" de distinto
-     color dentro de cada tarjeta. Se neutraliza acá para que todas
-     las celdas queden con el mismo blanco parejo de la tarjeta. */
+     color dentro de cada tarjeta. Ojo: Bootstrap 5.3 no pinta esto
+     con background-color sino con un box-shadow inset (para no
+     tapar los bordes) — hay que anular las dos propiedades, si no
+     el gris seguía viéndose aunque el background ya estuviera en
+     transparent. */
   #productos .tabla-productos-fixed.table-striped > tbody > tr > *{
     background-color:transparent !important;
+    box-shadow:none !important;
   }
 
   #productos .tabla-productos-fixed td{
