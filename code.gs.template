@@ -177,6 +177,15 @@ case "eliminarProducto":
 case "ingresosProductos":
   return getIngresosProductos(e);
 
+case "boletasProveedores":
+  return getBoletasProveedores(e);
+
+case "detalleBoletaProveedor":
+  return getDetalleBoletaProveedor(e);
+
+case "proveedoresConSaldo":
+  return getProveedoresConSaldo();
+
 case "generarCodigoProducto":
   return jsonResponse({ success:true, codigo: generarCodigoProductoNuevo() });
 
@@ -321,6 +330,10 @@ if (data.action === "registrarIngresoProducto") {
   return registrarIngresoProducto(data);
 }
 
+if (data.action === "registrarPagoProveedor") {
+  return registrarPagoProveedor(data);
+}
+
 if (data.action === "crearUsuario") {
   return crearUsuario(data);
 }
@@ -331,6 +344,10 @@ if (data.action === "editarUsuario") {
 
 if (data.action === "eliminarUsuario") {
   return eliminarUsuario(data);
+}
+
+if (data.action === "reordenarProductos") {
+  return reordenarProductos(data);
 }
 
 return jsonResponse({
@@ -391,7 +408,7 @@ function inicializarHojasNuevoNegocio(){
   asegurarHojaConEncabezados("PRODUCTOS", [
     "CODIGO", "PRODUCTO", "CATEGORIA", "PRECIO", "STOCK",
     "PUBLICADO", "DESTACADO", "OFERTA", "DESCRIPCION", "IMAGEN",
-    "CODIGO_CAJA", "UNIDADES_POR_CAJA", "PRECIO_CAJA"
+    "CODIGO_CAJA", "UNIDADES_POR_CAJA", "PRECIO_CAJA", "ORDEN"
   ]);
 
   asegurarHojaConEncabezados("PEDIDOS", [
@@ -464,15 +481,18 @@ function rowsToObjects(data) {
 
 function getProductos() {
 
-  const data = getSheet()
+  const sheet = getSheet();
+  asegurarColumnaOrden(sheet);
+
+  const data = sheet
     .getDataRange()
     .getValues();
 
   const productos = rowsToObjects(data);
 
-  const publicados = productos.filter(
-    p => String(p.PUBLICADO).toUpperCase() === "SI"
-  );
+  const publicados = productos
+    .filter(p => String(p.PUBLICADO).toUpperCase() === "SI")
+    .sort(ordenarPorColumnaOrden);
 
   return jsonResponse({
     success: true,
@@ -482,13 +502,131 @@ function getProductos() {
 }
 
 /**
+ * Comparador para Array.sort: ordena por la columna ORDEN (numérica,
+ * ascendente). Los productos sin ORDEN cargado (o con un valor no
+ * numérico) van al final, en vez de mezclarse al principio con un 0.
+ */
+function ordenarPorColumnaOrden(a, b){
+  const ordenA = a.ORDEN === "" || a.ORDEN === undefined || isNaN(Number(a.ORDEN)) ? Infinity : Number(a.ORDEN);
+  const ordenB = b.ORDEN === "" || b.ORDEN === undefined || isNaN(Number(b.ORDEN)) ? Infinity : Number(b.ORDEN);
+  return ordenA - ordenB;
+}
+
+/**
+ * Si la hoja PRODUCTOS todavía no tiene la columna ORDEN (usada para
+ * elegir en qué posición aparece cada producto en el catálogo/POS), la
+ * agrega al final — y a los productos que ya existían les asigna un
+ * ORDEN según la fila en la que ya estaban, así agregar la columna no
+ * les cambia el orden que ya tenían de entrada.
+ */
+function asegurarColumnaOrden(sheet){
+  if(!sheet) return;
+
+  const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  if(headerRow.indexOf("ORDEN") !== -1) return;
+
+  const colNueva = sheet.getLastColumn() + 1;
+  sheet.getRange(1, colNueva).setValue("ORDEN");
+
+  const totalFilas = sheet.getLastRow() - 1;
+  if(totalFilas > 0){
+    const ordenInicial = [];
+    for(let i = 1; i <= totalFilas; i++) ordenInicial.push([i]);
+    sheet.getRange(2, colNueva, totalFilas, 1).setValues(ordenInicial);
+  }
+}
+
+/** Devuelve el próximo número de ORDEN libre (el mayor ORDEN cargado + 1), para que un producto nuevo se agregue al final del catálogo en vez de al principio. */
+function obtenerSiguienteOrden(sheet, headerRow){
+  const colOrden = headerRow.indexOf("ORDEN");
+  if(colOrden === -1) return 1;
+
+  const totalFilas = sheet.getLastRow() - 1;
+  if(totalFilas <= 0) return 1;
+
+  const valores = sheet.getRange(2, colOrden + 1, totalFilas, 1).getValues();
+  const maxOrden = valores.reduce((max, fila) => {
+    const n = Number(fila[0]);
+    return isNaN(n) ? max : Math.max(max, n);
+  }, 0);
+
+  return maxOrden + 1;
+}
+
+/**
+ * Guarda un nuevo orden de productos para el catálogo, a partir de una
+ * lista de códigos en el orden deseado (mandada por el panel admin
+ * después de arrastrar y soltar filas en la tabla de productos).
+ *
+ * Los productos que NO vienen en la lista (por ejemplo, si el admin
+ * tenía un filtro/búsqueda aplicado al reordenar) conservan su
+ * posición relativa, pero se corren al final — detrás de todos los
+ * que sí se reordenaron — para que no queden mezclados.
+ */
+function reordenarProductos(data){
+  const codigos = data.codigos;
+
+  if(!Array.isArray(codigos) || codigos.length === 0){
+    return jsonResponse({
+      success: false,
+      message: "No se recibió la lista de productos a ordenar."
+    });
+  }
+
+  const sheet = getSheet();
+  if(!sheet){
+    return jsonResponse({
+      success: false,
+      message: "No se encontró la hoja 'PRODUCTOS'."
+    });
+  }
+
+  asegurarColumnaOrden(sheet);
+
+  const valores = sheet.getDataRange().getValues();
+  const headerRow = valores[0];
+  const colOrden = headerRow.indexOf("ORDEN");
+  const colCodigo = headerRow.indexOf("CODIGO");
+  const totalFilas = valores.length - 1;
+
+  if(totalFilas <= 0){
+    return jsonResponse({ success: true });
+  }
+
+  const posicionDeseada = {};
+  codigos.forEach((codigo, idx) => {
+    posicionDeseada[String(codigo).trim()] = idx + 1;
+  });
+
+  let siguienteParaElResto = codigos.length;
+  const nuevoOrdenPorFila = [];
+
+  for(let i = 1; i < valores.length; i++){
+    const codigo = String(valores[i][colCodigo]).trim();
+    if(posicionDeseada.hasOwnProperty(codigo)){
+      nuevoOrdenPorFila.push([posicionDeseada[codigo]]);
+    } else {
+      siguienteParaElResto++;
+      nuevoOrdenPorFila.push([siguienteParaElResto]);
+    }
+  }
+
+  sheet.getRange(2, colOrden + 1, totalFilas, 1).setValues(nuevoOrdenPorFila);
+
+  return jsonResponse({ success: true });
+}
+
+/**
  * Devuelve TODOS los productos (publicados o no), para la tabla de
  * administración en el panel — ahí el admin necesita ver y editar
  * también los productos que no están publicados en el catálogo/POS.
  */
 function getProductosAdmin() {
 
-  const data = getSheet()
+  const sheet = getSheet();
+  asegurarColumnaOrden(sheet);
+
+  const data = sheet
     .getDataRange()
     .getValues();
 
@@ -498,7 +636,8 @@ function getProductosAdmin() {
     // se descartan las filas sin código, porque no son productos
     // reales y rompían el guardado de la caché local del panel
     // (CODIGO es clave única ahí, y dos filas vacías chocan entre sí).
-    .filter(p => String(p.CODIGO || "").trim() !== "");
+    .filter(p => String(p.CODIGO || "").trim() !== "")
+    .sort(ordenarPorColumnaOrden);
 
   return jsonResponse({
     success: true,
@@ -626,6 +765,7 @@ function guardarProducto(e){
   }
 
   asegurarColumnasProductoCaja(sheet);
+  asegurarColumnaOrden(sheet);
 
   const headerRow =
     sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
@@ -675,7 +815,10 @@ function guardarProducto(e){
     // (normalmente más conveniente que N veces el precio unitario).
     CODIGO_CAJA:       (params.CODIGO_CAJA || "").toString().trim(),
     UNIDADES_POR_CAJA: Number(params.UNIDADES_POR_CAJA || 0),
-    PRECIO_CAJA:       Number(params.PRECIO_CAJA || 0)
+    PRECIO_CAJA:       Number(params.PRECIO_CAJA || 0),
+    // Producto nuevo -> va al final del orden actual del catálogo,
+    // no a un ORDEN vacío/0 que lo mandaría al principio.
+    ORDEN: obtenerSiguienteOrden(sheet, headerRow)
   };
 
   // Armar la fila en el MISMO ORDEN que los encabezados reales de la hoja.
@@ -720,6 +863,7 @@ function actualizarProducto(e){
   }
 
   asegurarColumnasProductoCaja(sheet);
+  asegurarColumnaOrden(sheet);
 
   const codigoOriginal = (params.codigoOriginal || "").toString().trim();
 
@@ -954,14 +1098,76 @@ function getOrCrearHojaIngresosProductos(){
   if(!sheet){
     sheet = ss.insertSheet("INGRESOS_PRODUCTOS");
     sheet.appendRow([
-      "INGRESO_ID", "FECHA", "CODIGO", "PRODUCTO", "CATEGORIA",
-      "CANTIDAD", "PRECIO_ANTERIOR", "PRECIO_NUEVO", "PROVEEDOR",
+      "INGRESO_ID", "BOLETA_ID", "FECHA", "CODIGO", "PRODUCTO", "CATEGORIA",
+      "CANTIDAD", "PRECIO_INGRESO", "PRECIO_ANTERIOR", "PRECIO_NUEVO", "PROVEEDOR",
       "PROVEEDOR_CONTACTO", "OBSERVACIONES", "ES_PRODUCTO_NUEVO", "USUARIO"
     ]);
     sheet.setFrozenRows(1);
     _hojaCache["INGRESOS_PRODUCTOS"] = sheet;
+    return sheet;
+  }
+  // Migración: instalaciones que ya tenían esta hoja de antes de que
+  // existieran las boletas agrupadas no tienen la columna BOLETA_ID.
+  // Se agrega sin tocar las filas viejas — quedan con BOLETA_ID vacío
+  // (siguen existiendo como ingresos sueltos, simplemente no forman
+  // parte de ninguna boleta con pagos).
+  const headerActual = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0];
+  if(String(headerActual[1] || "") !== "BOLETA_ID"){
+    sheet.insertColumnAfter(1);
+    sheet.getRange(1, 2).setValue("BOLETA_ID");
+  }
+  // Migración: instalaciones anteriores a la separación entre precio de
+  // ingreso (costo, lo que se le paga al proveedor) y precio de venta
+  // (PRECIO_ANTERIOR/PRECIO_NUEVO) no tienen la columna PRECIO_INGRESO
+  // — se agrega antes de PRECIO_ANTERIOR. Las filas viejas quedan con
+  // PRECIO_INGRESO vacío (no hay forma de reconstruir retroactivamente
+  // qué costo se pagó en esos ingresos ya guardados).
+  const headerActualizado = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0];
+  const idxPrecioAnterior = headerActualizado.indexOf("PRECIO_ANTERIOR");
+  if(idxPrecioAnterior !== -1 && headerActualizado.indexOf("PRECIO_INGRESO") === -1){
+    sheet.insertColumnBefore(idxPrecioAnterior + 1);
+    sheet.getRange(1, idxPrecioAnterior + 1).setValue("PRECIO_INGRESO");
   }
   return sheet;
+}
+
+/** Returns the BOLETAS_PROVEEDOR sheet (cabecera de cada recepción de mercadería), creating it the first time it's needed */
+function getOrCrearHojaBoletasProveedor(){
+  const ss = getSS();
+  let sheet = getHoja("BOLETAS_PROVEEDOR");
+  if(!sheet){
+    sheet = ss.insertSheet("BOLETAS_PROVEEDOR");
+    sheet.appendRow([
+      "BOLETA_ID", "FECHA", "PROVEEDOR", "PROVEEDOR_CONTACTO",
+      "NUMERO_BOLETA", "OBSERVACIONES", "TOTAL", "USUARIO", "FECHA_CREACION"
+    ]);
+    sheet.setFrozenRows(1);
+    _hojaCache["BOLETAS_PROVEEDOR"] = sheet;
+  }
+  return sheet;
+}
+
+/** Returns the PAGOS_PROVEEDOR sheet, creating it the first time it's needed */
+function getOrCrearHojaPagosProveedor(){
+  const ss = getSS();
+  let sheet = getHoja("PAGOS_PROVEEDOR");
+  if(!sheet){
+    sheet = ss.insertSheet("PAGOS_PROVEEDOR");
+    sheet.appendRow([
+      "PAGO_ID", "FECHA", "BOLETA_ID", "PROVEEDOR",
+      "MONTO", "FORMA_PAGO", "OBSERVACIONES", "USUARIO"
+    ]);
+    sheet.setFrozenRows(1);
+    _hojaCache["PAGOS_PROVEEDOR"] = sheet;
+  }
+  return sheet;
+}
+
+/** Normaliza fechas que Sheets puede devolver como objeto Date a texto "yyyy-MM-dd" */
+function _fechaComoTexto(valor){
+  const tz = Session.getScriptTimeZone() || "GMT-3";
+  if(valor instanceof Date) return Utilities.formatDate(valor, tz, "yyyy-MM-dd");
+  return valor ? String(valor).substring(0, 10) : "";
 }
 
 /**
@@ -983,13 +1189,153 @@ function generarCodigoProductoNuevo(){
 }
 
 /**
- * Registra un ingreso de mercadería (POST). Recibe:
- *   codigo, producto, categoria, cantidad, precio, proveedor,
- *   proveedorContacto, observaciones, usuario (opcional)
- * Si "codigo" ya existe en PRODUCTOS: suma "cantidad" al stock y,
- * si "precio" viene distinto del actual, lo actualiza.
- * Si no existe: crea el producto con ese código (o genera uno si vino
- * vacío) usando producto/categoria/precio, con stock inicial = cantidad.
+ * Da de alta o actualiza UN producto dentro de una recepción de
+ * mercadería (crea el producto si no existe, o suma stock/actualiza
+ * precio si ya existe). Es el mismo criterio que tenía antes
+ * registrarIngresoProducto, ahora aplicado a un solo ítem de la
+ * boleta — se llama una vez por cada línea de productos que llegó.
+ * "filas" es la matriz de PRODUCTOS ya leída (se le va agregando la
+ * fila nueva en memoria si corresponde, para que dos ítems nuevos con
+ * el mismo código en la misma boleta no se pisen entre sí).
+ */
+function _aplicarItemIngresoProducto(sheet, filas, headerRow, item){
+
+  const idxCodigo = headerRow.indexOf("CODIGO");
+  const idxProducto = headerRow.indexOf("PRODUCTO");
+  const idxCategoria = headerRow.indexOf("CATEGORIA");
+  const idxPrecio = headerRow.indexOf("PRECIO");
+  const idxStock = headerRow.indexOf("STOCK");
+
+  const nombre = (item.producto || "").toString().trim();
+  const cantidad = Number(item.cantidad || 0);
+
+  // Precio de INGRESO (costo pagado al proveedor) — es lo que determina
+  // cuánto se le debe al proveedor por esta boleta (ver totalBoleta en
+  // registrarIngresoProducto). NUNCA se usa para el catálogo/POS.
+  const precioIngresoNuevo = item.precio !== undefined && item.precio !== ""
+    ? Number(item.precio) : null;
+
+  // Precio de VENTA (al público) — el que ve el cliente en el POS y en
+  // la página del catálogo (columna PRECIO de PRODUCTOS). Es un dato
+  // aparte del precio de ingreso: lo que se le paga al proveedor no
+  // tiene por qué ser lo mismo que lo que se le cobra al cliente.
+  const precioVentaNuevo = item.precioVenta !== undefined && item.precioVenta !== ""
+    ? Number(item.precioVenta) : null;
+
+  if(!cantidad || cantidad <= 0){
+    return { error: "Ingresá una cantidad válida (mayor a 0) para \"" + (nombre || item.codigo || "un producto") + "\"." };
+  }
+
+  let codigo = (item.codigo || "").toString().trim();
+
+  let filaIndex = -1;
+  if(codigo){
+    for(let i = 1; i < filas.length; i++){
+      if(String(filas[i][idxCodigo]).trim() === codigo){
+        filaIndex = i;
+        break;
+      }
+    }
+  }
+
+  let esProductoNuevo = false;
+  let precioVentaAnterior = "";
+  let productoFinal = nombre;
+  let categoriaFinal = (item.categoria || "").toString().trim();
+
+  if(filaIndex !== -1){
+    // ---- Producto existente: sumar stock y, si corresponde, precio de VENTA ----
+    precioVentaAnterior = Number(filas[filaIndex][idxPrecio] || 0);
+    const stockActual = Number(filas[filaIndex][idxStock] || 0);
+    const stockNuevo = stockActual + cantidad;
+    sheet.getRange(filaIndex + 1, idxStock + 1).setValue(stockNuevo);
+    filas[filaIndex][idxStock] = stockNuevo;
+
+    if(precioVentaNuevo !== null && !isNaN(precioVentaNuevo) && precioVentaNuevo !== precioVentaAnterior){
+      sheet.getRange(filaIndex + 1, idxPrecio + 1).setValue(precioVentaNuevo);
+      filas[filaIndex][idxPrecio] = precioVentaNuevo;
+    }
+
+    productoFinal = filas[filaIndex][idxProducto];
+    categoriaFinal = filas[filaIndex][idxCategoria];
+
+  } else {
+    // ---- Producto nuevo: se crea ----
+    if(!nombre){
+      return { error: "El producto \"" + codigo + "\" no existe todavía — indicá el nombre para crearlo." };
+    }
+    if(!codigo){
+      codigo = generarCodigoProductoNuevo();
+    } else {
+      const yaExiste = filas.slice(1).some(row => String(row[idxCodigo]).trim() === codigo);
+      if(yaExiste){
+        return { error: "Ya existe un producto con el código '" + codigo + "'." };
+      }
+    }
+
+    esProductoNuevo = true;
+    precioVentaAnterior = "";
+
+    // Si no se cargó un precio de venta propio para el producto nuevo,
+    // se usa el precio de ingreso como respaldo — mejor eso que dejar
+    // el producto publicado a $0 en el catálogo.
+    const precioVentaInicial = (precioVentaNuevo !== null && !isNaN(precioVentaNuevo))
+      ? precioVentaNuevo
+      : (precioIngresoNuevo !== null && !isNaN(precioIngresoNuevo) ? precioIngresoNuevo : 0);
+
+    const valoresPorColumna = {
+      CODIGO: codigo,
+      PRODUCTO: nombre,
+      CATEGORIA: categoriaFinal,
+      PRECIO: precioVentaInicial,
+      STOCK: cantidad,
+      PUBLICADO: "SI",
+      DESTACADO: "NO",
+      OFERTA: "NO",
+      DESCRIPCION: "",
+      IMAGEN: ""
+    };
+
+    const fila = headerRow.map(header => {
+      const key = String(header || "").trim();
+      return valoresPorColumna.hasOwnProperty(key) ? valoresPorColumna[key] : "";
+    });
+
+    sheet.appendRow(fila);
+    filas.push(fila); // para que otro ítem de la misma boleta lo vea si se repite el código
+    productoFinal = nombre;
+  }
+
+  // El precio USADO para calcular cuánto se le debe al proveedor en esta
+  // boleta es siempre el precio de INGRESO (costo) — nunca el de venta.
+  // Si por algún motivo no se cargó un precio de ingreso puntual, se usa
+  // el de venta como respaldo (mejor eso que sumar $0 a la boleta).
+  const precioUsado = (precioIngresoNuevo !== null && !isNaN(precioIngresoNuevo))
+    ? precioIngresoNuevo
+    : (precioVentaNuevo !== null && !isNaN(precioVentaNuevo) ? precioVentaNuevo : 0);
+
+  return {
+    codigo, productoFinal, categoriaFinal, cantidad,
+    precioAnterior: precioVentaAnterior,
+    precioNuevo: precioVentaNuevo,
+    precioIngreso: precioIngresoNuevo,
+    precioUsado, esProductoNuevo
+  };
+}
+
+/**
+ * Registra la recepción de mercadería de UNA boleta/remito de un
+ * proveedor (POST). Recibe la cabecera —proveedor, proveedorContacto,
+ * numeroBoleta, observaciones, fecha, usuario— y "items": un array con
+ * cada producto que llegó ({codigo, producto, categoria, precio,
+ * cantidad}).
+ *
+ * Todos los ítems quedan agrupados bajo UN solo BOLETA_ID: si ya
+ * existía una boleta con el mismo proveedor + fecha + N° de boleta
+ * (por ejemplo, se está completando la carga en varias tandas), se le
+ * suman los ítems nuevos en vez de crear una boleta duplicada. Cada
+ * ítem, además, actualiza stock/precio del producto correspondiente
+ * en PRODUCTOS, igual que antes.
  */
 function registrarIngresoProducto(data){
 
@@ -998,6 +1344,16 @@ function registrarIngresoProducto(data){
       success:false,
       message:"Tu usuario (Vendedor) no tiene permiso para registrar ingresos de productos."
     });
+  }
+
+  const proveedor = ((data && data.proveedor) || "").toString().trim();
+  if(!proveedor){
+    return jsonResponse({ success:false, message:"Ingresá el proveedor de esta mercadería." });
+  }
+
+  const items = Array.isArray(data && data.items) ? data.items : [];
+  if(items.length === 0){
+    return jsonResponse({ success:false, message:"Agregá al menos un producto a la boleta antes de guardar." });
   }
 
   const lock = LockService.getScriptLock();
@@ -1016,120 +1372,400 @@ function registrarIngresoProducto(data){
       return jsonResponse({ success:false, message:"No se encontró la hoja 'PRODUCTOS'." });
     }
 
-    const nombre = (data.producto || "").toString().trim();
-    const cantidad = Number(data.cantidad || 0);
-    const precioNuevo = data.precio !== undefined && data.precio !== ""
-      ? Number(data.precio) : null;
-
-    if(!cantidad || cantidad <= 0){
-      return jsonResponse({ success:false, message:"Ingresá una cantidad recibida válida, mayor a 0." });
-    }
-
-    let codigo = (data.codigo || "").toString().trim();
-
     const filas = sheet.getDataRange().getValues();
     const headerRow = filas[0];
-    const idxCodigo = headerRow.indexOf("CODIGO");
-    const idxProducto = headerRow.indexOf("PRODUCTO");
-    const idxCategoria = headerRow.indexOf("CATEGORIA");
-    const idxPrecio = headerRow.indexOf("PRECIO");
-    const idxStock = headerRow.indexOf("STOCK");
 
-    let filaIndex = -1;
-    if(codigo){
-      for(let i = 1; i < filas.length; i++){
-        if(String(filas[i][idxCodigo]).trim() === codigo){
-          filaIndex = i;
-          break;
-        }
+    const resultados = [];
+    let totalBoleta = 0;
+
+    for(let idx = 0; idx < items.length; idx++){
+      const resultado = _aplicarItemIngresoProducto(sheet, filas, headerRow, items[idx]);
+      if(resultado.error){
+        return jsonResponse({ success:false, message: resultado.error });
       }
+      resultados.push(resultado);
+      totalBoleta += resultado.cantidad * resultado.precioUsado;
     }
 
-    let esProductoNuevo = false;
-    let precioAnterior = "";
-    let productoFinal = nombre;
-    let categoriaFinal = (data.categoria || "").toString().trim();
-
-    if(filaIndex !== -1){
-      // ---- Producto existente: sumar stock y, si corresponde, precio ----
-      precioAnterior = Number(filas[filaIndex][idxPrecio] || 0);
-      const stockActual = Number(filas[filaIndex][idxStock] || 0);
-      sheet.getRange(filaIndex + 1, idxStock + 1).setValue(stockActual + cantidad);
-
-      if(precioNuevo !== null && !isNaN(precioNuevo) && precioNuevo !== precioAnterior){
-        sheet.getRange(filaIndex + 1, idxPrecio + 1).setValue(precioNuevo);
-      }
-
-      productoFinal = filas[filaIndex][idxProducto];
-      categoriaFinal = filas[filaIndex][idxCategoria];
-
-    } else {
-      // ---- Producto nuevo: se crea ----
-      if(!nombre){
-        return jsonResponse({ success:false, message:"El producto no existe todavía — indicá el nombre para crearlo." });
-      }
-      if(!codigo){
-        codigo = generarCodigoProductoNuevo();
-      } else {
-        // Por seguridad, evitar duplicar si justo coincide con otro código existente
-        const yaExiste = filas.slice(1).some(row => String(row[idxCodigo]).trim() === codigo);
-        if(yaExiste){
-          return jsonResponse({ success:false, message:"Ya existe un producto con el código '" + codigo + "'." });
-        }
-      }
-
-      esProductoNuevo = true;
-      precioAnterior = "";
-
-      const valoresPorColumna = {
-        CODIGO: codigo,
-        PRODUCTO: nombre,
-        CATEGORIA: categoriaFinal,
-        PRECIO: precioNuevo !== null && !isNaN(precioNuevo) ? precioNuevo : 0,
-        STOCK: cantidad,
-        PUBLICADO: "SI",
-        DESTACADO: "NO",
-        OFERTA: "NO",
-        DESCRIPCION: "",
-        IMAGEN: ""
-      };
-
-      const fila = headerRow.map(header => {
-        const key = String(header || "").trim();
-        return valoresPorColumna.hasOwnProperty(key) ? valoresPorColumna[key] : "";
-      });
-
-      sheet.appendRow(fila);
-      productoFinal = nombre;
-    }
-
-    // ---- Registrar el ingreso en el historial ----
-    const hojaIngresos = getOrCrearHojaIngresosProductos();
-    const ingresoId = "ING-" + Date.now();
+    // ---- Cabecera de la boleta: reusar si ya existe (mismo proveedor + fecha + N° de boleta), o crear una nueva ----
+    const proveedorContacto = ((data && data.proveedorContacto) || "").toString().trim();
+    const numeroBoleta = ((data && data.numeroBoleta) || "").toString().trim();
+    const observaciones = ((data && data.observaciones) || "").toString().trim();
+    const usuario = ((data && data.usuario) || "").toString().trim();
     const fecha = data.fecha ? data.fecha : Utilities.formatDate(new Date(), Session.getScriptTimeZone() || "GMT-3", "yyyy-MM-dd");
 
-    hojaIngresos.appendRow([
-      ingresoId,
-      fecha,
-      codigo,
-      productoFinal,
-      categoriaFinal,
-      cantidad,
-      precioAnterior,
-      (precioNuevo !== null && !isNaN(precioNuevo)) ? precioNuevo : precioAnterior,
-      (data.proveedor || "").toString().trim(),
-      (data.proveedorContacto || "").toString().trim(),
-      (data.observaciones || "").toString().trim(),
-      esProductoNuevo ? "SI" : "NO",
-      (data.usuario || "").toString().trim()
-    ]);
+    const hojaBoletas = getOrCrearHojaBoletasProveedor();
+    const filasBoletas = hojaBoletas.getDataRange().getValues();
+    const bHeader = filasBoletas[0];
+    const bIdxId = bHeader.indexOf("BOLETA_ID");
+    const bIdxFecha = bHeader.indexOf("FECHA");
+    const bIdxProveedor = bHeader.indexOf("PROVEEDOR");
+    const bIdxNumero = bHeader.indexOf("NUMERO_BOLETA");
+    const bIdxTotal = bHeader.indexOf("TOTAL");
+
+    let filaBoletaIndex = -1;
+    for(let i = 1; i < filasBoletas.length; i++){
+      const mismaFecha = _fechaComoTexto(filasBoletas[i][bIdxFecha]) === fecha;
+      const mismoProveedor = String(filasBoletas[i][bIdxProveedor] || "").trim().toLowerCase() === proveedor.toLowerCase();
+      const mismoNumero = String(filasBoletas[i][bIdxNumero] || "").trim() === numeroBoleta;
+      if(mismaFecha && mismoProveedor && mismoNumero){
+        filaBoletaIndex = i;
+        break;
+      }
+    }
+
+    let boletaId;
+    if(filaBoletaIndex !== -1){
+      boletaId = filasBoletas[filaBoletaIndex][bIdxId];
+      const totalActual = Number(filasBoletas[filaBoletaIndex][bIdxTotal] || 0);
+      hojaBoletas.getRange(filaBoletaIndex + 1, bIdxTotal + 1).setValue(totalActual + totalBoleta);
+    } else {
+      boletaId = "BOL-" + Date.now();
+      hojaBoletas.appendRow([
+        boletaId, fecha, proveedor, proveedorContacto,
+        numeroBoleta, observaciones, totalBoleta, usuario,
+        Utilities.formatDate(new Date(), Session.getScriptTimeZone() || "GMT-3", "yyyy-MM-dd HH:mm:ss")
+      ]);
+    }
+
+    // ---- Una línea por ítem en INGRESOS_PRODUCTOS, todas con el mismo BOLETA_ID ----
+    const hojaIngresos = getOrCrearHojaIngresosProductos();
+    resultados.forEach(r => {
+      const ingresoId = "ING-" + Date.now() + "-" + Math.floor(Math.random() * 900 + 100);
+      hojaIngresos.appendRow([
+        ingresoId,
+        boletaId,
+        fecha,
+        r.codigo,
+        r.productoFinal,
+        r.categoriaFinal,
+        r.cantidad,
+        r.precioUsado, // PRECIO_INGRESO — el costo pagado al proveedor, lo que compone el total de la boleta
+        r.precioAnterior,
+        (r.precioNuevo !== null && !isNaN(r.precioNuevo)) ? r.precioNuevo : r.precioAnterior,
+        proveedor,
+        proveedorContacto,
+        observaciones,
+        r.esProductoNuevo ? "SI" : "NO",
+        usuario
+      ]);
+      r.ingresoId = ingresoId;
+    });
 
     return jsonResponse({
       success: true,
-      codigo: codigo,
-      producto: productoFinal,
-      esProductoNuevo: esProductoNuevo,
-      ingresoId: ingresoId
+      boletaId: boletaId,
+      totalBoleta: totalBoleta,
+      items: resultados.map(r => ({
+        codigo: r.codigo, producto: r.productoFinal,
+        cantidad: r.cantidad, esProductoNuevo: r.esProductoNuevo
+      }))
+    });
+
+  } catch(error){
+    return jsonResponse({ success:false, error: error.toString() });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * Devuelve el listado de boletas de proveedor (una fila = una
+ * recepción de mercadería completa), con su total, lo pagado (suma de
+ * PAGOS_PROVEEDOR para esa boleta) y el saldo pendiente. Filtros
+ * opcionales por querystring: desde, hasta (yyyy-MM-dd), proveedor
+ * (contiene) y estado ("PENDIENTE" | "PARCIAL" | "PAGADA").
+ */
+function getBoletasProveedores(e){
+
+  const hojaBoletas = getOrCrearHojaBoletasProveedor();
+  const boletas = rowsToObjects(hojaBoletas.getDataRange().getValues());
+
+  const hojaPagos = getOrCrearHojaPagosProveedor();
+  const pagos = rowsToObjects(hojaPagos.getDataRange().getValues());
+
+  const pagadoPorBoleta = {};
+  pagos.forEach(p => {
+    const id = String(p.BOLETA_ID || "");
+    pagadoPorBoleta[id] = (pagadoPorBoleta[id] || 0) + Number(p.MONTO || 0);
+  });
+
+  let resultado = boletas.map(b => {
+    const total = Number(b.TOTAL || 0);
+    const pagado = pagadoPorBoleta[String(b.BOLETA_ID)] || 0;
+    const saldo = Math.round((total - pagado) * 100) / 100;
+    let estado = "PENDIENTE";
+    if(saldo <= 0) estado = "PAGADA";
+    else if(pagado > 0) estado = "PARCIAL";
+    return {
+      BOLETA_ID: b.BOLETA_ID,
+      FECHA: _fechaComoTexto(b.FECHA),
+      PROVEEDOR: b.PROVEEDOR,
+      PROVEEDOR_CONTACTO: b.PROVEEDOR_CONTACTO,
+      NUMERO_BOLETA: b.NUMERO_BOLETA,
+      OBSERVACIONES: b.OBSERVACIONES,
+      TOTAL: total,
+      PAGADO: Math.round(pagado * 100) / 100,
+      SALDO: saldo,
+      ESTADO: estado,
+      USUARIO: b.USUARIO
+    };
+  });
+
+  const params = (e && e.parameter) || {};
+  const desde = (params.desde || "").toString().trim();
+  const hasta = (params.hasta || "").toString().trim();
+  const proveedor = (params.proveedor || "").toString().trim().toLowerCase();
+  const estado = (params.estado || "").toString().trim().toUpperCase();
+
+  if(desde) resultado = resultado.filter(b => String(b.FECHA) >= desde);
+  if(hasta) resultado = resultado.filter(b => String(b.FECHA) <= hasta);
+  if(proveedor) resultado = resultado.filter(b => String(b.PROVEEDOR || "").toLowerCase().indexOf(proveedor) !== -1);
+  const proveedorExacto = (params.proveedorExacto || "").toString().trim().toLowerCase();
+  if(proveedorExacto) resultado = resultado.filter(b => String(b.PROVEEDOR || "").trim().toLowerCase() === proveedorExacto);
+  if(estado) resultado = resultado.filter(b => b.ESTADO === estado);
+
+  resultado.sort((a, b) => String(b.FECHA).localeCompare(String(a.FECHA)) || String(b.BOLETA_ID).localeCompare(String(a.BOLETA_ID)));
+
+  return jsonResponse({ success:true, total: resultado.length, boletas: resultado });
+}
+
+/**
+ * Devuelve un resumen por proveedor (una fila = un proveedor), estilo
+ * "Clientes a crédito" pero para lo que se les debe a los
+ * proveedores: cuántas boletas tiene, cuánto se le compró en total,
+ * cuánto se le pagó y el saldo pendiente — sumando todas sus boletas
+ * (BOLETAS_PROVEEDOR) y todos los pagos hechos contra ellas
+ * (PAGOS_PROVEEDOR). Se agrupa por nombre de proveedor sin importar
+ * mayúsculas/espacios, para que "Coca Cola" y "coca cola " cuenten
+ * como el mismo proveedor.
+ */
+function getProveedoresConSaldo(){
+
+  const hojaBoletas = getOrCrearHojaBoletasProveedor();
+  const boletas = rowsToObjects(hojaBoletas.getDataRange().getValues());
+
+  const hojaPagos = getOrCrearHojaPagosProveedor();
+  const pagos = rowsToObjects(hojaPagos.getDataRange().getValues());
+
+  const pagadoPorBoleta = {};
+  pagos.forEach(p => {
+    const id = String(p.BOLETA_ID || "");
+    pagadoPorBoleta[id] = (pagadoPorBoleta[id] || 0) + Number(p.MONTO || 0);
+  });
+
+  const porProveedor = {};
+
+  boletas.forEach(b => {
+    const nombre = String(b.PROVEEDOR || "").trim();
+    if(!nombre) return;
+    const key = nombre.toLowerCase();
+
+    if(!porProveedor[key]){
+      porProveedor[key] = {
+        PROVEEDOR: nombre,
+        PROVEEDOR_CONTACTO: "",
+        BOLETAS: 0,
+        BOLETAS_PENDIENTES: 0,
+        TOTAL: 0,
+        PAGADO: 0,
+        ULTIMA_FECHA: ""
+      };
+    }
+
+    const entrada = porProveedor[key];
+    const total = Number(b.TOTAL || 0);
+    const pagado = pagadoPorBoleta[String(b.BOLETA_ID)] || 0;
+    const saldo = Math.round((total - pagado) * 100) / 100;
+    const fecha = _fechaComoTexto(b.FECHA);
+
+    entrada.BOLETAS += 1;
+    entrada.TOTAL += total;
+    entrada.PAGADO += pagado;
+    if(saldo > 0) entrada.BOLETAS_PENDIENTES += 1;
+
+    // Se queda con el contacto y la fecha de la boleta más reciente de este proveedor
+    if(!entrada.ULTIMA_FECHA || fecha > entrada.ULTIMA_FECHA){
+      entrada.ULTIMA_FECHA = fecha;
+      if(b.PROVEEDOR_CONTACTO) entrada.PROVEEDOR_CONTACTO = b.PROVEEDOR_CONTACTO;
+    } else if(!entrada.PROVEEDOR_CONTACTO && b.PROVEEDOR_CONTACTO){
+      entrada.PROVEEDOR_CONTACTO = b.PROVEEDOR_CONTACTO;
+    }
+  });
+
+  const proveedores = Object.values(porProveedor).map(p => {
+    const total = Math.round(p.TOTAL * 100) / 100;
+    const pagado = Math.round(p.PAGADO * 100) / 100;
+    const saldo = Math.round((total - pagado) * 100) / 100;
+    return {
+      PROVEEDOR: p.PROVEEDOR,
+      PROVEEDOR_CONTACTO: p.PROVEEDOR_CONTACTO,
+      BOLETAS: p.BOLETAS,
+      BOLETAS_PENDIENTES: p.BOLETAS_PENDIENTES,
+      TOTAL: total,
+      PAGADO: pagado,
+      SALDO: saldo,
+      ULTIMA_FECHA: p.ULTIMA_FECHA
+    };
+  });
+
+  // Los que tienen más deuda primero; entre los que no deben nada, orden alfabético
+  proveedores.sort((a, b) => {
+    if(b.SALDO !== a.SALDO) return b.SALDO - a.SALDO;
+    return String(a.PROVEEDOR).localeCompare(String(b.PROVEEDOR));
+  });
+
+  return jsonResponse({ success:true, total: proveedores.length, proveedores: proveedores });
+}
+
+/**
+ * Devuelve el detalle completo de UNA boleta de proveedor: su
+ * cabecera (con total/pagado/saldo), la lista de productos recibidos
+ * en ella (de INGRESOS_PRODUCTOS) y el historial de pagos hechos
+ * contra ella (de PAGOS_PROVEEDOR).
+ */
+function getDetalleBoletaProveedor(e){
+
+  const boletaId = ((e && e.parameter && e.parameter.boletaId) || "").toString().trim();
+  if(!boletaId){
+    return jsonResponse({ success:false, message:"Falta el ID de la boleta." });
+  }
+
+  const hojaBoletas = getOrCrearHojaBoletasProveedor();
+  const boletas = rowsToObjects(hojaBoletas.getDataRange().getValues());
+  const boleta = boletas.find(b => String(b.BOLETA_ID) === boletaId);
+  if(!boleta){
+    return jsonResponse({ success:false, message:"No se encontró la boleta." });
+  }
+
+  const hojaIngresos = getOrCrearHojaIngresosProductos();
+  const items = rowsToObjects(hojaIngresos.getDataRange().getValues())
+    .filter(i => String(i.BOLETA_ID) === boletaId)
+    .map(i => Object.assign({}, i, { FECHA: _fechaComoTexto(i.FECHA) }));
+
+  const hojaPagos = getOrCrearHojaPagosProveedor();
+  const pagos = rowsToObjects(hojaPagos.getDataRange().getValues())
+    .filter(p => String(p.BOLETA_ID) === boletaId)
+    .map(p => Object.assign({}, p, { FECHA: _fechaComoTexto(p.FECHA) }))
+    .sort((a, b) => String(b.FECHA).localeCompare(String(a.FECHA)) || String(b.PAGO_ID).localeCompare(String(a.PAGO_ID)));
+
+  const total = Number(boleta.TOTAL || 0);
+  const pagado = pagos.reduce((acc, p) => acc + Number(p.MONTO || 0), 0);
+  const saldo = Math.round((total - pagado) * 100) / 100;
+
+  return jsonResponse({
+    success: true,
+    boleta: {
+      BOLETA_ID: boleta.BOLETA_ID,
+      FECHA: _fechaComoTexto(boleta.FECHA),
+      PROVEEDOR: boleta.PROVEEDOR,
+      PROVEEDOR_CONTACTO: boleta.PROVEEDOR_CONTACTO,
+      NUMERO_BOLETA: boleta.NUMERO_BOLETA,
+      OBSERVACIONES: boleta.OBSERVACIONES,
+      USUARIO: boleta.USUARIO,
+      FECHA_CREACION: boleta.FECHA_CREACION,
+      TOTAL: total,
+      PAGADO: Math.round(pagado * 100) / 100,
+      SALDO: saldo,
+      ESTADO: saldo <= 0 ? "PAGADA" : (pagado > 0 ? "PARCIAL" : "PENDIENTE")
+    },
+    items: items,
+    pagos: pagos
+  });
+}
+
+/**
+ * Registra un pago a un proveedor (POST), aplicado contra UNA boleta
+ * puntual. Recibe: boletaId, monto, formaPago, observaciones, usuario.
+ * No deja registrar un pago que supere el saldo pendiente de la
+ * boleta (evita saldos negativos por error de tipeo).
+ */
+function registrarPagoProveedor(data){
+
+  if(String((data && data.rol) || "").trim().toLowerCase() === "vendedor"){
+    return jsonResponse({
+      success:false,
+      message:"Tu usuario (Vendedor) no tiene permiso para registrar pagos a proveedores."
+    });
+  }
+
+  const boletaId = ((data && data.boletaId) || "").toString().trim();
+  const monto = Number((data && data.monto) || 0);
+
+  if(!boletaId){
+    return jsonResponse({ success:false, message:"Falta el ID de la boleta." });
+  }
+  if(!monto || monto <= 0){
+    return jsonResponse({ success:false, message:"Ingresá un monto de pago válido, mayor a 0." });
+  }
+
+  const lock = LockService.getScriptLock();
+  const obtuvoLock = lock.tryLock(10000);
+  if(!obtuvoLock){
+    return jsonResponse({
+      success:false,
+      message:"El sistema está ocupado en este momento. Probá de nuevo en unos segundos."
+    });
+  }
+
+  try{
+
+    const hojaBoletas = getOrCrearHojaBoletasProveedor();
+    const filasBoletas = hojaBoletas.getDataRange().getValues();
+    const bHeader = filasBoletas[0];
+    const bIdxId = bHeader.indexOf("BOLETA_ID");
+    const bIdxProveedor = bHeader.indexOf("PROVEEDOR");
+    const bIdxTotal = bHeader.indexOf("TOTAL");
+
+    let filaBoleta = null;
+    for(let i = 1; i < filasBoletas.length; i++){
+      if(String(filasBoletas[i][bIdxId]) === boletaId){
+        filaBoleta = filasBoletas[i];
+        break;
+      }
+    }
+    if(!filaBoleta){
+      return jsonResponse({ success:false, message:"No se encontró la boleta." });
+    }
+
+    const proveedor = String(filaBoleta[bIdxProveedor] || "");
+    const total = Number(filaBoleta[bIdxTotal] || 0);
+
+    const hojaPagos = getOrCrearHojaPagosProveedor();
+    const pagosPrevios = rowsToObjects(hojaPagos.getDataRange().getValues())
+      .filter(p => String(p.BOLETA_ID) === boletaId)
+      .reduce((acc, p) => acc + Number(p.MONTO || 0), 0);
+
+    const saldoActual = Math.round((total - pagosPrevios) * 100) / 100;
+
+    if(monto - saldoActual > 0.01){
+      return jsonResponse({
+        success:false,
+        message:"El monto ($" + monto.toLocaleString("es-AR") + ") supera el saldo pendiente de la boleta ($" + saldoActual.toLocaleString("es-AR") + ")."
+      });
+    }
+
+    const fecha = data.fecha ? data.fecha : Utilities.formatDate(new Date(), Session.getScriptTimeZone() || "GMT-3", "yyyy-MM-dd");
+    const pagoId = "PAG-" + Date.now();
+
+    hojaPagos.appendRow([
+      pagoId,
+      fecha,
+      boletaId,
+      proveedor,
+      monto,
+      (data.formaPago || "EFECTIVO").toString().trim(),
+      (data.observaciones || "").toString().trim(),
+      (data.usuario || "").toString().trim()
+    ]);
+
+    const nuevoSaldo = Math.round((saldoActual - monto) * 100) / 100;
+
+    return jsonResponse({
+      success: true,
+      pagoId: pagoId,
+      nuevoSaldo: nuevoSaldo,
+      estado: nuevoSaldo <= 0 ? "PAGADA" : "PARCIAL"
     });
 
   } catch(error){
@@ -5598,67 +6234,103 @@ function guardarVenta(e){
   const clienteVentaId =
   String(params.clienteVentaId || "").trim();
 
-  if(clienteVentaId){
-    const yaExistente = buscarVentaPorClienteVentaId(ventasSheet, clienteVentaId);
-    if(yaExistente){
+  // --- CORRECCIÓN: chequeo + inserción atómicos ---
+  // Antes, "buscar si ya existe" y "agregar la fila" eran dos pasos
+  // separados sin ningún lock entre medio. Si el mismo clienteVentaId
+  // llegaba dos veces casi al mismo tiempo (por ej. el navegador dio
+  // timeout a los 15s y lo reintentó solo desde la cola local, pero la
+  // primera ejecución en el servidor todavía no había terminado),
+  // ambas ejecuciones podían pasar el chequeo ANTES de que cualquiera
+  // de las dos llegara a insertar la fila — y las dos terminaban
+  // agregando la venta, duplicándola. Ahora se toma un lock exclusivo
+  // que cubre el chequeo Y la inserción como una sola operación
+  // indivisible: la segunda ejecución tiene que esperar a que la
+  // primera termine de insertar antes de poder buscar, así que
+  // siempre la va a encontrar y nunca va a duplicar.
+  let lock = null;
+  if (clienteVentaId) {
+    lock = LockService.getScriptLock();
+    const obtuvoLock = lock.tryLock(20000); // hasta 20s esperando a que termine otra venta con el mismo ID
+    if (!obtuvoLock) {
       return jsonResponse({
-        success:true,
-        ventaId: yaExistente,
-        idempotente: true // ya estaba guardada; no se tocó stock ni se creó nada nuevo
+        success:false,
+        message:"El servidor está ocupado procesando esta misma venta, reintentá en unos segundos."
       });
     }
   }
 
-  const ventaId =
-  generarIdCorto("VEN", ventasSheet);
+  try {
 
-  const fecha =
-  new Date();
+    if(clienteVentaId){
+      const yaExistente = buscarVentaPorClienteVentaId(ventasSheet, clienteVentaId);
+      if(yaExistente){
+        return jsonResponse({
+          success:true,
+          ventaId: yaExistente,
+          idempotente: true // ya estaba guardada; no se tocó stock ni se creó nada nuevo
+        });
+      }
+    }
 
-  const total =
-  Number(params.total || 0);
+    const ventaId =
+    generarIdCorto("VEN", ventasSheet);
 
-  const formaPago =
-  params.formaPago || "EFECTIVO";
+    const fecha =
+    new Date();
 
-  const vendedor =
-  params.vendedor || "ADMIN";
+    const total =
+    Number(params.total || 0);
 
-  const observaciones =
-  params.observaciones || "";
+    const formaPago =
+    params.formaPago || "EFECTIVO";
 
-  const carrito =
-  Array.isArray(params.carrito) ? params.carrito : JSON.parse(params.carrito || "[]");
+    const vendedor =
+    params.vendedor || "ADMIN";
 
-  ventasSheet.appendRow([
-    ventaId,
-    fecha,
-    total,
-    formaPago,
-    vendedor,
-    observaciones,
-    clienteVentaId // columna nueva — vacía para ventas que no la mandan (compatibilidad hacia atrás)
-  ]);
+    const observaciones =
+    params.observaciones || "";
 
-  carrito.forEach(item => {
+    const carrito =
+    Array.isArray(params.carrito) ? params.carrito : JSON.parse(params.carrito || "[]");
 
-    detalleSheet.appendRow([
+    ventasSheet.appendRow([
       ventaId,
-      item.CODIGO,
-      item.PRODUCTO,
-      item.cantidad,
-      item.PRECIO,
-      item.PRECIO * item.cantidad
+      fecha,
+      total,
+      formaPago,
+      vendedor,
+      observaciones,
+      clienteVentaId // columna nueva — vacía para ventas que no la mandan (compatibilidad hacia atrás)
     ]);
 
-  });
+    carrito.forEach(item => {
 
-  descontarStockPorVenta(carrito);
+      detalleSheet.appendRow([
+        ventaId,
+        item.CODIGO,
+        item.PRODUCTO,
+        item.cantidad,
+        item.PRECIO,
+        item.PRECIO * item.cantidad
+      ]);
 
-  return jsonResponse({
-    success:true,
-    ventaId:ventaId
-  });
+    });
+
+    // Se libera el lock ANTES de descontar stock: descontarStockPorVenta
+    // toma su propio lock (protege una operación distinta, la resta de
+    // stock en PRODUCTOS) y no necesita mantener este otro tomado.
+    if (lock) { lock.releaseLock(); lock = null; }
+
+    descontarStockPorVenta(carrito);
+
+    return jsonResponse({
+      success:true,
+      ventaId:ventaId
+    });
+
+  } finally {
+    if (lock) lock.releaseLock();
+  }
 
 }
 
