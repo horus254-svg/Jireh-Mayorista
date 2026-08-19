@@ -1759,6 +1759,22 @@ function cargarSiVencido(clave, fn) {
   fn();
 }
 
+/** Cambia de pestaña dentro de la sección Configuración, sin recargar nada */
+function mostrarConfigTab(tabId, btnEl) {
+  document.querySelectorAll(".cfg-tab-pane").forEach(p => p.classList.remove("active"));
+  const pane = document.getElementById("cfgTab-" + tabId);
+  if (pane) pane.classList.add("active");
+
+  document.querySelectorAll(".cfg-tab-btn").forEach(b => b.classList.remove("active"));
+  if (btnEl) btnEl.classList.add("active");
+  else {
+    const btn = document.querySelector(`.cfg-tab-btn[data-cfg-tab="${tabId}"]`);
+    if (btn) btn.classList.add("active");
+  }
+
+  try { localStorage.setItem("veekpos_cfg_tab", tabId); } catch (e) {}
+}
+
 function mostrarSeccion(id) {
   if (!seccionPermitidaParaRol(id)) {
     toast("No tenés permiso para acceder a esta sección", "error");
@@ -1791,6 +1807,11 @@ function mostrarSeccion(id) {
   }
   if (id === "ventasPOS") cargarSiVencido("ventasPOS", cargarVentasPOSHistorial);
   if (id === "configuracion") {
+    let tabInicial = "general";
+    try { tabInicial = localStorage.getItem("veekpos_cfg_tab") || "general"; } catch (e) {}
+    if (!document.getElementById("cfgTab-" + tabInicial)) tabInicial = "general";
+    mostrarConfigTab(tabInicial);
+
     cargarConfigNegocioForm();
     actualizarEstadoUSBPrint();
     // En Electron: mostrar tarjetas específicas de escritorio

@@ -1580,696 +1580,745 @@
   <!-- ===== CONFIGURACION ===== -->
   <div id="configuracion" class="seccion">
     <div class="page-header">
-      <div><h1>⚙️ Configuración</h1><div class="sub">Datos del local que aparecen en el ticket impreso</div></div>
+      <div><h1>⚙️ Configuración</h1><div class="sub">Todo lo que podés personalizar de tu VeekPOS, agrupado por tema</div></div>
     </div>
 
-    <div class="card p-3 mb-3">
-      <h6 style="margin-bottom:14px;">🧾 Encabezado del ticket (impresora térmica)</h6>
+    <div class="cfg-tabs" id="cfgTabsNav">
+      <button type="button" class="cfg-tab-btn active" data-cfg-tab="general" onclick="mostrarConfigTab('general', this)"><span class="ic">🏪</span> General</button>
+      <button type="button" class="cfg-tab-btn" data-cfg-tab="catalogo" onclick="mostrarConfigTab('catalogo', this)"><span class="ic">🌐</span> Catálogo Web</button>
+      <button type="button" class="cfg-tab-btn" data-cfg-tab="productos" onclick="mostrarConfigTab('productos', this)"><span class="ic">🖼️</span> Productos y Pedidos</button>
+      <button type="button" class="cfg-tab-btn" data-cfg-tab="pagos" onclick="mostrarConfigTab('pagos', this)"><span class="ic">💳</span> Pagos y Conexión</button>
+      <button type="button" class="cfg-tab-btn" data-cfg-tab="hardware" onclick="mostrarConfigTab('hardware', this)"><span class="ic">🖨️</span> Hardware</button>
+      <button type="button" class="cfg-tab-btn" data-cfg-tab="avanzado" onclick="mostrarConfigTab('avanzado', this)"><span class="ic">🔧</span> Avanzado</button>
+    </div>
 
-      <div class="mb-3">
-        <label class="form-label">Nombre del local *</label>
-        <input type="text" class="form-control" id="cfgNombreLocal" placeholder="Ej: JIREH">
-      </div>
+    <!-- =================================================================== -->
+    <!-- TAB 1: GENERAL — lo que se configura al arrancar y se revisa seguido -->
+    <!-- =================================================================== -->
+    <div class="cfg-tab-pane active" id="cfgTab-general">
 
-      <div class="mb-3">
-        <label class="form-label">Subtítulo / rubro <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
-        <input type="text" class="form-control" id="cfgSubtitulo" placeholder="Ej: Punto de Venta">
-      </div>
+      <div class="card p-3 mb-3">
+        <h6 style="margin-bottom:14px;">🧾 Encabezado del ticket (impresora térmica)</h6>
 
-      <div class="mb-3">
-        <label class="form-label">Dirección <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
-        <input type="text" class="form-control" id="cfgDireccion" placeholder="Ej: Av. Siempre Viva 123, Buenos Aires">
-      </div>
-
-      <div class="row g-2 mb-3">
-        <div class="col-6">
-          <label class="form-label">Teléfono 1 <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
-          <input type="text" class="form-control" id="cfgTelefono1" placeholder="Ej: 11-2345-6789">
+        <div class="mb-3">
+          <label class="form-label">Nombre del local *</label>
+          <input type="text" class="form-control" id="cfgNombreLocal" placeholder="Ej: JIREH">
         </div>
-        <div class="col-6">
-          <label class="form-label">Teléfono 2 <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
-          <input type="text" class="form-control" id="cfgTelefono2" placeholder="Ej: 11-9876-5432">
+
+        <div class="mb-3">
+          <label class="form-label">Subtítulo / rubro <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+          <input type="text" class="form-control" id="cfgSubtitulo" placeholder="Ej: Punto de Venta">
         </div>
-      </div>
 
-      <div class="mb-3">
-        <label class="form-label">Pie de página <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
-        <input type="text" class="form-control" id="cfgPie" placeholder="Ej: ¡Gracias por su compra!">
-      </div>
-
-      <hr class="my-4">
-      <h6 style="margin-bottom:6px;">🏦 Datos bancarios</h6>
-      <p class="text-muted" style="font-size:12.5px; margin-top:-4px; margin-bottom:14px;">
-        Se incluyen en el mensaje de WhatsApp que se manda al cliente cuando un pedido queda en estado "Nuevo".
-      </p>
-      <div class="row g-2 mb-3">
-        <div class="col-md-7">
-          <label class="form-label">CBU / Alias para transferencia</label>
-          <input type="text" class="form-control" id="cfgCbuTransferencia" placeholder="Ej: 0000000000000000000000">
+        <div class="mb-3">
+          <label class="form-label">Dirección <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+          <input type="text" class="form-control" id="cfgDireccion" placeholder="Ej: Av. Siempre Viva 123, Buenos Aires">
         </div>
-        <div class="col-md-5">
-          <label class="form-label">Titular de la cuenta</label>
-          <input type="text" class="form-control" id="cfgNombreTitularCbu" placeholder="Ej: NOMBRE APELLIDO">
-        </div>
-      </div>
 
-      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-3">
-        <button class="btn btn-outline-secondary btn-sm" onclick="restablecerConfigNegocio()">↺ Restablecer valores</button>
-        <div class="d-flex gap-2">
-          <button class="btn btn-outline-primary" onclick="vistaPreviaTicketConfig()">👁️ Vista previa</button>
-          <button class="btn btn-success" id="btnGuardarConfigNegocio" onclick="guardarConfigNegocioForm()">💾 Guardar</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="card p-3">
-      <div class="config-preview-hint">
-        <span class="ic">ℹ️</span>
-        Estos datos se guardan en la hoja de cálculo (pestaña "CONFIGURACION") y se usan para armar el encabezado de todos los tickets impresos (ventas y cierres de caja). Como quedan en la planilla, se ven igual sin importar desde qué computadora o navegador entres al panel.
-      </div>
-    </div>
-
-    <div class="card p-3 mt-3">
-      <h6 style="margin-bottom:14px;">🅰️ Apariencia del panel admin (este sidebar)</h6>
-      <p class="text-muted" style="font-size:12.5px; margin-top:-8px; margin-bottom:14px;">
-        Esto cambia solo lo que se ve aquí, en el menú lateral del panel — no afecta al catálogo web.
-      </p>
-
-      <div class="row g-2 mb-3">
-        <div class="col-3">
-          <label class="form-label">Letra/ícono</label>
-          <input type="text" class="form-control text-center" id="cfgSidebarMark" placeholder="J" maxlength="2">
-        </div>
-        <div class="col-9">
-          <label class="form-label">Nombre <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
-          <input type="text" class="form-control" id="cfgSidebarTexto" placeholder="Ej: JIREH">
-        </div>
-      </div>
-
-      <div class="d-flex justify-content-end mt-3">
-        <button class="btn btn-success" id="btnGuardarSidebar" onclick="guardarSidebarForm()">💾 Guardar</button>
-      </div>
-    </div>
-
-    <div class="card p-3 mt-3">
-      <h6 style="margin-bottom:14px;">🖼️ Imágenes de productos</h6>
-      <p class="text-muted" style="font-size:12.5px; margin-top:-8px; margin-bottom:14px;">
-        Las fotos que subís desde "Nuevo Producto" se guardan en esta carpeta de tu Google Drive. Pegá el link de la carpeta (o solo el ID) — tiene que ser una carpeta de la misma cuenta de Google donde está la planilla.
-      </p>
-
-      <div class="mb-3">
-        <label class="form-label">Link o ID de la carpeta de Drive</label>
-        <input type="text" class="form-control" id="cfgDriveCarpetaProductos" placeholder="https://drive.google.com/drive/folders/...">
-      </div>
-
-      <div class="config-preview-hint">
-        <span class="ic">ℹ️</span>
-        En Drive: abrí la carpeta → botón "Compartir" → "Cualquier persona con el enlace" puede ver → copiá el link y pegalo aquí.
-      </div>
-
-      <div class="d-flex justify-content-end mt-3">
-        <button class="btn btn-success" id="btnGuardarDriveProductos" onclick="guardarDriveProductosForm()">💾 Guardar</button>
-      </div>
-    </div>
-
-    <div class="card p-3 mt-3">
-      <h6 style="margin-bottom:14px;">📄 PDF de pedidos</h6>
-      <p class="text-muted" style="font-size:12.5px; margin-top:-8px; margin-bottom:14px;">
-        Cada pedido genera un PDF con el detalle del cliente y los productos. El título y el WhatsApp del encabezado usan el <strong>nombre del local</strong> y el <strong>WhatsApp</strong> que configuraste arriba — los textos de abajo son específicos de este PDF.
-      </p>
-
-      <div class="mb-3">
-        <label class="form-label">Subtítulo del encabezado</label>
-        <input type="text" class="form-control" id="cfgPedidoPdfSubtitulo" placeholder="Ej: Distribuidora Mayorista">
-      </div>
-
-      <div class="mb-3">
-        <label class="form-label">Texto del pie de página</label>
-        <input type="text" class="form-control" id="cfgPedidoPdfPie" placeholder="Ej: Gracias por su compra.">
-      </div>
-
-      <hr class="my-3">
-
-      <p class="text-muted" style="font-size:12.5px; margin-bottom:14px;">
-        Carpeta de Google Drive donde se guarda cada PDF generado. Pegá el link de la carpeta (o solo el ID) — tiene que ser una carpeta de la misma cuenta de Google donde está la planilla.
-      </p>
-
-      <div class="mb-3">
-        <label class="form-label">Link o ID de la carpeta de Drive</label>
-        <input type="text" class="form-control" id="cfgDriveCarpetaPedidos" placeholder="https://drive.google.com/drive/folders/...">
-      </div>
-
-      <div class="config-preview-hint">
-        <span class="ic">ℹ️</span>
-        En Drive: abrí la carpeta → botón "Compartir" → "Cualquier persona con el enlace" puede ver → copiá el link y pegalo aquí.
-      </div>
-
-      <div class="d-flex justify-content-end mt-3">
-        <button class="btn btn-success" id="btnGuardarDrivePedidos" onclick="guardarDrivePedidosForm()">💾 Guardar</button>
-      </div>
-    </div>
-
-    <div class="card p-3 mt-3">
-      <h6 style="margin-bottom:14px;">📱 Catálogo online (para los QR de precio)</h6>
-      <p class="text-muted" style="font-size:12.5px; margin-top:-8px; margin-bottom:14px;">
-        La URL donde está publicado tu catálogo online. Se usa para armar el link de los códigos QR que generás desde Productos — al escanearlos, abren una página chica con el nombre y precio actualizado de ese producto.
-      </p>
-
-      <div class="mb-3">
-        <label class="form-label">URL del catálogo (sin / al final)</label>
-        <input type="text" class="form-control" id="cfgUrlCatalogo" placeholder="https://tunegocio.com">
-      </div>
-
-      <div class="d-flex justify-content-end mt-3">
-        <button class="btn btn-success" id="btnGuardarUrlCatalogo" onclick="guardarUrlCatalogoForm()">💾 Guardar</button>
-      </div>
-    </div>
-
-    <div class="card p-3 mt-3">
-      <h6 style="margin-bottom:6px;">🛒 Catálogo online — pedido mínimo</h6>
-      <p class="text-muted" style="font-size:12.5px; margin-top:-2px; margin-bottom:14px;">
-        El cliente no puede enviar el pedido si el total no llega a este monto. Se aplica al instante en el catálogo.
-      </p>
-      <div class="mb-3">
-        <label class="form-label">Monto mínimo ($)</label>
-        <input type="number" class="form-control" id="cfgPedidoMinimo" min="0" step="1000" placeholder="Ej: 100000">
-      </div>
-      <div class="d-flex justify-content-end">
-        <button class="btn btn-success" id="btnGuardarPedidoMinimo" onclick="guardarPedidoMinimoForm()">💾 Guardar pedido mínimo</button>
-      </div>
-    </div>
-
-    <!-- ===== LICENCIA ===== -->
-    <div class="card p-3 mb-3" id="cardLicencia">
-      <h6 style="margin-bottom:14px;">🔑 Licencia</h6>
-      <div id="licenciaEstadoBox" class="config-preview-hint">Cargando estado de la licencia...</div>
-      <div class="mt-3">
-        <label class="form-label">URL del servidor de licencias <span class="text-muted" style="font-size:11px;">(te la pasa quien te vendió VeekPOS)</span></label>
-        <input type="text" class="form-control" id="cfgLicenciaUrlServidor" placeholder="https://script.google.com/macros/s/.../exec">
-      </div>
-      <div class="d-flex justify-content-end gap-2 mt-3">
-        <button class="btn btn-outline-secondary btn-sm" onclick="validarLicenciaAhoraBtn()">↻ Validar ahora</button>
-        <button class="btn btn-success btn-sm" id="btnGuardarLicenciaUrl" onclick="guardarUrlServidorLicencia()">💾 Guardar URL</button>
-      </div>
-    </div>
-
-    <!-- Tarjeta API URL — solo visible en Electron -->
-    <div class="card p-3 mt-3" id="cardConexionNegocio" style="display:none;">
-      <h6 style="margin-bottom:6px;">🔗 Conexión con tu Google Sheets</h6>
-      <p class="text-muted" style="font-size:12.5px; margin-top:-4px; margin-bottom:10px;">
-        URL de la API que conecta el VeekPOS con tu planilla de Google Sheets.
-      </p>
-      <div class="mb-2">
-        <label class="form-label">URL de la API</label>
-        <input type="url" class="form-control" id="conexionNegocioUrl"
-          placeholder="https://script.google.com/macros/s/.../exec">
-      </div>
-      <div id="conexionNegocioUrlActual" class="text-muted mb-2" style="font-size:12px;"></div>
-      <button class="btn btn-success btn-sm" onclick="guardarApiUrlDesdeConfig()">💾 Guardar URL</button>
-    </div>
-
-    <!-- Tarjeta red local multicaja — solo visible en Electron -->
-    <div class="card p-3 mt-3" id="cardMultiCajaRed" style="display:none;">
-      <h6 style="margin-bottom:6px;">🌐 Red local (multi-caja)</h6>
-      <p class="text-muted" style="font-size:12.5px; margin-top:-4px; margin-bottom:10px;">
-        Configurá este equipo como servidor o cliente en una red local.
-      </p>
-      <div class="mb-2">
-        <label class="form-label">Rol en la red</label>
-        <select class="form-select" id="cfgRolRed" onchange="actualizarVisibilidadCampoNombreCaja(this.value)">
-          <option value="">Sin red local</option>
-          <option value="servidor">Servidor (caja principal)</option>
-          <option value="cliente">Cliente (caja secundaria)</option>
-        </select>
-      </div>
-      <div id="campoNombreCaja" style="display:none;" class="mb-2">
-        <label class="form-label">Nombre de esta caja</label>
-        <input type="text" class="form-control" id="cfgNombreCaja" placeholder="Ej: Caja 1, Caja Mostrador">
-      </div>
-      <div id="estadoRedLocal" class="text-muted mb-2" style="font-size:12px;"></div>
-      <button class="btn btn-success btn-sm" onclick="guardarConfigRed()">💾 Guardar configuración de red</button>
-    </div>
-
-    <!-- Tarjeta Mercado Pago — solo visible en Electron -->
-    <div class="card p-3 mt-3" id="cardMercadoPago" style="display:none;">
-      <h6 style="margin-bottom:6px;">📲 Mercado Pago — Cobro con QR</h6>
-      <p class="text-muted" style="font-size:13px; margin-bottom:14px;">
-        Opcional. Si lo configurás, el botón "Transferencia" del POS muestra un QR de Mercado Pago y confirma el cobro automáticamente cuando se acredita.
-      </p>
-      <div id="mpEstadoBox" class="config-preview-hint mb-3">Cargando estado...</div>
-      <div id="mpFormularioWrap">
-        <div class="mb-2">
-          <label class="form-label">Access Token de Mercado Pago <span class="text-muted" style="font-size:11px;">(Tus integraciones → tu app → Credenciales de producción)</span></label>
-          <input type="password" class="form-control" id="cfgMpAccessToken" placeholder="APP_USR-...">
-        </div>
-        <div class="mb-2 mt-3">
-          <label class="form-label" style="margin-bottom:2px;">Dirección del negocio <span class="text-muted" style="font-size:11px;">(Mercado Pago la exige para crear la tienda)</span></label>
-        </div>
-        <div class="row g-2 mb-2">
-          <div class="col-8"><input type="text" class="form-control form-control-sm" id="cfgMpCalle" placeholder="Calle"></div>
-          <div class="col-4"><input type="text" class="form-control form-control-sm" id="cfgMpNumero" placeholder="Número"></div>
-        </div>
-        <div class="row g-2 mb-2">
-          <div class="col-6"><input type="text" class="form-control form-control-sm" id="cfgMpCiudad" placeholder="Ciudad"></div>
+        <div class="row g-2 mb-3">
           <div class="col-6">
-            <select class="form-select form-select-sm" id="cfgMpProvincia">
-              <option value="">Provincia...</option>
-              <option value="Capital Federal">Ciudad Autónoma de Buenos Aires</option>
-              <option value="Buenos Aires">Buenos Aires</option>
-              <option value="Catamarca">Catamarca</option>
-              <option value="Chaco">Chaco</option>
-              <option value="Chubut">Chubut</option>
-              <option value="Cordoba">Córdoba</option>
-              <option value="Corrientes">Corrientes</option>
-              <option value="Entre Rios">Entre Ríos</option>
-              <option value="Formosa">Formosa</option>
-              <option value="Jujuy">Jujuy</option>
-              <option value="La Pampa">La Pampa</option>
-              <option value="La Rioja">La Rioja</option>
-              <option value="Mendoza">Mendoza</option>
-              <option value="Misiones">Misiones</option>
-              <option value="Neuquen">Neuquén</option>
-              <option value="Rio Negro">Río Negro</option>
-              <option value="Salta">Salta</option>
-              <option value="San Juan">San Juan</option>
-              <option value="San Luis">San Luis</option>
-              <option value="Santa Cruz">Santa Cruz</option>
-              <option value="Santa Fe">Santa Fe</option>
-              <option value="Santiago del Estero">Santiago del Estero</option>
-              <option value="Tierra del Fuego">Tierra del Fuego</option>
-              <option value="Tucuman">Tucumán</option>
-            </select>
-          </div>
-        </div>
-        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-3">
-          <button class="btn btn-outline-danger btn-sm" id="btnQuitarMercadoPago" onclick="quitarConfigMercadoPago()" style="display:none;">Quitar configuración</button>
-          <div class="d-flex gap-2">
-            <button class="btn btn-outline-secondary btn-sm" onclick="probarCredencialesMercadoPagoBtn()">🧪 Probar conexión</button>
-            <button class="btn btn-success btn-sm" id="btnGuardarMercadoPago" onclick="guardarConfigMercadoPagoForm()">💾 Guardar y configurar</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Tarjeta impresora — solo visible en Electron (pos-offline.js la muestra) -->
-    <div class="card p-3 mt-3" id="cardImpresoraPOS" style="display:none;">
-      <h6 style="margin-bottom:6px;">🖨️ Impresora para tickets</h6>
-      <p class="text-muted" style="font-size:12.5px; margin-top:-4px; margin-bottom:14px;">
-        Seleccioná la impresora de tickets para que imprima sin mostrar el diálogo del sistema.
-      </p>
-      <div class="d-flex gap-2 align-items-center">
-        <select class="form-select" id="cfgImpresoraSelector" style="max-width:340px;">
-          <option value="">Cargando impresoras...</option>
-        </select>
-        <button class="btn btn-outline-secondary btn-sm" onclick="cargarListaImpresoras()">↻</button>
-        <button class="btn btn-success btn-sm" onclick="guardarImpresoraSeleccionada()">💾 Guardar</button>
-      </div>
-      <div id="cfgImpresoraActual" class="text-muted mt-2" style="font-size:12px;"></div>
-    </div>
-
-    <div class="card p-3 mt-3">
-      <h6 style="margin-bottom:6px;">🔧 Mantenimiento de la planilla</h6>
-      <p class="text-muted" style="font-size:12.5px; margin-bottom:10px;">
-        Si los movimientos de caja no muestran la forma de pago correcta, ejecutá esta migración para agregar la columna FORMA_PAGO a la planilla.
-      </p>
-      <button class="btn btn-outline-secondary btn-sm" onclick="ejecutarMigracionFormaPago()">
-        🔄 Migrar columna FORMA_PAGO
-      </button>
-      <span id="migracionStatus" class="ms-2 text-muted" style="font-size:12px;"></span>
-    </div>
-
-    <div class="card p-3 mt-3">
-      <h6 style="margin-bottom:14px;">🔑 Acceso al panel</h6>
-      <p class="text-muted" style="font-size:12.5px; margin-top:-8px; margin-bottom:14px;">
-        Usuario y contraseña para entrar al panel admin. Por seguridad, necesitás escribir la contraseña actual para poder cambiarlos.
-      </p>
-
-      <div class="mb-3">
-        <label class="form-label">Contraseña actual *</label>
-        <input type="password" class="form-control" id="credPasswordActual" placeholder="Tu contraseña actual" autocomplete="current-password">
-      </div>
-
-      <div class="row g-2 mb-3">
-        <div class="col-6">
-          <label class="form-label">Nuevo usuario</label>
-          <input type="text" class="form-control" id="credNuevoUsuario" placeholder="Ej: admin" autocomplete="username">
-        </div>
-        <div class="col-6">
-          <label class="form-label">Nueva contraseña</label>
-          <input type="password" class="form-control" id="credNuevaPassword" placeholder="Mínimo 4 caracteres" autocomplete="new-password">
-        </div>
-      </div>
-
-      <div class="d-flex justify-content-end mt-3">
-        <button class="btn btn-success" id="btnGuardarCredenciales" onclick="guardarCredencialesForm()">💾 Cambiar acceso</button>
-      </div>
-    </div>
-
-    <div class="card p-3 mt-3">
-      <h6 style="margin-bottom:14px;">📦 Acceso a Gestión de Stock</h6>
-      <p class="text-muted" style="font-size:12.5px; margin-top:-8px; margin-bottom:14px;">
-        Contraseña propia para <code>stock.html</code> — a propósito distinta de la del panel completo, para poder dársela a alguien de depósito sin darle acceso a ventas, clientes ni el resto de la configuración. Para cambiarla necesitás tu contraseña del panel admin (no la de stock vieja).
-      </p>
-
-      <div class="mb-3">
-        <label class="form-label">Tu contraseña del panel admin *</label>
-        <input type="password" class="form-control" id="stockPasswordAdminActual" placeholder="Para confirmar el cambio" autocomplete="current-password">
-      </div>
-
-      <div class="mb-3">
-        <label class="form-label">Nueva contraseña de stock</label>
-        <input type="password" class="form-control" id="stockPasswordNueva" placeholder="Mínimo 4 caracteres" autocomplete="new-password">
-      </div>
-
-      <div class="d-flex justify-content-end mt-3">
-        <button class="btn btn-success" id="btnGuardarPasswordStock" onclick="guardarPasswordStockForm()">💾 Cambiar contraseña de stock</button>
-      </div>
-    </div>
-
-    <div class="card p-3 mt-3">
-      <h6 style="margin-bottom:14px;">🎨 Apariencia del catálogo web</h6>
-
-      <div class="mb-3">
-        <label class="form-label">Texto del encabezado (navbar) <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
-        <input type="text" class="form-control" id="cfgNavbarTexto" placeholder="Ej: Jireh Mayorista">
-        <div class="form-text" style="font-size:11.5px;">Es el texto que aparece arriba de todo, al lado del ícono, en cualquier pantalla del catálogo.</div>
-      </div>
-
-      <div class="mb-3">
-        <label class="form-label">Ícono del encabezado <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
-        <input type="text" class="form-control" id="cfgNavbarIcono" maxlength="4" style="max-width:120px;" placeholder="🏬">
-        <div class="form-text" style="font-size:11.5px;">Pegá cualquier emoji (🏬 🧸 🎁 📚...). Evitá un carrito o una bolsa — ya hay un botón de carrito al lado, y usar el mismo tipo de ícono para las dos cosas confunde al cliente.</div>
-      </div>
-
-      <div class="mb-3">
-        <label class="form-label">Título del banner <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
-        <input type="text" class="form-control" id="cfgBannerTitulo" placeholder="Ej: Mayorista Jireh">
-      </div>
-
-      <div class="mb-3">
-        <label class="form-label">Subtítulo del banner <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
-        <input type="text" class="form-control" id="cfgBannerSubtitulo" placeholder="Ej: Catálogo Mayorista Online">
-      </div>
-
-      <div class="mb-3">
-        <label class="form-label">Imagen de fondo del banner <span class="text-muted" style="font-size:11px;">(opcional, URL de una imagen)</span></label>
-        <input type="url" class="form-control" id="cfgBannerImagen" placeholder="https://...">
-        <div class="form-text" style="font-size:11.5px;">Pegá un link directo a una imagen (termina en .jpg, .png, etc). Si lo dejás vacío, el banner queda con el fondo de color sin imagen.</div>
-      </div>
-
-      <div class="mb-3">
-        <label class="form-label">Color del sitio <span class="text-muted" style="font-size:11px;">(se aplica acá y en el catálogo)</span></label>
-        <select class="form-select" id="cfgTema">
-          <option value="navy">Violeta cálido (original)</option>
-          <option value="azul">Azul</option>
-          <option value="verde">Verde</option>
-          <option value="rojo">Rojo</option>
-        </select>
-      </div>
-
-      <div class="mb-3">
-        <div class="form-check form-switch mb-2">
-          <input class="form-check-input" type="checkbox" id="cfgGradPersonalizado" onchange="toggleGradPersonalizado()">
-          <label class="form-check-label" for="cfgGradPersonalizado">Usar un gradiente de color propio en vez de la lista de arriba</label>
-        </div>
-        <div id="cfgGradWrap" class="row g-2" style="display:none;">
-          <div class="col-6">
-            <label class="form-label">Color 1 (arranca el degradé)</label>
-            <input type="color" class="form-control form-control-color w-100" id="cfgGradA" value="#241536">
+            <label class="form-label">Teléfono 1 <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+            <input type="text" class="form-control" id="cfgTelefono1" placeholder="Ej: 11-2345-6789">
           </div>
           <div class="col-6">
-            <label class="form-label">Color 2 (termina el degradé)</label>
-            <input type="color" class="form-control form-control-color w-100" id="cfgGradB" value="#3a2856">
+            <label class="form-label">Teléfono 2 <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+            <input type="text" class="form-control" id="cfgTelefono2" placeholder="Ej: 11-9876-5432">
           </div>
         </div>
-        <div class="form-text" style="font-size:11.5px;">Se aplica al encabezado y al banner del catálogo. Los colores de productos, stock y precios no cambian.</div>
-      </div>
 
-      <div class="d-flex justify-content-end mt-3">
-        <button class="btn btn-success" id="btnGuardarApariencia" onclick="guardarAparienciaForm()">💾 Guardar apariencia</button>
-      </div>
-
-      <!-- Datos generales, íconos y SEO del catálogo -->
-      <hr class="my-4">
-      <h6 style="margin-bottom:6px;">🌐 Datos generales, ícono y SEO</h6>
-      <p class="text-muted" style="font-size:13px;">Se usan al compartir el link del catálogo (WhatsApp, Facebook, X) y para buscadores como Google.</p>
-
-      <div class="mb-3">
-        <span class="form-label d-block">URL del catálogo online</span>
-        <div class="form-text" style="font-size:11.5px;">
-          Ese dato ya se edita en la sección <strong>"📱 Catálogo online (para los QR de precio)"</strong> más arriba — se usa tanto para los QR como para el SEO/redes, no hace falta repetirlo acá.
+        <div class="mb-3">
+          <label class="form-label">Pie de página <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+          <input type="text" class="form-control" id="cfgPie" placeholder="Ej: ¡Gracias por su compra!">
         </div>
-      </div>
 
-      <div class="mb-3">
-        <label class="form-label">Nombre corto <span class="text-muted" style="font-size:11px;">(pantalla de acceso a Reportes)</span></label>
-        <input type="text" class="form-control" id="cfgNombreCorto" placeholder="Ej: JIREH">
-      </div>
-
-      <div class="row g-2 mb-3">
-        <div class="col-md-6">
-          <label class="form-label">Ícono del catálogo <span class="text-muted" style="font-size:11px;">(archivo icon-512.png o URL)</span></label>
-          <input type="text" class="form-control" id="cfgIconoUrl" placeholder="icon-512.png">
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">Ícono del botón flotante de WhatsApp</label>
-          <input type="url" class="form-control" id="cfgWhatsappIconoUrl" placeholder="https://...">
-        </div>
-      </div>
-
-      <div class="mb-3">
-        <label class="form-label">Título SEO <span class="text-muted" style="font-size:11px;">(pestaña del navegador y buscadores)</span></label>
-        <input type="text" class="form-control" id="cfgSeoTitulo" placeholder="Ej: Mi Negocio — Venta mayorista">
-      </div>
-
-      <div class="mb-3">
-        <label class="form-label">Descripción SEO</label>
-        <textarea class="form-control" id="cfgSeoDescripcion" rows="2" placeholder="Descripción corta que aparece en Google y al compartir el link"></textarea>
-      </div>
-
-      <div class="mb-3">
-        <label class="form-label">Palabras clave SEO <span class="text-muted" style="font-size:11px;">(separadas por coma)</span></label>
-        <input type="text" class="form-control" id="cfgSeoKeywords" placeholder="mayorista, juguetes, ...">
-      </div>
-
-      <!-- Footer del catálogo -->
-      <hr class="my-4">
-      <h6 style="margin-bottom:6px;">🦶 Pie de página del catálogo</h6>
-
-      <div class="mb-3">
-        <label class="form-label">Título de la primera columna</label>
-        <input type="text" class="form-control" id="cfgFooterTitulo1" placeholder="Ej: Mi Negocio">
-      </div>
-      <div class="mb-3">
-        <label class="form-label">Texto de la primera columna</label>
-        <textarea class="form-control" id="cfgFooterTexto1" rows="2"></textarea>
-      </div>
-      <div class="mb-3">
-        <label class="form-label">Texto de la columna "Categorías"</label>
-        <textarea class="form-control" id="cfgFooterTexto2" rows="2"></textarea>
-      </div>
-      <div class="mb-3">
-        <label class="form-label">Texto de la columna "Envíos y pedidos"</label>
-        <textarea class="form-control" id="cfgFooterTexto3" rows="2"></textarea>
-      </div>
-      <div class="mb-3">
-        <label class="form-label">Copyright (línea final del footer)</label>
-        <input type="text" class="form-control" id="cfgFooterCopyright" placeholder="© 2026 Mi Negocio">
-      </div>
-
-      <div class="d-flex justify-content-end mt-3">
-        <button class="btn btn-success" onclick="guardarAparienciaForm()">💾 Guardar</button>
-      </div>
-
-
-      <!-- Popup promocional -->
-      <hr class="my-4">
-      <h6 style="margin-bottom:6px;">🎯 Popup promocional (catálogo web)</h6>
-      <p class="text-muted" style="font-size:13px;">Imagen que aparece al entrar al catálogo. Dejá el campo vacío o desactivá para que no aparezca.</p>
-      <div class="mb-2 d-flex align-items-center gap-3">
-        <div class="form-check form-switch mb-0">
-          <input class="form-check-input" type="checkbox" id="cfgPopupActivo">
-          <label class="form-check-label" for="cfgPopupActivo">Popup activo</label>
-        </div>
-      </div>
-
-      <!-- Tipo de contenido del popup -->
-      <div class="mb-3 d-flex align-items-center gap-3">
-        <div class="form-check form-check-inline mb-0">
-          <input class="form-check-input" type="radio" name="cfgPopupTipo" id="cfgPopupTipoImagen" value="imagen" checked
-            onchange="onCambiarTipoPopup()">
-          <label class="form-check-label" for="cfgPopupTipoImagen">🖼️ Imagen</label>
-        </div>
-        <div class="form-check form-check-inline mb-0">
-          <input class="form-check-input" type="radio" name="cfgPopupTipo" id="cfgPopupTipoVideo" value="video"
-            onchange="onCambiarTipoPopup()">
-          <label class="form-check-label" for="cfgPopupTipoVideo">🎬 Video</label>
-        </div>
-      </div>
-
-      <!-- Preview de imagen del popup -->
-      <div class="pm-image-wrap mb-2" style="max-width:320px;" id="popupImagenWrap">
-        <div class="pm-image-preview" id="popupImagenPreview" style="height:160px;">
-          <span class="pm-image-placeholder">Sin imagen</span>
-        </div>
-        <div class="pm-image-actions">
-          <label class="btn btn-outline-secondary btn-sm pm-image-btn" style="cursor:pointer;">
-            📁 Elegir imagen
-            <input type="file" id="cfgPopupImagenFile" accept="image/*" style="display:none"
-              onchange="onSeleccionarImagenPopup(event)">
-          </label>
-          <button class="btn btn-outline-danger btn-sm pm-image-btn" onclick="quitarImagenPopup()">✕ Quitar</button>
-        </div>
-        <div class="pm-image-status" id="popupImagenStatus"></div>
-        <input type="hidden" id="cfgPopupImagen">
-      </div>
-
-      <!-- URL de video del popup (oculto salvo que se elija "Video") -->
-      <div class="mb-2" id="popupVideoWrap" style="max-width:420px; display:none;">
-        <label class="form-label" style="font-size:13px;" for="cfgPopupVideoUrl">URL directa del video (.mp4, .webm)</label>
-        <input type="url" class="form-control form-control-sm" id="cfgPopupVideoUrl"
-          placeholder="https://.../promo.mp4" oninput="onCambiarUrlVideoPopup()">
-        <div class="pm-image-status" id="popupVideoStatus"></div>
-        <p class="text-muted mt-1" style="font-size:12px;">
-          Subí el video a Drive, Firebase Storage o un CDN y pegá acá el enlace directo al archivo
-          (que termine en .mp4/.webm). No se puede subir el video desde acá.
+        <hr class="my-4">
+        <h6 style="margin-bottom:6px;">🏦 Datos bancarios</h6>
+        <p class="text-muted" style="font-size:12.5px; margin-top:-4px; margin-bottom:14px;">
+          Se incluyen en el mensaje de WhatsApp que se manda al cliente cuando un pedido queda en estado "Nuevo".
         </p>
-        <div class="pm-image-preview mt-2" id="popupVideoPreview" style="height:160px; display:none;">
-          <video id="popupVideoPreviewTag" src="" muted loop autoplay playsinline style="width:100%;height:100%;object-fit:contain;"></video>
+        <div class="row g-2 mb-3">
+          <div class="col-md-7">
+            <label class="form-label">CBU / Alias para transferencia</label>
+            <input type="text" class="form-control" id="cfgCbuTransferencia" placeholder="Ej: 0000000000000000000000">
+          </div>
+          <div class="col-md-5">
+            <label class="form-label">Titular de la cuenta</label>
+            <input type="text" class="form-control" id="cfgNombreTitularCbu" placeholder="Ej: NOMBRE APELLIDO">
+          </div>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-3">
+          <button class="btn btn-outline-secondary btn-sm" onclick="restablecerConfigNegocio()">↺ Restablecer valores</button>
+          <div class="d-flex gap-2">
+            <button class="btn btn-outline-primary" onclick="vistaPreviaTicketConfig()">👁️ Vista previa</button>
+            <button class="btn btn-success" id="btnGuardarConfigNegocio" onclick="guardarConfigNegocioForm()">💾 Guardar</button>
+          </div>
+        </div>
+
+        <div class="config-preview-hint mt-3">
+          <span class="ic">ℹ️</span>
+          Estos datos se guardan en la hoja de cálculo (pestaña "CONFIGURACION") y se usan para armar el encabezado de todos los tickets impresos (ventas y cierres de caja). Como quedan en la planilla, se ven igual sin importar desde qué computadora o navegador entres al panel.
         </div>
       </div>
 
-      <div class="mt-2">
-        <button class="btn btn-success btn-sm" onclick="guardarPopupPromoForm()">💾 Guardar popup</button>
+      <div class="card p-3 mt-3">
+        <h6 style="margin-bottom:14px;">🔑 Acceso al panel</h6>
+        <p class="text-muted" style="font-size:12.5px; margin-top:-8px; margin-bottom:14px;">
+          Usuario y contraseña para entrar al panel admin. Por seguridad, necesitás escribir la contraseña actual para poder cambiarlos.
+        </p>
+
+        <div class="mb-3">
+          <label class="form-label">Contraseña actual *</label>
+          <input type="password" class="form-control" id="credPasswordActual" placeholder="Tu contraseña actual" autocomplete="current-password">
+        </div>
+
+        <div class="row g-2 mb-3">
+          <div class="col-6">
+            <label class="form-label">Nuevo usuario</label>
+            <input type="text" class="form-control" id="credNuevoUsuario" placeholder="Ej: admin" autocomplete="username">
+          </div>
+          <div class="col-6">
+            <label class="form-label">Nueva contraseña</label>
+            <input type="password" class="form-control" id="credNuevaPassword" placeholder="Mínimo 4 caracteres" autocomplete="new-password">
+          </div>
+        </div>
+
+        <div class="d-flex justify-content-end mt-3">
+          <button class="btn btn-success" id="btnGuardarCredenciales" onclick="guardarCredencialesForm()">💾 Cambiar acceso</button>
+        </div>
       </div>
+
+      <div class="card p-3 mt-3">
+        <h6 style="margin-bottom:14px;">📦 Acceso a Gestión de Stock</h6>
+        <p class="text-muted" style="font-size:12.5px; margin-top:-8px; margin-bottom:14px;">
+          Contraseña propia para <code>stock.html</code> — a propósito distinta de la del panel completo, para poder dársela a alguien de depósito sin darle acceso a ventas, clientes ni el resto de la configuración. Para cambiarla necesitás tu contraseña del panel admin (no la de stock vieja).
+        </p>
+
+        <div class="mb-3">
+          <label class="form-label">Tu contraseña del panel admin *</label>
+          <input type="password" class="form-control" id="stockPasswordAdminActual" placeholder="Para confirmar el cambio" autocomplete="current-password">
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Nueva contraseña de stock</label>
+          <input type="password" class="form-control" id="stockPasswordNueva" placeholder="Mínimo 4 caracteres" autocomplete="new-password">
+        </div>
+
+        <div class="d-flex justify-content-end mt-3">
+          <button class="btn btn-success" id="btnGuardarPasswordStock" onclick="guardarPasswordStockForm()">💾 Cambiar contraseña de stock</button>
+        </div>
+      </div>
+
     </div>
 
-    <div class="card p-3 mt-3">
-      <div class="config-preview-hint">
-        <span class="ic">ℹ️</span>
-        El color que elijas se aplica tanto a este panel admin como a la página del catálogo, apenas guardás — sin tocar ningún archivo. El banner y los textos solo afectan al catálogo.
+    <!-- =================================================================== -->
+    <!-- TAB 2: CATÁLOGO WEB — todo lo que ve el cliente en la página online -->
+    <!-- =================================================================== -->
+    <div class="cfg-tab-pane" id="cfgTab-catalogo">
+
+      <div class="card p-3 mb-3">
+        <h6 style="margin-bottom:14px;">📱 Catálogo online (para los QR de precio)</h6>
+        <p class="text-muted" style="font-size:12.5px; margin-top:-8px; margin-bottom:14px;">
+          La URL donde está publicado tu catálogo online. Se usa para armar el link de los códigos QR que generás desde Productos — al escanearlos, abren una página chica con el nombre y precio actualizado de ese producto. También se usa para el SEO y las redes sociales, más abajo.
+        </p>
+
+        <div class="mb-3">
+          <label class="form-label">URL del catálogo (sin / al final)</label>
+          <input type="text" class="form-control" id="cfgUrlCatalogo" placeholder="https://tunegocio.com">
+        </div>
+
+        <div class="d-flex justify-content-end mt-3">
+          <button class="btn btn-success" id="btnGuardarUrlCatalogo" onclick="guardarUrlCatalogoForm()">💾 Guardar</button>
+        </div>
       </div>
+
+      <div class="card p-3 mt-3">
+        <h6 style="margin-bottom:6px;">🛒 Pedido mínimo</h6>
+        <p class="text-muted" style="font-size:12.5px; margin-top:-2px; margin-bottom:14px;">
+          El cliente no puede enviar el pedido si el total no llega a este monto. Se aplica al instante en el catálogo.
+        </p>
+        <div class="mb-3">
+          <label class="form-label">Monto mínimo ($)</label>
+          <input type="number" class="form-control" id="cfgPedidoMinimo" min="0" step="1000" placeholder="Ej: 100000">
+        </div>
+        <div class="d-flex justify-content-end">
+          <button class="btn btn-success" id="btnGuardarPedidoMinimo" onclick="guardarPedidoMinimoForm()">💾 Guardar pedido mínimo</button>
+        </div>
+      </div>
+
+      <div class="card p-3 mt-3">
+        <h6 style="margin-bottom:14px;">🎨 Apariencia del catálogo web</h6>
+
+        <div class="mb-3">
+          <label class="form-label">Texto del encabezado (navbar) <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+          <input type="text" class="form-control" id="cfgNavbarTexto" placeholder="Ej: Jireh Mayorista">
+          <div class="form-text" style="font-size:11.5px;">Es el texto que aparece arriba de todo, al lado del ícono, en cualquier pantalla del catálogo.</div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Ícono del encabezado <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+          <input type="text" class="form-control" id="cfgNavbarIcono" maxlength="4" style="max-width:120px;" placeholder="🏬">
+          <div class="form-text" style="font-size:11.5px;">Pegá cualquier emoji (🏬 🧸 🎁 📚...). Evitá un carrito o una bolsa — ya hay un botón de carrito al lado, y usar el mismo tipo de ícono para las dos cosas confunde al cliente.</div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Título del banner <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+          <input type="text" class="form-control" id="cfgBannerTitulo" placeholder="Ej: Mayorista Jireh">
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Subtítulo del banner <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+          <input type="text" class="form-control" id="cfgBannerSubtitulo" placeholder="Ej: Catálogo Mayorista Online">
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Imagen de fondo del banner <span class="text-muted" style="font-size:11px;">(opcional, URL de una imagen)</span></label>
+          <input type="url" class="form-control" id="cfgBannerImagen" placeholder="https://...">
+          <div class="form-text" style="font-size:11.5px;">Pegá un link directo a una imagen (termina en .jpg, .png, etc). Si lo dejás vacío, el banner queda con el fondo de color sin imagen.</div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Color del sitio <span class="text-muted" style="font-size:11px;">(se aplica acá y en el catálogo)</span></label>
+          <select class="form-select" id="cfgTema">
+            <option value="navy">Violeta cálido (original)</option>
+            <option value="azul">Azul</option>
+            <option value="verde">Verde</option>
+            <option value="rojo">Rojo</option>
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <div class="form-check form-switch mb-2">
+            <input class="form-check-input" type="checkbox" id="cfgGradPersonalizado" onchange="toggleGradPersonalizado()">
+            <label class="form-check-label" for="cfgGradPersonalizado">Usar un gradiente de color propio en vez de la lista de arriba</label>
+          </div>
+          <div id="cfgGradWrap" class="row g-2" style="display:none;">
+            <div class="col-6">
+              <label class="form-label">Color 1 (arranca el degradé)</label>
+              <input type="color" class="form-control form-control-color w-100" id="cfgGradA" value="#241536">
+            </div>
+            <div class="col-6">
+              <label class="form-label">Color 2 (termina el degradé)</label>
+              <input type="color" class="form-control form-control-color w-100" id="cfgGradB" value="#3a2856">
+            </div>
+          </div>
+          <div class="form-text" style="font-size:11.5px;">Se aplica al encabezado y al banner del catálogo. Los colores de productos, stock y precios no cambian.</div>
+        </div>
+
+        <div class="config-preview-hint mb-3">
+          <span class="ic">ℹ️</span>
+          El color que elijas se aplica tanto a este panel admin como a la página del catálogo, apenas guardás — sin tocar ningún archivo. El banner y los textos solo afectan al catálogo.
+        </div>
+
+        <div class="d-flex justify-content-end mt-3">
+          <button class="btn btn-success" id="btnGuardarApariencia" onclick="guardarAparienciaForm()">💾 Guardar apariencia</button>
+        </div>
+      </div>
+
+      <div class="card p-3 mt-3">
+        <h6 style="margin-bottom:6px;">🌐 Datos generales, ícono y SEO</h6>
+        <p class="text-muted" style="font-size:13px;">Se usan al compartir el link del catálogo (WhatsApp, Facebook, X) y para buscadores como Google.</p>
+
+        <div class="mb-3">
+          <span class="form-label d-block">URL del catálogo online</span>
+          <div class="form-text" style="font-size:11.5px;">
+            Ese dato ya se edita en la sección <strong>"📱 Catálogo online (para los QR de precio)"</strong> más arriba — se usa tanto para los QR como para el SEO/redes, no hace falta repetirlo acá.
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Nombre corto <span class="text-muted" style="font-size:11px;">(pantalla de acceso a Reportes)</span></label>
+          <input type="text" class="form-control" id="cfgNombreCorto" placeholder="Ej: JIREH">
+        </div>
+
+        <div class="row g-2 mb-3">
+          <div class="col-md-6">
+            <label class="form-label">Ícono del catálogo <span class="text-muted" style="font-size:11px;">(archivo icon-512.png o URL)</span></label>
+            <input type="text" class="form-control" id="cfgIconoUrl" placeholder="icon-512.png">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Ícono del botón flotante de WhatsApp</label>
+            <input type="url" class="form-control" id="cfgWhatsappIconoUrl" placeholder="https://...">
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Título SEO <span class="text-muted" style="font-size:11px;">(pestaña del navegador y buscadores)</span></label>
+          <input type="text" class="form-control" id="cfgSeoTitulo" placeholder="Ej: Mi Negocio — Venta mayorista">
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Descripción SEO</label>
+          <textarea class="form-control" id="cfgSeoDescripcion" rows="2" placeholder="Descripción corta que aparece en Google y al compartir el link"></textarea>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Palabras clave SEO <span class="text-muted" style="font-size:11px;">(separadas por coma)</span></label>
+          <input type="text" class="form-control" id="cfgSeoKeywords" placeholder="mayorista, juguetes, ...">
+        </div>
+
+        <div class="d-flex justify-content-end mt-3">
+          <button class="btn btn-success" onclick="guardarAparienciaForm()">💾 Guardar</button>
+        </div>
+      </div>
+
+      <div class="card p-3 mt-3">
+        <h6 style="margin-bottom:6px;">🦶 Pie de página del catálogo</h6>
+
+        <div class="mb-3">
+          <label class="form-label">Título de la primera columna</label>
+          <input type="text" class="form-control" id="cfgFooterTitulo1" placeholder="Ej: Mi Negocio">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Texto de la primera columna</label>
+          <textarea class="form-control" id="cfgFooterTexto1" rows="2"></textarea>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Texto de la columna "Categorías"</label>
+          <textarea class="form-control" id="cfgFooterTexto2" rows="2"></textarea>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Texto de la columna "Envíos y pedidos"</label>
+          <textarea class="form-control" id="cfgFooterTexto3" rows="2"></textarea>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Copyright (línea final del footer)</label>
+          <input type="text" class="form-control" id="cfgFooterCopyright" placeholder="© 2026 Mi Negocio">
+        </div>
+
+        <div class="d-flex justify-content-end mt-3">
+          <button class="btn btn-success" onclick="guardarAparienciaForm()">💾 Guardar</button>
+        </div>
+      </div>
+
+      <div class="card p-3 mt-3">
+        <h6 style="margin-bottom:6px;">🎯 Popup promocional (catálogo web)</h6>
+        <p class="text-muted" style="font-size:13px;">Imagen que aparece al entrar al catálogo. Dejá el campo vacío o desactivá para que no aparezca.</p>
+        <div class="mb-2 d-flex align-items-center gap-3">
+          <div class="form-check form-switch mb-0">
+            <input class="form-check-input" type="checkbox" id="cfgPopupActivo">
+            <label class="form-check-label" for="cfgPopupActivo">Popup activo</label>
+          </div>
+        </div>
+
+        <!-- Tipo de contenido del popup -->
+        <div class="mb-3 d-flex align-items-center gap-3">
+          <div class="form-check form-check-inline mb-0">
+            <input class="form-check-input" type="radio" name="cfgPopupTipo" id="cfgPopupTipoImagen" value="imagen" checked
+              onchange="onCambiarTipoPopup()">
+            <label class="form-check-label" for="cfgPopupTipoImagen">🖼️ Imagen</label>
+          </div>
+          <div class="form-check form-check-inline mb-0">
+            <input class="form-check-input" type="radio" name="cfgPopupTipo" id="cfgPopupTipoVideo" value="video"
+              onchange="onCambiarTipoPopup()">
+            <label class="form-check-label" for="cfgPopupTipoVideo">🎬 Video</label>
+          </div>
+        </div>
+
+        <!-- Preview de imagen del popup -->
+        <div class="pm-image-wrap mb-2" style="max-width:320px;" id="popupImagenWrap">
+          <div class="pm-image-preview" id="popupImagenPreview" style="height:160px;">
+            <span class="pm-image-placeholder">Sin imagen</span>
+          </div>
+          <div class="pm-image-actions">
+            <label class="btn btn-outline-secondary btn-sm pm-image-btn" style="cursor:pointer;">
+              📁 Elegir imagen
+              <input type="file" id="cfgPopupImagenFile" accept="image/*" style="display:none"
+                onchange="onSeleccionarImagenPopup(event)">
+            </label>
+            <button class="btn btn-outline-danger btn-sm pm-image-btn" onclick="quitarImagenPopup()">✕ Quitar</button>
+          </div>
+          <div class="pm-image-status" id="popupImagenStatus"></div>
+          <input type="hidden" id="cfgPopupImagen">
+        </div>
+
+        <!-- URL de video del popup (oculto salvo que se elija "Video") -->
+        <div class="mb-2" id="popupVideoWrap" style="max-width:420px; display:none;">
+          <label class="form-label" style="font-size:13px;" for="cfgPopupVideoUrl">URL directa del video (.mp4, .webm)</label>
+          <input type="url" class="form-control form-control-sm" id="cfgPopupVideoUrl"
+            placeholder="https://.../promo.mp4" oninput="onCambiarUrlVideoPopup()">
+          <div class="pm-image-status" id="popupVideoStatus"></div>
+          <p class="text-muted mt-1" style="font-size:12px;">
+            Subí el video a Drive, Firebase Storage o un CDN y pegá acá el enlace directo al archivo
+            (que termine en .mp4/.webm). No se puede subir el video desde acá.
+          </p>
+          <div class="pm-image-preview mt-2" id="popupVideoPreview" style="height:160px; display:none;">
+            <video id="popupVideoPreviewTag" src="" muted loop autoplay playsinline style="width:100%;height:100%;object-fit:contain;"></video>
+          </div>
+        </div>
+
+        <div class="mt-2">
+          <button class="btn btn-success btn-sm" onclick="guardarPopupPromoForm()">💾 Guardar popup</button>
+        </div>
+      </div>
+
+      <div class="card p-3 mt-3">
+        <h6 style="margin-bottom:14px;">🏷️ Beneficios del catálogo (debajo del banner)</h6>
+        <p class="text-muted" style="font-size:12.5px; margin-top:-8px; margin-bottom:14px;">
+          Estos son los 6 carteles cortos que aparecen debajo del banner del catálogo. El que dejes vacío, simplemente no se muestra.
+        </p>
+
+        <div class="mb-3">
+          <label class="form-label">WhatsApp <span class="text-muted" style="font-size:11px;">(número, solo para este botón y para recibir pedidos)</span></label>
+          <input type="text" class="form-control" id="cfgBeneficioWhatsapp" placeholder="Ej: 5491140975795">
+          <div class="form-text" style="font-size:11.5px;">Con código de país y de área, sin espacios ni signos. Ej: 5491140975795.</div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Instagram <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+          <input type="text" class="form-control" id="cfgBeneficioInstagram" placeholder="https://instagram.com/tu_cuenta">
+        </div>
+
+        <div class="row g-2 mb-3">
+          <div class="col-6">
+            <label class="form-label">Teléfono 1 <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+            <input type="text" class="form-control" id="cfgBeneficioTelefono1" placeholder="Ej: 11-2345-6789">
+          </div>
+          <div class="col-6">
+            <label class="form-label">Teléfono 2 <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+            <input type="text" class="form-control" id="cfgBeneficioTelefono2" placeholder="Ej: 11-9876-5432">
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Dirección <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+          <input type="text" class="form-control" id="cfgBeneficioDireccion" placeholder="Ej: Av. Siempre Viva 123, Buenos Aires">
+        </div>
+
+        <div class="row g-2 mb-3">
+          <div class="col-6">
+            <label class="form-label">Texto libre 1 <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+            <input type="text" class="form-control" id="cfgBeneficioTexto1" placeholder="Ej: ✅ Stock actualizado">
+          </div>
+          <div class="col-6">
+            <label class="form-label">Texto libre 2 <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+            <input type="text" class="form-control" id="cfgBeneficioTexto2" placeholder="Ej: 🚚 Envíos a todo el país">
+          </div>
+        </div>
+
+        <div class="config-preview-hint mb-3">
+          <span class="ic">ℹ️</span>
+          El número de WhatsApp que pongas aquí es el que usa el botón flotante de ayuda y al que llegan los pedidos del catálogo.
+        </div>
+
+        <div class="d-flex justify-content-end mt-3">
+          <button class="btn btn-success" id="btnGuardarBeneficios" onclick="guardarBeneficiosForm()">💾 Guardar beneficios</button>
+        </div>
+      </div>
+
+      <div class="card p-3 mt-3">
+        <h6 style="margin-bottom:6px;">📢 Banner superior (mensajes rotativos)</h6>
+        <p class="text-muted" style="font-size:12.5px; margin-top:-4px; margin-bottom:14px;">
+          Una franja verde arriba de todo el catálogo, que va rotando solo entre los mensajes que escribas acá. Escribí un mensaje por línea — si dejás solo uno, queda fijo sin rotar.
+        </p>
+
+        <div class="mb-3">
+          <textarea class="form-control" id="cfgBannerTopMensajes" rows="4" placeholder="🚚 Envíos a todo el país&#10;✅ Stock actualizado&#10;💳 Aceptamos todos los medios de pago"></textarea>
+          <div class="form-text" style="font-size:11.5px;">Un mensaje por renglón. Vaciá el campo entero para ocultar la franja por completo.</div>
+        </div>
+
+        <div class="d-flex justify-content-end mt-3">
+          <button class="btn btn-success" id="btnGuardarBannerTop" onclick="guardarBannerTopForm()">💾 Guardar</button>
+        </div>
+      </div>
+
+      <div class="card p-3 mt-3">
+        <h6 style="margin-bottom:6px;">🚫 Transportes que no trabajamos</h6>
+        <p class="text-muted" style="font-size:12.5px; margin-top:-4px; margin-bottom:14px;">
+          Escribí acá los nombres de las empresas de transporte con las que NO trabajás (una por línea). El catálogo web no va a dejar que el cliente escriba ninguno de esos nombres en el campo "Transporte" del carrito — ni parecido, ni con mayúsculas o acentos distintos. Dejalo vacío si no querés restringir ninguna.
+        </p>
+
+        <div class="mb-3">
+          <textarea class="form-control" id="cfgTransportesNoDisponibles" rows="4" placeholder="Correo Argentino&#10;OCA&#10;Vía Cargo"></textarea>
+          <div class="form-text" style="font-size:11.5px;">Un transporte por renglón. No hace falta escribir mayúsculas ni acentos exactos — "via cargo" también bloquea "Vía Cargo".</div>
+        </div>
+
+        <div class="d-flex justify-content-end mt-3">
+          <button class="btn btn-success" id="btnGuardarTransportesNoDisponibles" onclick="guardarTransportesNoDisponiblesForm()">💾 Guardar</button>
+        </div>
+      </div>
+
     </div>
 
-    <div class="card p-3 mt-3">
-      <h6 style="margin-bottom:14px;">🏷️ Beneficios del catálogo (debajo del banner)</h6>
-      <p class="text-muted" style="font-size:12.5px; margin-top:-8px; margin-bottom:14px;">
-        Estos son los 6 carteles cortos que aparecen debajo del banner del catálogo. El que dejes vacío, simplemente no se muestra.
-      </p>
+    <!-- =================================================================== -->
+    <!-- TAB 3: PRODUCTOS Y PEDIDOS — dónde se guardan fotos y PDFs en Drive  -->
+    <!-- =================================================================== -->
+    <div class="cfg-tab-pane" id="cfgTab-productos">
 
-      <div class="mb-3">
-        <label class="form-label">WhatsApp <span class="text-muted" style="font-size:11px;">(número, solo para este botón y para recibir pedidos)</span></label>
-        <input type="text" class="form-control" id="cfgBeneficioWhatsapp" placeholder="Ej: 5491140975795">
-        <div class="form-text" style="font-size:11.5px;">Con código de país y de área, sin espacios ni signos. Ej: 5491140975795.</div>
-      </div>
+      <div class="card p-3 mb-3">
+        <h6 style="margin-bottom:14px;">🖼️ Imágenes de productos</h6>
+        <p class="text-muted" style="font-size:12.5px; margin-top:-8px; margin-bottom:14px;">
+          Las fotos que subís desde "Nuevo Producto" se guardan en esta carpeta de tu Google Drive. Pegá el link de la carpeta (o solo el ID) — tiene que ser una carpeta de la misma cuenta de Google donde está la planilla.
+        </p>
 
-      <div class="mb-3">
-        <label class="form-label">Instagram <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
-        <input type="text" class="form-control" id="cfgBeneficioInstagram" placeholder="https://instagram.com/tu_cuenta">
-      </div>
-
-      <div class="row g-2 mb-3">
-        <div class="col-6">
-          <label class="form-label">Teléfono 1 <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
-          <input type="text" class="form-control" id="cfgBeneficioTelefono1" placeholder="Ej: 11-2345-6789">
+        <div class="mb-3">
+          <label class="form-label">Link o ID de la carpeta de Drive</label>
+          <input type="text" class="form-control" id="cfgDriveCarpetaProductos" placeholder="https://drive.google.com/drive/folders/...">
         </div>
-        <div class="col-6">
-          <label class="form-label">Teléfono 2 <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
-          <input type="text" class="form-control" id="cfgBeneficioTelefono2" placeholder="Ej: 11-9876-5432">
+
+        <div class="config-preview-hint">
+          <span class="ic">ℹ️</span>
+          En Drive: abrí la carpeta → botón "Compartir" → "Cualquier persona con el enlace" puede ver → copiá el link y pegalo aquí.
+        </div>
+
+        <div class="d-flex justify-content-end mt-3">
+          <button class="btn btn-success" id="btnGuardarDriveProductos" onclick="guardarDriveProductosForm()">💾 Guardar</button>
         </div>
       </div>
 
-      <div class="mb-3">
-        <label class="form-label">Dirección <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
-        <input type="text" class="form-control" id="cfgBeneficioDireccion" placeholder="Ej: Av. Siempre Viva 123, Buenos Aires">
+      <div class="card p-3 mt-3">
+        <h6 style="margin-bottom:14px;">📄 PDF de pedidos</h6>
+        <p class="text-muted" style="font-size:12.5px; margin-top:-8px; margin-bottom:14px;">
+          Cada pedido genera un PDF con el detalle del cliente y los productos. El título y el WhatsApp del encabezado usan el <strong>nombre del local</strong> y el <strong>WhatsApp</strong> que configuraste en la pestaña General / Catálogo Web — los textos de abajo son específicos de este PDF.
+        </p>
+
+        <div class="mb-3">
+          <label class="form-label">Subtítulo del encabezado</label>
+          <input type="text" class="form-control" id="cfgPedidoPdfSubtitulo" placeholder="Ej: Distribuidora Mayorista">
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Texto del pie de página</label>
+          <input type="text" class="form-control" id="cfgPedidoPdfPie" placeholder="Ej: Gracias por su compra.">
+        </div>
+
+        <hr class="my-3">
+
+        <p class="text-muted" style="font-size:12.5px; margin-bottom:14px;">
+          Carpeta de Google Drive donde se guarda cada PDF generado. Pegá el link de la carpeta (o solo el ID) — tiene que ser una carpeta de la misma cuenta de Google donde está la planilla.
+        </p>
+
+        <div class="mb-3">
+          <label class="form-label">Link o ID de la carpeta de Drive</label>
+          <input type="text" class="form-control" id="cfgDriveCarpetaPedidos" placeholder="https://drive.google.com/drive/folders/...">
+        </div>
+
+        <div class="config-preview-hint">
+          <span class="ic">ℹ️</span>
+          En Drive: abrí la carpeta → botón "Compartir" → "Cualquier persona con el enlace" puede ver → copiá el link y pegalo aquí.
+        </div>
+
+        <div class="d-flex justify-content-end mt-3">
+          <button class="btn btn-success" id="btnGuardarDrivePedidos" onclick="guardarDrivePedidosForm()">💾 Guardar</button>
+        </div>
       </div>
 
-      <div class="row g-2 mb-3">
-        <div class="col-6">
-          <label class="form-label">Texto libre 1 <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
-          <input type="text" class="form-control" id="cfgBeneficioTexto1" placeholder="Ej: ✅ Stock actualizado">
-        </div>
-        <div class="col-6">
-          <label class="form-label">Texto libre 2 <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
-          <input type="text" class="form-control" id="cfgBeneficioTexto2" placeholder="Ej: 🚚 Envíos a todo el país">
-        </div>
-      </div>
-
-      <div class="d-flex justify-content-end mt-3">
-        <button class="btn btn-success" id="btnGuardarBeneficios" onclick="guardarBeneficiosForm()">💾 Guardar beneficios</button>
-      </div>
     </div>
 
-    <div class="card p-3 mt-3">
-      <h6 style="margin-bottom:6px;">📢 Banner superior (mensajes rotativos)</h6>
-      <p class="text-muted" style="font-size:12.5px; margin-top:-4px; margin-bottom:14px;">
-        Una franja verde arriba de todo el catálogo, que va rotando solo entre los mensajes que escribas acá. Escribí un mensaje por línea — si dejás solo uno, queda fijo sin rotar.
-      </p>
+    <!-- =================================================================== -->
+    <!-- TAB 4: PAGOS Y CONEXIÓN — licencia, Sheets, red local, Mercado Pago  -->
+    <!-- =================================================================== -->
+    <div class="cfg-tab-pane" id="cfgTab-pagos">
 
-      <div class="mb-3">
-        <textarea class="form-control" id="cfgBannerTopMensajes" rows="4" placeholder="🚚 Envíos a todo el país&#10;✅ Stock actualizado&#10;💳 Aceptamos todos los medios de pago"></textarea>
-        <div class="form-text" style="font-size:11.5px;">Un mensaje por renglón. Vaciá el campo entero para ocultar la franja por completo.</div>
-      </div>
-
-      <div class="d-flex justify-content-end mt-3">
-        <button class="btn btn-success" id="btnGuardarBannerTop" onclick="guardarBannerTopForm()">💾 Guardar</button>
-      </div>
-    </div>
-
-    <div class="card p-3 mt-3">
-      <h6 style="margin-bottom:6px;">🚫 Transportes que no trabajamos</h6>
-      <p class="text-muted" style="font-size:12.5px; margin-top:-4px; margin-bottom:14px;">
-        Escribí acá los nombres de las empresas de transporte con las que NO trabajás (una por línea). El catálogo web no va a dejar que el cliente escriba ninguno de esos nombres en el campo "Transporte" del carrito — ni parecido, ni con mayúsculas o acentos distintos. Dejalo vacío si no querés restringir ninguna.
-      </p>
-
-      <div class="mb-3">
-        <textarea class="form-control" id="cfgTransportesNoDisponibles" rows="4" placeholder="Correo Argentino&#10;OCA&#10;Vía Cargo"></textarea>
-        <div class="form-text" style="font-size:11.5px;">Un transporte por renglón. No hace falta escribir mayúsculas ni acentos exactos — "via cargo" también bloquea "Vía Cargo".</div>
-      </div>
-
-      <div class="d-flex justify-content-end mt-3">
-        <button class="btn btn-success" id="btnGuardarTransportesNoDisponibles" onclick="guardarTransportesNoDisponiblesForm()">💾 Guardar</button>
-      </div>
-    </div>
-
-    <div class="card p-3 mt-3">
-      <div class="config-preview-hint">
-        <span class="ic">ℹ️</span>
-        El número de WhatsApp que pongas aquí es el que usa el botón flotante de ayuda y al que llegan los pedidos del catálogo.
-      </div>
-    </div>
-
-    <div class="card p-3 mt-3" id="usbPrintCard">
-      <h6 style="margin-bottom:6px;">🔌 Impresión directa por USB</h6>
-      <p class="text-muted" style="font-size:13px; margin-bottom:14px;">
-        Conectá la impresora térmica una sola vez para imprimir sin el cartel de "Imprimir" de Chrome. Solo funciona en Chrome o Edge, en esta misma computadora.
-      </p>
-
-      <div id="usbPrintUnsupported" class="usb-print-status warn" style="display:none;">
-        <span class="ic">⚠️</span>
-        Este navegador no soporta impresión directa (Web Serial). Vas a seguir usando el cartel de impresión normal — funciona igual, solo con un paso más.
-      </div>
-
-      <div id="usbPrintSupported" style="display:none;">
-        <div class="usb-print-status" id="usbPrintStatus">
-          <span class="ic">🔌</span>
-          <span id="usbPrintStatusText">Impresora no conectada</span>
+      <!-- ===== LICENCIA ===== -->
+      <div class="card p-3 mb-3" id="cardLicencia">
+        <h6 style="margin-bottom:14px;">🔑 Licencia</h6>
+        <div id="licenciaEstadoBox" class="config-preview-hint">Cargando estado de la licencia...</div>
+        <div class="mt-3">
+          <label class="form-label">URL del servidor de licencias <span class="text-muted" style="font-size:11px;">(te la pasa quien te vendió VeekPOS)</span></label>
+          <input type="text" class="form-control" id="cfgLicenciaUrlServidor" placeholder="https://script.google.com/macros/s/.../exec">
         </div>
-
-        <div class="d-flex gap-2 flex-wrap mt-2">
-          <button class="btn btn-outline-primary btn-sm" id="btnConectarImpresora" onclick="conectarImpresoraUSB()">🔌 Conectar impresora</button>
-          <button class="btn btn-outline-secondary btn-sm" id="btnDesconectarImpresora" onclick="desconectarImpresoraUSB()" style="display:none;">Desconectar</button>
-          <button class="btn btn-outline-secondary btn-sm" id="btnProbarImpresora" onclick="probarImpresoraUSB()" style="display:none;">🧪 Imprimir prueba</button>
-        </div>
-
-        <div class="pm-switches mt-3">
-          <label class="pm-switch">
-            <input type="checkbox" id="usbPrintToggle" onchange="onToggleUsbPrint()">
-            <span>Usar impresión directa en vez del cartel de impresión</span>
-          </label>
+        <div class="d-flex justify-content-end gap-2 mt-3">
+          <button class="btn btn-outline-secondary btn-sm" onclick="validarLicenciaAhoraBtn()">↻ Validar ahora</button>
+          <button class="btn btn-success btn-sm" id="btnGuardarLicenciaUrl" onclick="guardarUrlServidorLicencia()">💾 Guardar URL</button>
         </div>
       </div>
+
+      <!-- Tarjeta API URL — solo visible en Electron -->
+      <div class="card p-3 mt-3" id="cardConexionNegocio" style="display:none;">
+        <h6 style="margin-bottom:6px;">🔗 Conexión con tu Google Sheets</h6>
+        <p class="text-muted" style="font-size:12.5px; margin-top:-4px; margin-bottom:10px;">
+          URL de la API que conecta el VeekPOS con tu planilla de Google Sheets.
+        </p>
+        <div class="mb-2">
+          <label class="form-label">URL de la API</label>
+          <input type="url" class="form-control" id="conexionNegocioUrl"
+            placeholder="https://script.google.com/macros/s/.../exec">
+        </div>
+        <div id="conexionNegocioUrlActual" class="text-muted mb-2" style="font-size:12px;"></div>
+        <button class="btn btn-success btn-sm" onclick="guardarApiUrlDesdeConfig()">💾 Guardar URL</button>
+      </div>
+
+      <!-- Tarjeta red local multicaja — solo visible en Electron -->
+      <div class="card p-3 mt-3" id="cardMultiCajaRed" style="display:none;">
+        <h6 style="margin-bottom:6px;">🌐 Red local (multi-caja)</h6>
+        <p class="text-muted" style="font-size:12.5px; margin-top:-4px; margin-bottom:10px;">
+          Configurá este equipo como servidor o cliente en una red local.
+        </p>
+        <div class="mb-2">
+          <label class="form-label">Rol en la red</label>
+          <select class="form-select" id="cfgRolRed" onchange="actualizarVisibilidadCampoNombreCaja(this.value)">
+            <option value="">Sin red local</option>
+            <option value="servidor">Servidor (caja principal)</option>
+            <option value="cliente">Cliente (caja secundaria)</option>
+          </select>
+        </div>
+        <div id="campoNombreCaja" style="display:none;" class="mb-2">
+          <label class="form-label">Nombre de esta caja</label>
+          <input type="text" class="form-control" id="cfgNombreCaja" placeholder="Ej: Caja 1, Caja Mostrador">
+        </div>
+        <div id="estadoRedLocal" class="text-muted mb-2" style="font-size:12px;"></div>
+        <button class="btn btn-success btn-sm" onclick="guardarConfigRed()">💾 Guardar configuración de red</button>
+      </div>
+
+      <!-- Tarjeta Mercado Pago — solo visible en Electron -->
+      <div class="card p-3 mt-3" id="cardMercadoPago" style="display:none;">
+        <h6 style="margin-bottom:6px;">📲 Mercado Pago — Cobro con QR</h6>
+        <p class="text-muted" style="font-size:13px; margin-bottom:14px;">
+          Opcional. Si lo configurás, el botón "Transferencia" del POS muestra un QR de Mercado Pago y confirma el cobro automáticamente cuando se acredita.
+        </p>
+        <div id="mpEstadoBox" class="config-preview-hint mb-3">Cargando estado...</div>
+        <div id="mpFormularioWrap">
+          <div class="mb-2">
+            <label class="form-label">Access Token de Mercado Pago <span class="text-muted" style="font-size:11px;">(Tus integraciones → tu app → Credenciales de producción)</span></label>
+            <input type="password" class="form-control" id="cfgMpAccessToken" placeholder="APP_USR-...">
+          </div>
+          <div class="mb-2 mt-3">
+            <label class="form-label" style="margin-bottom:2px;">Dirección del negocio <span class="text-muted" style="font-size:11px;">(Mercado Pago la exige para crear la tienda)</span></label>
+          </div>
+          <div class="row g-2 mb-2">
+            <div class="col-8"><input type="text" class="form-control form-control-sm" id="cfgMpCalle" placeholder="Calle"></div>
+            <div class="col-4"><input type="text" class="form-control form-control-sm" id="cfgMpNumero" placeholder="Número"></div>
+          </div>
+          <div class="row g-2 mb-2">
+            <div class="col-6"><input type="text" class="form-control form-control-sm" id="cfgMpCiudad" placeholder="Ciudad"></div>
+            <div class="col-6">
+              <select class="form-select form-select-sm" id="cfgMpProvincia">
+                <option value="">Provincia...</option>
+                <option value="Capital Federal">Ciudad Autónoma de Buenos Aires</option>
+                <option value="Buenos Aires">Buenos Aires</option>
+                <option value="Catamarca">Catamarca</option>
+                <option value="Chaco">Chaco</option>
+                <option value="Chubut">Chubut</option>
+                <option value="Cordoba">Córdoba</option>
+                <option value="Corrientes">Corrientes</option>
+                <option value="Entre Rios">Entre Ríos</option>
+                <option value="Formosa">Formosa</option>
+                <option value="Jujuy">Jujuy</option>
+                <option value="La Pampa">La Pampa</option>
+                <option value="La Rioja">La Rioja</option>
+                <option value="Mendoza">Mendoza</option>
+                <option value="Misiones">Misiones</option>
+                <option value="Neuquen">Neuquén</option>
+                <option value="Rio Negro">Río Negro</option>
+                <option value="Salta">Salta</option>
+                <option value="San Juan">San Juan</option>
+                <option value="San Luis">San Luis</option>
+                <option value="Santa Cruz">Santa Cruz</option>
+                <option value="Santa Fe">Santa Fe</option>
+                <option value="Santiago del Estero">Santiago del Estero</option>
+                <option value="Tierra del Fuego">Tierra del Fuego</option>
+                <option value="Tucuman">Tucumán</option>
+              </select>
+            </div>
+          </div>
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-3">
+            <button class="btn btn-outline-danger btn-sm" id="btnQuitarMercadoPago" onclick="quitarConfigMercadoPago()" style="display:none;">Quitar configuración</button>
+            <div class="d-flex gap-2">
+              <button class="btn btn-outline-secondary btn-sm" onclick="probarCredencialesMercadoPagoBtn()">🧪 Probar conexión</button>
+              <button class="btn btn-success btn-sm" id="btnGuardarMercadoPago" onclick="guardarConfigMercadoPagoForm()">💾 Guardar y configurar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
+
+    <!-- =================================================================== -->
+    <!-- TAB 5: HARDWARE — impresoras                                        -->
+    <!-- =================================================================== -->
+    <div class="cfg-tab-pane" id="cfgTab-hardware">
+
+      <!-- Tarjeta impresora — solo visible en Electron (pos-offline.js la muestra) -->
+      <div class="card p-3 mb-3" id="cardImpresoraPOS" style="display:none;">
+        <h6 style="margin-bottom:6px;">🖨️ Impresora para tickets</h6>
+        <p class="text-muted" style="font-size:12.5px; margin-top:-4px; margin-bottom:14px;">
+          Seleccioná la impresora de tickets para que imprima sin mostrar el diálogo del sistema.
+        </p>
+        <div class="d-flex gap-2 align-items-center">
+          <select class="form-select" id="cfgImpresoraSelector" style="max-width:340px;">
+            <option value="">Cargando impresoras...</option>
+          </select>
+          <button class="btn btn-outline-secondary btn-sm" onclick="cargarListaImpresoras()">↻</button>
+          <button class="btn btn-success btn-sm" onclick="guardarImpresoraSeleccionada()">💾 Guardar</button>
+        </div>
+        <div id="cfgImpresoraActual" class="text-muted mt-2" style="font-size:12px;"></div>
+      </div>
+
+      <div class="card p-3 mt-3" id="usbPrintCard">
+        <h6 style="margin-bottom:6px;">🔌 Impresión directa por USB</h6>
+        <p class="text-muted" style="font-size:13px; margin-bottom:14px;">
+          Conectá la impresora térmica una sola vez para imprimir sin el cartel de "Imprimir" de Chrome. Solo funciona en Chrome o Edge, en esta misma computadora.
+        </p>
+
+        <div id="usbPrintUnsupported" class="usb-print-status warn" style="display:none;">
+          <span class="ic">⚠️</span>
+          Este navegador no soporta impresión directa (Web Serial). Vas a seguir usando el cartel de impresión normal — funciona igual, solo con un paso más.
+        </div>
+
+        <div id="usbPrintSupported" style="display:none;">
+          <div class="usb-print-status" id="usbPrintStatus">
+            <span class="ic">🔌</span>
+            <span id="usbPrintStatusText">Impresora no conectada</span>
+          </div>
+
+          <div class="d-flex gap-2 flex-wrap mt-2">
+            <button class="btn btn-outline-primary btn-sm" id="btnConectarImpresora" onclick="conectarImpresoraUSB()">🔌 Conectar impresora</button>
+            <button class="btn btn-outline-secondary btn-sm" id="btnDesconectarImpresora" onclick="desconectarImpresoraUSB()" style="display:none;">Desconectar</button>
+            <button class="btn btn-outline-secondary btn-sm" id="btnProbarImpresora" onclick="probarImpresoraUSB()" style="display:none;">🧪 Imprimir prueba</button>
+          </div>
+
+          <div class="pm-switches mt-3">
+            <label class="pm-switch">
+              <input type="checkbox" id="usbPrintToggle" onchange="onToggleUsbPrint()">
+              <span>Usar impresión directa en vez del cartel de impresión</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- TAB 6: AVANZADO — apariencia del panel y mantenimiento técnico       -->
+    <!-- =================================================================== -->
+    <div class="cfg-tab-pane" id="cfgTab-avanzado">
+
+      <div class="card p-3 mb-3">
+        <h6 style="margin-bottom:14px;">🅰️ Apariencia del panel admin (este sidebar)</h6>
+        <p class="text-muted" style="font-size:12.5px; margin-top:-8px; margin-bottom:14px;">
+          Esto cambia solo lo que se ve aquí, en el menú lateral del panel — no afecta al catálogo web.
+        </p>
+
+        <div class="row g-2 mb-3">
+          <div class="col-3">
+            <label class="form-label">Letra/ícono</label>
+            <input type="text" class="form-control text-center" id="cfgSidebarMark" placeholder="J" maxlength="2">
+          </div>
+          <div class="col-9">
+            <label class="form-label">Nombre <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+            <input type="text" class="form-control" id="cfgSidebarTexto" placeholder="Ej: JIREH">
+          </div>
+        </div>
+
+        <div class="d-flex justify-content-end mt-3">
+          <button class="btn btn-success" id="btnGuardarSidebar" onclick="guardarSidebarForm()">💾 Guardar</button>
+        </div>
+      </div>
+
+      <div class="card p-3 mt-3">
+        <h6 style="margin-bottom:6px;">🔧 Mantenimiento de la planilla</h6>
+        <p class="text-muted" style="font-size:12.5px; margin-bottom:10px;">
+          Si los movimientos de caja no muestran la forma de pago correcta, ejecutá esta migración para agregar la columna FORMA_PAGO a la planilla.
+        </p>
+        <button class="btn btn-outline-secondary btn-sm" onclick="ejecutarMigracionFormaPago()">
+          🔄 Migrar columna FORMA_PAGO
+        </button>
+        <span id="migracionStatus" class="ms-2 text-muted" style="font-size:12px;"></span>
+      </div>
+
+    </div>
+
   </div>
 
   <!-- ===== INSTALADOR / GENERADOR ===== -->
