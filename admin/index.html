@@ -1763,18 +1763,48 @@
 
         <div class="mb-3">
           <label class="form-label">Título del banner <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
-          <input type="text" class="form-control" id="cfgBannerTitulo" placeholder="Ej: Mayorista Jireh">
+          <input type="text" class="form-control" id="cfgBannerTitulo" placeholder="Ej: Mayorista Jireh" oninput="actualizarPreviewBanner()">
         </div>
 
         <div class="mb-3">
           <label class="form-label">Subtítulo del banner <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
-          <input type="text" class="form-control" id="cfgBannerSubtitulo" placeholder="Ej: Catálogo Mayorista Online">
+          <input type="text" class="form-control" id="cfgBannerSubtitulo" placeholder="Ej: Catálogo Mayorista Online" oninput="actualizarPreviewBanner()">
         </div>
 
         <div class="mb-3">
-          <label class="form-label">Imagen de fondo del banner <span class="text-muted" style="font-size:11px;">(opcional, URL de una imagen)</span></label>
-          <input type="url" class="form-control" id="cfgBannerImagen" placeholder="https://...">
-          <div class="form-text" style="font-size:11.5px;">Pegá un link directo a una imagen (termina en .jpg, .png, etc). Si lo dejás vacío, el banner queda con el fondo de color sin imagen.</div>
+          <label class="form-label">Imagen de fondo del banner <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+          <div class="pm-image-row">
+            <div class="pm-image-preview banner-image-preview" id="cfgBannerImagenPreview">🖼️</div>
+            <div style="flex:1; min-width:0;">
+              <input type="file" class="form-control form-control-sm mb-1" id="cfgBannerImagenArchivo" accept="image/*" onchange="onSeleccionarArchivoBanner(event)">
+              <input type="url" class="form-control form-control-sm" id="cfgBannerImagen" placeholder="o pegá una URL de imagen" oninput="actualizarPreviewBanner()">
+            </div>
+          </div>
+          <div class="pm-image-status" id="cfgBannerImagenStatus"></div>
+          <div class="form-text" style="font-size:11.5px;">Subí una foto y recortala con el editor — abajo se ve cómo queda en escritorio y en celular antes de guardar. Si lo dejás vacío, el banner queda con el fondo de color sin imagen.</div>
+
+          <div class="banner-preview-wrap">
+            <div class="banner-preview-item">
+              <div class="banner-preview-label">💻 Vista en escritorio</div>
+              <div class="banner-mock banner-mock--desktop" id="bannerMockDesktop">
+                <div class="banner-mock-overlay"></div>
+                <div class="banner-mock-text">
+                  <div class="banner-mock-title" id="bannerMockTituloD">Mayorista Jireh</div>
+                  <div class="banner-mock-subtitle" id="bannerMockSubtituloD">Catálogo Mayorista Online</div>
+                </div>
+              </div>
+            </div>
+            <div class="banner-preview-item banner-preview-item--mobile">
+              <div class="banner-preview-label">📱 Vista en celular</div>
+              <div class="banner-mock banner-mock--mobile" id="bannerMockMobile">
+                <div class="banner-mock-overlay"></div>
+                <div class="banner-mock-text">
+                  <div class="banner-mock-title" id="bannerMockTituloM">Mayorista Jireh</div>
+                  <div class="banner-mock-subtitle" id="bannerMockSubtituloM">Catálogo Mayorista Online</div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="mb-3">
@@ -2703,6 +2733,36 @@
     <div class="product-modal-actions">
       <button class="btn btn-outline-secondary" onclick="cancelarRecorteImagenProducto()">Cancelar</button>
       <button class="btn btn-success" onclick="confirmarRecorteImagenProducto()">✅ Usar esta foto</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== RECORTE PANORÁMICO DE IMAGEN DEL BANNER ===== -->
+<div class="product-modal-backdrop" id="cropBannerModalBackdrop">
+  <div class="product-modal" style="max-width:520px; width:94vw;">
+    <div class="product-modal-header">
+      <h6>✂️ Recortar imagen del banner</h6>
+      <button onclick="cancelarRecorteBanner()">✕</button>
+    </div>
+
+    <div class="product-modal-body" style="display:flex; flex-direction:column; align-items:center; gap:14px;">
+      <div class="crop-viewport crop-viewport--banner" id="cropBannerViewport">
+        <img id="cropBannerImgEl" src="" alt="" draggable="false">
+      </div>
+
+      <div style="width:100%; max-width:280px;">
+        <label class="form-label" style="font-size:12px; margin-bottom:2px;">🔍 Zoom</label>
+        <input type="range" class="form-range" id="cropBannerZoomSlider" min="0" max="100" value="0">
+      </div>
+
+      <p class="text-muted" style="font-size:11.5px; text-align:center; margin:0;">
+        Arrastrá la imagen para ubicarla y usá el zoom. Este marco ancho es el que se ve en escritorio — en celular el sitio recorta un poco más los costados automáticamente (lo vas a ver reflejado en la vista previa de abajo).
+      </p>
+    </div>
+
+    <div class="product-modal-actions">
+      <button class="btn btn-outline-secondary" onclick="cancelarRecorteBanner()">Cancelar</button>
+      <button class="btn btn-success" onclick="confirmarRecorteBanner()">✅ Usar esta imagen</button>
     </div>
   </div>
 </div>

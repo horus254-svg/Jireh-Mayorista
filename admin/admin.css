@@ -1955,6 +1955,55 @@ kbd{
 .pm-image-status.success{ color:var(--green-600); }
 .pm-image-status.error{ color:var(--red-500); }
 
+/* ===================== APARIENCIA — imagen del banner (recorte + preview) ===================== */
+
+/* Marco de recorte panorámico: mismo ratio que el hero de escritorio real
+   (max-width:1400px, height:260px en style.css) para que lo que el usuario
+   ve acá sea lo mismo que va a ver en la pantalla grande. */
+.crop-viewport--banner{
+  width:100%; max-width:460px; height:auto;
+  aspect-ratio:1400/260;
+}
+
+.banner-image-preview{ width:160px; height:80px; }
+
+.banner-preview-wrap{
+  display:flex; flex-wrap:wrap; gap:16px; margin-top:14px;
+}
+.banner-preview-item{ flex:1 1 260px; min-width:200px; }
+.banner-preview-item--mobile{ flex:0 0 160px; max-width:160px; }
+.banner-preview-label{
+  font-size:11.5px; font-weight:700; color:var(--slate-500);
+  margin-bottom:6px;
+}
+/* Simulan el .hero real de style.css: mismo gradiente de fondo, mismo
+   overlay oscuro sobre la imagen, mismo texto centrado. Los ratios
+   (1400:260 y 375:150) son los que produce el CSS del catálogo con
+   background-size:cover — así el recorte que el usuario elige arriba
+   se ve acá exactamente como se va a ver en cada tamaño de pantalla. */
+.banner-mock{
+  position:relative; overflow:hidden;
+  background-color:#241536;
+  background-image:radial-gradient(120% 140% at 15% 0%, #3a2856 0%, #241536 55%, #241536 100%);
+  background-size:cover; background-position:center;
+  display:flex; align-items:center; justify-content:center;
+  border-radius:16px;
+  box-shadow:0 8px 20px rgba(42,25,54,.25), 0 0 0 2px rgba(255,255,255,.14) inset;
+}
+.banner-mock--desktop{ width:100%; aspect-ratio:1400/260; }
+.banner-mock--mobile{ width:100%; aspect-ratio:375/150; }
+.banner-mock-overlay{
+  position:absolute; inset:0;
+  background:linear-gradient(180deg, rgba(36,21,54,.55), rgba(36,21,54,.72));
+}
+.banner-mock-text{
+  position:relative; z-index:1; text-align:center; color:#fff; padding:8px 10px;
+}
+.banner-mock-title{ font-weight:700; font-size:14px; letter-spacing:-.02em; }
+.banner-mock-subtitle{ font-size:11px; opacity:.85; margin-top:2px; }
+.banner-mock--mobile .banner-mock-title{ font-size:11px; }
+.banner-mock--mobile .banner-mock-subtitle{ font-size:9.5px; }
+
 /* ===================== MOVIMIENTOS DE CAJA ===================== */
 
 .mc-summary-row{

@@ -828,6 +828,7 @@ function cargarAparienciaForm(cfg) {
   document.getElementById("cfgBannerSubtitulo").value = cfg.bannerSubtitulo ?? APARIENCIA_DEFAULT.bannerSubtitulo;
   document.getElementById("cfgBannerImagen").value    = cfg.bannerImagen   ?? APARIENCIA_DEFAULT.bannerImagen;
   document.getElementById("cfgTema").value            = cfg.tema           || APARIENCIA_DEFAULT.tema;
+  actualizarPreviewBanner();
 
   const gradActivo = cfg.gradPersonalizado ?? APARIENCIA_DEFAULT.gradPersonalizado;
   document.getElementById("cfgGradPersonalizado").checked = !!gradActivo;
@@ -3695,6 +3696,354 @@ function confirmarRecorteImagenProducto() {
     _cropState = null;
     if (blob) subirImagenProductoRecortada(blob, inputEl);
   }, "image/jpeg", 0.92);
+}
+
+/* ===================== RECORTE PANORÁMICO DE IMAGEN DEL BANNER ===================== */
+/* Mismo editor que el recorte de fotos de producto (abrirRecorteImagenProducto),
+   pero generalizado a un marco rectangular en vez de cuadrado: el ratio del
+   hero de escritorio real (1400:260, ver .hero.hero--imagen en style.css).
+   El recorte que el usuario elige acá es el que después el celular recorta
+   un poco más angosto de forma automática (background-size:cover), así que
+   actualizarPreviewBanner() muestra debajo cómo queda en cada tamaño. */
+
+const BANNER_RATIO_DESKTOP        = 1400 / 260; // debe coincidir con .hero.hero--imagen en style.css
+const BANNER_LADO_SALIDA_ANCHO_PX = 1600;        // resolución del recorte panorámico; comprimirImagenBanner() la ajusta después
+
+let _cropBannerState = null; // misma forma que _cropState, pero con vpW/vpH en vez de un solo vp (marco no es cuadrado)
+let _cropBannerListenersListos = false;
+
+/** Handles the banner file picker: abre el editor de recorte antes de subir */
+async function onSeleccionarArchivoBanner(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+
+  const statusEl = document.getElementById("cfgBannerImagenStatus");
+
+  if (!file.type.startsWith("image/")) {
+    if (statusEl) { statusEl.className = "pm-image-status error"; statusEl.textContent = "Elegí un archivo de imagen (jpg, png, webp)."; }
+    event.target.value = "";
+    return;
+  }
+
+  const TAMANO_ORIGINAL_MAXIMO_MB = 20;
+  if (file.size > TAMANO_ORIGINAL_MAXIMO_MB * 1024 * 1024) {
+    if (statusEl) { statusEl.className = "pm-image-status error"; statusEl.textContent = `⚠️ El archivo pesa demasiado (máx. ${TAMANO_ORIGINAL_MAXIMO_MB}MB). Elegí una foto más liviana.`; }
+    event.target.value = "";
+    return;
+  }
+
+  abrirRecorteBanner(file, event.target);
+}
+
+function abrirRecorteBanner(file, inputEl) {
+  const backdrop = document.getElementById("cropBannerModalBackdrop");
+  const imgEl = document.getElementById("cropBannerImgEl");
+  if (!backdrop || !imgEl) {
+    // Fallback de seguridad: si el modal no está en el HTML, subimos sin recortar.
+    subirImagenBanner(file, inputEl);
+    return;
+  }
+
+  const url = URL.createObjectURL(file);
+  imgEl.src = url;
+
+  imgEl.onload = () => {
+    // Igual que en el recorte de producto: mostramos el modal ANTES de medir,
+    // porque oculto (display:none) el viewport mide 0px.
+    backdrop.classList.add("show");
+
+    const viewport = document.getElementById("cropBannerViewport");
+    const vpW = viewport.clientWidth;
+    const vpH = viewport.clientHeight; // fijado por CSS vía aspect-ratio (crop-viewport--banner)
+    const natW = imgEl.naturalWidth;
+    const natH = imgEl.naturalHeight;
+    const minScale = Math.max(vpW / natW, vpH / natH); // "cover": la imagen tapa todo el marco
+
+    _cropBannerState = {
+      file, imgEl, natW, natH, vpW, vpH,
+      scale: minScale, minScale, maxScale: minScale * 4,
+      tx: (vpW - natW * minScale) / 2,
+      ty: (vpH - natH * minScale) / 2,
+      inputEl,
+      dragging: false, dragStartX: 0, dragStartY: 0, txStart: 0, tyStart: 0
+    };
+
+    const slider = document.getElementById("cropBannerZoomSlider");
+    if (slider) slider.value = 0;
+
+    _cropBannerAplicarTransform();
+    _cropBannerInicializarListeners();
+  };
+}
+
+function _cropBannerAplicarTransform() {
+  if (!_cropBannerState) return;
+  const { imgEl, tx, ty, scale } = _cropBannerState;
+  imgEl.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+}
+
+/** Evita arrastrar/zoomear el marco fuera de los bordes de la imagen */
+function _cropBannerClamp() {
+  if (!_cropBannerState) return;
+  const s = _cropBannerState;
+  s.scale = Math.min(s.maxScale, Math.max(s.minScale, s.scale));
+  const minTx = s.vpW - s.natW * s.scale;
+  const minTy = s.vpH - s.natH * s.scale;
+  s.tx = Math.min(0, Math.max(minTx, s.tx));
+  s.ty = Math.min(0, Math.max(minTy, s.ty));
+}
+
+function _cropBannerInicializarListeners() {
+  if (_cropBannerListenersListos) return;
+  _cropBannerListenersListos = true;
+
+  const viewport = document.getElementById("cropBannerViewport");
+  const slider = document.getElementById("cropBannerZoomSlider");
+  if (!viewport || !slider) return;
+
+  const iniciarDrag = (clientX, clientY) => {
+    if (!_cropBannerState) return;
+    _cropBannerState.dragging = true;
+    _cropBannerState.dragStartX = clientX;
+    _cropBannerState.dragStartY = clientY;
+    _cropBannerState.txStart = _cropBannerState.tx;
+    _cropBannerState.tyStart = _cropBannerState.ty;
+    viewport.classList.add("dragging");
+  };
+  const moverDrag = (clientX, clientY) => {
+    if (!_cropBannerState || !_cropBannerState.dragging) return;
+    _cropBannerState.tx = _cropBannerState.txStart + (clientX - _cropBannerState.dragStartX);
+    _cropBannerState.ty = _cropBannerState.tyStart + (clientY - _cropBannerState.dragStartY);
+    _cropBannerClamp();
+    _cropBannerAplicarTransform();
+  };
+  const terminarDrag = () => {
+    if (!_cropBannerState) return;
+    _cropBannerState.dragging = false;
+    viewport.classList.remove("dragging");
+  };
+
+  // Mouse
+  viewport.addEventListener("mousedown", e => { e.preventDefault(); iniciarDrag(e.clientX, e.clientY); });
+  window.addEventListener("mousemove", e => moverDrag(e.clientX, e.clientY));
+  window.addEventListener("mouseup", terminarDrag);
+
+  // Touch (celular/tablet)
+  viewport.addEventListener("touchstart", e => {
+    const t = e.touches[0];
+    iniciarDrag(t.clientX, t.clientY);
+  }, { passive: true });
+  viewport.addEventListener("touchmove", e => {
+    const t = e.touches[0];
+    moverDrag(t.clientX, t.clientY);
+  }, { passive: true });
+  viewport.addEventListener("touchend", terminarDrag);
+
+  // Rueda del mouse también hace zoom
+  viewport.addEventListener("wheel", e => {
+    e.preventDefault();
+    const delta = e.deltaY < 0 ? 1 : -1;
+    const nuevoValor = Math.min(100, Math.max(0, Number(slider.value) + delta * 4));
+    slider.value = nuevoValor;
+    slider.dispatchEvent(new Event("input"));
+  }, { passive: false });
+
+  // Slider de zoom (0-100) → escala real, manteniendo el centro del marco fijo
+  slider.addEventListener("input", () => {
+    if (!_cropBannerState) return;
+    const s = _cropBannerState;
+    const t = Number(slider.value) / 100; // 0..1
+    const nuevaEscala = s.minScale + t * (s.maxScale - s.minScale);
+
+    const cx = (s.vpW / 2 - s.tx) / s.scale;
+    const cy = (s.vpH / 2 - s.ty) / s.scale;
+
+    s.scale = nuevaEscala;
+    s.tx = s.vpW / 2 - cx * s.scale;
+    s.ty = s.vpH / 2 - cy * s.scale;
+
+    _cropBannerClamp();
+    _cropBannerAplicarTransform();
+  });
+}
+
+function cancelarRecorteBanner() {
+  const backdrop = document.getElementById("cropBannerModalBackdrop");
+  if (backdrop) backdrop.classList.remove("show");
+  if (_cropBannerState) {
+    if (_cropBannerState.imgEl && _cropBannerState.imgEl.src) URL.revokeObjectURL(_cropBannerState.imgEl.src);
+    if (_cropBannerState.inputEl) _cropBannerState.inputEl.value = "";
+  }
+  _cropBannerState = null;
+}
+
+function confirmarRecorteBanner() {
+  if (!_cropBannerState) return;
+  const s = _cropBannerState;
+
+  // Rectángulo recortado, en píxeles del archivo original (no de la pantalla)
+  const sx = (0 - s.tx) / s.scale;
+  const sy = (0 - s.ty) / s.scale;
+  const sW = s.vpW / s.scale;
+  const sH = s.vpH / s.scale;
+
+  const outW = BANNER_LADO_SALIDA_ANCHO_PX;
+  const outH = Math.round(outW / BANNER_RATIO_DESKTOP);
+  const canvas = document.createElement("canvas");
+  canvas.width = outW;
+  canvas.height = outH;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(s.imgEl, sx, sy, sW, sH, 0, 0, outW, outH);
+
+  const backdrop = document.getElementById("cropBannerModalBackdrop");
+  const urlOriginal = s.imgEl.src;
+  const inputEl = s.inputEl;
+
+  canvas.toBlob(blob => {
+    if (backdrop) backdrop.classList.remove("show");
+    URL.revokeObjectURL(urlOriginal);
+    _cropBannerState = null;
+    if (blob) subirImagenBanner(blob, inputEl);
+  }, "image/jpeg", 0.92);
+}
+
+/**
+ * Comprime la imagen del banner antes de subirla — misma idea que
+ * comprimirImagenProducto(), pero con un lado máximo más grande, porque
+ * el banner ocupa mucho más espacio en pantalla que una foto de producto
+ * (todo el ancho del catálogo) y se ve pixelado si se lo achica de más.
+ */
+async function comprimirImagenBanner(file) {
+  const LADO_MAXIMO_PX   = 1600;
+  const PESO_OBJETIVO_KB = 900;
+  const CALIDADES        = [0.82, 0.7, 0.55, 0.4];
+
+  const imagen = await new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload  = () => resolve(img);
+    img.onerror = () => reject(new Error("No se pudo leer la imagen seleccionada"));
+    img.src = URL.createObjectURL(file);
+  });
+
+  let { width, height } = imagen;
+  if (width > LADO_MAXIMO_PX) {
+    height = Math.round(height * (LADO_MAXIMO_PX / width));
+    width  = LADO_MAXIMO_PX;
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, width, height);
+  ctx.drawImage(imagen, 0, 0, width, height);
+  URL.revokeObjectURL(imagen.src);
+
+  let ultimoBase64 = null;
+
+  for (const calidad of CALIDADES) {
+    const base64 = await new Promise(resolve => {
+      canvas.toBlob(blob => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.readAsDataURL(blob);
+      }, "image/jpeg", calidad);
+    });
+
+    ultimoBase64 = base64;
+    const pesoKB = Math.round((base64.length * 0.75) / 1024);
+    if (pesoKB <= PESO_OBJETIVO_KB) break;
+  }
+
+  return { base64: ultimoBase64, tipoMime: "image/jpeg" };
+}
+
+/** Sube (comprime + manda a Drive) el blob ya recortado del banner */
+async function subirImagenBanner(blob, inputEl) {
+  const statusEl = document.getElementById("cfgBannerImagenStatus");
+
+  // Preview local inmediata (miniatura + las dos vistas escritorio/celular),
+  // mientras se comprime y sube en segundo plano.
+  const localUrl = URL.createObjectURL(blob);
+  const preview = document.getElementById("cfgBannerImagenPreview");
+  if (preview) preview.innerHTML = `<img src="${localUrl}" alt="">`;
+  const mockD = document.getElementById("bannerMockDesktop");
+  const mockM = document.getElementById("bannerMockMobile");
+  if (mockD) mockD.style.backgroundImage = `url("${localUrl}")`;
+  if (mockM) mockM.style.backgroundImage = `url("${localUrl}")`;
+
+  if (statusEl) { statusEl.className = "pm-image-status uploading"; statusEl.textContent = "⏳ Optimizando imagen..."; }
+
+  try {
+    const pesoOriginalKB = Math.round(blob.size / 1024);
+    const { base64, tipoMime } = await comprimirImagenBanner(blob);
+    const pesoFinalKB = Math.round((base64.length * 0.75) / 1024);
+
+    if (statusEl) {
+      statusEl.className = "pm-image-status uploading";
+      statusEl.textContent = pesoFinalKB < pesoOriginalKB
+        ? `⏳ Subiendo a Drive... (${pesoOriginalKB}KB → ${pesoFinalKB}KB)`
+        : "⏳ Subiendo a Drive...";
+    }
+
+    const response = await fetchAPI(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" }, // evita preflight CORS contra Apps Script
+      body: JSON.stringify({
+        action: "subirImagenProducto",
+        imagenBase64: base64,
+        tipoMime: tipoMime,
+        codigoProducto: "BANNER_CATALOGO" // mismo endpoint que las fotos de producto, con un código fijo para el banner
+      })
+    }, { timeoutMs: 40000 });
+
+    const data = await response.json();
+
+    if (!data.success) {
+      if (statusEl) { statusEl.className = "pm-image-status error"; statusEl.textContent = "⚠️ " + (data.message || "No se pudo subir la imagen."); }
+      return;
+    }
+
+    document.getElementById("cfgBannerImagen").value = data.url;
+    if (statusEl) { statusEl.className = "pm-image-status success"; statusEl.textContent = `✓ Imagen subida (${pesoFinalKB}KB) — no te olvides de guardar`; }
+    actualizarPreviewBanner();
+
+  } catch (error) {
+    console.error("Error al subir imagen del banner:", error);
+    if (statusEl) { statusEl.className = "pm-image-status error"; statusEl.textContent = "⚠️ Error de conexión al subir la imagen."; }
+  } finally {
+    URL.revokeObjectURL(localUrl);
+    if (inputEl) inputEl.value = "";
+  }
+}
+
+/**
+ * Actualiza la miniatura y las dos vistas previas (escritorio/celular) del
+ * banner, a partir de la URL cargada en cfgBannerImagen y los textos de
+ * título/subtítulo actuales del formulario. Se llama al escribir, al pegar
+ * una URL a mano, al terminar de subir una imagen, y al abrir "Apariencia".
+ */
+function actualizarPreviewBanner() {
+  const urlInput = document.getElementById("cfgBannerImagen");
+  if (!urlInput) return;
+  const url = urlInput.value.trim();
+
+  const preview = document.getElementById("cfgBannerImagenPreview");
+  if (preview) preview.innerHTML = url ? `<img src="${escapeHtml(url)}" alt="" onerror="this.parentElement.innerHTML='⚠️';">` : "🖼️";
+
+  const bgCss = url ? `url("${url.replace(/"/g, '\\"')}")` : "none";
+  const mockD = document.getElementById("bannerMockDesktop");
+  const mockM = document.getElementById("bannerMockMobile");
+  if (mockD) mockD.style.backgroundImage = bgCss;
+  if (mockM) mockM.style.backgroundImage = bgCss;
+
+  const tituloEl = document.getElementById("cfgBannerTitulo");
+  const subtituloEl = document.getElementById("cfgBannerSubtitulo");
+  const titulo    = (tituloEl && tituloEl.value.trim())    || "Mayorista Jireh";
+  const subtitulo = (subtituloEl && subtituloEl.value.trim()) || "Catálogo Mayorista Online";
+  ["bannerMockTituloD", "bannerMockTituloM"].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = titulo; });
+  ["bannerMockSubtituloD", "bannerMockSubtituloM"].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = subtitulo; });
 }
 
 /** Fills the category <datalist> with the distinct categories already in use */
