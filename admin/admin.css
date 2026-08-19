@@ -1505,15 +1505,32 @@ tr.fila-arrastrable{ cursor:default; }
 
   .page-header h1{ font-size:19px; }
 
+  /* Orden pedido en mobile: Buscador -> Ticket -> Último escaneado ->
+     Categorías -> Tarjetas de productos. .pos-left es un flex-column
+     que agrupa scanbar/scan-result/categorías/grid — para poder
+     intercalar el Ticket (que en el HTML es hermano de .pos-left, no
+     hijo) en el medio de esos 4 elementos, .pos-left pasa a
+     display:contents: "desaparece" como caja pero deja que sus hijos
+     participen directamente del flex de .pos-wrap, así el order de
+     cada uno se puede pisar individualmente. */
   .pos-wrap{
-    grid-template-columns:1fr;
+    display:flex;
+    flex-direction:column;
     height:auto; max-height:none;
     gap:14px;
   }
 
-  .pos-left{ height:auto; max-height:none; overflow:visible; }
+  .pos-left{
+    display:contents;
+  }
 
-  /* On mobile the ticket sits below the grid */
+  .pos-scanbar{ order:1; }
+  .ticket-panel{ order:2; }
+  .scan-result-panel{ order:3; }
+  .pos-categories{ order:4; }
+  .pos-grid-wrap{ order:5; }
+
+  /* On mobile the ticket sits below the search bar, above the catalog */
   .ticket-panel{
     height:auto;
     min-height:460px;
