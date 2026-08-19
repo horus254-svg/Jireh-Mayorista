@@ -1505,6 +1505,24 @@ tr.fila-arrastrable{ cursor:default; }
 
   .page-header h1{ font-size:19px; }
 
+  /* El encabezado de Punto de Venta ("Punto de Venta" + bajada
+     explicando cómo usarlo) es el que menos falta hace en celular —
+     una vez que el usuario ya sabe usarlo, esas dos líneas grandes
+     solo le roban alto a la pantalla donde más se necesita (buscador,
+     ticket, categorías y grilla de productos). Se compacta a una
+     sola línea chica en vez de sacarlo del todo, para no perder el
+     contexto de en qué sección está. */
+  #pos .page-header{
+    margin-bottom:10px;
+  }
+  #pos .page-header h1{
+    font-size:15px;
+  }
+  #pos .page-header .sub{
+    font-size:11px;
+    margin-top:1px;
+  }
+
   /* Orden pedido en mobile: Buscador -> Ticket -> Último escaneado ->
      Categorías -> Tarjetas de productos. .pos-left es un flex-column
      que agrupa scanbar/scan-result/categorías/grid — para poder
