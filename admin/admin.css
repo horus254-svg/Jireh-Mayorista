@@ -546,6 +546,114 @@ html,body{
   }
 }
 
+/* Tabla de Productos en celulares angostos: 9 columnas con anchos por
+   porcentaje ya no entran nunca, por más que se comprima el padding —
+   los encabezados terminan pisándose entre sí. Por debajo de 640px se
+   abandona el layout de tabla y cada fila pasa a mostrarse como una
+   tarjeta apilada (foto + nombre arriba, el resto en pares
+   etiqueta/valor, acciones abajo de ancho completo). Todas las reglas
+   van con !important porque tienen que ganarle a los anchos por
+   colgroup/columna y al display:none de Categoría de los breakpoints
+   de arriba (900px/480px), que siguen aplicando en simultáneo. */
+@media (max-width:640px){
+  #productos .tabla-productos-fixed{
+    table-layout:auto !important;
+  }
+  #productos .tabla-productos-fixed thead{ display:none !important; }
+  #productos .tabla-productos-fixed,
+  #productos .tabla-productos-fixed tbody{
+    display:block !important; width:100% !important;
+  }
+  #productos .tabla-productos-fixed tr{
+    display:grid !important;
+    grid-template-columns:56px 1fr 1fr;
+    grid-template-areas:
+      "foto   nombre   nombre"
+      "foto   codigo   categoria"
+      "check  precio   stock"
+      "estado estado   estado"
+      "acciones acciones acciones";
+    column-gap:10px; row-gap:4px;
+    background:#fff;
+    border:1px solid var(--slate-200);
+    border-radius:12px;
+    padding:10px 12px;
+    margin-bottom:10px;
+    box-shadow:0 1px 3px rgba(0,0,0,.05);
+  }
+  #productos .tabla-productos-fixed tr:hover{ background:#fff !important; }
+  #productos .tabla-productos-fixed tr.arrastrando{ background:var(--slate-50) !important; }
+
+  #productos .tabla-productos-fixed td{
+    display:block !important; width:auto !important;
+    padding:2px 0 !important; border:none !important;
+    font-size:13.5px;
+  }
+
+  /* Checkbox de selección para etiquetas */
+  #productos .tabla-productos-fixed td:nth-child(1){
+    grid-area:check; align-self:center;
+  }
+  #productos .tabla-productos-fixed .check-orden-inner{ justify-content:flex-start; }
+
+  /* Foto: cuadrado a la izquierda, ocupa las 3 primeras filas visuales */
+  #productos .tabla-productos-fixed td:nth-child(2){
+    grid-area:foto; position:relative;
+    width:56px !important; height:56px;
+    border-radius:8px; overflow:hidden;
+    background:var(--slate-50);
+  }
+  #productos .tabla-productos-fixed td:nth-child(2) .tabla-producto-thumb{
+    position:absolute; inset:0; font-size:22px;
+  }
+
+  /* Nombre del producto: título de la tarjeta */
+  #productos .tabla-productos-fixed td:nth-child(4){
+    grid-area:nombre; font-weight:700; font-size:14.5px;
+    color:var(--navy-900); align-self:center;
+  }
+
+  /* Código, Categoría, Precio y Stock: pares etiqueta/valor chicos */
+  #productos .tabla-productos-fixed td:nth-child(3){ grid-area:codigo; }
+  #productos .tabla-productos-fixed td:nth-child(5){
+    grid-area:categoria; display:block !important; text-align:right;
+  }
+  #productos .tabla-productos-fixed td:nth-child(6){ grid-area:precio; }
+  #productos .tabla-productos-fixed td:nth-child(7){
+    grid-area:stock; text-align:right;
+  }
+  #productos .tabla-productos-fixed td:nth-child(3)::before{ content:"Código: "; }
+  #productos .tabla-productos-fixed td:nth-child(5)::before{ content:"Categoría: "; }
+  #productos .tabla-productos-fixed td:nth-child(6)::before{ content:"Precio: "; }
+  #productos .tabla-productos-fixed td:nth-child(7)::before{ content:"Stock: "; }
+  #productos .tabla-productos-fixed td:nth-child(3)::before,
+  #productos .tabla-productos-fixed td:nth-child(5)::before,
+  #productos .tabla-productos-fixed td:nth-child(6)::before,
+  #productos .tabla-productos-fixed td:nth-child(7)::before{
+    font-weight:600; color:var(--slate-500); font-size:11px;
+    text-transform:uppercase; letter-spacing:.03em;
+  }
+
+  /* Estado publicado/oculto: franja propia de ancho completo */
+  #productos .tabla-productos-fixed td:nth-child(8){
+    grid-area:estado; margin-top:4px; padding-top:6px !important;
+    border-top:1px solid var(--slate-100) !important;
+  }
+
+  /* Acciones: fila propia de ancho completo, botones en línea repartidos */
+  #productos .tabla-productos-fixed td:nth-child(9){
+    grid-area:acciones; display:flex !important; gap:6px;
+    margin-top:6px; padding-top:8px !important;
+    border-top:1px solid var(--slate-100) !important;
+  }
+  #productos .tabla-productos-fixed .celda-acciones-producto{
+    flex-direction:row !important; width:100% !important;
+  }
+  #productos .tabla-productos-fixed .btn-accion-producto{
+    flex:1; margin-left:0 !important;
+  }
+}
+
 #avisoOrdenProductos{
   padding:18px 20px !important;
   line-height:1.5 !important;
