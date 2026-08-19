@@ -3459,16 +3459,25 @@ async function onSeleccionarArchivoImagenProducto(event) {
     return;
   }
 
+  // En vez de subir directo, abrimos el editor de recorte cuadrado.
+  // La subida real sigue en subirImagenProductoRecortada(), una vez confirmado el recorte.
+  abrirRecorteImagenProducto(file, event.target);
+}
+
+/** Sube (comprime + manda a Drive) el blob YA recortado por el editor de recorte */
+async function subirImagenProductoRecortada(blob, inputEl) {
+  const statusEl = document.getElementById("pmImagenStatus");
+
   // Local preview inmediata, mientras se comprime y sube en segundo plano
-  const localUrl = URL.createObjectURL(file);
+  const localUrl = URL.createObjectURL(blob);
   const preview = document.getElementById("pmImagenPreview");
   if (preview) preview.innerHTML = `<img src="${localUrl}" alt="">`;
 
   if (statusEl) { statusEl.className = "pm-image-status uploading"; statusEl.textContent = "⏳ Optimizando imagen..."; }
 
   try {
-    const pesoOriginalKB = Math.round(file.size / 1024);
-    const { base64, tipoMime } = await comprimirImagenProducto(file);
+    const pesoOriginalKB = Math.round(blob.size / 1024);
+    const { base64, tipoMime } = await comprimirImagenProducto(blob);
     const pesoFinalKB = Math.round((base64.length * 0.75) / 1024); // estimación: base64 pesa ~33% más que los bytes reales
 
     if (statusEl) {
@@ -3506,7 +3515,183 @@ async function onSeleccionarArchivoImagenProducto(event) {
     if (statusEl) { statusEl.className = "pm-image-status error"; statusEl.textContent = "⚠️ Error de conexión al subir la imagen."; }
   } finally {
     URL.revokeObjectURL(localUrl);
+    if (inputEl) inputEl.value = "";
   }
+}
+
+/* ===================== RECORTE CUADRADO DE FOTO DE PRODUCTO ===================== */
+/* Editor de recorte 1:1 nativo (sin librerías externas): el usuario arrastra la
+   imagen y ajusta el zoom dentro de un marco cuadrado fijo; al confirmar, se
+   genera un canvas cuadrado recortado que después pasa por comprimirImagenProducto(). */
+
+let _cropState = null; // { file, imgEl, natW, natH, vp, scale, minScale, maxScale, tx, ty, inputEl, dragging, dragStartX, dragStartY, txStart, tyStart }
+let _cropListenersListos = false;
+
+function abrirRecorteImagenProducto(file, inputEl) {
+  const backdrop = document.getElementById("cropImagenModalBackdrop");
+  const imgEl = document.getElementById("cropImgEl");
+  if (!backdrop || !imgEl) {
+    // Fallback de seguridad: si el modal no está en el HTML, subimos sin recortar.
+    subirImagenProductoRecortada(file, inputEl);
+    return;
+  }
+
+  const url = URL.createObjectURL(file);
+  imgEl.src = url;
+
+  imgEl.onload = () => {
+    const viewport = document.getElementById("cropViewport");
+    const vp = viewport.clientWidth; // el viewport es cuadrado (mismo ancho y alto por CSS)
+    const natW = imgEl.naturalWidth;
+    const natH = imgEl.naturalHeight;
+    const minScale = Math.max(vp / natW, vp / natH); // "cover": la imagen tapa todo el marco
+
+    _cropState = {
+      file, imgEl, natW, natH, vp,
+      scale: minScale, minScale, maxScale: minScale * 4,
+      tx: (vp - natW * minScale) / 2,
+      ty: (vp - natH * minScale) / 2,
+      inputEl,
+      dragging: false, dragStartX: 0, dragStartY: 0, txStart: 0, tyStart: 0
+    };
+
+    const slider = document.getElementById("cropZoomSlider");
+    if (slider) slider.value = 0;
+
+    _cropAplicarTransform();
+    _cropInicializarListeners();
+    backdrop.classList.add("show");
+  };
+}
+
+function _cropAplicarTransform() {
+  if (!_cropState) return;
+  const { imgEl, tx, ty, scale } = _cropState;
+  imgEl.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+}
+
+/** Evita que se pueda arrastrar/zoomear el marco fuera de los bordes de la imagen */
+function _cropClamp() {
+  if (!_cropState) return;
+  const s = _cropState;
+  s.scale = Math.min(s.maxScale, Math.max(s.minScale, s.scale));
+  const minTx = s.vp - s.natW * s.scale;
+  const minTy = s.vp - s.natH * s.scale;
+  s.tx = Math.min(0, Math.max(minTx, s.tx));
+  s.ty = Math.min(0, Math.max(minTy, s.ty));
+}
+
+function _cropInicializarListeners() {
+  if (_cropListenersListos) return;
+  _cropListenersListos = true;
+
+  const viewport = document.getElementById("cropViewport");
+  const slider = document.getElementById("cropZoomSlider");
+  if (!viewport || !slider) return;
+
+  const iniciarDrag = (clientX, clientY) => {
+    if (!_cropState) return;
+    _cropState.dragging = true;
+    _cropState.dragStartX = clientX;
+    _cropState.dragStartY = clientY;
+    _cropState.txStart = _cropState.tx;
+    _cropState.tyStart = _cropState.ty;
+    viewport.classList.add("dragging");
+  };
+  const moverDrag = (clientX, clientY) => {
+    if (!_cropState || !_cropState.dragging) return;
+    _cropState.tx = _cropState.txStart + (clientX - _cropState.dragStartX);
+    _cropState.ty = _cropState.tyStart + (clientY - _cropState.dragStartY);
+    _cropClamp();
+    _cropAplicarTransform();
+  };
+  const terminarDrag = () => {
+    if (!_cropState) return;
+    _cropState.dragging = false;
+    viewport.classList.remove("dragging");
+  };
+
+  // Mouse
+  viewport.addEventListener("mousedown", e => { e.preventDefault(); iniciarDrag(e.clientX, e.clientY); });
+  window.addEventListener("mousemove", e => moverDrag(e.clientX, e.clientY));
+  window.addEventListener("mouseup", terminarDrag);
+
+  // Touch (celular/tablet)
+  viewport.addEventListener("touchstart", e => {
+    const t = e.touches[0];
+    iniciarDrag(t.clientX, t.clientY);
+  }, { passive: true });
+  viewport.addEventListener("touchmove", e => {
+    const t = e.touches[0];
+    moverDrag(t.clientX, t.clientY);
+  }, { passive: true });
+  viewport.addEventListener("touchend", terminarDrag);
+
+  // Rueda del mouse también hace zoom
+  viewport.addEventListener("wheel", e => {
+    e.preventDefault();
+    const delta = e.deltaY < 0 ? 1 : -1;
+    const nuevoValor = Math.min(100, Math.max(0, Number(slider.value) + delta * 4));
+    slider.value = nuevoValor;
+    slider.dispatchEvent(new Event("input"));
+  }, { passive: false });
+
+  // Slider de zoom (0-100) → escala real, manteniendo el centro del marco fijo
+  slider.addEventListener("input", () => {
+    if (!_cropState) return;
+    const s = _cropState;
+    const t = Number(slider.value) / 100; // 0..1
+    const nuevaEscala = s.minScale + t * (s.maxScale - s.minScale);
+
+    // Punto de la imagen que hoy está en el centro del marco — lo mantenemos fijo al hacer zoom
+    const cx = (s.vp / 2 - s.tx) / s.scale;
+    const cy = (s.vp / 2 - s.ty) / s.scale;
+
+    s.scale = nuevaEscala;
+    s.tx = s.vp / 2 - cx * s.scale;
+    s.ty = s.vp / 2 - cy * s.scale;
+
+    _cropClamp();
+    _cropAplicarTransform();
+  });
+}
+
+function cancelarRecorteImagenProducto() {
+  const backdrop = document.getElementById("cropImagenModalBackdrop");
+  if (backdrop) backdrop.classList.remove("show");
+  if (_cropState) {
+    if (_cropState.imgEl && _cropState.imgEl.src) URL.revokeObjectURL(_cropState.imgEl.src);
+    if (_cropState.inputEl) _cropState.inputEl.value = "";
+  }
+  _cropState = null;
+}
+
+function confirmarRecorteImagenProducto() {
+  if (!_cropState) return;
+  const s = _cropState;
+
+  // Rectángulo recortado, en píxeles del archivo original (no de la pantalla)
+  const sx = (0 - s.tx) / s.scale;
+  const sy = (0 - s.ty) / s.scale;
+  const sSize = s.vp / s.scale;
+
+  const LADO_SALIDA_PX = 1000; // resolución del cuadrado recortado; comprimirImagenProducto() la ajusta después
+  const canvas = document.createElement("canvas");
+  canvas.width = LADO_SALIDA_PX;
+  canvas.height = LADO_SALIDA_PX;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(s.imgEl, sx, sy, sSize, sSize, 0, 0, LADO_SALIDA_PX, LADO_SALIDA_PX);
+
+  const backdrop = document.getElementById("cropImagenModalBackdrop");
+  const urlOriginal = s.imgEl.src;
+  const inputEl = s.inputEl;
+
+  canvas.toBlob(blob => {
+    if (backdrop) backdrop.classList.remove("show");
+    URL.revokeObjectURL(urlOriginal);
+    _cropState = null;
+    if (blob) subirImagenProductoRecortada(blob, inputEl);
+  }, "image/jpeg", 0.92);
 }
 
 /** Fills the category <datalist> with the distinct categories already in use */

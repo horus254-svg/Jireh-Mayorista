@@ -2677,6 +2677,36 @@
   </div>
 </div>
 
+<!-- ===== RECORTE CUADRADO DE FOTO DE PRODUCTO ===== -->
+<div class="product-modal-backdrop" id="cropImagenModalBackdrop">
+  <div class="product-modal" style="max-width:400px; width:92vw;">
+    <div class="product-modal-header">
+      <h6>✂️ Recortar foto del producto</h6>
+      <button onclick="cancelarRecorteImagenProducto()">✕</button>
+    </div>
+
+    <div class="product-modal-body" style="display:flex; flex-direction:column; align-items:center; gap:14px;">
+      <div class="crop-viewport" id="cropViewport">
+        <img id="cropImgEl" src="" alt="" draggable="false">
+      </div>
+
+      <div style="width:100%; max-width:280px;">
+        <label class="form-label" style="font-size:12px; margin-bottom:2px;">🔍 Zoom</label>
+        <input type="range" class="form-range" id="cropZoomSlider" min="0" max="100" value="0">
+      </div>
+
+      <p class="text-muted" style="font-size:11.5px; text-align:center; margin:0;">
+        Arrastrá la imagen para ubicarla y usá el zoom para ajustar el recorte cuadrado.
+      </p>
+    </div>
+
+    <div class="product-modal-actions">
+      <button class="btn btn-outline-secondary" onclick="cancelarRecorteImagenProducto()">Cancelar</button>
+      <button class="btn btn-success" onclick="confirmarRecorteImagenProducto()">✅ Usar esta foto</button>
+    </div>
+  </div>
+</div>
+
 <!-- ===== AGREGAR STOCK (entrada de mercadería) ===== -->
 <div class="product-modal-backdrop" id="stockModalBackdrop">
   <div class="product-modal stock-modal">

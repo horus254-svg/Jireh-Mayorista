@@ -1770,6 +1770,22 @@ tr.fila-arrastrable{ cursor:default; }
   font-family:var(--font-mono); font-size:18px;
 }
 
+/* ===================== RECORTE CUADRADO DE FOTO DE PRODUCTO ===================== */
+
+.crop-viewport{
+  width:280px; height:280px; max-width:100%;
+  border-radius:12px; overflow:hidden; position:relative;
+  background:var(--slate-100); border:1px solid var(--slate-200);
+  touch-action:none; cursor:grab; user-select:none;
+}
+.crop-viewport.dragging{ cursor:grabbing; }
+.crop-viewport img{
+  position:absolute; top:0; left:0;
+  transform-origin:0 0;
+  max-width:none; /* la imagen se dimensiona por transform, no por CSS width/height */
+  pointer-events:none; /* los eventos de drag los maneja el contenedor */
+}
+
 /* ===================== CONFIGURACIÓN (datos del local) ===================== */
 
 .cfg-tabs{
