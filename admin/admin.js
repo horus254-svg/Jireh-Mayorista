@@ -3540,6 +3540,10 @@ function abrirRecorteImagenProducto(file, inputEl) {
   imgEl.src = url;
 
   imgEl.onload = () => {
+    // Mostramos el modal PRIMERO: mientras está oculto (display:none) el viewport
+    // mide 0px de ancho, así que si midiéramos antes, la imagen quedaría con escala 0 (invisible).
+    backdrop.classList.add("show");
+
     const viewport = document.getElementById("cropViewport");
     const vp = viewport.clientWidth; // el viewport es cuadrado (mismo ancho y alto por CSS)
     const natW = imgEl.naturalWidth;
@@ -3560,7 +3564,6 @@ function abrirRecorteImagenProducto(file, inputEl) {
 
     _cropAplicarTransform();
     _cropInicializarListeners();
-    backdrop.classList.add("show");
   };
 }
 
