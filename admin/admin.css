@@ -1569,11 +1569,10 @@ tr.fila-arrastrable{ cursor:default; }
   .ticket-header{ padding:10px 14px 8px; }
   .ticket-footer{ padding:10px 14px; }
 
-  /* "Último escaneado" en reposo (sin producto todavía) es solo un
-     cartel de "escaneá algo acá" que ocupa espacio permanentemente
-     sin aportar nada — se oculta y solo aparece cuando de verdad hay
-     algo para mostrar, justo después de escanear/buscar. */
-  .scan-result-panel:not(.has-product){ display:none; }
+  /* "Último escaneado" no aporta nada en celular — se oculta
+     siempre, tenga o no producto cargado (antes solo se ocultaba en
+     reposo). */
+  .scan-result-panel{ display:none !important; }
 
   .pos-scanbar{ padding:10px 12px; }
   .pos-categories{ padding-bottom:4px; }
@@ -1583,7 +1582,9 @@ tr.fila-arrastrable{ cursor:default; }
      mostrar más productos de una sola vez sin scrollear la grilla. */
   .pos-grid-wrap{ height:44vh; max-height:44vh; }
 
-  .pos-product-grid{ grid-template-columns:repeat(auto-fill, minmax(110px, 1fr)); gap:8px; }
+  /* 3 tarjetas por fila en vez de 2 (antes auto-fill con mínimo de
+     110px encajaba solo 2 en la mayoría de los celulares). */
+  .pos-product-grid{ grid-template-columns:repeat(3, 1fr); gap:8px; }
   .product-tile{ padding:8px; }
   .product-tile .tile-name{ font-size:12px; min-height:2.4em; }
   .product-tile .tile-price{ font-size:13px; }
