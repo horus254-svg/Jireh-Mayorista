@@ -583,6 +583,15 @@ html,body{
   }
   #productos .tabla-productos-fixed tr:hover{ background:#fff !important; }
   #productos .tabla-productos-fixed tr.arrastrando{ background:var(--slate-50) !important; }
+  /* Bootstrap .table-striped pinta de fondo cada <td> de las filas
+     impares (no toda la fila de una — celda por celda), y esa clase
+     sigue puesta en la tabla. Sumado al fondo gris propio de la
+     miniatura, esto es lo que se ve como "manchones" de distinto
+     color dentro de cada tarjeta. Se neutraliza acá para que todas
+     las celdas queden con el mismo blanco parejo de la tarjeta. */
+  #productos .tabla-productos-fixed.table-striped > tbody > tr > *{
+    background-color:transparent !important;
+  }
 
   #productos .tabla-productos-fixed td{
     display:block !important; width:auto !important;
@@ -596,12 +605,16 @@ html,body{
   }
   #productos .tabla-productos-fixed .check-orden-inner{ justify-content:flex-start; }
 
-  /* Foto: cuadrado a la izquierda, ocupa las 3 primeras filas visuales */
+  /* Foto: cuadrado a la izquierda, ocupa las 3 primeras filas visuales.
+     Fondo casi imperceptible con borde propio en vez de un gris
+     sólido — así no se lee como un bloque de otro color pegado a la
+     tarjeta blanca, solo como el marco natural de la miniatura. */
   #productos .tabla-productos-fixed td:nth-child(2){
     grid-area:foto; position:relative;
     width:56px !important; height:56px;
     border-radius:8px; overflow:hidden;
     background:var(--slate-50);
+    border:1px solid var(--slate-100);
   }
   #productos .tabla-productos-fixed td:nth-child(2) .tabla-producto-thumb{
     position:absolute; inset:0; font-size:22px;
