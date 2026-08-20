@@ -85,7 +85,7 @@ async function cargarConfigCliente() {
 
 // Cantidad de productos (los últimos agregados en la hoja de Sheets)
 // que se consideran "recién agregados" y se destacan en el catálogo.
-const CANTIDAD_PRODUCTOS_NUEVOS = 10;
+const CANTIDAD_PRODUCTOS_NUEVOS = 8;
 
 const PLACEHOLDER_IMG = "data:image/svg+xml;base64," + btoa(
     "<svg xmlns='http://www.w3.org/2000/svg' width='400' height='400'>" +
@@ -242,6 +242,7 @@ async function cargarProductos(){
 
         renderChips();
         aplicarFiltros();
+        abrirProductoDesdeUrl();
 
     }catch(err){
 
@@ -644,9 +645,11 @@ function cambiarQtyInput(id, delta){
     el.value = Math.max(1, stockDisponible > 0 ? Math.min(stockDisponible, nuevo) : nuevo);
 }
 
-function abrirQuickView(producto){
+function abrirQuickView(producto, opciones){
 
     if(!producto) return;
+
+    opciones = opciones || {};
 
     qvProductoActual = producto;
 
@@ -680,9 +683,113 @@ function abrirQuickView(producto){
 
     renderRelacionados(producto);
 
+    // Actualiza la URL (?producto=CODIGO) y los meta tags para que este
+    // producto tenga su propio link compartible y sea indexable por
+    // buscadores. No se hace si ya lo abrimos vía URL al cargar la
+    // página (para no duplicar la entrada en el historial).
+    if(!opciones.sinActualizarUrl){
+        actualizarUrlProducto(producto);
+    }
+
     const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById("quickViewModal"));
     modal.show();
 }
+
+/**
+ * Guarda la URL "base" del catálogo (sin parámetro de producto) para
+ * poder restaurarla al cerrar el Quick View.
+ */
+const URL_BASE_CATALOGO = window.location.pathname + window.location.search.replace(/[?&]producto=[^&]*/, "").replace(/^&/, "?") + window.location.hash;
+
+/**
+ * Pone ?producto=CODIGO en la URL (sin recargar la página) y actualiza
+ * título + meta tags para ese producto puntual. Esto permite:
+ * - Compartir el link de un producto específico (WhatsApp, redes, etc).
+ * - Que Google pueda indexar cada producto por separado.
+ * Nota: las vistas previas de WhatsApp/redes leen el HTML sin ejecutar
+ * JavaScript, así que la imagen/título que se ve al compartir el link
+ * seguirá siendo la genérica del sitio a menos que se sume generación
+ * de meta tags del lado del servidor. Buscadores como Google sí
+ * ejecutan JS y pueden indexar este contenido dinámico.
+ */
+function actualizarUrlProducto(producto){
+
+    const codigo = String(producto.CODIGO);
+    const url = new URL(window.location.href);
+    url.searchParams.set("producto", codigo);
+
+    // Si ya había un producto abierto (navegando entre relacionados),
+    // se reemplaza la entrada del historial en vez de apilar una nueva,
+    // para que "atrás" no obligue a pasar por cada producto intermedio.
+    const yaHabiaProducto = new URL(window.location.href).searchParams.has("producto");
+    if(yaHabiaProducto){
+        window.history.replaceState({ producto: codigo }, "", url.toString());
+    }else{
+        window.history.pushState({ producto: codigo }, "", url.toString());
+    }
+
+    const nombre = String(producto.PRODUCTO || "").trim();
+    const precio = "$" + formatearPrecio(producto.PRECIO);
+    const tituloPagina = nombre ? `${nombre} — ${precio}` : document.title;
+
+    document.title = tituloPagina;
+
+    const setMeta = (selector, valor) => {
+        const el = document.querySelector(selector);
+        if(el && valor) el.setAttribute("content", valor);
+    };
+
+    const descripcion = String(producto.DESCRIPCION || "").trim() || `Comprá ${nombre} a ${precio}. Hacé tu pedido por WhatsApp.`;
+
+    setMeta('meta[name="description"]', descripcion);
+    setMeta('meta[property="og:title"]', tituloPagina);
+    setMeta('meta[property="og:description"]', descripcion);
+    if(producto.IMAGEN) setMeta('meta[property="og:image"]', producto.IMAGEN);
+}
+
+/**
+ * Restaura la URL, el título y los meta tags originales del catálogo
+ * al cerrar el Quick View (para que compartir la página en general
+ * no quede pegado al último producto visto).
+ */
+function restaurarUrlCatalogo(){
+
+    window.history.pushState({}, "", URL_BASE_CATALOGO);
+    aplicarConfigSEO();
+}
+
+/**
+ * Al cargar la página, si la URL trae ?producto=CODIGO (por ejemplo
+ * porque alguien compartió el link de un producto puntual), abre
+ * automáticamente su Quick View apenas el catálogo termina de cargar.
+ */
+function abrirProductoDesdeUrl(){
+
+    const codigo = new URL(window.location.href).searchParams.get("producto");
+    if(!codigo) return;
+
+    const producto = estado.productos.find(p => String(p.CODIGO) === String(codigo));
+    if(producto) abrirQuickView(producto, { sinActualizarUrl: true });
+}
+
+// Al cerrar el Quick View (con la X, tocando afuera, o con Escape),
+// se limpia la URL para volver al catálogo general.
+document.getElementById("quickViewModal").addEventListener("hidden.bs.modal", restaurarUrlCatalogo);
+
+// Soporte para los botones atrás/adelante del navegador.
+window.addEventListener("popstate", function(){
+
+    const codigo = new URL(window.location.href).searchParams.get("producto");
+
+    if(codigo){
+        const producto = estado.productos.find(p => String(p.CODIGO) === String(codigo));
+        if(producto) abrirQuickView(producto, { sinActualizarUrl: true });
+    }else{
+        const modal = bootstrap.Modal.getInstance(document.getElementById("quickViewModal"));
+        if(modal) modal.hide();
+    }
+});
+
 
 /**
  * Muestra hasta 8 productos de la misma categoría (con stock) en el
