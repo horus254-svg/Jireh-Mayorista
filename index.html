@@ -461,11 +461,25 @@
                 </div>
 
                 <div class="col-md-2 col-6" id="beneficio-direccion-wrap">
-                    <span class="beneficio-item">
+                    <a href="#" id="beneficio-direccion" class="beneficio-item beneficio-link" target="_blank" rel="noopener">
                         <i class="bi bi-geo-alt-fill"></i> <span id="beneficio-direccion-texto"></span>
-                    </span>
+                    </a>
                 </div>
 
+            </div>
+
+            <!-- MINIMAPA — se arma dinámicamente con la dirección cargada
+                 desde el panel admin (ver aplicarBeneficios() en app.js).
+                 Sin API key: usa el embed público de Google Maps. -->
+            <div id="mapa-direccion-wrap" class="mapa-direccion-wrap d-none">
+                <iframe
+                    id="mapa-direccion-iframe"
+                    class="mapa-direccion-iframe"
+                    src=""
+                    loading="lazy"
+                    referrerpolicy="no-referrer-when-downgrade"
+                    title="Ubicación del local">
+                </iframe>
             </div>
 
         </div>

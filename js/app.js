@@ -1621,14 +1621,33 @@ function aplicarBeneficios(cfg){
     }
     configurarChipBeneficio("beneficio-telefono2-wrap", !!tel2);
 
-    // --- Dirección ---
+    // --- Dirección + minimapa de Google Maps ---
     const direccion = (cfg.beneficioDireccion || "").trim();
+    const direccionEl = document.getElementById("beneficio-direccion");
     const direccionTextoEl = document.getElementById("beneficio-direccion-texto");
 
     if(direccionTextoEl && direccion){
         direccionTextoEl.textContent = direccion;
     }
+    if(direccionEl && direccion){
+        // Abre la dirección en Google Maps al hacer click en el chip
+        direccionEl.href = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(direccion);
+    }
     configurarChipBeneficio("beneficio-direccion-wrap", !!direccion);
+
+    // Minimapa embebido — no requiere API key de Google Maps
+    const mapaWrap = document.getElementById("mapa-direccion-wrap");
+    const mapaIframe = document.getElementById("mapa-direccion-iframe");
+
+    if(mapaWrap && mapaIframe){
+        if(direccion){
+            mapaIframe.src = "https://maps.google.com/maps?q=" + encodeURIComponent(direccion) + "&z=15&output=embed";
+            mapaWrap.classList.remove("d-none");
+        } else {
+            mapaIframe.src = "";
+            mapaWrap.classList.add("d-none");
+        }
+    }
 
     // --- Textos libres (si el contenido es un link, se muestra como
     // botón clickable con el nombre de la red social detectada en vez

@@ -378,6 +378,41 @@ select:focus-visible{
     color:var(--indigo-600);
 }
 
+/* Minimapa de Google Maps con la dirección del local (carga dinámica
+   desde el panel admin, ver aplicarBeneficios() en app.js) */
+.mapa-direccion-wrap{
+    margin:14px auto 4px;
+    max-width:520px;
+    border-radius:14px;
+    overflow:hidden;
+    border:1px solid rgba(0,0,0,.08);
+    box-shadow:0 4px 16px rgba(0,0,0,.08);
+    animation:fadeInMapa .35s ease;
+}
+
+.mapa-direccion-iframe{
+    display:block;
+    width:100%;
+    height:180px;
+    border:0;
+}
+
+@keyframes fadeInMapa{
+    from{ opacity:0; transform:translateY(-6px); }
+    to{ opacity:1; transform:translateY(0); }
+}
+
+@media (max-width:576px){
+    .mapa-direccion-wrap{
+        max-width:100%;
+        margin-left:12px;
+        margin-right:12px;
+    }
+    .mapa-direccion-iframe{
+        height:150px;
+    }
+}
+
 /* =========================================================
    CATEGORÍAS (CHIPS — tag motif with a punched hole)
 ========================================================= */
