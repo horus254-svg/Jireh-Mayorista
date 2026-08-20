@@ -85,7 +85,7 @@ async function cargarConfigCliente() {
 
 // Cantidad de productos (los últimos agregados en la hoja de Sheets)
 // que se consideran "recién agregados" y se destacan en el catálogo.
-const CANTIDAD_PRODUCTOS_NUEVOS = 8;
+const CANTIDAD_PRODUCTOS_NUEVOS = 10;
 
 const PLACEHOLDER_IMG = "data:image/svg+xml;base64," + btoa(
     "<svg xmlns='http://www.w3.org/2000/svg' width='400' height='400'>" +
