@@ -665,6 +665,10 @@ function abrirQuickView(producto){
  * Quick View, para incentivar que el cliente agregue más de un
  * producto al pedido antes de cerrar el modal. Si la categoría no
  * tiene más productos, la sección se oculta directamente.
+ *
+ * Para que sea realmente útil (y no siempre los mismos 8 primeros
+ * de la categoría), se prioriza la misma subcategoría cuando existe
+ * y, dentro de cada grupo, el orden se mezcla en cada apertura.
  */
 function renderRelacionados(producto){
 
@@ -673,16 +677,37 @@ function renderRelacionados(producto){
     if(!wrap || !cont) return;
 
     const categoria = String(producto.CATEGORIA || "").trim();
+    const subcategoria = String(producto.SUBCATEGORIA || "").trim();
 
-    const relacionados = categoria
-        ? estado.productos
-            .filter(p =>
-                String(p.CATEGORIA || "").trim() === categoria &&
-                String(p.CODIGO) !== String(producto.CODIGO) &&
-                (Number(String(p.STOCK ?? "").trim()) || 0) > 0
-            )
-            .slice(0, 8)
+    const codigosEnCarrito = new Set(estado.carrito.map(p => String(p.CODIGO)));
+
+    const candidatos = categoria
+        ? estado.productos.filter(p =>
+            String(p.CATEGORIA || "").trim() === categoria &&
+            String(p.CODIGO) !== String(producto.CODIGO) &&
+            !codigosEnCarrito.has(String(p.CODIGO)) &&
+            (Number(String(p.STOCK ?? "").trim()) || 0) > 0
+          )
         : [];
+
+    // Mezcla aleatoria (Fisher-Yates) para no repetir siempre el mismo orden.
+    const mezclar = (arr) => {
+        const copia = arr.slice();
+        for(let i = copia.length - 1; i > 0; i--){
+            const j = Math.floor(Math.random() * (i + 1));
+            [copia[i], copia[j]] = [copia[j], copia[i]];
+        }
+        return copia;
+    };
+
+    let relacionados;
+    if(subcategoria){
+        const mismaSub = mezclar(candidatos.filter(p => String(p.SUBCATEGORIA || "").trim() === subcategoria));
+        const otraSub = mezclar(candidatos.filter(p => String(p.SUBCATEGORIA || "").trim() !== subcategoria));
+        relacionados = [...mismaSub, ...otraSub].slice(0, 8);
+    }else{
+        relacionados = mezclar(candidatos).slice(0, 8);
+    }
 
     if(relacionados.length === 0){
         wrap.classList.add("d-none");
