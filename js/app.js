@@ -83,6 +83,10 @@ async function cargarConfigCliente() {
   }
 }
 
+// Cantidad de productos (los últimos agregados en la hoja de Sheets)
+// que se consideran "recién agregados" y se destacan en el catálogo.
+const CANTIDAD_PRODUCTOS_NUEVOS = 8;
+
 const PLACEHOLDER_IMG = "data:image/svg+xml;base64," + btoa(
     "<svg xmlns='http://www.w3.org/2000/svg' width='400' height='400'>" +
     "<rect width='100%' height='100%' fill='#eef1f6'/>" +
@@ -207,15 +211,33 @@ async function cargarProductos(){
         const res = await fetchAPI(API_URL + "?action=productos");
         const data = await res.json();
 
-        estado.productos = (data.productos || [])
-        .filter(p => Number(String(p.STOCK).trim()) > 0)
+        const productosConStock = (data.productos || [])
+            .filter(p => Number(String(p.STOCK).trim()) > 0);
+
+        // Los productos nuevos se agregan siempre al final de la hoja
+        // de Sheets, así que los últimos N (en el orden original,
+        // antes de reordenar por destacados) son los "recién agregados".
+        const codigosNuevos = new Set(
+            productosConStock
+                .slice(-CANTIDAD_PRODUCTOS_NUEVOS)
+                .map(p => String(p.CODIGO))
+        );
+
+        estado.productos = productosConStock
+        .map(p => ({ ...p, _esNuevo: codigosNuevos.has(String(p.CODIGO)) }))
         .sort((a,b)=>{
 
             const esDestacadaA = String(a.DESTACADO || "").trim().toUpperCase() === "SI";
             const esDestacadaB = String(b.DESTACADO || "").trim().toUpperCase() === "SI";
 
-            if(esDestacadaA === esDestacadaB) return 0;
-            return esDestacadaA ? -1 : 1;
+            if(esDestacadaA !== esDestacadaB) return esDestacadaA ? -1 : 1;
+
+            // Entre no-destacados, los recién agregados van primero
+            // (Array.sort es estable, así que dentro de cada grupo se
+            // conserva el orden original de la hoja).
+            if(a._esNuevo !== b._esNuevo) return a._esNuevo ? -1 : 1;
+
+            return 0;
         });
 
         renderChips();
@@ -474,7 +496,9 @@ function mostrarProductos(lista){
 
             <div class="card-product h-100" data-code="${codigo}" data-action="quickview">
 
-                ${String(p.DESTACADO || "").trim().toUpperCase() === "SI" ? `<div class="ribbon-destacado">⭐ DESTACADO</div>` : ""}
+                ${String(p.DESTACADO || "").trim().toUpperCase() === "SI"
+                    ? `<div class="ribbon-destacado">⭐ DESTACADO</div>`
+                    : (p._esNuevo ? `<div class="ribbon-nuevo">🆕 NUEVO</div>` : "")}
 
                 ${String(p.OFERTA || "").trim().toUpperCase() === "SI" ? `<div class="ribbon-oferta">🔥 OFERTA</div>` : ""}
 
