@@ -1605,7 +1605,7 @@ function aplicarBeneficios(cfg){
     const tel1TextoEl = document.getElementById("beneficio-telefono1-texto");
 
     if(tel1El && tel1TextoEl && tel1){
-        tel1El.href = `tel:${limpiarTelefonoParaLink(tel1)}`;
+        tel1El.href = "https://wa.me/" + limpiarTelefonoParaLink(tel1);
         tel1TextoEl.textContent = tel1;
     }
     configurarChipBeneficio("beneficio-telefono1-wrap", !!tel1);
@@ -1616,36 +1616,65 @@ function aplicarBeneficios(cfg){
     const tel2TextoEl = document.getElementById("beneficio-telefono2-texto");
 
     if(tel2El && tel2TextoEl && tel2){
-        tel2El.href = `tel:${limpiarTelefonoParaLink(tel2)}`;
+        tel2El.href = "https://wa.me/" + limpiarTelefonoParaLink(tel2);
         tel2TextoEl.textContent = tel2;
     }
     configurarChipBeneficio("beneficio-telefono2-wrap", !!tel2);
 
-    // --- Dirección + minimapa de Google Maps ---
+    // --- Dirección: chip que abre el modal de ubicación ---
     const direccion = (cfg.beneficioDireccion || "").trim();
-    const direccionEl = document.getElementById("beneficio-direccion");
     const direccionTextoEl = document.getElementById("beneficio-direccion-texto");
 
     if(direccionTextoEl && direccion){
         direccionTextoEl.textContent = direccion;
     }
-    if(direccionEl && direccion){
-        // Abre la dirección en Google Maps al hacer click en el chip
-        direccionEl.href = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(direccion);
-    }
     configurarChipBeneficio("beneficio-direccion-wrap", !!direccion);
 
-    // Minimapa embebido — no requiere API key de Google Maps
-    const mapaWrap = document.getElementById("mapa-direccion-wrap");
-    const mapaIframe = document.getElementById("mapa-direccion-iframe");
+    // --- Modal de ubicación: minimapa + dirección + teléfonos ---
+    // Se completa siempre que haya al menos dirección o algún teléfono
+    // cargado en el panel admin, aunque el chip de dirección de arriba
+    // (que es el que lo abre) solo se muestra si hay dirección.
+    const mapaWrap = document.getElementById("modalUbicacion-mapa-wrap");
+    const mapaIframe = document.getElementById("modalUbicacion-mapa-iframe");
 
     if(mapaWrap && mapaIframe){
         if(direccion){
+            // Embed público de Google Maps — no requiere API key
             mapaIframe.src = "https://maps.google.com/maps?q=" + encodeURIComponent(direccion) + "&z=15&output=embed";
             mapaWrap.classList.remove("d-none");
         } else {
             mapaIframe.src = "";
             mapaWrap.classList.add("d-none");
+        }
+    }
+
+    const modalDireccionEl = document.getElementById("modalUbicacion-direccion");
+    if(modalDireccionEl){
+        modalDireccionEl.querySelector("span").textContent = direccion;
+        modalDireccionEl.classList.toggle("d-none", !direccion);
+    }
+
+    const modalTel1El = document.getElementById("modalUbicacion-telefono1");
+    if(modalTel1El){
+        modalTel1El.href = "https://wa.me/" + limpiarTelefonoParaLink(tel1);
+        modalTel1El.querySelector("span").textContent = tel1;
+        modalTel1El.classList.toggle("d-none", !tel1);
+    }
+
+    const modalTel2El = document.getElementById("modalUbicacion-telefono2");
+    if(modalTel2El){
+        modalTel2El.href = "https://wa.me/" + limpiarTelefonoParaLink(tel2);
+        modalTel2El.querySelector("span").textContent = tel2;
+        modalTel2El.classList.toggle("d-none", !tel2);
+    }
+
+    const modalComoLlegarEl = document.getElementById("modalUbicacion-comofllegar");
+    if(modalComoLlegarEl){
+        if(direccion){
+            modalComoLlegarEl.href = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(direccion);
+            modalComoLlegarEl.classList.remove("d-none");
+        } else {
+            modalComoLlegarEl.classList.add("d-none");
         }
     }
 

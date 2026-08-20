@@ -449,31 +449,48 @@
                 </div>
 
                 <div class="col-md-2 col-6" id="beneficio-telefono1-wrap">
-                    <a href="#" id="beneficio-telefono1" class="beneficio-item beneficio-link">
-                        <i class="bi bi-telephone-fill"></i> <span id="beneficio-telefono1-texto"></span>
+                    <a href="#" id="beneficio-telefono1" class="beneficio-item beneficio-link" target="_blank" rel="noopener">
+                        <i class="bi bi-whatsapp"></i> <span id="beneficio-telefono1-texto"></span>
                     </a>
                 </div>
 
                 <div class="col-md-2 col-6" id="beneficio-telefono2-wrap">
-                    <a href="#" id="beneficio-telefono2" class="beneficio-item beneficio-link">
-                        <i class="bi bi-telephone-fill"></i> <span id="beneficio-telefono2-texto"></span>
+                    <a href="#" id="beneficio-telefono2" class="beneficio-item beneficio-link" target="_blank" rel="noopener">
+                        <i class="bi bi-whatsapp"></i> <span id="beneficio-telefono2-texto"></span>
                     </a>
                 </div>
 
                 <div class="col-md-2 col-6" id="beneficio-direccion-wrap">
-                    <a href="#" id="beneficio-direccion" class="beneficio-item beneficio-link" target="_blank" rel="noopener">
+                    <a href="#" id="beneficio-direccion" class="beneficio-item beneficio-link" data-bs-toggle="modal" data-bs-target="#modalUbicacion">
                         <i class="bi bi-geo-alt-fill"></i> <span id="beneficio-direccion-texto"></span>
                     </a>
                 </div>
 
             </div>
 
-            <!-- MINIMAPA — se arma dinámicamente con la dirección cargada
-                 desde el panel admin (ver aplicarBeneficios() en app.js).
-                 Sin API key: usa el embed público de Google Maps. -->
-            <div id="mapa-direccion-wrap" class="mapa-direccion-wrap d-none">
+        </div>
+
+    </section>
+
+    <!-- MODAL UBICACIÓN — mapa + dirección + teléfonos del local
+         (se completa dinámicamente desde el panel admin,
+         ver aplicarBeneficios() en app.js) -->
+    <div class="modal fade" id="modalUbicacion" tabindex="-1">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4 border-0 shadow">
+
+          <div class="modal-header border-0 pb-0">
+            <h5 class="modal-title fw-bold">
+              <i class="bi bi-geo-alt-fill"></i> Nuestra ubicación
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+          </div>
+
+          <div class="modal-body">
+
+            <div id="modalUbicacion-mapa-wrap" class="mapa-direccion-wrap d-none">
                 <iframe
-                    id="mapa-direccion-iframe"
+                    id="modalUbicacion-mapa-iframe"
                     class="mapa-direccion-iframe"
                     src=""
                     loading="lazy"
@@ -482,9 +499,27 @@
                 </iframe>
             </div>
 
-        </div>
+            <p id="modalUbicacion-direccion" class="modalUbicacion-dato d-none">
+                <i class="bi bi-geo-alt-fill"></i> <span></span>
+            </p>
 
-    </section>
+            <a id="modalUbicacion-telefono1" href="#" target="_blank" rel="noopener" class="modalUbicacion-dato modalUbicacion-link d-none">
+                <i class="bi bi-whatsapp"></i> <span></span>
+            </a>
+
+            <a id="modalUbicacion-telefono2" href="#" target="_blank" rel="noopener" class="modalUbicacion-dato modalUbicacion-link d-none">
+                <i class="bi bi-whatsapp"></i> <span></span>
+            </a>
+
+            <a id="modalUbicacion-comofllegar" href="#" target="_blank" rel="noopener" class="btn btn-primary w-100 mt-2 d-none">
+                <i class="bi bi-signpost-2-fill"></i> Cómo llegar
+            </a>
+
+          </div>
+
+        </div>
+      </div>
+    </div>
 
     <!-- MODAL CONSULTA PEDIDO -->
     <div class="modal fade" id="modalConsultaPedido" tabindex="-1">
