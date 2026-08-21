@@ -1,0 +1,42 @@
+# Guardar este archivo en: .github/workflows/actualizar-sitemap.yml
+#
+# Regenera sitemap.xml todos los días y cuando se hace push a main,
+# y lo commitea automáticamente al repo si cambió.
+#
+# IMPORTANTE: hay que cargar la API_URL como "secret" del repo:
+#   Settings -> Secrets and variables -> Actions -> New repository secret
+#   Nombre: API_URL
+#   Valor: la misma URL de CONFIG_NEGOCIO.API_URL que usa config.js
+
+name: Actualizar sitemap
+
+on:
+  schedule:
+    - cron: "0 6 * * *"   # todos los días a las 06:00 UTC (03:00 en Argentina)
+  push:
+    branches: [main]
+  workflow_dispatch: {}     # permite ejecutarlo manualmente desde la pestaña Actions
+
+jobs:
+  sitemap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Generar sitemap.xml
+        env:
+          API_URL: ${{ secrets.API_URL }}
+          BASE_URL: "https://horus254-svg.github.io/Jireh-Mayorista/"
+        run: node generar-sitemap.js
+
+      - name: Commitear si cambió
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add sitemap.xml
+          git diff --cached --quiet || git commit -m "Actualizar sitemap.xml"
+          git push
