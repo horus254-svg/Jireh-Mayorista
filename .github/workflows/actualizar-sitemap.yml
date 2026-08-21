@@ -17,6 +17,9 @@ on:
     branches: [main]
   workflow_dispatch: {}     # permite ejecutarlo manualmente desde la pestaña Actions
 
+permissions:
+  contents: write   # sin esto, git push falla con "exit code 128" (permiso denegado)
+
 jobs:
   sitemap:
     runs-on: ubuntu-latest
