@@ -644,9 +644,11 @@ function cambiarQtyInput(id, delta){
     el.value = Math.max(1, stockDisponible > 0 ? Math.min(stockDisponible, nuevo) : nuevo);
 }
 
-function abrirQuickView(producto){
+function abrirQuickView(producto, actualizarUrl){
 
     if(!producto) return;
+
+    if(actualizarUrl === undefined) actualizarUrl = true;
 
     qvProductoActual = producto;
 
@@ -679,6 +681,8 @@ function abrirQuickView(producto){
     document.getElementById("qv-cantidad").value = 1;
 
     renderRelacionados(producto);
+
+    if(actualizarUrl) actualizarURLProducto(producto);
 
     const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById("quickViewModal"));
     modal.show();
@@ -770,6 +774,135 @@ document.getElementById("qv-relacionados").addEventListener("click", function(e)
     const producto = estado.productos.find(p => String(p.CODIGO) === String(codigo));
     if(producto) abrirQuickView(producto);
 });
+
+/* =========================================================
+   URL POR PRODUCTO (para que Google pueda indexar cada uno)
+
+   Cada vez que se abre el Quick View de un producto, se agrega
+   ?producto=CODIGO-slug a la URL con history.pushState (sin recargar
+   la página), y se actualizan <title>, <meta name="description"> y
+   <link rel="canonical">. Al cerrar el modal, se vuelve a la URL base.
+
+   Esto también habilita "deep links": si alguien entra directo a
+   tuweb.com/?producto=123-nombre, el Quick View de ese producto se
+   abre solo al cargar — así Googlebot (que sí ejecuta JS) puede
+   rastrear y renderizar el contenido de esa URL puntual.
+
+   OJO: esto por sí solo no hace que Google "descubra" las URLs de
+   producto. Para que las indexe hace falta que existan enlaces
+   rastreables hacia ellas (o un sitemap.xml con esas URLs). Si querés,
+   te ayudo a generar ese sitemap aparte.
+========================================================= */
+
+let urlBase = null;
+let metaOriginal = null;
+
+function generarSlug(texto){
+    return String(texto || "")
+        .trim()
+        .toLowerCase()
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+}
+
+function actualizarURLProducto(producto){
+
+    if(!producto) return;
+
+    if(!urlBase){
+        urlBase = window.location.href.split("?")[0].split("#")[0];
+    }
+
+    if(!metaOriginal){
+        const metaDescActual = document.querySelector('meta[name="description"]');
+        metaOriginal = {
+            title: document.title,
+            description: metaDescActual ? metaDescActual.getAttribute("content") : ""
+        };
+    }
+
+    const slug = generarSlug(producto.PRODUCTO);
+    const codigo = encodeURIComponent(producto.CODIGO);
+    const nuevaUrl = urlBase + "?producto=" + codigo + (slug ? "-" + slug : "");
+
+    document.title = producto.PRODUCTO + (nombreNegocio ? " | " + nombreNegocio : "");
+
+    let metaDesc = document.querySelector('meta[name="description"]');
+    if(!metaDesc){
+        metaDesc = document.createElement("meta");
+        metaDesc.setAttribute("name", "description");
+        document.head.appendChild(metaDesc);
+    }
+    const descripcionCorta = String(producto.DESCRIPCION || producto.PRODUCTO || "").slice(0, 160);
+    metaDesc.setAttribute("content", descripcionCorta);
+
+    let canonical = document.querySelector('link[rel="canonical"]');
+    if(!canonical){
+        canonical = document.createElement("link");
+        canonical.setAttribute("rel", "canonical");
+        document.head.appendChild(canonical);
+    }
+    canonical.setAttribute("href", nuevaUrl);
+
+    // No usar la misma URL dos veces seguidas en el historial
+    // (por ej. al pasar de un producto a un relacionado)
+    if(window.location.href !== nuevaUrl){
+        history.pushState({ producto: producto.CODIGO }, "", nuevaUrl);
+    }
+}
+
+function restaurarURLBase(){
+
+    if(!urlBase) return;
+
+    if(metaOriginal){
+        document.title = metaOriginal.title;
+        const metaDesc = document.querySelector('meta[name="description"]');
+        if(metaDesc) metaDesc.setAttribute("content", metaOriginal.description);
+    }
+
+    const canonical = document.querySelector('link[rel="canonical"]');
+    if(canonical) canonical.setAttribute("href", urlBase);
+
+    if(window.location.href !== urlBase){
+        history.pushState({}, "", urlBase);
+    }
+}
+
+// Al cerrar el Quick View (X, click afuera, Escape) se vuelve a la URL base
+document.getElementById("quickViewModal").addEventListener("hidden.bs.modal", function(){
+    qvProductoActual = null;
+    restaurarURLBase();
+});
+
+// Botón "atrás"/"adelante" del navegador
+window.addEventListener("popstate", function(){
+
+    const codigoParam = new URLSearchParams(window.location.search).get("producto");
+
+    if(!codigoParam){
+        const modal = bootstrap.Modal.getInstance(document.getElementById("quickViewModal"));
+        if(modal) modal.hide();
+        return;
+    }
+
+    const codigo = codigoParam.split("-")[0];
+    const producto = estado.productos.find(p => String(p.CODIGO) === String(codigo));
+    if(producto) abrirQuickView(producto, false); // false: no volver a pushear la URL
+});
+
+// Deep link inicial: si la página se abre con ?producto=... en la URL,
+// abre ese Quick View automáticamente una vez cargado el catálogo.
+function abrirProductoDesdeURL(){
+
+    const codigoParam = new URLSearchParams(window.location.search).get("producto");
+    if(!codigoParam) return;
+
+    const codigo = codigoParam.split("-")[0];
+    const producto = estado.productos.find(p => String(p.CODIGO) === String(codigo));
+    if(producto) abrirQuickView(producto, false);
+}
 
 document.getElementById("qv-agregar").addEventListener("click", function(){
 
@@ -1954,7 +2087,8 @@ async function descargarCatalogoPDF(){
   await cargarConfigCliente();
   apariencaCargadaPromise = aplicarApariencia();
   actualizarContador();
-  cargarProductos();
+  await cargarProductos();
+  abrirProductoDesdeURL();
 })();
 
 /* =========================================================
