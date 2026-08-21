@@ -6948,7 +6948,6 @@ function _ejecutarImpresion(ventaId, items, total, formaPago, fecha, descuento) 
     enviarBytesAImpresoraUSB(bytes)
       .catch(error => {
         console.error("Error al imprimir por USB:", error);
-        toast("Error al imprimir por USB — se abre el diálogo normal", "error");
         return _imprimirConDialogo(buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, null, cambioData));
       })
       .finally(liberar);
@@ -7230,7 +7229,6 @@ function imprimirCierreCaja() {
     const bytes = buildThermalCierreESCPOS(resumen);
     enviarBytesAImpresoraUSB(bytes).catch(error => {
       console.error("Error al imprimir cierre por USB:", error);
-      toast("Error al imprimir por USB — se abre el diálogo normal", "error");
       _imprimirConDialogo(buildThermalCierreHTML(resumen));
     });
     return;
