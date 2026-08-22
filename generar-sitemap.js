@@ -1,7 +1,21 @@
 /**
- * Genera sitemap.xml con la home + una URL por cada producto del catálogo,
- * usando el mismo formato ?producto=CODIGO-slug que arma app.js al abrir
- * el Quick View.
+ * Genera sitemap.xml con la home + una URL por cada producto del catálogo.
+ *
+ * IMPORTANTE: las URLs de producto apuntan a las páginas HTML estáticas
+ * generadas por scripts/generar-seo.js en /producto/CODIGO-slug/ (NO al
+ * formato ?producto=CODIGO-slug de la SPA). Esas páginas estáticas son
+ * las que de verdad conviene que Google rastree: tienen el contenido
+ * pre-renderizado (title, description, OG, JSON-LD) sin depender de que
+ * el crawler ejecute JavaScript. La SPA (/?producto=...) sigue existiendo
+ * para la navegación normal del usuario, pero no es la URL "canónica" a
+ * indexar — por eso su <link rel="canonical"> (ver app.js) también
+ * apunta a la página estática, para no generar contenido duplicado.
+ *
+ * Este script debe correr DESPUÉS de scripts/generar-seo.js dentro del
+ * mismo workflow (mismo orden de productos = mismos slugs, así que en
+ * la práctica no hace falta que las carpetas ya existan para calcular
+ * las URLs, pero sí conviene mantenerlos como pasos consecutivos del
+ * mismo job para que ambos commiteen juntos).
  *
  * USO:
  *   node generar-sitemap.js
@@ -72,7 +86,7 @@ async function main() {
     codigosVistos.add(codigo);
 
     const slug = generarSlug(p.PRODUCTO);
-    const loc = `${baseSinBarra}/?producto=${encodeURIComponent(codigo)}${slug ? "-" + slug : ""}`;
+    const loc = `${baseSinBarra}/producto/${encodeURIComponent(codigo)}${slug ? "-" + slug : ""}/`;
 
     urls.push(
       `  <url>\n    <loc>${escapeXml(loc)}</loc>\n    <lastmod>${hoy}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`

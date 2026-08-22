@@ -825,30 +825,103 @@ function actualizarURLProducto(producto){
     const slug = generarSlug(producto.PRODUCTO);
     const codigo = encodeURIComponent(producto.CODIGO);
     const nuevaUrl = urlBase + "?producto=" + codigo + (slug ? "-" + slug : "");
-
-    document.title = producto.PRODUCTO + (nombreNegocio ? " | " + nombreNegocio : "");
-
-    let metaDesc = document.querySelector('meta[name="description"]');
-    if(!metaDesc){
-        metaDesc = document.createElement("meta");
-        metaDesc.setAttribute("name", "description");
-        document.head.appendChild(metaDesc);
-    }
+    // El canonical NO apunta a nuevaUrl (la URL con ?producto=... que
+    // ve el usuario en la SPA), sino a la página estática generada por
+    // scripts/generar-seo.js en /producto/CODIGO-slug/ — esa es la que
+    // se lista en sitemap.xml y la que conviene que Google indexe como
+    // "la" URL de este producto, para no generar contenido duplicado
+    // entre las dos versiones.
+    const urlCanonicaEstatica = urlBase + "producto/" + codigo + (slug ? "-" + slug : "") + "/";
+    const tituloProducto = producto.PRODUCTO + (nombreNegocio ? " | " + nombreNegocio : "");
     const descripcionCorta = String(producto.DESCRIPCION || producto.PRODUCTO || "").slice(0, 160);
-    metaDesc.setAttribute("content", descripcionCorta);
+    const imagenProducto = producto.IMAGEN || "";
 
-    let canonical = document.querySelector('link[rel="canonical"]');
-    if(!canonical){
-        canonical = document.createElement("link");
-        canonical.setAttribute("rel", "canonical");
-        document.head.appendChild(canonical);
-    }
-    canonical.setAttribute("href", nuevaUrl);
+    document.title = tituloProducto;
+
+    setMetaTag('meta[name="description"]', "name", "description", descripcionCorta);
+    setMetaTag('link[rel="canonical"]', "rel", "canonical", urlCanonicaEstatica, "href");
+
+    // Open Graph — WhatsApp/Facebook no ejecutan JS, así que esto solo
+    // sirve para cuando Googlebot renderiza la página o para debug
+    // tools (Rich Results Test, Facebook Debugger forzando refetch).
+    // Los links compartidos reales dependen de las páginas estáticas
+    // generadas en /producto/ (ver scripts/generar-seo.js).
+    setMetaTag('meta[property="og:url"]', "property", "og:url", urlCanonicaEstatica);
+    setMetaTag('meta[property="og:title"]', "property", "og:title", producto.PRODUCTO);
+    setMetaTag('meta[property="og:description"]', "property", "og:description", descripcionCorta);
+    if(imagenProducto) setMetaTag('meta[property="og:image"]', "property", "og:image", imagenProducto);
+
+    setMetaTag('meta[name="twitter:title"]', "name", "twitter:title", producto.PRODUCTO);
+    setMetaTag('meta[name="twitter:description"]', "name", "twitter:description", descripcionCorta);
+    if(imagenProducto) setMetaTag('meta[name="twitter:image"]', "name", "twitter:image", imagenProducto);
+
+    actualizarSchemaProducto(producto, urlCanonicaEstatica, descripcionCorta, imagenProducto);
 
     // No usar la misma URL dos veces seguidas en el historial
     // (por ej. al pasar de un producto a un relacionado)
     if(window.location.href !== nuevaUrl){
         history.pushState({ producto: producto.CODIGO }, "", nuevaUrl);
+    }
+}
+
+/**
+ * Crea (si no existe) o actualiza un meta/link tag del <head>.
+ * attrSelector/attrNombre identifican el tag (ej. name="description"),
+ * attrValor es lo que se busca setear (por defecto "content", pero
+ * <link> usa "href").
+ */
+function setMetaTag(selector, attrNombre, attrValorId, contenido, attrContenido){
+    attrContenido = attrContenido || "content";
+    let tag = document.querySelector(selector);
+    if(!tag){
+        tag = document.createElement(selector.startsWith("link") ? "link" : "meta");
+        tag.setAttribute(attrNombre, attrValorId);
+        document.head.appendChild(tag);
+    }
+    tag.setAttribute(attrContenido, contenido);
+}
+
+/**
+ * Reemplaza el JSON-LD de tipo Store (#schema-negocio) por uno de
+ * tipo Product mientras el Quick View de un producto está abierto,
+ * y lo restaura al cerrar (ver restaurarURLBase).
+ */
+let schemaOriginalTexto = null;
+
+function actualizarSchemaProducto(producto, url, descripcion, imagen){
+    const schemaTag = document.getElementById("schema-negocio");
+    if(!schemaTag) return;
+
+    if(schemaOriginalTexto === null){
+        schemaOriginalTexto = schemaTag.textContent;
+    }
+
+    const precioNum = Number(String(producto.PRECIO || "").replace(/[^\d.,-]/g, "").replace(",", "."));
+
+    const schemaProducto = {
+        "@context": "https://schema.org",
+        "@type": "Product",
+        "name": producto.PRODUCTO,
+        "description": descripcion,
+        "sku": String(producto.CODIGO),
+        "image": imagen || undefined,
+        "category": producto.CATEGORIA || undefined,
+        "offers": {
+            "@type": "Offer",
+            "url": url,
+            "priceCurrency": "ARS",
+            "price": isFinite(precioNum) && precioNum > 0 ? precioNum : undefined,
+            "availability": "https://schema.org/InStock"
+        }
+    };
+
+    schemaTag.textContent = JSON.stringify(schemaProducto);
+}
+
+function restaurarSchemaNegocio(){
+    const schemaTag = document.getElementById("schema-negocio");
+    if(schemaTag && schemaOriginalTexto !== null){
+        schemaTag.textContent = schemaOriginalTexto;
     }
 }
 
@@ -860,10 +933,18 @@ function restaurarURLBase(){
         document.title = metaOriginal.title;
         const metaDesc = document.querySelector('meta[name="description"]');
         if(metaDesc) metaDesc.setAttribute("content", metaOriginal.description);
+
+        setMetaTag('meta[property="og:url"]', "property", "og:url", urlBase);
+        setMetaTag('meta[property="og:title"]', "property", "og:title", metaOriginal.title);
+        setMetaTag('meta[property="og:description"]', "property", "og:description", metaOriginal.description);
+        setMetaTag('meta[name="twitter:title"]', "name", "twitter:title", metaOriginal.title);
+        setMetaTag('meta[name="twitter:description"]', "name", "twitter:description", metaOriginal.description);
     }
 
     const canonical = document.querySelector('link[rel="canonical"]');
     if(canonical) canonical.setAttribute("href", urlBase);
+
+    restaurarSchemaNegocio();
 
     if(window.location.href !== urlBase){
         history.pushState({}, "", urlBase);
