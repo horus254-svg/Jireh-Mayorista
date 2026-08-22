@@ -1,0 +1,54 @@
+# Guardar este archivo en: .github/workflows/generar-seo.yml
+# Reemplaza a los dos workflows separados (generar-seo.yml viejo y
+# actualizar-sitemap.yml) — borrá ese último para que no corran
+# duplicado ni pisen commits entre sí.
+#
+# Orden importante: primero se generan las páginas estáticas de
+# producto (/producto/CODIGO-slug/index.html) y DESPUÉS el sitemap,
+# que apunta a esas mismas páginas. Todo en un solo commit.
+#
+# Secrets necesarios (Settings -> Secrets and variables -> Actions):
+#   API_URL   -> la misma URL de CONFIG_NEGOCIO.API_URL que usa config.js
+#   SITE_URL  -> opcional, si no está se usa el valor por defecto de abajo
+
+name: Generar SEO (páginas de producto + sitemap)
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 6 * * *"   # todos los días a las 06:00 UTC (03:00 Argentina)
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  seo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Generar páginas de producto (/producto/CODIGO-slug/)
+        env:
+          API_URL: ${{ secrets.API_URL }}
+          SITE_URL: ${{ secrets.SITE_URL || 'https://horus254-svg.github.io/Jireh-Mayorista' }}
+        run: node scripts/generar-seo.js
+
+      - name: Generar sitemap.xml
+        env:
+          API_URL: ${{ secrets.API_URL }}
+          BASE_URL: ${{ secrets.SITE_URL || 'https://horus254-svg.github.io/Jireh-Mayorista/' }}
+        run: node generar-sitemap.js
+
+      - name: Commitear cambios (si los hay)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add producto sitemap.xml
+          git diff --cached --quiet || git commit -m "chore: regenerar SEO de productos [automático]"
+          git push
