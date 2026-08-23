@@ -9958,6 +9958,31 @@ async function ejecutarMigracionFormaPago() {
 =================================================================== */
 
 let ingresosProductosGlobal = [];
+function onCambioMonedaIngreso() {
+  const moneda = document.getElementById("ipMoneda").value;
+  const wrap = document.getElementById("ipTipoCambioWrap");
+  if (wrap) wrap.style.display = moneda === "USD" ? "" : "none";
+  if (moneda !== "USD") document.getElementById("ipTipoCambio").value = "";
+}
+
+function onCambioOrigenBoleta() {
+  const origen = document.getElementById("ipbOrigen").value;
+  const esDeposito = origen === "DEPOSITO";
+  const proveedorLabel = document.getElementById("ipbProveedorLabel");
+  const proveedorInput = document.getElementById("ipbProveedor");
+  const aviso = document.getElementById("ipbAvisoSinDeuda");
+  const totalLabel = document.getElementById("ipCarritoTotalLabel");
+
+  if (proveedorLabel) proveedorLabel.textContent = esDeposito ? "Sucursal / depósito de origen" : "Proveedor *";
+  if (proveedorInput) proveedorInput.placeholder = esDeposito ? "Ej: Depósito central" : "Nombre del proveedor";
+  if (aviso) aviso.style.display = esDeposito ? "" : "none";
+  if (totalLabel) totalLabel.textContent = esDeposito
+    ? "Total de la boleta (interno — no genera deuda)"
+    : "Total de la boleta (lo que se le debe al proveedor)";
+
+  renderCarritoBoleta();
+}
+
 let ipProductoActualEsNuevo = false;
 
 // Carrito de la boleta que se está armando: cada ítem escaneado se
@@ -10040,6 +10065,17 @@ function buscarProductoParaIngreso() {
     document.getElementById("ipCategoria").value = producto.CATEGORIA || "";
     document.getElementById("ipPrecio").value = "";
     document.getElementById("ipPrecioHint").textContent = "Lo que le pagás al proveedor por esta entrega — con esto se calcula el saldo que se le debe.";
+    const costoUsdRef = Number(producto.COSTO_USD_REF || 0);
+    if (costoUsdRef > 0) {
+      document.getElementById("ipMoneda").value = "USD";
+      onCambioMonedaIngreso();
+      document.getElementById("ipPrecio").value = costoUsdRef;
+      document.getElementById("ipPrecioHint").textContent =
+        `Último costo cargado en USD: US$${costoUsdRef.toLocaleString("es-AR")} — corregilo si cambió, o el tipo de cambio.`;
+    } else {
+      document.getElementById("ipMoneda").value = "ARS";
+      onCambioMonedaIngreso();
+    }
     document.getElementById("ipPrecioVenta").value = Number(producto.PRECIO || 0);
     document.getElementById("ipPrecioVentaHint").textContent = "Dejalo así si no cambió, o corregilo si el precio al público cambió.";
     if (estado) { estado.textContent = "✓ Producto encontrado: " + (producto.PRODUCTO || ""); estado.style.color = "var(--green-600, green)"; }
@@ -10052,6 +10088,8 @@ function buscarProductoParaIngreso() {
     document.getElementById("ipNombre").readOnly = false;
     document.getElementById("ipCategoria").value = "";
     document.getElementById("ipPrecio").value = "";
+    document.getElementById("ipMoneda").value = "ARS";
+    onCambioMonedaIngreso();
     document.getElementById("ipPrecioHint").textContent = "Lo que le pagás al proveedor por esta entrega.";
     document.getElementById("ipPrecioVenta").value = "";
     document.getElementById("ipPrecioVentaHint").textContent = "Precio de venta al público con el que se va a publicar en el POS y en la página. Si lo dejás vacío, se usa el precio de ingreso.";
@@ -10079,6 +10117,9 @@ function cancelarIngresoProducto() {
   document.getElementById("ipCodigoScan").value = "";
   document.getElementById("ipPrecio").value = "";
   document.getElementById("ipPrecioVenta").value = "";
+  document.getElementById("ipMoneda").value = "ARS";
+  document.getElementById("ipTipoCambio").value = "";
+  document.getElementById("ipTipoCambioWrap").style.display = "none";
   document.getElementById("ipEstadoBusqueda").textContent = "";
   document.getElementById("ipCodigoScan").focus();
 }
@@ -10099,9 +10140,12 @@ function poblarDatalistProveedoresIngreso() {
 
 /** Agrega el producto del formulario al carrito de la boleta (todavía no lo manda al backend) */
 function agregarItemABoleta() {
+  const origen = (document.getElementById("ipbOrigen")?.value) || "PROVEEDOR";
   const proveedor = document.getElementById("ipbProveedor").value.trim();
   if (!proveedor) {
-    toast("Completá el proveedor de la boleta (arriba) antes de agregar productos", "error");
+    toast(origen === "DEPOSITO"
+      ? "Completá de qué sucursal/depósito viene la mercadería antes de agregar productos"
+      : "Completá el proveedor de la boleta (arriba) antes de agregar productos", "error");
     document.getElementById("ipbProveedor").focus();
     return;
   }
@@ -10109,7 +10153,9 @@ function agregarItemABoleta() {
   const codigo = document.getElementById("ipCodigo").value.trim();
   const nombre = document.getElementById("ipNombre").value.trim();
   const categoria = document.getElementById("ipCategoria").value.trim();
+  const moneda = document.getElementById("ipMoneda").value === "USD" ? "USD" : "ARS";
   const precio = Number(document.getElementById("ipPrecio").value || 0);
+  const tipoCambio = Number(document.getElementById("ipTipoCambio").value || 0);
   const precioVentaInput = document.getElementById("ipPrecioVenta").value;
   const precioVenta = precioVentaInput !== "" ? Number(precioVentaInput) : null;
   const cantidad = Number(document.getElementById("ipCantidad").value || 0);
@@ -10126,9 +10172,17 @@ function agregarItemABoleta() {
     toast("Ingresá el precio de ingreso (costo) — se usa para calcular el saldo al proveedor", "error");
     return;
   }
+  if (moneda === "USD" && (!tipoCambio || tipoCambio <= 0)) {
+    toast("Ingresá el tipo de cambio para convertir el precio en dólares a pesos", "error");
+    document.getElementById("ipTipoCambio").focus();
+    return;
+  }
+
+  const precioARS = moneda === "USD" ? precio * tipoCambio : precio;
 
   ipCarritoBoleta.push({
-    codigo, producto: nombre || codigo, categoria, precio,
+    codigo, producto: nombre || codigo, categoria,
+    moneda, precio, tipoCambio: moneda === "USD" ? tipoCambio : null, precioARS,
     precioVenta: precioVenta !== null && !isNaN(precioVenta) ? precioVenta : null,
     cantidad,
     esNuevo: ipProductoActualEsNuevo
@@ -10152,22 +10206,25 @@ function renderCarritoBoleta() {
 
   let total = 0;
   tbody.innerHTML = ipCarritoBoleta.map((it, idx) => {
-    // El subtotal de la boleta (lo que se le debe al proveedor) se
-    // calcula con el precio de INGRESO (costo), nunca con el de venta.
-    const subtotal = it.precio * it.cantidad;
-    total += subtotal;
+    // El subtotal (en pesos) se calcula con el precio de INGRESO (costo),
+    // convertido a ARS si el producto se cargó en dólares.
+    const subtotalARS = it.precioARS * it.cantidad;
+    total += subtotalARS;
     const precioVentaTexto = (it.precioVenta !== null && it.precioVenta !== undefined)
       ? "$" + Number(it.precioVenta).toLocaleString("es-AR")
       : "—";
+    const precioIngresoTexto = it.moneda === "USD"
+      ? "US$" + Number(it.precio).toLocaleString("es-AR") + ` (TC ${it.tipoCambio})`
+      : "$" + Number(it.precio).toLocaleString("es-AR");
     return `
       <tr>
         <td class="mono">${escapeHtml(it.codigo || "—")}</td>
         <td>${escapeHtml(it.producto)} ${it.esNuevo ? '<span class="badge bg-warning text-dark">nuevo</span>' : ""}</td>
         <td>${escapeHtml(it.categoria || "—")}</td>
         <td class="money">${Number(it.cantidad).toLocaleString("es-AR")}</td>
-        <td class="money">$${Number(it.precio).toLocaleString("es-AR")}</td>
+        <td class="money">${precioIngresoTexto}</td>
         <td class="money">${precioVentaTexto}</td>
-        <td class="money">$${subtotal.toLocaleString("es-AR")}</td>
+        <td class="money">$${subtotalARS.toLocaleString("es-AR")}</td>
         <td><button class="btn btn-outline-danger btn-sm" onclick="quitarItemCarrito(${idx})">✕</button></td>
       </tr>`;
   }).join("");
@@ -10188,6 +10245,8 @@ function vaciarCarritoBoleta() {
 
 /** Manda TODA la boleta (cabecera + todos los productos del carrito) al backend en un solo documento */
 async function guardarBoletaCompleta() {
+  const origen = (document.getElementById("ipbOrigen")?.value) || "PROVEEDOR";
+  const sinDeuda = origen === "DEPOSITO";
   const proveedor = document.getElementById("ipbProveedor").value.trim();
   const proveedorContacto = document.getElementById("ipbProveedorContacto").value.trim();
   const numeroBoleta = document.getElementById("ipbNumeroBoleta").value.trim();
@@ -10195,7 +10254,7 @@ async function guardarBoletaCompleta() {
   const fecha = document.getElementById("ipbFecha").value || _hoyISO();
 
   if (!proveedor) {
-    toast("Ingresá el proveedor de esta boleta", "error");
+    toast(sinDeuda ? "Ingresá de qué sucursal/depósito viene la mercadería" : "Ingresá el proveedor de esta boleta", "error");
     return;
   }
   if (ipCarritoBoleta.length === 0) {
@@ -10216,9 +10275,11 @@ async function guardarBoletaCompleta() {
         rol: obtenerRolActual(),
         usuario: (sessionStorage.getItem("nombreUsuario") || sessionStorage.getItem("vendedor") || "ADMIN"),
         proveedor, proveedorContacto, numeroBoleta, observaciones, fecha,
+        origen, sinDeuda,
         items: ipCarritoBoleta.map(it => ({
           codigo: it.codigo, producto: it.producto, categoria: it.categoria,
-          precio: it.precio, precioVenta: it.precioVenta, cantidad: it.cantidad
+          moneda: it.moneda, precio: it.precio, tipoCambio: it.tipoCambio, precioARS: it.precioARS,
+          precioVenta: it.precioVenta, cantidad: it.cantidad
         }))
       })
     });
@@ -10229,11 +10290,15 @@ async function guardarBoletaCompleta() {
       return;
     }
 
-    toast(`Boleta guardada — ${ipCarritoBoleta.length} producto(s), total $${Number(data.totalBoleta || 0).toLocaleString("es-AR")}`, "success");
+    toast(sinDeuda
+      ? `Boleta guardada — ${ipCarritoBoleta.length} producto(s), ingreso interno sin deuda`
+      : `Boleta guardada — ${ipCarritoBoleta.length} producto(s), total $${Number(data.totalBoleta || 0).toLocaleString("es-AR")}`, "success");
 
     try { localStorage.removeItem("vpos_cache_productosAdmin"); } catch(e) {}
     ipCarritoBoleta = [];
     renderCarritoBoleta();
+    document.getElementById("ipbOrigen").value = "PROVEEDOR";
+    onCambioOrigenBoleta();
     document.getElementById("ipbNumeroBoleta").value = "";
     document.getElementById("ipbObservaciones").value = "";
     await cargarProductos();
@@ -10264,6 +10329,7 @@ async function cargarHistorialIngresos() {
 }
 
 function _badgeEstadoBoleta(estado) {
+  if (estado === "SIN_DEUDA") return `<span class="badge bg-info text-dark">Interno · sin deuda</span>`;
   if (estado === "PAGADA") return `<span class="badge bg-success">Pagada</span>`;
   if (estado === "PARCIAL") return `<span class="badge bg-warning text-dark">Pago parcial</span>`;
   return `<span class="badge bg-danger">Pendiente</span>`;
