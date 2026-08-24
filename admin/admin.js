@@ -8690,7 +8690,12 @@ async function cargarMovimientosCajaHoy() {
   if (le) le.textContent = `Egresos — ${fechaLabel}`;
 
   // Caché 60 segundos por fecha
-  const CACHE_KEY = "vpos_cache_movimientos_" + fecha;
+  // v2: se cambió el nombre de la clave para descartar cualquier caché
+  // vieja guardada en localStorage antes de este fix (sobre todo en
+  // Electron, donde localStorage persiste entre sesiones y podía
+  // quedar con movimientos sin MOVIMIENTO_ID armado correctamente,
+  // causando el error "No se encontró el movimiento 'undefined'").
+  const CACHE_KEY = "vpos_cache_movimientos_v2_" + fecha;
   try {
     const raw = localStorage.getItem(CACHE_KEY);
     if (raw) {
@@ -8763,7 +8768,7 @@ function renderTablaMovimientosCaja(lista) {
         ${esIngreso ? "+" : "-"}$${Number(m.MONTO || 0).toLocaleString("es-AR")}
       </td>
       <td>${escapeHtml(m.VENDEDOR || "—")}</td>
-      <td>${esVendedorRol ? "" : `<button class="btn btn-outline-danger btn-sm"
+      <td>${(esVendedorRol || !m.MOVIMIENTO_ID) ? "" : `<button class="btn btn-outline-danger btn-sm"
         onclick="confirmarEliminarMovimiento('${escapeHtml(m.MOVIMIENTO_ID)}', '${escapeHtml(m.MOTIVO || "")}')">✕</button>`}</td>
     </tr>`;
   });
@@ -8811,7 +8816,8 @@ async function eliminarMovimientoCajaForm(movimientoId) {
 
     toast("Movimiento eliminado", "success");
     const fechaMov = document.getElementById("mcFechaSelector")?.value || new Date().toISOString().slice(0, 10);
-    try { localStorage.removeItem("vpos_cache_movimientos_" + fechaMov); } catch(e) {}
+    try { localStorage.removeItem("vpos_cache_movimientos_v2_" + fechaMov); } catch(e) {}
+    try { localStorage.removeItem("vpos_cache_movimientos_" + fechaMov); } catch(e) {} // limpieza de clave vieja
     try { localStorage.removeItem("vpos_cache_cierre_" + fechaMov); } catch(e) {}
     try { localStorage.removeItem("vpos_cache_cierre_ayer"); } catch(e) {}
     cargarMovimientosCajaHoy();
