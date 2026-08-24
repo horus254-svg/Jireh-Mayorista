@@ -10328,6 +10328,16 @@ async function cargarHistorialIngresos() {
   }
 }
 
+/** Da formato compacto a un monto que puede tener parte en pesos y parte en dólares — ej: "$5.000 + US$120" — omitiendo la parte que esté en $0 */
+function _formatoMontoBiMoneda(ars, usd) {
+  const ars_ = Number(ars || 0);
+  const usd_ = Number(usd || 0);
+  const partes = [];
+  if (ars_ || !usd_) partes.push("$" + ars_.toLocaleString("es-AR"));
+  if (usd_) partes.push("US$" + usd_.toLocaleString("es-AR"));
+  return partes.join(" + ");
+}
+
 function _badgeEstadoBoleta(estado) {
   if (estado === "SIN_DEUDA") return `<span class="badge bg-info text-dark">Interno · sin deuda</span>`;
   if (estado === "PAGADA") return `<span class="badge bg-success">Pagada</span>`;
@@ -10368,9 +10378,9 @@ function filtrarHistorialIngresos() {
       <td class="mono">${escapeHtml(i.NUMERO_BOLETA || "—")}</td>
       <td>${escapeHtml(i.PROVEEDOR || "—")}</td>
       <td>${escapeHtml(i.PROVEEDOR_CONTACTO || "—")}</td>
-      <td class="money">$${Number(i.TOTAL || 0).toLocaleString("es-AR")}</td>
-      <td class="money" style="color:var(--green-600);">$${Number(i.PAGADO || 0).toLocaleString("es-AR")}</td>
-      <td class="money" style="color:var(--red-500);">$${Number(i.SALDO || 0).toLocaleString("es-AR")}</td>
+      <td class="money">${_formatoMontoBiMoneda(i.TOTAL_ARS, i.TOTAL_USD)}</td>
+      <td class="money" style="color:var(--green-600);">${_formatoMontoBiMoneda(i.PAGADO_ARS, i.PAGADO_USD)}</td>
+      <td class="money" style="color:var(--red-500);">${_formatoMontoBiMoneda(i.SALDO_ARS, i.SALDO_USD)}</td>
       <td>${_badgeEstadoBoleta(i.ESTADO)}</td>
       <td><button class="btn btn-outline-primary btn-sm" onclick="abrirModalDetalleBoleta('${i.BOLETA_ID}')">Ver / Pagar</button></td>
     </tr>`).join("");
@@ -10391,6 +10401,8 @@ async function abrirModalDetalleBoleta(boletaId) {
   document.getElementById("pagoProveedorMonto").value = "";
   document.getElementById("pagoProveedorObservaciones").value = "";
   document.getElementById("pagoProveedorFormaPago").value = "EFECTIVO";
+  const selMoneda = document.getElementById("pagoProveedorMoneda");
+  if (selMoneda) selMoneda.value = "ARS";
   const btnPago = document.getElementById("btnRegistrarPagoProveedor");
   if (btnPago) { btnPago.disabled = false; btnPago.textContent = "💾 Pagar"; }
   boletaProveedorIdActual = boletaId;
@@ -10408,9 +10420,12 @@ async function abrirModalDetalleBoleta(boletaId) {
     detalleBoletaDatosActual = { boleta: b, items: data.items || [], pagos: data.pagos || [] };
     document.getElementById("detalleBoletaTitulo").textContent =
       `${b.PROVEEDOR}${b.NUMERO_BOLETA ? " — Boleta " + b.NUMERO_BOLETA : ""} (${b.FECHA})`;
-    document.getElementById("detalleBoletaTotal").textContent = "$" + Number(b.TOTAL || 0).toLocaleString("es-AR");
-    document.getElementById("detalleBoletaPagado").textContent = "$" + Number(b.PAGADO || 0).toLocaleString("es-AR");
-    document.getElementById("detalleBoletaSaldo").textContent = "$" + Number(b.SALDO || 0).toLocaleString("es-AR");
+    document.getElementById("detalleBoletaTotal").textContent = "$" + Number(b.TOTAL_ARS || 0).toLocaleString("es-AR");
+    document.getElementById("detalleBoletaPagado").textContent = "$" + Number(b.PAGADO_ARS || 0).toLocaleString("es-AR");
+    document.getElementById("detalleBoletaSaldo").textContent = "$" + Number(b.SALDO_ARS || 0).toLocaleString("es-AR");
+    document.getElementById("detalleBoletaTotalUsd").textContent = b.TOTAL_USD > 0 ? "US$" + Number(b.TOTAL_USD).toLocaleString("es-AR") : "";
+    document.getElementById("detalleBoletaPagadoUsd").textContent = b.PAGADO_USD > 0 ? "US$" + Number(b.PAGADO_USD).toLocaleString("es-AR") : "";
+    document.getElementById("detalleBoletaSaldoUsd").textContent = b.SALDO_USD > 0 ? "US$" + Number(b.SALDO_USD).toLocaleString("es-AR") : "";
 
     const datosWrap = document.getElementById("detalleBoletaDatos");
     if (datosWrap) {
@@ -10428,7 +10443,11 @@ async function abrirModalDetalleBoleta(boletaId) {
     }
 
     const formWrap = document.getElementById("cardFormularioPagoProveedor");
-    if (formWrap) formWrap.style.display = b.SALDO > 0 ? "" : "none";
+    if (formWrap) formWrap.style.display = (b.SALDO_ARS > 0 || b.SALDO_USD > 0) ? "" : "none";
+    // Si la boleta solo tiene deuda en una de las dos monedas, se arranca
+    // con esa moneda seleccionada para no confundir con un saldo en $0.
+    if (selMoneda) selMoneda.value = (b.SALDO_ARS <= 0 && b.SALDO_USD > 0) ? "USD" : "ARS";
+    onCambioMonedaPagoProveedor();
 
     const items = data.items || [];
     const resumenEl = document.getElementById("detalleBoletaResumenItems");
@@ -10464,17 +10483,32 @@ async function abrirModalDetalleBoleta(boletaId) {
       ? pagos.map(p => `
         <tr>
           <td>${escapeHtml(p.FECHA || "—")}</td>
-          <td class="money">$${Number(p.MONTO || 0).toLocaleString("es-AR")}</td>
+          <td class="money">${(p.MONEDA === "USD" ? "US$" : "$")}${Number(p.MONTO || 0).toLocaleString("es-AR")}</td>
+          <td>${escapeHtml(p.MONEDA || "ARS")}</td>
           <td>${escapeHtml(p.FORMA_PAGO || "—")}</td>
           <td>${escapeHtml(p.OBSERVACIONES || "—")}</td>
         </tr>`).join("")
-      : `<tr><td colspan="4" class="text-center text-muted py-2">Todavía no hay pagos registrados</td></tr>`;
+      : `<tr><td colspan="5" class="text-center text-muted py-2">Todavía no hay pagos registrados</td></tr>`;
 
   } catch (error) {
     console.error("Error al cargar el detalle de la boleta:", error);
     toast("Error de conexión al cargar la boleta", "error");
     cerrarModalDetalleBoleta();
   }
+}
+
+/** Al cambiar la moneda del formulario de pago, actualiza el hint con el saldo pendiente disponible en esa moneda */
+function onCambioMonedaPagoProveedor() {
+  const sel = document.getElementById("pagoProveedorMoneda");
+  const hint = document.getElementById("pagoProveedorSaldoHint");
+  const montoInput = document.getElementById("pagoProveedorMonto");
+  if (!sel || !hint || !detalleBoletaDatosActual) return;
+  const b = detalleBoletaDatosActual.boleta;
+  const esUsd = sel.value === "USD";
+  const saldo = esUsd ? Number(b.SALDO_USD || 0) : Number(b.SALDO_ARS || 0);
+  const simbolo = esUsd ? "US$" : "$";
+  hint.textContent = `Saldo pendiente en ${esUsd ? "dólares" : "pesos"}: ${simbolo}${saldo.toLocaleString("es-AR")}`;
+  if (montoInput) montoInput.max = saldo > 0 ? saldo : "";
 }
 
 /** Arma e imprime (A4) el comprobante de la boleta de proveedor que está abierta en el modal de detalle */
@@ -10506,11 +10540,12 @@ function imprimirBoletaProveedor() {
     ? pagos.map(p => `
       <tr>
         <td style="padding:5px 6px; border-bottom:1px solid #e2e8f0;">${escapeHtml(p.FECHA || "—")}</td>
-        <td style="padding:5px 6px; border-bottom:1px solid #e2e8f0; text-align:right;">$${Number(p.MONTO || 0).toLocaleString("es-AR")}</td>
+        <td style="padding:5px 6px; border-bottom:1px solid #e2e8f0; text-align:right;">${(p.MONEDA === "USD" ? "US$" : "$")}${Number(p.MONTO || 0).toLocaleString("es-AR")}</td>
+        <td style="padding:5px 6px; border-bottom:1px solid #e2e8f0;">${escapeHtml(p.MONEDA || "ARS")}</td>
         <td style="padding:5px 6px; border-bottom:1px solid #e2e8f0;">${escapeHtml(p.FORMA_PAGO || "—")}</td>
         <td style="padding:5px 6px; border-bottom:1px solid #e2e8f0;">${escapeHtml(p.OBSERVACIONES || "—")}</td>
       </tr>`).join("")
-    : `<tr><td colspan="4" style="padding:8px; text-align:center; color:#64748b;">Sin pagos registrados</td></tr>`;
+    : `<tr><td colspan="5" style="padding:8px; text-align:center; color:#64748b;">Sin pagos registrados</td></tr>`;
 
   const totalUnidades = items.reduce((acc, it) => acc + (Number(it.CANTIDAD) || 0), 0);
 
@@ -10561,9 +10596,9 @@ function imprimirBoletaProveedor() {
       <div style="text-align:right; color:#64748b; margin-bottom:16px;">${items.length} producto${items.length === 1 ? "" : "s"} · ${totalUnidades.toLocaleString("es-AR")} unidad${totalUnidades === 1 ? "" : "es"}</div>
 
       <div style="display:flex; justify-content:flex-end; gap:24px; border-top:2px solid #1e293b; padding-top:10px; margin-bottom:18px;">
-        <div style="text-align:right;"><div style="color:#64748b;">Total</div><div style="font-size:15px; font-weight:800;">$${Number(b.TOTAL || 0).toLocaleString("es-AR")}</div></div>
-        <div style="text-align:right;"><div style="color:#64748b;">Pagado</div><div style="font-size:15px; font-weight:800; color:#16a34a;">$${Number(b.PAGADO || 0).toLocaleString("es-AR")}</div></div>
-        <div style="text-align:right;"><div style="color:#64748b;">Saldo</div><div style="font-size:15px; font-weight:800; color:#dc2626;">$${Number(b.SALDO || 0).toLocaleString("es-AR")}</div></div>
+        <div style="text-align:right;"><div style="color:#64748b;">Total</div><div style="font-size:15px; font-weight:800;">${_formatoMontoBiMoneda(b.TOTAL_ARS, b.TOTAL_USD)}</div></div>
+        <div style="text-align:right;"><div style="color:#64748b;">Pagado</div><div style="font-size:15px; font-weight:800; color:#16a34a;">${_formatoMontoBiMoneda(b.PAGADO_ARS, b.PAGADO_USD)}</div></div>
+        <div style="text-align:right;"><div style="color:#64748b;">Saldo</div><div style="font-size:15px; font-weight:800; color:#dc2626;">${_formatoMontoBiMoneda(b.SALDO_ARS, b.SALDO_USD)}</div></div>
       </div>
 
       <div style="font-weight:700; margin-bottom:6px;">Pagos registrados</div>
@@ -10572,6 +10607,7 @@ function imprimirBoletaProveedor() {
           <tr style="background:#f1f5f9;">
             <th style="padding:6px; text-align:left;">Fecha</th>
             <th style="padding:6px; text-align:right;">Monto</th>
+            <th style="padding:6px; text-align:left;">Moneda</th>
             <th style="padding:6px; text-align:left;">Forma de pago</th>
             <th style="padding:6px; text-align:left;">Observaciones</th>
           </tr>
@@ -10622,6 +10658,7 @@ async function registrarPagoProveedorForm() {
         rol: obtenerRolActual(),
         boletaId: boletaProveedorIdActual,
         monto,
+        moneda: document.getElementById("pagoProveedorMoneda")?.value || "ARS",
         formaPago: document.getElementById("pagoProveedorFormaPago").value,
         observaciones: document.getElementById("pagoProveedorObservaciones").value.trim(),
         usuario: (sessionStorage.getItem("nombreUsuario") || sessionStorage.getItem("vendedor") || "ADMIN")
@@ -10714,8 +10751,9 @@ function renderTablaProveedores(lista) {
   }
 
   cont.innerHTML = lista.map(p => {
-    const saldo = Number(p.SALDO || 0);
-    const tieneSaldo = saldo > 0.01;
+    const saldoArs = Number(p.SALDO_ARS || 0);
+    const saldoUsd = Number(p.SALDO_USD || 0);
+    const tieneSaldo = saldoArs > 0.01 || saldoUsd > 0.01;
     const bordeClase = tieneSaldo ? "cliente-card-deuda" : "cliente-card-credito";
 
     return `
@@ -10729,12 +10767,12 @@ function renderTablaProveedores(lista) {
           </div>
         </div>
         <div class="text-end" style="flex-shrink:0;">
-          <div class="pedido-card-total" style="font-size:15px;">$${Number(p.TOTAL || 0).toLocaleString("es-AR")}</div>
+          <div class="pedido-card-total" style="font-size:15px;">${_formatoMontoBiMoneda(p.TOTAL_ARS, p.TOTAL_USD)}</div>
           <div style="font-size:11px;color:var(--slate-500);margin-top:1px;">${p.BOLETAS || 0} boleta${p.BOLETAS !== 1 ? "s" : ""}${p.BOLETAS_PENDIENTES ? ` · ${p.BOLETAS_PENDIENTES} pendiente${p.BOLETAS_PENDIENTES !== 1 ? "s" : ""}` : ""}</div>
           <div class="mt-1" style="font-size:12px;">
             <span class="cliente-dato-label">Saldo</span>
             ${tieneSaldo
-              ? `<span style="color:var(--red-500);font-weight:700;">$${saldo.toLocaleString("es-AR")}</span>`
+              ? `<span style="color:var(--red-500);font-weight:700;">${_formatoMontoBiMoneda(saldoArs, saldoUsd)}</span>`
               : `<span class="text-muted" style="font-size:12px;">Sin deuda</span>`}
           </div>
         </div>
@@ -10757,7 +10795,7 @@ function filtrarProveedores() {
     filtrados = filtrados.filter(p => String(p.PROVEEDOR || "").toLowerCase().includes(termino));
   }
   if (soloConSaldo && soloConSaldo.checked) {
-    filtrados = filtrados.filter(p => Number(p.SALDO || 0) > 0.01);
+    filtrados = filtrados.filter(p => Number(p.SALDO_ARS || 0) > 0.01 || Number(p.SALDO_USD || 0) > 0.01);
   }
 
   renderTablaProveedores(filtrados);
@@ -10774,22 +10812,28 @@ async function abrirModalBoletasProveedor(proveedor) {
     const data = await res.json();
     const boletas = data.boletas || [];
 
-    const total = boletas.reduce((acc, b) => acc + Number(b.TOTAL || 0), 0);
-    const pagado = boletas.reduce((acc, b) => acc + Number(b.PAGADO || 0), 0);
-    const saldo = boletas.reduce((acc, b) => acc + Number(b.SALDO || 0), 0);
+    const totalArs = boletas.reduce((acc, b) => acc + Number(b.TOTAL_ARS || 0), 0);
+    const totalUsd = boletas.reduce((acc, b) => acc + Number(b.TOTAL_USD || 0), 0);
+    const pagadoArs = boletas.reduce((acc, b) => acc + Number(b.PAGADO_ARS || 0), 0);
+    const pagadoUsd = boletas.reduce((acc, b) => acc + Number(b.PAGADO_USD || 0), 0);
+    const saldoArs = boletas.reduce((acc, b) => acc + Number(b.SALDO_ARS || 0), 0);
+    const saldoUsd = boletas.reduce((acc, b) => acc + Number(b.SALDO_USD || 0), 0);
 
-    document.getElementById("boletasProveedorTotal").textContent = "$" + total.toLocaleString("es-AR");
-    document.getElementById("boletasProveedorPagado").textContent = "$" + pagado.toLocaleString("es-AR");
-    document.getElementById("boletasProveedorSaldo").textContent = "$" + saldo.toLocaleString("es-AR");
+    document.getElementById("boletasProveedorTotal").textContent = "$" + totalArs.toLocaleString("es-AR");
+    document.getElementById("boletasProveedorPagado").textContent = "$" + pagadoArs.toLocaleString("es-AR");
+    document.getElementById("boletasProveedorSaldo").textContent = "$" + saldoArs.toLocaleString("es-AR");
+    document.getElementById("boletasProveedorTotalUsd").textContent = totalUsd > 0 ? "US$" + totalUsd.toLocaleString("es-AR") : "";
+    document.getElementById("boletasProveedorPagadoUsd").textContent = pagadoUsd > 0 ? "US$" + pagadoUsd.toLocaleString("es-AR") : "";
+    document.getElementById("boletasProveedorSaldoUsd").textContent = saldoUsd > 0 ? "US$" + saldoUsd.toLocaleString("es-AR") : "";
 
     document.getElementById("boletasProveedorBody").innerHTML = boletas.length
       ? boletas.map(b => `
         <tr>
           <td>${escapeHtml(b.FECHA || "—")}</td>
           <td class="mono">${escapeHtml(b.NUMERO_BOLETA || "—")}</td>
-          <td class="money">$${Number(b.TOTAL || 0).toLocaleString("es-AR")}</td>
-          <td class="money" style="color:var(--green-600);">$${Number(b.PAGADO || 0).toLocaleString("es-AR")}</td>
-          <td class="money" style="color:var(--red-500);">$${Number(b.SALDO || 0).toLocaleString("es-AR")}</td>
+          <td class="money">${_formatoMontoBiMoneda(b.TOTAL_ARS, b.TOTAL_USD)}</td>
+          <td class="money" style="color:var(--green-600);">${_formatoMontoBiMoneda(b.PAGADO_ARS, b.PAGADO_USD)}</td>
+          <td class="money" style="color:var(--red-500);">${_formatoMontoBiMoneda(b.SALDO_ARS, b.SALDO_USD)}</td>
           <td>${_badgeEstadoBoleta(b.ESTADO)}</td>
           <td><button class="btn btn-outline-primary btn-sm" onclick="abrirModalDetalleBoleta('${b.BOLETA_ID}')">Ver / Pagar</button></td>
         </tr>`).join("")

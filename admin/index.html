@@ -806,19 +806,22 @@
           <div class="col-4">
             <div class="card p-2 text-center" style="background:var(--slate-50);">
               <div class="text-muted" style="font-size:10.5px;">Total</div>
-              <div style="font-size:15px; font-weight:700;" id="detalleBoletaTotal">$0</div>
+              <div style="font-size:14px; font-weight:700;" id="detalleBoletaTotal">$0</div>
+              <div style="font-size:12px; font-weight:600; color:#0369a1;" id="detalleBoletaTotalUsd"></div>
             </div>
           </div>
           <div class="col-4">
             <div class="card p-2 text-center" style="background:var(--slate-50);">
               <div class="text-muted" style="font-size:10.5px;">Pagado</div>
-              <div style="font-size:15px; font-weight:700; color:var(--green-600);" id="detalleBoletaPagado">$0</div>
+              <div style="font-size:14px; font-weight:700; color:var(--green-600);" id="detalleBoletaPagado">$0</div>
+              <div style="font-size:12px; font-weight:600; color:var(--green-600);" id="detalleBoletaPagadoUsd"></div>
             </div>
           </div>
           <div class="col-4">
             <div class="card p-2 text-center" style="background:var(--slate-50);">
               <div class="text-muted" style="font-size:10.5px;">Saldo pendiente</div>
-              <div style="font-size:15px; font-weight:700; color:var(--red-500);" id="detalleBoletaSaldo">$0</div>
+              <div style="font-size:14px; font-weight:700; color:var(--red-500);" id="detalleBoletaSaldo">$0</div>
+              <div style="font-size:12px; font-weight:600; color:var(--red-500);" id="detalleBoletaSaldoUsd"></div>
             </div>
           </div>
         </div>
@@ -828,7 +831,14 @@
         <div class="card p-3 mb-3" id="cardFormularioPagoProveedor" style="background:var(--slate-50);">
           <h6 style="font-size:13px;" class="mb-2">Registrar pago a proveedor</h6>
           <div class="row g-2">
-            <div class="col-md-3">
+            <div class="col-md-2">
+              <label class="form-label" style="font-size:12px;">Moneda</label>
+              <select class="form-select form-select-sm" id="pagoProveedorMoneda" onchange="onCambioMonedaPagoProveedor()">
+                <option value="ARS">Pesos (ARS)</option>
+                <option value="USD">Dólares (USD)</option>
+              </select>
+            </div>
+            <div class="col-md-2">
               <label class="form-label" style="font-size:12px;">Monto a pagar</label>
               <input type="number" class="form-control form-control-sm" id="pagoProveedorMonto" placeholder="0">
             </div>
@@ -840,7 +850,7 @@
                 <option value="TARJETA">Tarjeta</option>
               </select>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
               <label class="form-label" style="font-size:12px;">Observaciones</label>
               <input type="text" class="form-control form-control-sm" id="pagoProveedorObservaciones" placeholder="opcional">
             </div>
@@ -848,6 +858,7 @@
               <button class="btn btn-success btn-sm w-100" id="btnRegistrarPagoProveedor" onclick="registrarPagoProveedorForm()">💾 Pagar</button>
             </div>
           </div>
+          <div class="form-text mt-1" style="font-size:11px;" id="pagoProveedorSaldoHint"></div>
         </div>
 
         <div class="d-flex justify-content-between align-items-center mb-2">
@@ -864,8 +875,8 @@
         <h6 style="font-size:13px;" class="mb-2">Pagos registrados</h6>
         <div class="table-responsive" style="max-height:180px; overflow-y:auto;">
           <table class="table table-sm table-striped">
-            <thead><tr><th>Fecha</th><th>Monto</th><th>Forma de pago</th><th>Obs.</th></tr></thead>
-            <tbody id="detalleBoletaPagosBody"><tr><td colspan="4" class="text-center text-muted py-2">Todavía no hay pagos registrados</td></tr></tbody>
+            <thead><tr><th>Fecha</th><th>Monto</th><th>Moneda</th><th>Forma de pago</th><th>Obs.</th></tr></thead>
+            <tbody id="detalleBoletaPagosBody"><tr><td colspan="5" class="text-center text-muted py-2">Todavía no hay pagos registrados</td></tr></tbody>
           </table>
         </div>
 
@@ -910,19 +921,22 @@
           <div class="col-4">
             <div class="card p-2 text-center" style="background:var(--slate-50);">
               <div class="text-muted" style="font-size:10.5px;">Total comprado</div>
-              <div style="font-size:15px; font-weight:700;" id="boletasProveedorTotal">$0</div>
+              <div style="font-size:14px; font-weight:700;" id="boletasProveedorTotal">$0</div>
+              <div style="font-size:12px; font-weight:600; color:#0369a1;" id="boletasProveedorTotalUsd"></div>
             </div>
           </div>
           <div class="col-4">
             <div class="card p-2 text-center" style="background:var(--slate-50);">
               <div class="text-muted" style="font-size:10.5px;">Pagado</div>
-              <div style="font-size:15px; font-weight:700; color:var(--green-600);" id="boletasProveedorPagado">$0</div>
+              <div style="font-size:14px; font-weight:700; color:var(--green-600);" id="boletasProveedorPagado">$0</div>
+              <div style="font-size:12px; font-weight:600; color:var(--green-600);" id="boletasProveedorPagadoUsd"></div>
             </div>
           </div>
           <div class="col-4">
             <div class="card p-2 text-center" style="background:var(--slate-50);">
               <div class="text-muted" style="font-size:10.5px;">Saldo pendiente</div>
-              <div style="font-size:15px; font-weight:700; color:var(--red-500);" id="boletasProveedorSaldo">$0</div>
+              <div style="font-size:14px; font-weight:700; color:var(--red-500);" id="boletasProveedorSaldo">$0</div>
+              <div style="font-size:12px; font-weight:600; color:var(--red-500);" id="boletasProveedorSaldoUsd"></div>
             </div>
           </div>
         </div>
