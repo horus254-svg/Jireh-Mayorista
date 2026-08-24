@@ -3146,16 +3146,23 @@ function filtrarProductos() {
   const selectCategoria = document.getElementById("filtroCategoriaProductos");
   const selectEstado = document.getElementById("filtroEstadoProducto");
 
-  const termino = inputBuscar ? inputBuscar.value.trim() : "";
+  // Normalizar: minúsculas + sin acentos para búsqueda más precisa
+  const normalizar = t => String(t || "").toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+
+  const termino = normalizar(inputBuscar ? inputBuscar.value : "");
   const categoria = selectCategoria ? selectCategoria.value : "";
   const estado = selectEstado ? selectEstado.value : "";
 
   let filtrados = productosAdminGlobal;
 
   if (termino) {
-    // Misma búsqueda tolerante a errores de tipeo que usa el POS —
-    // también considera el ALIAS del producto, no solo código/nombre/categoría.
-    filtrados = filtrados.filter(p => productoCoincideBusquedaPOS(p, termino));
+    filtrados = filtrados.filter(p => {
+      const codigo = normalizar(p.CODIGO);
+      const nombre = normalizar(p.PRODUCTO);
+      const cat    = normalizar(p.CATEGORIA);
+      return codigo.includes(termino) || nombre.includes(termino) || cat.includes(termino);
+    });
   }
 
   if (categoria) {
@@ -3199,7 +3206,6 @@ function nuevoProducto() {
   document.getElementById("pmCodigo").disabled = false;
   document.getElementById("pmNombre").value = "";
   document.getElementById("pmCategoria").value = "";
-  document.getElementById("pmAlias").value = "";
   document.getElementById("pmPrecio").value = "";
   document.getElementById("pmStock").value = "";
   document.getElementById("pmImagen").value = "";
@@ -3232,7 +3238,6 @@ function editarProducto(codigo) {
   document.getElementById("pmCodigo").value = p.CODIGO;
   document.getElementById("pmNombre").value = p.PRODUCTO || "";
   document.getElementById("pmCategoria").value = p.CATEGORIA || "";
-  document.getElementById("pmAlias").value = p.ALIAS || "";
   document.getElementById("pmPrecio").value = Number(p.PRECIO || 0);
   document.getElementById("pmStock").value = Number(p.STOCK || 0);
   document.getElementById("pmImagen").value = p.IMAGEN || "";
@@ -4057,7 +4062,6 @@ async function guardarProductoForm() {
   const codigo   = document.getElementById("pmCodigo").value.trim();
   const nombre   = document.getElementById("pmNombre").value.trim();
   const categoria = document.getElementById("pmCategoria").value.trim();
-  const alias     = document.getElementById("pmAlias").value.trim();
   const precio   = document.getElementById("pmPrecio").value;
   const stock    = document.getElementById("pmStock").value;
   const imagen   = document.getElementById("pmImagen").value.trim();
@@ -4090,7 +4094,6 @@ async function guardarProductoForm() {
       CODIGO: codigo,
       PRODUCTO: nombre,
       CATEGORIA: categoria,
-      ALIAS: alias,
       PRECIO: precio || 0,
       STOCK: stock || 0,
       IMAGEN: imagen,
@@ -5171,82 +5174,6 @@ function filtrarCategoriaPOS(cat, el) {
   renderPosGrid();
 }
 
-/* ---- búsqueda tolerante a errores (código, nombre, categoría y alias) ---- */
-
-/** minúsculas + sin acentos, para comparar sin importar mayúsculas/tildes */
-function normalizarBusquedaPOS(t) {
-  return String(t || "").toLowerCase()
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-}
-
-/**
- * Distancia de Levenshtein entre dos strings, con corte anticipado:
- * si en algún punto ya se superó maxDist, devuelve maxDist + 1 sin
- * terminar el cálculo completo (más rápido cuando se llama muchas
- * veces por tecla tipeada en el buscador del POS).
- */
-function distanciaLevenshteinPOS(a, b, maxDist) {
-  if (a === b) return 0;
-  if (Math.abs(a.length - b.length) > maxDist) return maxDist + 1;
-
-  const n = b.length;
-  let prev = new Array(n + 1);
-  for (let j = 0; j <= n; j++) prev[j] = j;
-
-  for (let i = 1; i <= a.length; i++) {
-    const curr = new Array(n + 1);
-    curr[0] = i;
-    let filaMin = curr[0];
-    for (let j = 1; j <= n; j++) {
-      const costo = a[i - 1] === b[j - 1] ? 0 : 1;
-      curr[j] = Math.min(prev[j] + 1, curr[j - 1] + 1, prev[j - 1] + costo);
-      if (curr[j] < filaMin) filaMin = curr[j];
-    }
-    if (filaMin > maxDist) return maxDist + 1;
-    prev = curr;
-  }
-  return prev[n];
-}
-
-/** True si "palabraTexto" contiene "palabraBusqueda", o si difiere de ella en pocas letras (typo tolerado según el largo de lo tipeado) */
-function palabraCoincideTolerantePOS(palabraBusqueda, palabraTexto) {
-  if (!palabraBusqueda) return true;
-  if (palabraTexto.includes(palabraBusqueda)) return true;
-  if (palabraBusqueda.length < 3) return false; // muy corta -> el fuzzy da falsos positivos
-  const maxDist = palabraBusqueda.length <= 5 ? 1 : 2;
-  return distanciaLevenshteinPOS(palabraBusqueda, palabraTexto, maxDist) <= maxDist;
-}
-
-/**
- * Compara lo tipeado en el buscador contra CODIGO, PRODUCTO,
- * CATEGORIA y ALIAS del producto (el alias no se muestra en ningún
- * lado, solo suma más "palabras" por las que ese producto puede
- * encontrarse). Primero intenta un match literal (rápido y exacto);
- * si no matchea, prueba palabra por palabra con tolerancia a errores
- * de tipeo, para que buscar "cocacol" o "coaca" igual encuentre
- * "Coca Cola".
- */
-function productoCoincideBusquedaPOS(producto, filtroTexto) {
-  const texto = normalizarBusquedaPOS(filtroTexto);
-  if (!texto) return true;
-
-  const textoCompleto = normalizarBusquedaPOS(
-    [producto.CODIGO, producto.PRODUCTO, producto.CATEGORIA, producto.ALIAS].join(" ")
-  );
-
-  // Camino rápido: la frase completa tipeada aparece tal cual
-  if (textoCompleto.includes(texto)) return true;
-
-  const palabrasTexto = textoCompleto.split(/\s+/).filter(Boolean);
-  const palabrasBusqueda = texto.split(/\s+/).filter(Boolean);
-
-  // Cada palabra tipeada tiene que encontrar alguna palabra del
-  // producto que la contenga o que sea "casi igual" (typo tolerado)
-  return palabrasBusqueda.every(pb =>
-    palabrasTexto.some(pt => palabraCoincideTolerantePOS(pb, pt))
-  );
-}
-
 /* ---- product grid ---- */
 
 function renderPosGrid(filtroTexto) {
@@ -5258,7 +5185,14 @@ function renderPosGrid(filtroTexto) {
     lista = lista.filter(p => String(p.CATEGORIA || "").trim() === categoriaActivaPOS);
   }
   if (filtroTexto) {
-    lista = lista.filter(p => productoCoincideBusquedaPOS(p, filtroTexto));
+    const normalizar = t => String(t || "").toLowerCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const texto = normalizar(filtroTexto);
+    lista = lista.filter(p =>
+      normalizar(p.CODIGO).includes(texto) ||
+      normalizar(p.PRODUCTO).includes(texto) ||
+      normalizar(p.CATEGORIA).includes(texto)
+    );
   }
 
   if (lista.length === 0) {
@@ -5424,7 +5358,6 @@ function abrirEdicionRapidaPOS(codigo) {
   document.getElementById("erpCodigo").value = producto.CODIGO;
   document.getElementById("erpPrecio").value = producto.PRECIO ?? 0;
   document.getElementById("erpStock").value = producto.STOCK ?? 0;
-  document.getElementById("erpAlias").value = producto.ALIAS || "";
   document.getElementById("modalEdicionRapidaPOSBackdrop").classList.add("show");
 }
 
@@ -5443,7 +5376,6 @@ async function guardarEdicionRapidaPOS() {
   const codigoNuevo = document.getElementById("erpCodigo").value.trim();
   const precio = document.getElementById("erpPrecio").value;
   const stock  = document.getElementById("erpStock").value;
-  const alias  = document.getElementById("erpAlias").value.trim();
 
   if (!codigoNuevo) { toast("El código no puede quedar vacío", "error"); return; }
   if (precio === "" || Number(precio) < 0) { toast("Ingresá un precio válido", "error"); return; }
@@ -5473,7 +5405,6 @@ async function guardarEdicionRapidaPOS() {
       CODIGO: codigoNuevo,
       PRODUCTO: producto.PRODUCTO,
       CATEGORIA: producto.CATEGORIA || "",
-      ALIAS: alias,
       PRECIO: precio,
       STOCK: stock,
       IMAGEN: producto.IMAGEN || "",
@@ -5498,7 +5429,6 @@ async function guardarEdicionRapidaPOS() {
     producto.CODIGO = codigoNuevo;
     producto.PRECIO = Number(precio);
     producto.STOCK = Number(stock);
-    producto.ALIAS = alias;
     // Si el producto editado ya estaba en el ticket actual, el código
     // ahí también tiene que actualizarse — si no, quedaría apuntando
     // a un código que ya no existe más en productosPOS.
@@ -10028,31 +9958,6 @@ async function ejecutarMigracionFormaPago() {
 =================================================================== */
 
 let ingresosProductosGlobal = [];
-function onCambioMonedaIngreso() {
-  const moneda = document.getElementById("ipMoneda").value;
-  const wrap = document.getElementById("ipTipoCambioWrap");
-  if (wrap) wrap.style.display = moneda === "USD" ? "" : "none";
-  if (moneda !== "USD") document.getElementById("ipTipoCambio").value = "";
-}
-
-function onCambioOrigenBoleta() {
-  const origen = document.getElementById("ipbOrigen").value;
-  const esDeposito = origen === "DEPOSITO";
-  const proveedorLabel = document.getElementById("ipbProveedorLabel");
-  const proveedorInput = document.getElementById("ipbProveedor");
-  const aviso = document.getElementById("ipbAvisoSinDeuda");
-  const totalLabel = document.getElementById("ipCarritoTotalLabel");
-
-  if (proveedorLabel) proveedorLabel.textContent = esDeposito ? "Sucursal / depósito de origen" : "Proveedor *";
-  if (proveedorInput) proveedorInput.placeholder = esDeposito ? "Ej: Depósito central" : "Nombre del proveedor";
-  if (aviso) aviso.style.display = esDeposito ? "" : "none";
-  if (totalLabel) totalLabel.textContent = esDeposito
-    ? "Total de la boleta (interno — no genera deuda)"
-    : "Total de la boleta (lo que se le debe al proveedor)";
-
-  renderCarritoBoleta();
-}
-
 let ipProductoActualEsNuevo = false;
 
 // Carrito de la boleta que se está armando: cada ítem escaneado se
@@ -10135,17 +10040,6 @@ function buscarProductoParaIngreso() {
     document.getElementById("ipCategoria").value = producto.CATEGORIA || "";
     document.getElementById("ipPrecio").value = "";
     document.getElementById("ipPrecioHint").textContent = "Lo que le pagás al proveedor por esta entrega — con esto se calcula el saldo que se le debe.";
-    const costoUsdRef = Number(producto.COSTO_USD_REF || 0);
-    if (costoUsdRef > 0) {
-      document.getElementById("ipMoneda").value = "USD";
-      onCambioMonedaIngreso();
-      document.getElementById("ipPrecio").value = costoUsdRef;
-      document.getElementById("ipPrecioHint").textContent =
-        `Último costo cargado en USD: US$${costoUsdRef.toLocaleString("es-AR")} — corregilo si cambió, o el tipo de cambio.`;
-    } else {
-      document.getElementById("ipMoneda").value = "ARS";
-      onCambioMonedaIngreso();
-    }
     document.getElementById("ipPrecioVenta").value = Number(producto.PRECIO || 0);
     document.getElementById("ipPrecioVentaHint").textContent = "Dejalo así si no cambió, o corregilo si el precio al público cambió.";
     if (estado) { estado.textContent = "✓ Producto encontrado: " + (producto.PRODUCTO || ""); estado.style.color = "var(--green-600, green)"; }
@@ -10158,8 +10052,6 @@ function buscarProductoParaIngreso() {
     document.getElementById("ipNombre").readOnly = false;
     document.getElementById("ipCategoria").value = "";
     document.getElementById("ipPrecio").value = "";
-    document.getElementById("ipMoneda").value = "ARS";
-    onCambioMonedaIngreso();
     document.getElementById("ipPrecioHint").textContent = "Lo que le pagás al proveedor por esta entrega.";
     document.getElementById("ipPrecioVenta").value = "";
     document.getElementById("ipPrecioVentaHint").textContent = "Precio de venta al público con el que se va a publicar en el POS y en la página. Si lo dejás vacío, se usa el precio de ingreso.";
@@ -10187,9 +10079,6 @@ function cancelarIngresoProducto() {
   document.getElementById("ipCodigoScan").value = "";
   document.getElementById("ipPrecio").value = "";
   document.getElementById("ipPrecioVenta").value = "";
-  document.getElementById("ipMoneda").value = "ARS";
-  document.getElementById("ipTipoCambio").value = "";
-  document.getElementById("ipTipoCambioWrap").style.display = "none";
   document.getElementById("ipEstadoBusqueda").textContent = "";
   document.getElementById("ipCodigoScan").focus();
 }
@@ -10210,12 +10099,9 @@ function poblarDatalistProveedoresIngreso() {
 
 /** Agrega el producto del formulario al carrito de la boleta (todavía no lo manda al backend) */
 function agregarItemABoleta() {
-  const origen = (document.getElementById("ipbOrigen")?.value) || "PROVEEDOR";
   const proveedor = document.getElementById("ipbProveedor").value.trim();
   if (!proveedor) {
-    toast(origen === "DEPOSITO"
-      ? "Completá de qué sucursal/depósito viene la mercadería antes de agregar productos"
-      : "Completá el proveedor de la boleta (arriba) antes de agregar productos", "error");
+    toast("Completá el proveedor de la boleta (arriba) antes de agregar productos", "error");
     document.getElementById("ipbProveedor").focus();
     return;
   }
@@ -10223,9 +10109,7 @@ function agregarItemABoleta() {
   const codigo = document.getElementById("ipCodigo").value.trim();
   const nombre = document.getElementById("ipNombre").value.trim();
   const categoria = document.getElementById("ipCategoria").value.trim();
-  const moneda = document.getElementById("ipMoneda").value === "USD" ? "USD" : "ARS";
   const precio = Number(document.getElementById("ipPrecio").value || 0);
-  const tipoCambio = Number(document.getElementById("ipTipoCambio").value || 0);
   const precioVentaInput = document.getElementById("ipPrecioVenta").value;
   const precioVenta = precioVentaInput !== "" ? Number(precioVentaInput) : null;
   const cantidad = Number(document.getElementById("ipCantidad").value || 0);
@@ -10242,17 +10126,9 @@ function agregarItemABoleta() {
     toast("Ingresá el precio de ingreso (costo) — se usa para calcular el saldo al proveedor", "error");
     return;
   }
-  if (moneda === "USD" && (!tipoCambio || tipoCambio <= 0)) {
-    toast("Ingresá el tipo de cambio para convertir el precio en dólares a pesos", "error");
-    document.getElementById("ipTipoCambio").focus();
-    return;
-  }
-
-  const precioARS = moneda === "USD" ? precio * tipoCambio : precio;
 
   ipCarritoBoleta.push({
-    codigo, producto: nombre || codigo, categoria,
-    moneda, precio, tipoCambio: moneda === "USD" ? tipoCambio : null, precioARS,
+    codigo, producto: nombre || codigo, categoria, precio,
     precioVenta: precioVenta !== null && !isNaN(precioVenta) ? precioVenta : null,
     cantidad,
     esNuevo: ipProductoActualEsNuevo
@@ -10276,25 +10152,22 @@ function renderCarritoBoleta() {
 
   let total = 0;
   tbody.innerHTML = ipCarritoBoleta.map((it, idx) => {
-    // El subtotal (en pesos) se calcula con el precio de INGRESO (costo),
-    // convertido a ARS si el producto se cargó en dólares.
-    const subtotalARS = it.precioARS * it.cantidad;
-    total += subtotalARS;
+    // El subtotal de la boleta (lo que se le debe al proveedor) se
+    // calcula con el precio de INGRESO (costo), nunca con el de venta.
+    const subtotal = it.precio * it.cantidad;
+    total += subtotal;
     const precioVentaTexto = (it.precioVenta !== null && it.precioVenta !== undefined)
       ? "$" + Number(it.precioVenta).toLocaleString("es-AR")
       : "—";
-    const precioIngresoTexto = it.moneda === "USD"
-      ? "US$" + Number(it.precio).toLocaleString("es-AR") + ` (TC ${it.tipoCambio})`
-      : "$" + Number(it.precio).toLocaleString("es-AR");
     return `
       <tr>
         <td class="mono">${escapeHtml(it.codigo || "—")}</td>
         <td>${escapeHtml(it.producto)} ${it.esNuevo ? '<span class="badge bg-warning text-dark">nuevo</span>' : ""}</td>
         <td>${escapeHtml(it.categoria || "—")}</td>
         <td class="money">${Number(it.cantidad).toLocaleString("es-AR")}</td>
-        <td class="money">${precioIngresoTexto}</td>
+        <td class="money">$${Number(it.precio).toLocaleString("es-AR")}</td>
         <td class="money">${precioVentaTexto}</td>
-        <td class="money">$${subtotalARS.toLocaleString("es-AR")}</td>
+        <td class="money">$${subtotal.toLocaleString("es-AR")}</td>
         <td><button class="btn btn-outline-danger btn-sm" onclick="quitarItemCarrito(${idx})">✕</button></td>
       </tr>`;
   }).join("");
@@ -10315,8 +10188,6 @@ function vaciarCarritoBoleta() {
 
 /** Manda TODA la boleta (cabecera + todos los productos del carrito) al backend en un solo documento */
 async function guardarBoletaCompleta() {
-  const origen = (document.getElementById("ipbOrigen")?.value) || "PROVEEDOR";
-  const sinDeuda = origen === "DEPOSITO";
   const proveedor = document.getElementById("ipbProveedor").value.trim();
   const proveedorContacto = document.getElementById("ipbProveedorContacto").value.trim();
   const numeroBoleta = document.getElementById("ipbNumeroBoleta").value.trim();
@@ -10324,7 +10195,7 @@ async function guardarBoletaCompleta() {
   const fecha = document.getElementById("ipbFecha").value || _hoyISO();
 
   if (!proveedor) {
-    toast(sinDeuda ? "Ingresá de qué sucursal/depósito viene la mercadería" : "Ingresá el proveedor de esta boleta", "error");
+    toast("Ingresá el proveedor de esta boleta", "error");
     return;
   }
   if (ipCarritoBoleta.length === 0) {
@@ -10345,11 +10216,9 @@ async function guardarBoletaCompleta() {
         rol: obtenerRolActual(),
         usuario: (sessionStorage.getItem("nombreUsuario") || sessionStorage.getItem("vendedor") || "ADMIN"),
         proveedor, proveedorContacto, numeroBoleta, observaciones, fecha,
-        origen, sinDeuda,
         items: ipCarritoBoleta.map(it => ({
           codigo: it.codigo, producto: it.producto, categoria: it.categoria,
-          moneda: it.moneda, precio: it.precio, tipoCambio: it.tipoCambio, precioARS: it.precioARS,
-          precioVenta: it.precioVenta, cantidad: it.cantidad
+          precio: it.precio, precioVenta: it.precioVenta, cantidad: it.cantidad
         }))
       })
     });
@@ -10360,15 +10229,11 @@ async function guardarBoletaCompleta() {
       return;
     }
 
-    toast(sinDeuda
-      ? `Boleta guardada — ${ipCarritoBoleta.length} producto(s), ingreso interno sin deuda`
-      : `Boleta guardada — ${ipCarritoBoleta.length} producto(s), total $${Number(data.totalBoleta || 0).toLocaleString("es-AR")}`, "success");
+    toast(`Boleta guardada — ${ipCarritoBoleta.length} producto(s), total $${Number(data.totalBoleta || 0).toLocaleString("es-AR")}`, "success");
 
     try { localStorage.removeItem("vpos_cache_productosAdmin"); } catch(e) {}
     ipCarritoBoleta = [];
     renderCarritoBoleta();
-    document.getElementById("ipbOrigen").value = "PROVEEDOR";
-    onCambioOrigenBoleta();
     document.getElementById("ipbNumeroBoleta").value = "";
     document.getElementById("ipbObservaciones").value = "";
     await cargarProductos();
@@ -10398,18 +10263,7 @@ async function cargarHistorialIngresos() {
   }
 }
 
-/** Da formato compacto a un monto que puede tener parte en pesos y parte en dólares — ej: "$5.000 + US$120" — omitiendo la parte que esté en $0 */
-function _formatoMontoBiMoneda(ars, usd) {
-  const ars_ = Number(ars || 0);
-  const usd_ = Number(usd || 0);
-  const partes = [];
-  if (ars_ || !usd_) partes.push("$" + ars_.toLocaleString("es-AR"));
-  if (usd_) partes.push("US$" + usd_.toLocaleString("es-AR"));
-  return partes.join(" + ");
-}
-
 function _badgeEstadoBoleta(estado) {
-  if (estado === "SIN_DEUDA") return `<span class="badge bg-info text-dark">Interno · sin deuda</span>`;
   if (estado === "PAGADA") return `<span class="badge bg-success">Pagada</span>`;
   if (estado === "PARCIAL") return `<span class="badge bg-warning text-dark">Pago parcial</span>`;
   return `<span class="badge bg-danger">Pendiente</span>`;
@@ -10448,9 +10302,9 @@ function filtrarHistorialIngresos() {
       <td class="mono">${escapeHtml(i.NUMERO_BOLETA || "—")}</td>
       <td>${escapeHtml(i.PROVEEDOR || "—")}</td>
       <td>${escapeHtml(i.PROVEEDOR_CONTACTO || "—")}</td>
-      <td class="money">${_formatoMontoBiMoneda(i.TOTAL_ARS, i.TOTAL_USD)}</td>
-      <td class="money" style="color:var(--green-600);">${_formatoMontoBiMoneda(i.PAGADO_ARS, i.PAGADO_USD)}</td>
-      <td class="money" style="color:var(--red-500);">${_formatoMontoBiMoneda(i.SALDO_ARS, i.SALDO_USD)}</td>
+      <td class="money">$${Number(i.TOTAL || 0).toLocaleString("es-AR")}</td>
+      <td class="money" style="color:var(--green-600);">$${Number(i.PAGADO || 0).toLocaleString("es-AR")}</td>
+      <td class="money" style="color:var(--red-500);">$${Number(i.SALDO || 0).toLocaleString("es-AR")}</td>
       <td>${_badgeEstadoBoleta(i.ESTADO)}</td>
       <td><button class="btn btn-outline-primary btn-sm" onclick="abrirModalDetalleBoleta('${i.BOLETA_ID}')">Ver / Pagar</button></td>
     </tr>`).join("");
@@ -10471,8 +10325,6 @@ async function abrirModalDetalleBoleta(boletaId) {
   document.getElementById("pagoProveedorMonto").value = "";
   document.getElementById("pagoProveedorObservaciones").value = "";
   document.getElementById("pagoProveedorFormaPago").value = "EFECTIVO";
-  const selMoneda = document.getElementById("pagoProveedorMoneda");
-  if (selMoneda) selMoneda.value = "ARS";
   const btnPago = document.getElementById("btnRegistrarPagoProveedor");
   if (btnPago) { btnPago.disabled = false; btnPago.textContent = "💾 Pagar"; }
   boletaProveedorIdActual = boletaId;
@@ -10490,12 +10342,9 @@ async function abrirModalDetalleBoleta(boletaId) {
     detalleBoletaDatosActual = { boleta: b, items: data.items || [], pagos: data.pagos || [] };
     document.getElementById("detalleBoletaTitulo").textContent =
       `${b.PROVEEDOR}${b.NUMERO_BOLETA ? " — Boleta " + b.NUMERO_BOLETA : ""} (${b.FECHA})`;
-    document.getElementById("detalleBoletaTotal").textContent = "$" + Number(b.TOTAL_ARS || 0).toLocaleString("es-AR");
-    document.getElementById("detalleBoletaPagado").textContent = "$" + Number(b.PAGADO_ARS || 0).toLocaleString("es-AR");
-    document.getElementById("detalleBoletaSaldo").textContent = "$" + Number(b.SALDO_ARS || 0).toLocaleString("es-AR");
-    document.getElementById("detalleBoletaTotalUsd").textContent = b.TOTAL_USD > 0 ? "US$" + Number(b.TOTAL_USD).toLocaleString("es-AR") : "";
-    document.getElementById("detalleBoletaPagadoUsd").textContent = b.PAGADO_USD > 0 ? "US$" + Number(b.PAGADO_USD).toLocaleString("es-AR") : "";
-    document.getElementById("detalleBoletaSaldoUsd").textContent = b.SALDO_USD > 0 ? "US$" + Number(b.SALDO_USD).toLocaleString("es-AR") : "";
+    document.getElementById("detalleBoletaTotal").textContent = "$" + Number(b.TOTAL || 0).toLocaleString("es-AR");
+    document.getElementById("detalleBoletaPagado").textContent = "$" + Number(b.PAGADO || 0).toLocaleString("es-AR");
+    document.getElementById("detalleBoletaSaldo").textContent = "$" + Number(b.SALDO || 0).toLocaleString("es-AR");
 
     const datosWrap = document.getElementById("detalleBoletaDatos");
     if (datosWrap) {
@@ -10513,11 +10362,7 @@ async function abrirModalDetalleBoleta(boletaId) {
     }
 
     const formWrap = document.getElementById("cardFormularioPagoProveedor");
-    if (formWrap) formWrap.style.display = (b.SALDO_ARS > 0 || b.SALDO_USD > 0) ? "" : "none";
-    // Si la boleta solo tiene deuda en una de las dos monedas, se arranca
-    // con esa moneda seleccionada para no confundir con un saldo en $0.
-    if (selMoneda) selMoneda.value = (b.SALDO_ARS <= 0 && b.SALDO_USD > 0) ? "USD" : "ARS";
-    onCambioMonedaPagoProveedor();
+    if (formWrap) formWrap.style.display = b.SALDO > 0 ? "" : "none";
 
     const items = data.items || [];
     const resumenEl = document.getElementById("detalleBoletaResumenItems");
@@ -10553,32 +10398,17 @@ async function abrirModalDetalleBoleta(boletaId) {
       ? pagos.map(p => `
         <tr>
           <td>${escapeHtml(p.FECHA || "—")}</td>
-          <td class="money">${(p.MONEDA === "USD" ? "US$" : "$")}${Number(p.MONTO || 0).toLocaleString("es-AR")}</td>
-          <td>${escapeHtml(p.MONEDA || "ARS")}</td>
+          <td class="money">$${Number(p.MONTO || 0).toLocaleString("es-AR")}</td>
           <td>${escapeHtml(p.FORMA_PAGO || "—")}</td>
           <td>${escapeHtml(p.OBSERVACIONES || "—")}</td>
         </tr>`).join("")
-      : `<tr><td colspan="5" class="text-center text-muted py-2">Todavía no hay pagos registrados</td></tr>`;
+      : `<tr><td colspan="4" class="text-center text-muted py-2">Todavía no hay pagos registrados</td></tr>`;
 
   } catch (error) {
     console.error("Error al cargar el detalle de la boleta:", error);
     toast("Error de conexión al cargar la boleta", "error");
     cerrarModalDetalleBoleta();
   }
-}
-
-/** Al cambiar la moneda del formulario de pago, actualiza el hint con el saldo pendiente disponible en esa moneda */
-function onCambioMonedaPagoProveedor() {
-  const sel = document.getElementById("pagoProveedorMoneda");
-  const hint = document.getElementById("pagoProveedorSaldoHint");
-  const montoInput = document.getElementById("pagoProveedorMonto");
-  if (!sel || !hint || !detalleBoletaDatosActual) return;
-  const b = detalleBoletaDatosActual.boleta;
-  const esUsd = sel.value === "USD";
-  const saldo = esUsd ? Number(b.SALDO_USD || 0) : Number(b.SALDO_ARS || 0);
-  const simbolo = esUsd ? "US$" : "$";
-  hint.textContent = `Saldo pendiente en ${esUsd ? "dólares" : "pesos"}: ${simbolo}${saldo.toLocaleString("es-AR")}`;
-  if (montoInput) montoInput.max = saldo > 0 ? saldo : "";
 }
 
 /** Arma e imprime (A4) el comprobante de la boleta de proveedor que está abierta en el modal de detalle */
@@ -10610,12 +10440,11 @@ function imprimirBoletaProveedor() {
     ? pagos.map(p => `
       <tr>
         <td style="padding:5px 6px; border-bottom:1px solid #e2e8f0;">${escapeHtml(p.FECHA || "—")}</td>
-        <td style="padding:5px 6px; border-bottom:1px solid #e2e8f0; text-align:right;">${(p.MONEDA === "USD" ? "US$" : "$")}${Number(p.MONTO || 0).toLocaleString("es-AR")}</td>
-        <td style="padding:5px 6px; border-bottom:1px solid #e2e8f0;">${escapeHtml(p.MONEDA || "ARS")}</td>
+        <td style="padding:5px 6px; border-bottom:1px solid #e2e8f0; text-align:right;">$${Number(p.MONTO || 0).toLocaleString("es-AR")}</td>
         <td style="padding:5px 6px; border-bottom:1px solid #e2e8f0;">${escapeHtml(p.FORMA_PAGO || "—")}</td>
         <td style="padding:5px 6px; border-bottom:1px solid #e2e8f0;">${escapeHtml(p.OBSERVACIONES || "—")}</td>
       </tr>`).join("")
-    : `<tr><td colspan="5" style="padding:8px; text-align:center; color:#64748b;">Sin pagos registrados</td></tr>`;
+    : `<tr><td colspan="4" style="padding:8px; text-align:center; color:#64748b;">Sin pagos registrados</td></tr>`;
 
   const totalUnidades = items.reduce((acc, it) => acc + (Number(it.CANTIDAD) || 0), 0);
 
@@ -10666,9 +10495,9 @@ function imprimirBoletaProveedor() {
       <div style="text-align:right; color:#64748b; margin-bottom:16px;">${items.length} producto${items.length === 1 ? "" : "s"} · ${totalUnidades.toLocaleString("es-AR")} unidad${totalUnidades === 1 ? "" : "es"}</div>
 
       <div style="display:flex; justify-content:flex-end; gap:24px; border-top:2px solid #1e293b; padding-top:10px; margin-bottom:18px;">
-        <div style="text-align:right;"><div style="color:#64748b;">Total</div><div style="font-size:15px; font-weight:800;">${_formatoMontoBiMoneda(b.TOTAL_ARS, b.TOTAL_USD)}</div></div>
-        <div style="text-align:right;"><div style="color:#64748b;">Pagado</div><div style="font-size:15px; font-weight:800; color:#16a34a;">${_formatoMontoBiMoneda(b.PAGADO_ARS, b.PAGADO_USD)}</div></div>
-        <div style="text-align:right;"><div style="color:#64748b;">Saldo</div><div style="font-size:15px; font-weight:800; color:#dc2626;">${_formatoMontoBiMoneda(b.SALDO_ARS, b.SALDO_USD)}</div></div>
+        <div style="text-align:right;"><div style="color:#64748b;">Total</div><div style="font-size:15px; font-weight:800;">$${Number(b.TOTAL || 0).toLocaleString("es-AR")}</div></div>
+        <div style="text-align:right;"><div style="color:#64748b;">Pagado</div><div style="font-size:15px; font-weight:800; color:#16a34a;">$${Number(b.PAGADO || 0).toLocaleString("es-AR")}</div></div>
+        <div style="text-align:right;"><div style="color:#64748b;">Saldo</div><div style="font-size:15px; font-weight:800; color:#dc2626;">$${Number(b.SALDO || 0).toLocaleString("es-AR")}</div></div>
       </div>
 
       <div style="font-weight:700; margin-bottom:6px;">Pagos registrados</div>
@@ -10677,7 +10506,6 @@ function imprimirBoletaProveedor() {
           <tr style="background:#f1f5f9;">
             <th style="padding:6px; text-align:left;">Fecha</th>
             <th style="padding:6px; text-align:right;">Monto</th>
-            <th style="padding:6px; text-align:left;">Moneda</th>
             <th style="padding:6px; text-align:left;">Forma de pago</th>
             <th style="padding:6px; text-align:left;">Observaciones</th>
           </tr>
@@ -10728,7 +10556,6 @@ async function registrarPagoProveedorForm() {
         rol: obtenerRolActual(),
         boletaId: boletaProveedorIdActual,
         monto,
-        moneda: document.getElementById("pagoProveedorMoneda")?.value || "ARS",
         formaPago: document.getElementById("pagoProveedorFormaPago").value,
         observaciones: document.getElementById("pagoProveedorObservaciones").value.trim(),
         usuario: (sessionStorage.getItem("nombreUsuario") || sessionStorage.getItem("vendedor") || "ADMIN")
@@ -10821,9 +10648,8 @@ function renderTablaProveedores(lista) {
   }
 
   cont.innerHTML = lista.map(p => {
-    const saldoArs = Number(p.SALDO_ARS || 0);
-    const saldoUsd = Number(p.SALDO_USD || 0);
-    const tieneSaldo = saldoArs > 0.01 || saldoUsd > 0.01;
+    const saldo = Number(p.SALDO || 0);
+    const tieneSaldo = saldo > 0.01;
     const bordeClase = tieneSaldo ? "cliente-card-deuda" : "cliente-card-credito";
 
     return `
@@ -10837,12 +10663,12 @@ function renderTablaProveedores(lista) {
           </div>
         </div>
         <div class="text-end" style="flex-shrink:0;">
-          <div class="pedido-card-total" style="font-size:15px;">${_formatoMontoBiMoneda(p.TOTAL_ARS, p.TOTAL_USD)}</div>
+          <div class="pedido-card-total" style="font-size:15px;">$${Number(p.TOTAL || 0).toLocaleString("es-AR")}</div>
           <div style="font-size:11px;color:var(--slate-500);margin-top:1px;">${p.BOLETAS || 0} boleta${p.BOLETAS !== 1 ? "s" : ""}${p.BOLETAS_PENDIENTES ? ` · ${p.BOLETAS_PENDIENTES} pendiente${p.BOLETAS_PENDIENTES !== 1 ? "s" : ""}` : ""}</div>
           <div class="mt-1" style="font-size:12px;">
             <span class="cliente-dato-label">Saldo</span>
             ${tieneSaldo
-              ? `<span style="color:var(--red-500);font-weight:700;">${_formatoMontoBiMoneda(saldoArs, saldoUsd)}</span>`
+              ? `<span style="color:var(--red-500);font-weight:700;">$${saldo.toLocaleString("es-AR")}</span>`
               : `<span class="text-muted" style="font-size:12px;">Sin deuda</span>`}
           </div>
         </div>
@@ -10865,7 +10691,7 @@ function filtrarProveedores() {
     filtrados = filtrados.filter(p => String(p.PROVEEDOR || "").toLowerCase().includes(termino));
   }
   if (soloConSaldo && soloConSaldo.checked) {
-    filtrados = filtrados.filter(p => Number(p.SALDO_ARS || 0) > 0.01 || Number(p.SALDO_USD || 0) > 0.01);
+    filtrados = filtrados.filter(p => Number(p.SALDO || 0) > 0.01);
   }
 
   renderTablaProveedores(filtrados);
@@ -10882,28 +10708,22 @@ async function abrirModalBoletasProveedor(proveedor) {
     const data = await res.json();
     const boletas = data.boletas || [];
 
-    const totalArs = boletas.reduce((acc, b) => acc + Number(b.TOTAL_ARS || 0), 0);
-    const totalUsd = boletas.reduce((acc, b) => acc + Number(b.TOTAL_USD || 0), 0);
-    const pagadoArs = boletas.reduce((acc, b) => acc + Number(b.PAGADO_ARS || 0), 0);
-    const pagadoUsd = boletas.reduce((acc, b) => acc + Number(b.PAGADO_USD || 0), 0);
-    const saldoArs = boletas.reduce((acc, b) => acc + Number(b.SALDO_ARS || 0), 0);
-    const saldoUsd = boletas.reduce((acc, b) => acc + Number(b.SALDO_USD || 0), 0);
+    const total = boletas.reduce((acc, b) => acc + Number(b.TOTAL || 0), 0);
+    const pagado = boletas.reduce((acc, b) => acc + Number(b.PAGADO || 0), 0);
+    const saldo = boletas.reduce((acc, b) => acc + Number(b.SALDO || 0), 0);
 
-    document.getElementById("boletasProveedorTotal").textContent = "$" + totalArs.toLocaleString("es-AR");
-    document.getElementById("boletasProveedorPagado").textContent = "$" + pagadoArs.toLocaleString("es-AR");
-    document.getElementById("boletasProveedorSaldo").textContent = "$" + saldoArs.toLocaleString("es-AR");
-    document.getElementById("boletasProveedorTotalUsd").textContent = totalUsd > 0 ? "US$" + totalUsd.toLocaleString("es-AR") : "";
-    document.getElementById("boletasProveedorPagadoUsd").textContent = pagadoUsd > 0 ? "US$" + pagadoUsd.toLocaleString("es-AR") : "";
-    document.getElementById("boletasProveedorSaldoUsd").textContent = saldoUsd > 0 ? "US$" + saldoUsd.toLocaleString("es-AR") : "";
+    document.getElementById("boletasProveedorTotal").textContent = "$" + total.toLocaleString("es-AR");
+    document.getElementById("boletasProveedorPagado").textContent = "$" + pagado.toLocaleString("es-AR");
+    document.getElementById("boletasProveedorSaldo").textContent = "$" + saldo.toLocaleString("es-AR");
 
     document.getElementById("boletasProveedorBody").innerHTML = boletas.length
       ? boletas.map(b => `
         <tr>
           <td>${escapeHtml(b.FECHA || "—")}</td>
           <td class="mono">${escapeHtml(b.NUMERO_BOLETA || "—")}</td>
-          <td class="money">${_formatoMontoBiMoneda(b.TOTAL_ARS, b.TOTAL_USD)}</td>
-          <td class="money" style="color:var(--green-600);">${_formatoMontoBiMoneda(b.PAGADO_ARS, b.PAGADO_USD)}</td>
-          <td class="money" style="color:var(--red-500);">${_formatoMontoBiMoneda(b.SALDO_ARS, b.SALDO_USD)}</td>
+          <td class="money">$${Number(b.TOTAL || 0).toLocaleString("es-AR")}</td>
+          <td class="money" style="color:var(--green-600);">$${Number(b.PAGADO || 0).toLocaleString("es-AR")}</td>
+          <td class="money" style="color:var(--red-500);">$${Number(b.SALDO || 0).toLocaleString("es-AR")}</td>
           <td>${_badgeEstadoBoleta(b.ESTADO)}</td>
           <td><button class="btn btn-outline-primary btn-sm" onclick="abrirModalDetalleBoleta('${b.BOLETA_ID}')">Ver / Pagar</button></td>
         </tr>`).join("")

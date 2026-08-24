@@ -621,19 +621,12 @@
     <div class="card p-3 mb-3">
       <h6 class="mb-2">1) Datos de la boleta / remito</h6>
       <div class="row g-2">
-        <div class="col-md-3">
-          <label class="form-label">Origen de la mercadería *</label>
-          <select class="form-select" id="ipbOrigen" onchange="onCambioOrigenBoleta()">
-            <option value="PROVEEDOR">Proveedor externo</option>
-            <option value="DEPOSITO">Nuestra sucursal / depósito (no genera deuda)</option>
-          </select>
-        </div>
-        <div class="col-md-3" id="ipbProveedorWrap">
-          <label class="form-label" id="ipbProveedorLabel">Proveedor *</label>
+        <div class="col-md-4">
+          <label class="form-label">Proveedor *</label>
           <input type="text" class="form-control" id="ipbProveedor" list="ipProveedoresList" placeholder="Nombre del proveedor" oninput="actualizarEstadoBoletaActual()">
           <datalist id="ipProveedoresList"></datalist>
         </div>
-        <div class="col-md-2">
+        <div class="col-md-3">
           <label class="form-label">Contacto del proveedor</label>
           <input type="text" class="form-control" id="ipbProveedorContacto" placeholder="Teléfono / email (opcional)">
         </div>
@@ -641,7 +634,7 @@
           <label class="form-label">Fecha de recepción</label>
           <input type="date" class="form-control" id="ipbFecha" onchange="actualizarEstadoBoletaActual()">
         </div>
-        <div class="col-md-2">
+        <div class="col-md-3">
           <label class="form-label">N° de boleta / remito</label>
           <input type="text" class="form-control" id="ipbNumeroBoleta" placeholder="Ej: 0001-000123" oninput="actualizarEstadoBoletaActual()">
         </div>
@@ -649,9 +642,6 @@
       <div class="mt-2">
         <label class="form-label">Observaciones de la boleta</label>
         <input type="text" class="form-control" id="ipbObservaciones" placeholder="Opcional">
-      </div>
-      <div class="mt-2" id="ipbAvisoSinDeuda" style="display:none; font-size:12.5px; color:var(--green-700,#15803d); font-weight:600;">
-        ✓ Esta mercadería viene de nuestra propia sucursal/depósito — no se va a generar deuda con proveedor.
       </div>
       <div class="mt-2" style="font-size:12.5px;" id="ipbEstadoBoleta"></div>
     </div>
@@ -695,34 +685,22 @@
       </div>
 
       <div class="row g-2 mt-2">
-        <div class="col-md-2">
-          <label class="form-label">Moneda</label>
-          <select class="form-select" id="ipMoneda" onchange="onCambioMonedaIngreso()">
-            <option value="ARS">Pesos (ARS)</option>
-            <option value="USD">Dólares (USD)</option>
-          </select>
-        </div>
-        <div class="col-md-2">
+        <div class="col-md-3">
           <label class="form-label">Precio de ingreso (costo)</label>
           <input type="number" class="form-control" id="ipPrecio" min="0" step="1" placeholder="0">
           <div class="form-text" style="font-size:11px;" id="ipPrecioHint">Lo que se le paga al proveedor — con esto se calcula el saldo que se le debe.</div>
         </div>
-        <div class="col-md-2" id="ipTipoCambioWrap" style="display:none;">
-          <label class="form-label">Tipo de cambio</label>
-          <input type="number" class="form-control" id="ipTipoCambio" min="0" step="0.01" placeholder="Ej: 1250">
-          <div class="form-text" style="font-size:11px;">Para convertir a pesos y calcular el saldo.</div>
-        </div>
-        <div class="col-md-2">
+        <div class="col-md-3">
           <label class="form-label">Precio de venta (público)</label>
           <input type="number" class="form-control" id="ipPrecioVenta" min="0" step="1" placeholder="0">
           <div class="form-text" style="font-size:11px;" id="ipPrecioVentaHint">El que ve el cliente en el POS y en la página.</div>
         </div>
-        <div class="col-md-2">
+        <div class="col-md-3">
           <label class="form-label">Cantidad que llega *</label>
           <input type="number" class="form-control" id="ipCantidad" min="1" step="1" placeholder="Ej: 24"
             onkeydown="if(event.key==='Enter'){ event.preventDefault(); agregarItemABoleta(); }">
         </div>
-        <div class="col-md-2 d-flex align-items-end">
+        <div class="col-md-3 d-flex align-items-end">
           <button class="btn btn-success w-100" id="btnConfirmarIngreso" onclick="agregarItemABoleta()">➕ Agregar a la boleta</button>
         </div>
       </div>
@@ -739,12 +717,12 @@
         <table class="table table-sm table-striped">
           <thead><tr>
             <th>Código</th><th>Producto</th><th>Categoría</th>
-            <th>Cantidad</th><th>Precio ingreso</th><th>Precio venta</th><th>Subtotal (equiv. $)</th><th></th>
+            <th>Cantidad</th><th>Precio ingreso</th><th>Precio venta</th><th>Subtotal (a proveedor)</th><th></th>
           </tr></thead>
           <tbody id="ipCarritoBody"><tr><td colspan="8" class="text-center text-muted py-3">Todavía no agregaste productos</td></tr></tbody>
           <tfoot>
             <tr>
-              <td colspan="6" class="text-end fw-bold" id="ipCarritoTotalLabel">Total de la boleta (lo que se le debe al proveedor)</td>
+              <td colspan="6" class="text-end fw-bold">Total de la boleta (lo que se le debe al proveedor)</td>
               <td class="money fw-bold" id="ipCarritoTotal">$0</td>
               <td></td>
             </tr>
@@ -771,7 +749,6 @@
             <option value="PENDIENTE">Pendiente</option>
             <option value="PARCIAL">Pago parcial</option>
             <option value="PAGADA">Pagada</option>
-            <option value="SIN_DEUDA">Interno · sin deuda</option>
           </select>
         </div>
       </div>
@@ -806,22 +783,19 @@
           <div class="col-4">
             <div class="card p-2 text-center" style="background:var(--slate-50);">
               <div class="text-muted" style="font-size:10.5px;">Total</div>
-              <div style="font-size:14px; font-weight:700;" id="detalleBoletaTotal">$0</div>
-              <div style="font-size:12px; font-weight:600; color:#0369a1;" id="detalleBoletaTotalUsd"></div>
+              <div style="font-size:15px; font-weight:700;" id="detalleBoletaTotal">$0</div>
             </div>
           </div>
           <div class="col-4">
             <div class="card p-2 text-center" style="background:var(--slate-50);">
               <div class="text-muted" style="font-size:10.5px;">Pagado</div>
-              <div style="font-size:14px; font-weight:700; color:var(--green-600);" id="detalleBoletaPagado">$0</div>
-              <div style="font-size:12px; font-weight:600; color:var(--green-600);" id="detalleBoletaPagadoUsd"></div>
+              <div style="font-size:15px; font-weight:700; color:var(--green-600);" id="detalleBoletaPagado">$0</div>
             </div>
           </div>
           <div class="col-4">
             <div class="card p-2 text-center" style="background:var(--slate-50);">
               <div class="text-muted" style="font-size:10.5px;">Saldo pendiente</div>
-              <div style="font-size:14px; font-weight:700; color:var(--red-500);" id="detalleBoletaSaldo">$0</div>
-              <div style="font-size:12px; font-weight:600; color:var(--red-500);" id="detalleBoletaSaldoUsd"></div>
+              <div style="font-size:15px; font-weight:700; color:var(--red-500);" id="detalleBoletaSaldo">$0</div>
             </div>
           </div>
         </div>
@@ -831,14 +805,7 @@
         <div class="card p-3 mb-3" id="cardFormularioPagoProveedor" style="background:var(--slate-50);">
           <h6 style="font-size:13px;" class="mb-2">Registrar pago a proveedor</h6>
           <div class="row g-2">
-            <div class="col-md-2">
-              <label class="form-label" style="font-size:12px;">Moneda</label>
-              <select class="form-select form-select-sm" id="pagoProveedorMoneda" onchange="onCambioMonedaPagoProveedor()">
-                <option value="ARS">Pesos (ARS)</option>
-                <option value="USD">Dólares (USD)</option>
-              </select>
-            </div>
-            <div class="col-md-2">
+            <div class="col-md-3">
               <label class="form-label" style="font-size:12px;">Monto a pagar</label>
               <input type="number" class="form-control form-control-sm" id="pagoProveedorMonto" placeholder="0">
             </div>
@@ -850,7 +817,7 @@
                 <option value="TARJETA">Tarjeta</option>
               </select>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-4">
               <label class="form-label" style="font-size:12px;">Observaciones</label>
               <input type="text" class="form-control form-control-sm" id="pagoProveedorObservaciones" placeholder="opcional">
             </div>
@@ -858,7 +825,6 @@
               <button class="btn btn-success btn-sm w-100" id="btnRegistrarPagoProveedor" onclick="registrarPagoProveedorForm()">💾 Pagar</button>
             </div>
           </div>
-          <div class="form-text mt-1" style="font-size:11px;" id="pagoProveedorSaldoHint"></div>
         </div>
 
         <div class="d-flex justify-content-between align-items-center mb-2">
@@ -875,8 +841,8 @@
         <h6 style="font-size:13px;" class="mb-2">Pagos registrados</h6>
         <div class="table-responsive" style="max-height:180px; overflow-y:auto;">
           <table class="table table-sm table-striped">
-            <thead><tr><th>Fecha</th><th>Monto</th><th>Moneda</th><th>Forma de pago</th><th>Obs.</th></tr></thead>
-            <tbody id="detalleBoletaPagosBody"><tr><td colspan="5" class="text-center text-muted py-2">Todavía no hay pagos registrados</td></tr></tbody>
+            <thead><tr><th>Fecha</th><th>Monto</th><th>Forma de pago</th><th>Obs.</th></tr></thead>
+            <tbody id="detalleBoletaPagosBody"><tr><td colspan="4" class="text-center text-muted py-2">Todavía no hay pagos registrados</td></tr></tbody>
           </table>
         </div>
 
@@ -921,22 +887,19 @@
           <div class="col-4">
             <div class="card p-2 text-center" style="background:var(--slate-50);">
               <div class="text-muted" style="font-size:10.5px;">Total comprado</div>
-              <div style="font-size:14px; font-weight:700;" id="boletasProveedorTotal">$0</div>
-              <div style="font-size:12px; font-weight:600; color:#0369a1;" id="boletasProveedorTotalUsd"></div>
+              <div style="font-size:15px; font-weight:700;" id="boletasProveedorTotal">$0</div>
             </div>
           </div>
           <div class="col-4">
             <div class="card p-2 text-center" style="background:var(--slate-50);">
               <div class="text-muted" style="font-size:10.5px;">Pagado</div>
-              <div style="font-size:14px; font-weight:700; color:var(--green-600);" id="boletasProveedorPagado">$0</div>
-              <div style="font-size:12px; font-weight:600; color:var(--green-600);" id="boletasProveedorPagadoUsd"></div>
+              <div style="font-size:15px; font-weight:700; color:var(--green-600);" id="boletasProveedorPagado">$0</div>
             </div>
           </div>
           <div class="col-4">
             <div class="card p-2 text-center" style="background:var(--slate-50);">
               <div class="text-muted" style="font-size:10.5px;">Saldo pendiente</div>
-              <div style="font-size:14px; font-weight:700; color:var(--red-500);" id="boletasProveedorSaldo">$0</div>
-              <div style="font-size:12px; font-weight:600; color:var(--red-500);" id="boletasProveedorSaldoUsd"></div>
+              <div style="font-size:15px; font-weight:700; color:var(--red-500);" id="boletasProveedorSaldo">$0</div>
             </div>
           </div>
         </div>
@@ -2542,11 +2505,6 @@
         <input type="number" class="form-control" id="erpStock" step="1">
         <div class="form-text" style="font-size:11px;">Puede ser negativo — se usa para saber cuánto se vendió sin stock cargado.</div>
       </div>
-      <div class="mb-2">
-        <label class="form-label" style="font-size:12.5px;">Alias / palabras clave</label>
-        <input type="text" class="form-control" id="erpAlias" placeholder="Ej: coca, cocacola, gaseosa negra">
-        <div class="form-text" style="font-size:11px;">Separados por coma. Se usan solo para encontrar el producto más rápido al buscar en el POS — no cambian el nombre real.</div>
-      </div>
     </div>
     <div class="product-modal-actions">
       <button class="btn btn-outline-secondary" onclick="cerrarEdicionRapidaPOS()">Cancelar</button>
@@ -2677,12 +2635,6 @@
       <div class="mt-2">
         <label class="form-label">Nombre del producto *</label>
         <input type="text" class="form-control" id="pmNombre" placeholder="Ej: Coca Cola 500ml" required>
-      </div>
-
-      <div class="mt-2">
-        <label class="form-label">Alias / palabras clave <span class="text-muted" style="font-size:11px;">(opcional, para buscar más rápido en el POS)</span></label>
-        <input type="text" class="form-control" id="pmAlias" placeholder="Ej: coca, cocacola, gaseosa negra">
-        <div class="form-text" style="font-size:11px;">Separados por coma. No se muestran al cliente ni reemplazan el nombre — solo ayudan a encontrar el producto al escribir en el buscador del POS.</div>
       </div>
 
       <div class="mt-2">
