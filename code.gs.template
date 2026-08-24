@@ -128,6 +128,41 @@ function invalidarCacheProductos(){
   }
 }
 
+/** Se llama después de cualquier cambio en PEDIDOS o VENTAS_LOCAL (crear/editar/cobrar/anular pedido o venta) — invalida la caché de los endpoints de polling (dashboard, pedidos, ventasPOS). */
+function invalidarCachePolling(){
+  try{
+    const cache = CacheService.getScriptCache();
+    ["dashboard", "pedidos", "ventas_pos_hoy"].forEach(base => {
+      const claves = ["n"];
+      for(let i = 0; i < 20; i++) claves.push(String(i));
+      cache.removeAll(claves.map(c => base + ":" + c));
+    });
+  } catch(e){
+    console.error("No se pudo invalidar la caché de polling: " + e.message);
+  }
+}
+
+/**
+ * Envuelve una función que arma su respuesta con jsonResponse(...) para
+ * que quede cacheada un rato corto — pensada para los endpoints que el
+ * panel consulta por POLLING cada 15s (dashboard, pedidos, ventasPOS).
+ * Con varias cajas abiertas a la vez, todas piden lo mismo casi al
+ * mismo tiempo; con TTL corto (10-15s) se evita releer las hojas en
+ * cada ciclo sin perder frescura real (cualquier cambio invalida la
+ * caché al toque vía invalidarCachePolling(), no hay que esperar a que
+ * venza el TTL para ver algo nuevo que uno mismo acaba de guardar).
+ */
+function conCachePolling(clave, ttlSegundos, fnImpl){
+  const cacheado = cacheLeerTexto(clave);
+  if(cacheado){
+    return ContentService.createTextOutput(cacheado).setMimeType(ContentService.MimeType.JSON);
+  }
+  const resultado = fnImpl();
+  const texto = resultado.getContent();
+  cacheGuardarTexto(clave, texto, ttlSegundos);
+  return ContentService.createTextOutput(texto).setMimeType(ContentService.MimeType.JSON);
+}
+
 function doGet(e) {
   if (e.parameter.action === "metricas") {
 
@@ -3922,6 +3957,8 @@ function guardarPedido(data){
     Logger.log("guardarPedido: no se pudo registrar cliente automático: " + errCliente.toString());
   }
 
+  invalidarCachePolling();
+
   return jsonResponse({
     success: true,
     pedidoId: pedidoId
@@ -4342,6 +4379,10 @@ for (let c = 0; c < 4; c++) {
 
 }
 function getPedidos(){
+  return conCachePolling("pedidos", 10, getPedidosImpl);
+}
+
+function getPedidosImpl(){
 
 const ss =
 getSS();
@@ -4763,6 +4804,10 @@ function guardarCredencialesAdmin(e){
 }
 
 function dashboard(){
+  return conCachePolling("dashboard", 12, dashboardImpl);
+}
+
+function dashboardImpl(){
 
 const ss =
 getSS();
@@ -4876,6 +4921,8 @@ if(String(data[i][0]) === String(pedidoId)){
     devolverStockPorPedido(pedidoId);
     sheet.getRange(i + 1, 14).setValue("NO");
   }
+
+  invalidarCachePolling();
 
   return jsonResponse({
     success:true
@@ -5108,6 +5155,7 @@ function editarItemsPedido(e){
     // desactualizado, para no perder el trabajo del cajero por un
     // problema aparte (por ejemplo, Drive lento en ese momento).
     Logger.log("Error regenerando PDF tras editar ítems: " + error);
+    invalidarCachePolling();
     return jsonResponse({
       success:true,
       total: totalNuevo,
@@ -5115,6 +5163,8 @@ function editarItemsPedido(e){
       message:"Los ítems se guardaron, pero no se pudo regenerar el PDF. Volvé a intentar desde el detalle del pedido."
     });
   }
+
+  invalidarCachePolling();
 
   return jsonResponse({ success:true, total: totalNuevo });
 }
@@ -5197,6 +5247,7 @@ function marcarPedidoCobrado(e){
 
     if(!cobrado){
       pedidosSheet.getRange(fila, colCobrado + 1, 1, 4).setValues([["NO", "", "", ""]]);
+      invalidarCachePolling();
       return jsonResponse({ success:true, cobrado:false });
     }
 
@@ -5250,6 +5301,7 @@ function marcarPedidoCobrado(e){
       // El cobro del pedido ya quedó registrado igual — esto es solo un extra
     }
 
+    invalidarCachePolling();
     return jsonResponse({ success:true, cobrado:true, ventaId:nuevoVentaId });
   }
 
@@ -6743,6 +6795,8 @@ function guardarVenta(e){
 
     descontarStockPorVenta(carrito);
 
+    invalidarCachePolling();
+
     return jsonResponse({
       success:true,
       ventaId:ventaId
@@ -6853,7 +6907,9 @@ function descontarStockPorVenta(carrito){
 
 function getVentasPOS(){
   // El dashboard solo muestra ventas activas — las anuladas no cuentan
-  return getVentasPOSPorRango(null, null, true);
+  return conCachePolling("ventas_pos_hoy", 10, function(){
+    return getVentasPOSPorRango(null, null, true);
+  });
 }
 
 /**
@@ -7070,6 +7126,8 @@ function eliminarVenta(e){
       }catch(errStock){
         Logger.log("anularVenta: no se pudo devolver stock: " + errStock);
       }
+
+      invalidarCachePolling();
 
       return jsonResponse({ success:true, anulada:true });
     }
