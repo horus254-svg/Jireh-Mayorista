@@ -755,86 +755,107 @@ function guardarProducto(e){
     });
   }
 
-  const sheet = getSheet();
+  // Evita que dos guardados simultáneos (dos cajas, o un doble clic)
+  // lean la hoja al mismo tiempo antes de que ninguno haya hecho el
+  // appendRow todavía, y terminen creando dos filas con el mismo
+  // CODIGO. Mismo patrón que descontarStockPorVenta / sumarStock.
+  const lock = LockService.getScriptLock();
+  const obtuvoLock = lock.tryLock(10000);
 
-  if(!sheet){
+  if(!obtuvoLock){
+    console.error("No se pudo obtener el lock para guardar producto. CODIGO: " + (params.CODIGO || params.codigo || ""));
     return jsonResponse({
       success:false,
-      message:"No se encontró la hoja 'PRODUCTOS'."
+      message:"El sistema está ocupado guardando otro producto, probá de nuevo en unos segundos."
     });
   }
 
-  asegurarColumnasProductoCaja(sheet);
-  asegurarColumnaOrden(sheet);
+  try{
 
-  const headerRow =
-    sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const sheet = getSheet();
 
-  // Validaciones mínimas
-  const nombre = (params.PRODUCTO || params.producto || "").toString().trim();
-  if(!nombre){
-    return jsonResponse({
-      success:false,
-      message:"El nombre del producto es obligatorio."
-    });
-  }
-
-  // CODIGO: si no lo manda el formulario, se genera uno
-  let codigo = (params.CODIGO || params.codigo || "").toString().trim();
-  if(!codigo){
-    codigo = "PRD-" + new Date().getTime();
-  } else {
-    // Evitar códigos duplicados
-    const existentes = sheet.getDataRange().getValues();
-    existentes.shift();
-    const yaExiste = existentes.some(row => String(row[0]).trim() === codigo);
-    if(yaExiste){
+    if(!sheet){
       return jsonResponse({
         success:false,
-        message:"Ya existe un producto con el código '" + codigo + "'."
+        message:"No se encontró la hoja 'PRODUCTOS'."
       });
     }
+
+    asegurarColumnasProductoCaja(sheet);
+    asegurarColumnaOrden(sheet);
+
+    const headerRow =
+      sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+
+    // Validaciones mínimas
+    const nombre = (params.PRODUCTO || params.producto || "").toString().trim();
+    if(!nombre){
+      return jsonResponse({
+        success:false,
+        message:"El nombre del producto es obligatorio."
+      });
+    }
+
+    // CODIGO: si no lo manda el formulario, se genera uno
+    let codigo = (params.CODIGO || params.codigo || "").toString().trim();
+    if(!codigo){
+      codigo = "PRD-" + new Date().getTime();
+    } else {
+      // Evitar códigos duplicados
+      const existentes = sheet.getDataRange().getValues();
+      existentes.shift();
+      const yaExiste = existentes.some(row => String(row[0]).trim() === codigo);
+      if(yaExiste){
+        return jsonResponse({
+          success:false,
+          message:"Ya existe un producto con el código '" + codigo + "'."
+        });
+      }
+    }
+
+    // Valores recibidos del formulario, normalizados por nombre de columna.
+    // Las claves de este objeto deben coincidir EXACTAMENTE con los
+    // encabezados de la hoja PRODUCTOS.
+    const valoresPorColumna = {
+      CODIGO:     codigo,
+      PRODUCTO:   nombre,
+      CATEGORIA:  (params.CATEGORIA || "").toString().trim(),
+      PRECIO:     Number(params.PRECIO || 0),
+      STOCK:      Number(params.STOCK || 0),
+      PUBLICADO:  (params.PUBLICADO || "SI").toString().toUpperCase(),
+      DESTACADO:  (params.DESTACADO || "NO").toString().toUpperCase(),
+      OFERTA:     (params.OFERTA || "NO").toString().toUpperCase(),
+      DESCRIPCION:(params.DESCRIPCION || "").toString(),
+      IMAGEN:     (params.IMAGEN || "").toString().trim(),
+      // Venta por caja (opcional) — mismo producto, otro código de
+      // barras para el bulto/caja cerrada, a un precio total distinto
+      // (normalmente más conveniente que N veces el precio unitario).
+      CODIGO_CAJA:       (params.CODIGO_CAJA || "").toString().trim(),
+      UNIDADES_POR_CAJA: Number(params.UNIDADES_POR_CAJA || 0),
+      PRECIO_CAJA:       Number(params.PRECIO_CAJA || 0),
+      // Producto nuevo -> va al final del orden actual del catálogo,
+      // no a un ORDEN vacío/0 que lo mandaría al principio.
+      ORDEN: obtenerSiguienteOrden(sheet, headerRow)
+    };
+
+    // Armar la fila en el MISMO ORDEN que los encabezados reales de la hoja.
+    const fila = headerRow.map(header => {
+      const key = String(header || "").trim();
+      return valoresPorColumna.hasOwnProperty(key)
+        ? valoresPorColumna[key]
+        : ""; // columna desconocida -> se deja vacía
+    });
+
+    sheet.appendRow(fila);
+
+    return jsonResponse({
+      success:true,
+      codigo: codigo
+    });
+
+  } finally {
+    lock.releaseLock();
   }
-
-  // Valores recibidos del formulario, normalizados por nombre de columna.
-  // Las claves de este objeto deben coincidir EXACTAMENTE con los
-  // encabezados de la hoja PRODUCTOS.
-  const valoresPorColumna = {
-    CODIGO:     codigo,
-    PRODUCTO:   nombre,
-    CATEGORIA:  (params.CATEGORIA || "").toString().trim(),
-    PRECIO:     Number(params.PRECIO || 0),
-    STOCK:      Number(params.STOCK || 0),
-    PUBLICADO:  (params.PUBLICADO || "SI").toString().toUpperCase(),
-    DESTACADO:  (params.DESTACADO || "NO").toString().toUpperCase(),
-    OFERTA:     (params.OFERTA || "NO").toString().toUpperCase(),
-    DESCRIPCION:(params.DESCRIPCION || "").toString(),
-    IMAGEN:     (params.IMAGEN || "").toString().trim(),
-    // Venta por caja (opcional) — mismo producto, otro código de
-    // barras para el bulto/caja cerrada, a un precio total distinto
-    // (normalmente más conveniente que N veces el precio unitario).
-    CODIGO_CAJA:       (params.CODIGO_CAJA || "").toString().trim(),
-    UNIDADES_POR_CAJA: Number(params.UNIDADES_POR_CAJA || 0),
-    PRECIO_CAJA:       Number(params.PRECIO_CAJA || 0),
-    // Producto nuevo -> va al final del orden actual del catálogo,
-    // no a un ORDEN vacío/0 que lo mandaría al principio.
-    ORDEN: obtenerSiguienteOrden(sheet, headerRow)
-  };
-
-  // Armar la fila en el MISMO ORDEN que los encabezados reales de la hoja.
-  const fila = headerRow.map(header => {
-    const key = String(header || "").trim();
-    return valoresPorColumna.hasOwnProperty(key)
-      ? valoresPorColumna[key]
-      : ""; // columna desconocida -> se deja vacía
-  });
-
-  sheet.appendRow(fila);
-
-  return jsonResponse({
-    success:true,
-    codigo: codigo
-  });
 
 }
 
@@ -853,99 +874,120 @@ function actualizarProducto(e){
     });
   }
 
-  const sheet = getSheet();
+  // Mismo motivo que en guardarProducto: sin lock, dos actualizaciones
+  // simultáneas (ej. dos cambios de código casi al mismo tiempo) podrían
+  // leer la hoja antes de que la otra escriba y terminar pisándose o
+  // dejando dos filas con el mismo CODIGO nuevo.
+  const lock = LockService.getScriptLock();
+  const obtuvoLock = lock.tryLock(10000);
 
-  if(!sheet){
+  if(!obtuvoLock){
+    console.error("No se pudo obtener el lock para actualizar producto. codigoOriginal: " + (params.codigoOriginal || ""));
     return jsonResponse({
       success:false,
-      message:"No se encontró la hoja 'PRODUCTOS'."
+      message:"El sistema está ocupado guardando otro producto, probá de nuevo en unos segundos."
     });
   }
 
-  asegurarColumnasProductoCaja(sheet);
-  asegurarColumnaOrden(sheet);
+  try{
 
-  const codigoOriginal = (params.codigoOriginal || "").toString().trim();
+    const sheet = getSheet();
 
-  if(!codigoOriginal){
-    return jsonResponse({
-      success:false,
-      message:"Falta el código original del producto a actualizar."
-    });
-  }
-
-  const nombre = (params.PRODUCTO || params.producto || "").toString().trim();
-  if(!nombre){
-    return jsonResponse({
-      success:false,
-      message:"El nombre del producto es obligatorio."
-    });
-  }
-
-  const data = sheet.getDataRange().getValues();
-  const headerRow = data[0];
-
-  let filaIndex = -1;
-  for(let i = 1; i < data.length; i++){
-    if(String(data[i][0]).trim() === codigoOriginal){
-      filaIndex = i;
-      break;
+    if(!sheet){
+      return jsonResponse({
+        success:false,
+        message:"No se encontró la hoja 'PRODUCTOS'."
+      });
     }
-  }
 
-  if(filaIndex === -1){
-    return jsonResponse({
-      success:false,
-      message:"No se encontró un producto con el código '" + codigoOriginal + "'."
-    });
-  }
+    asegurarColumnasProductoCaja(sheet);
+    asegurarColumnaOrden(sheet);
 
-  let nuevoCodigo = (params.CODIGO || params.codigo || codigoOriginal).toString().trim();
-  if(!nuevoCodigo) nuevoCodigo = codigoOriginal;
+    const codigoOriginal = (params.codigoOriginal || "").toString().trim();
 
-  // Si cambiaron el código, verificar que no choque con otro producto existente
-  if(nuevoCodigo !== codigoOriginal){
+    if(!codigoOriginal){
+      return jsonResponse({
+        success:false,
+        message:"Falta el código original del producto a actualizar."
+      });
+    }
+
+    const nombre = (params.PRODUCTO || params.producto || "").toString().trim();
+    if(!nombre){
+      return jsonResponse({
+        success:false,
+        message:"El nombre del producto es obligatorio."
+      });
+    }
+
+    const data = sheet.getDataRange().getValues();
+    const headerRow = data[0];
+
+    let filaIndex = -1;
     for(let i = 1; i < data.length; i++){
-      if(i !== filaIndex && String(data[i][0]).trim() === nuevoCodigo){
-        return jsonResponse({
-          success:false,
-          message:"Ya existe otro producto con el código '" + nuevoCodigo + "'."
-        });
+      if(String(data[i][0]).trim() === codigoOriginal){
+        filaIndex = i;
+        break;
       }
     }
+
+    if(filaIndex === -1){
+      return jsonResponse({
+        success:false,
+        message:"No se encontró un producto con el código '" + codigoOriginal + "'."
+      });
+    }
+
+    let nuevoCodigo = (params.CODIGO || params.codigo || codigoOriginal).toString().trim();
+    if(!nuevoCodigo) nuevoCodigo = codigoOriginal;
+
+    // Si cambiaron el código, verificar que no choque con otro producto existente
+    if(nuevoCodigo !== codigoOriginal){
+      for(let i = 1; i < data.length; i++){
+        if(i !== filaIndex && String(data[i][0]).trim() === nuevoCodigo){
+          return jsonResponse({
+            success:false,
+            message:"Ya existe otro producto con el código '" + nuevoCodigo + "'."
+          });
+        }
+      }
+    }
+
+    const valoresPorColumna = {
+      CODIGO:     nuevoCodigo,
+      PRODUCTO:   nombre,
+      CATEGORIA:  (params.CATEGORIA || "").toString().trim(),
+      PRECIO:     Number(params.PRECIO || 0),
+      STOCK:      Number(params.STOCK || 0),
+      PUBLICADO:  (params.PUBLICADO || "SI").toString().toUpperCase(),
+      DESTACADO:  (params.DESTACADO || "NO").toString().toUpperCase(),
+      OFERTA:     (params.OFERTA || "NO").toString().toUpperCase(),
+      DESCRIPCION:(params.DESCRIPCION || "").toString(),
+      IMAGEN:     (params.IMAGEN || "").toString().trim(),
+      CODIGO_CAJA:       (params.CODIGO_CAJA || "").toString().trim(),
+      UNIDADES_POR_CAJA: Number(params.UNIDADES_POR_CAJA || 0),
+      PRECIO_CAJA:       Number(params.PRECIO_CAJA || 0)
+    };
+
+    const filaActual = data[filaIndex];
+
+    const filaNueva = headerRow.map((header, idx) => {
+      const key = String(header || "").trim();
+      return valoresPorColumna.hasOwnProperty(key)
+        ? valoresPorColumna[key]
+        : filaActual[idx]; // columna desconocida -> conserva el valor que ya tenía
+    });
+
+    sheet.getRange(filaIndex + 1, 1, 1, filaNueva.length).setValues([filaNueva]);
+
+    return jsonResponse({
+      success:true,
+      codigo: nuevoCodigo
+    });
+
+  } finally {
+    lock.releaseLock();
   }
-
-  const valoresPorColumna = {
-    CODIGO:     nuevoCodigo,
-    PRODUCTO:   nombre,
-    CATEGORIA:  (params.CATEGORIA || "").toString().trim(),
-    PRECIO:     Number(params.PRECIO || 0),
-    STOCK:      Number(params.STOCK || 0),
-    PUBLICADO:  (params.PUBLICADO || "SI").toString().toUpperCase(),
-    DESTACADO:  (params.DESTACADO || "NO").toString().toUpperCase(),
-    OFERTA:     (params.OFERTA || "NO").toString().toUpperCase(),
-    DESCRIPCION:(params.DESCRIPCION || "").toString(),
-    IMAGEN:     (params.IMAGEN || "").toString().trim(),
-    CODIGO_CAJA:       (params.CODIGO_CAJA || "").toString().trim(),
-    UNIDADES_POR_CAJA: Number(params.UNIDADES_POR_CAJA || 0),
-    PRECIO_CAJA:       Number(params.PRECIO_CAJA || 0)
-  };
-
-  const filaActual = data[filaIndex];
-
-  const filaNueva = headerRow.map((header, idx) => {
-    const key = String(header || "").trim();
-    return valoresPorColumna.hasOwnProperty(key)
-      ? valoresPorColumna[key]
-      : filaActual[idx]; // columna desconocida -> conserva el valor que ya tenía
-  });
-
-  sheet.getRange(filaIndex + 1, 1, 1, filaNueva.length).setValues([filaNueva]);
-
-  return jsonResponse({
-    success:true,
-    codigo: nuevoCodigo
-  });
 
 }
 
@@ -1099,7 +1141,7 @@ function getOrCrearHojaIngresosProductos(){
     sheet = ss.insertSheet("INGRESOS_PRODUCTOS");
     sheet.appendRow([
       "INGRESO_ID", "BOLETA_ID", "FECHA", "CODIGO", "PRODUCTO", "CATEGORIA",
-      "CANTIDAD", "PRECIO_INGRESO", "PRECIO_ANTERIOR", "PRECIO_NUEVO", "PROVEEDOR",
+      "CANTIDAD", "MONEDA", "TIPO_CAMBIO", "PRECIO_INGRESO", "PRECIO_ARS", "PRECIO_ANTERIOR", "PRECIO_NUEVO", "PROVEEDOR",
       "PROVEEDOR_CONTACTO", "OBSERVACIONES", "ES_PRODUCTO_NUEVO", "USUARIO"
     ]);
     sheet.setFrozenRows(1);
@@ -1128,6 +1170,24 @@ function getOrCrearHojaIngresosProductos(){
     sheet.insertColumnBefore(idxPrecioAnterior + 1);
     sheet.getRange(1, idxPrecioAnterior + 1).setValue("PRECIO_INGRESO");
   }
+  // Migración: instalaciones anteriores a poder cargar el precio de
+  // ingreso en dólares no tienen MONEDA/TIPO_CAMBIO/PRECIO_ARS. Se
+  // agregan antes de PRECIO_INGRESO. Filas viejas quedan con MONEDA
+  // vacía — se interpretan como ARS (ver _monedaComoTexto).
+  const headerConPrecioIngreso = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0];
+  const idxPrecioIngresoActual = headerConPrecioIngreso.indexOf("PRECIO_INGRESO");
+  if(idxPrecioIngresoActual !== -1 && headerConPrecioIngreso.indexOf("MONEDA") === -1){
+    sheet.insertColumnBefore(idxPrecioIngresoActual + 1);
+    sheet.insertColumnBefore(idxPrecioIngresoActual + 2);
+    sheet.getRange(1, idxPrecioIngresoActual + 1).setValue("MONEDA");
+    sheet.getRange(1, idxPrecioIngresoActual + 2).setValue("TIPO_CAMBIO");
+  }
+  const headerConMoneda = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0];
+  const idxPrecioIngresoFinal = headerConMoneda.indexOf("PRECIO_INGRESO");
+  if(idxPrecioIngresoFinal !== -1 && headerConMoneda.indexOf("PRECIO_ARS") === -1){
+    sheet.insertColumnAfter(idxPrecioIngresoFinal + 1);
+    sheet.getRange(1, idxPrecioIngresoFinal + 2).setValue("PRECIO_ARS");
+  }
   return sheet;
 }
 
@@ -1139,14 +1199,28 @@ function getOrCrearHojaBoletasProveedor(){
     sheet = ss.insertSheet("BOLETAS_PROVEEDOR");
     sheet.appendRow([
       "BOLETA_ID", "FECHA", "PROVEEDOR", "PROVEEDOR_CONTACTO",
-      "NUMERO_BOLETA", "OBSERVACIONES", "TOTAL", "USUARIO", "FECHA_CREACION"
+      "NUMERO_BOLETA", "OBSERVACIONES", "TOTAL", "USUARIO", "FECHA_CREACION",
+      "ORIGEN", "SIN_DEUDA"
     ]);
     sheet.setFrozenRows(1);
     _hojaCache["BOLETAS_PROVEEDOR"] = sheet;
+    return sheet;
+  }
+  // Migración: instalaciones que ya tenían esta hoja de antes de que
+  // existiera el origen "nuestra sucursal/depósito" no tienen las
+  // columnas ORIGEN/SIN_DEUDA. Se agregan al final; las filas viejas
+  // quedan con SIN_DEUDA vacío, que se interpreta como "con deuda"
+  // (comportamiento anterior, sin cambios).
+  const header = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0];
+  if(header.indexOf("ORIGEN") === -1){
+    const ultimaCol = sheet.getLastColumn();
+    sheet.getRange(1, ultimaCol + 1).setValue("ORIGEN");
+    sheet.getRange(1, ultimaCol + 2).setValue("SIN_DEUDA");
   }
   return sheet;
 }
 
+/** Returns the PAGOS_PROVEEDOR sheet, creating it the first time it's needed */
 /** Returns the PAGOS_PROVEEDOR sheet, creating it the first time it's needed */
 function getOrCrearHojaPagosProveedor(){
   const ss = getSS();
@@ -1155,12 +1229,75 @@ function getOrCrearHojaPagosProveedor(){
     sheet = ss.insertSheet("PAGOS_PROVEEDOR");
     sheet.appendRow([
       "PAGO_ID", "FECHA", "BOLETA_ID", "PROVEEDOR",
-      "MONTO", "FORMA_PAGO", "OBSERVACIONES", "USUARIO"
+      "MONTO", "MONEDA", "FORMA_PAGO", "OBSERVACIONES", "USUARIO"
     ]);
     sheet.setFrozenRows(1);
     _hojaCache["PAGOS_PROVEEDOR"] = sheet;
+    return sheet;
+  }
+  // Migración: instalaciones que ya tenían esta hoja de antes de poder
+  // pagarle al proveedor en dólares no tienen la columna MONEDA. Se
+  // agrega después de MONTO; los pagos viejos quedan con MONEDA vacía,
+  // que se interpreta como ARS (todos los pagos históricos se hicieron
+  // en pesos, ya que la opción de dólares no existía todavía).
+  const header = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0];
+  const idxMonto = header.indexOf("MONTO");
+  if(idxMonto !== -1 && header.indexOf("MONEDA") === -1){
+    sheet.insertColumnAfter(idxMonto + 1);
+    sheet.getRange(1, idxMonto + 2).setValue("MONEDA");
   }
   return sheet;
+}
+
+/**
+ * Calcula, a partir de las líneas de INGRESOS_PRODUCTOS de una boleta,
+ * cuánto se debe en cada moneda — SIN convertir nada entre monedas
+ * (a diferencia de TOTAL, que es un equivalente en pesos). Esto es lo
+ * que permite que una boleta se pague parte en pesos y parte en
+ * dólares: cada moneda tiene su propio total y su propio saldo,
+ * independiente del tipo de cambio del día.
+ */
+function _totalesNativosBoleta(boletaId){
+  const hojaIngresos = getOrCrearHojaIngresosProductos();
+  const items = rowsToObjects(hojaIngresos.getDataRange().getValues())
+    .filter(i => String(i.BOLETA_ID) === String(boletaId));
+
+  let totalArs = 0;
+  let totalUsd = 0;
+  items.forEach(i => {
+    const cantidad = Number(i.CANTIDAD || 0);
+    const precioIngreso = Number(i.PRECIO_INGRESO || 0);
+    const moneda = String(i.MONEDA || "ARS").trim().toUpperCase() === "USD" ? "USD" : "ARS";
+    const subtotal = cantidad * precioIngreso;
+    if(moneda === "USD") totalUsd += subtotal;
+    else totalArs += subtotal;
+  });
+
+  return {
+    totalArs: Math.round(totalArs * 100) / 100,
+    totalUsd: Math.round(totalUsd * 100) / 100
+  };
+}
+
+/**
+ * Suma los pagos ya registrados contra una boleta, separados por
+ * moneda (ARS/USD). Un pago sin MONEDA (registrado antes de que
+ * existiera esta opción) se cuenta como ARS.
+ */
+function _pagadoNativoBoleta(boletaId, pagos){
+  let pagadoArs = 0;
+  let pagadoUsd = 0;
+  pagos.forEach(p => {
+    if(String(p.BOLETA_ID) !== String(boletaId)) return;
+    const moneda = String(p.MONEDA || "ARS").trim().toUpperCase() === "USD" ? "USD" : "ARS";
+    const monto = Number(p.MONTO || 0);
+    if(moneda === "USD") pagadoUsd += monto;
+    else pagadoArs += monto;
+  });
+  return {
+    pagadoArs: Math.round(pagadoArs * 100) / 100,
+    pagadoUsd: Math.round(pagadoUsd * 100) / 100
+  };
 }
 
 /** Normaliza fechas que Sheets puede devolver como objeto Date a texto "yyyy-MM-dd" */
@@ -1198,6 +1335,20 @@ function generarCodigoProductoNuevo(){
  * fila nueva en memoria si corresponde, para que dos ítems nuevos con
  * el mismo código en la misma boleta no se pisen entre sí).
  */
+/**
+ * Asegura que la hoja PRODUCTOS tenga la columna COSTO_USD_REF —
+ * guarda el último precio de ingreso cargado en dólares para ese
+ * producto, como referencia para futuros ingresos (no se usa en el
+ * catálogo/POS, es solo informativo). Se agrega al final de la hoja
+ * sin tocar columnas ni filas existentes.
+ */
+function _asegurarColumnaCostoUsdRef(sheet){
+  const header = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0];
+  if(header.indexOf("COSTO_USD_REF") === -1){
+    sheet.getRange(1, sheet.getLastColumn() + 1).setValue("COSTO_USD_REF");
+  }
+}
+
 function _aplicarItemIngresoProducto(sheet, filas, headerRow, item){
 
   const idxCodigo = headerRow.indexOf("CODIGO");
@@ -1205,6 +1356,7 @@ function _aplicarItemIngresoProducto(sheet, filas, headerRow, item){
   const idxCategoria = headerRow.indexOf("CATEGORIA");
   const idxPrecio = headerRow.indexOf("PRECIO");
   const idxStock = headerRow.indexOf("STOCK");
+  const idxCostoUsdRef = headerRow.indexOf("COSTO_USD_REF");
 
   const nombre = (item.producto || "").toString().trim();
   const cantidad = Number(item.cantidad || 0);
@@ -1214,6 +1366,19 @@ function _aplicarItemIngresoProducto(sheet, filas, headerRow, item){
   // registrarIngresoProducto). NUNCA se usa para el catálogo/POS.
   const precioIngresoNuevo = item.precio !== undefined && item.precio !== ""
     ? Number(item.precio) : null;
+
+  // Moneda en la que se cargó el precio de ingreso: "USD" o "ARS"
+  // (por defecto ARS si no viene nada, para no romper llamadas viejas).
+  const monedaItem = String(item.moneda || "ARS").trim().toUpperCase() === "USD" ? "USD" : "ARS";
+  const tipoCambioItem = (monedaItem === "USD" && item.tipoCambio) ? Number(item.tipoCambio) : null;
+  // Precio de ingreso convertido a pesos — es lo que realmente compone
+  // la deuda con el proveedor. Si viene precalculado desde el
+  // frontend se usa ese; si no, se recalcula acá como respaldo.
+  const precioARSItem = item.precioARS !== undefined && item.precioARS !== "" && !isNaN(Number(item.precioARS))
+    ? Number(item.precioARS)
+    : (monedaItem === "USD" && tipoCambioItem && precioIngresoNuevo !== null
+        ? precioIngresoNuevo * tipoCambioItem
+        : precioIngresoNuevo);
 
   // Precio de VENTA (al público) — el que ve el cliente en el POS y en
   // la página del catálogo (columna PRECIO de PRODUCTOS). Es un dato
@@ -1256,6 +1421,14 @@ function _aplicarItemIngresoProducto(sheet, filas, headerRow, item){
       filas[filaIndex][idxPrecio] = precioVentaNuevo;
     }
 
+    // Guardar el precio de ingreso en USD como referencia futura — solo
+    // si este ingreso puntual vino en dólares; si vino en pesos se deja
+    // el último valor en USD que ya hubiera, sin borrarlo.
+    if(idxCostoUsdRef !== -1 && monedaItem === "USD" && precioIngresoNuevo !== null && !isNaN(precioIngresoNuevo)){
+      sheet.getRange(filaIndex + 1, idxCostoUsdRef + 1).setValue(precioIngresoNuevo);
+      filas[filaIndex][idxCostoUsdRef] = precioIngresoNuevo;
+    }
+
     productoFinal = filas[filaIndex][idxProducto];
     categoriaFinal = filas[filaIndex][idxCategoria];
 
@@ -1293,7 +1466,8 @@ function _aplicarItemIngresoProducto(sheet, filas, headerRow, item){
       DESTACADO: "NO",
       OFERTA: "NO",
       DESCRIPCION: "",
-      IMAGEN: ""
+      IMAGEN: "",
+      COSTO_USD_REF: (monedaItem === "USD" && precioIngresoNuevo !== null && !isNaN(precioIngresoNuevo)) ? precioIngresoNuevo : ""
     };
 
     const fila = headerRow.map(header => {
@@ -1307,11 +1481,12 @@ function _aplicarItemIngresoProducto(sheet, filas, headerRow, item){
   }
 
   // El precio USADO para calcular cuánto se le debe al proveedor en esta
-  // boleta es siempre el precio de INGRESO (costo) — nunca el de venta.
-  // Si por algún motivo no se cargó un precio de ingreso puntual, se usa
-  // el de venta como respaldo (mejor eso que sumar $0 a la boleta).
-  const precioUsado = (precioIngresoNuevo !== null && !isNaN(precioIngresoNuevo))
-    ? precioIngresoNuevo
+  // boleta es siempre el precio de INGRESO (costo) convertido a pesos
+  // (precioARS) — nunca el de venta. Si por algún motivo no se cargó un
+  // precio de ingreso puntual, se usa el de venta como respaldo (mejor
+  // eso que sumar $0 a la boleta).
+  const precioUsado = (precioARSItem !== null && !isNaN(precioARSItem))
+    ? precioARSItem
     : (precioVentaNuevo !== null && !isNaN(precioVentaNuevo) ? precioVentaNuevo : 0);
 
   return {
@@ -1319,6 +1494,9 @@ function _aplicarItemIngresoProducto(sheet, filas, headerRow, item){
     precioAnterior: precioVentaAnterior,
     precioNuevo: precioVentaNuevo,
     precioIngreso: precioIngresoNuevo,
+    moneda: monedaItem,
+    tipoCambio: tipoCambioItem,
+    precioARS: precioARSItem,
     precioUsado, esProductoNuevo
   };
 }
@@ -1371,6 +1549,7 @@ function registrarIngresoProducto(data){
     if(!sheet){
       return jsonResponse({ success:false, message:"No se encontró la hoja 'PRODUCTOS'." });
     }
+    _asegurarColumnaCostoUsdRef(sheet);
 
     const filas = sheet.getDataRange().getValues();
     const headerRow = filas[0];
@@ -1393,6 +1572,13 @@ function registrarIngresoProducto(data){
     const observaciones = ((data && data.observaciones) || "").toString().trim();
     const usuario = ((data && data.usuario) || "").toString().trim();
     const fecha = data.fecha ? data.fecha : Utilities.formatDate(new Date(), Session.getScriptTimeZone() || "GMT-3", "yyyy-MM-dd");
+    // Origen de la mercadería: "PROVEEDOR" (default) o "DEPOSITO" —
+    // cuando viene de nuestra propia sucursal/depósito no genera deuda,
+    // así que la boleta queda marcada SIN_DEUDA y no aparece en los
+    // listados de deuda a proveedores (ver getBoletasProveedores/
+    // getProveedoresConSaldo).
+    const origen = String((data && data.origen) || "PROVEEDOR").trim().toUpperCase() === "DEPOSITO" ? "DEPOSITO" : "PROVEEDOR";
+    const sinDeuda = origen === "DEPOSITO" || (data && data.sinDeuda === true);
 
     const hojaBoletas = getOrCrearHojaBoletasProveedor();
     const filasBoletas = hojaBoletas.getDataRange().getValues();
@@ -1402,6 +1588,7 @@ function registrarIngresoProducto(data){
     const bIdxProveedor = bHeader.indexOf("PROVEEDOR");
     const bIdxNumero = bHeader.indexOf("NUMERO_BOLETA");
     const bIdxTotal = bHeader.indexOf("TOTAL");
+    const bIdxSinDeuda = bHeader.indexOf("SIN_DEUDA");
 
     let filaBoletaIndex = -1;
     for(let i = 1; i < filasBoletas.length; i++){
@@ -1419,12 +1606,16 @@ function registrarIngresoProducto(data){
       boletaId = filasBoletas[filaBoletaIndex][bIdxId];
       const totalActual = Number(filasBoletas[filaBoletaIndex][bIdxTotal] || 0);
       hojaBoletas.getRange(filaBoletaIndex + 1, bIdxTotal + 1).setValue(totalActual + totalBoleta);
+      if(bIdxSinDeuda !== -1){
+        hojaBoletas.getRange(filaBoletaIndex + 1, bIdxSinDeuda + 1).setValue(sinDeuda ? "SI" : "NO");
+      }
     } else {
       boletaId = "BOL-" + Date.now();
       hojaBoletas.appendRow([
         boletaId, fecha, proveedor, proveedorContacto,
         numeroBoleta, observaciones, totalBoleta, usuario,
-        Utilities.formatDate(new Date(), Session.getScriptTimeZone() || "GMT-3", "yyyy-MM-dd HH:mm:ss")
+        Utilities.formatDate(new Date(), Session.getScriptTimeZone() || "GMT-3", "yyyy-MM-dd HH:mm:ss"),
+        origen, sinDeuda ? "SI" : "NO"
       ]);
     }
 
@@ -1440,7 +1631,10 @@ function registrarIngresoProducto(data){
         r.productoFinal,
         r.categoriaFinal,
         r.cantidad,
-        r.precioUsado, // PRECIO_INGRESO — el costo pagado al proveedor, lo que compone el total de la boleta
+        r.moneda, // MONEDA en la que se cargó el precio de ingreso (ARS/USD)
+        r.tipoCambio !== null && r.tipoCambio !== undefined ? r.tipoCambio : "", // TIPO_CAMBIO usado, solo si es USD
+        r.precioIngreso, // PRECIO_INGRESO — el costo pagado al proveedor, en su moneda original
+        r.precioARS, // PRECIO_ARS — costo convertido a pesos, lo que compone el total de la boleta
         r.precioAnterior,
         (r.precioNuevo !== null && !isNaN(r.precioNuevo)) ? r.precioNuevo : r.precioAnterior,
         proveedor,
@@ -1456,6 +1650,8 @@ function registrarIngresoProducto(data){
       success: true,
       boletaId: boletaId,
       totalBoleta: totalBoleta,
+      origen: origen,
+      sinDeuda: sinDeuda,
       items: resultados.map(r => ({
         codigo: r.codigo, producto: r.productoFinal,
         cantidad: r.cantidad, esProductoNuevo: r.esProductoNuevo
@@ -1484,19 +1680,26 @@ function getBoletasProveedores(e){
   const hojaPagos = getOrCrearHojaPagosProveedor();
   const pagos = rowsToObjects(hojaPagos.getDataRange().getValues());
 
-  const pagadoPorBoleta = {};
-  pagos.forEach(p => {
-    const id = String(p.BOLETA_ID || "");
-    pagadoPorBoleta[id] = (pagadoPorBoleta[id] || 0) + Number(p.MONTO || 0);
-  });
-
+  // Las boletas de mercadería que vino de nuestra propia sucursal/depósito
+  // (SIN_DEUDA = "SI") se siguen listando —para poder revisarlas e
+  // imprimirlas igual que cualquier otra— pero no representan una deuda
+  // real: se muestran con saldo $0/US$0 y estado especial "SIN_DEUDA".
   let resultado = boletas.map(b => {
-    const total = Number(b.TOTAL || 0);
-    const pagado = pagadoPorBoleta[String(b.BOLETA_ID)] || 0;
-    const saldo = Math.round((total - pagado) * 100) / 100;
-    let estado = "PENDIENTE";
-    if(saldo <= 0) estado = "PAGADA";
-    else if(pagado > 0) estado = "PARCIAL";
+    const esSinDeuda = String(b.SIN_DEUDA || "").trim().toUpperCase() === "SI";
+    const { totalArs, totalUsd } = _totalesNativosBoleta(b.BOLETA_ID);
+    const { pagadoArs, pagadoUsd } = _pagadoNativoBoleta(b.BOLETA_ID, pagos);
+
+    const pagadoArsFinal = esSinDeuda ? totalArs : pagadoArs;
+    const pagadoUsdFinal = esSinDeuda ? totalUsd : pagadoUsd;
+    const saldoArs = esSinDeuda ? 0 : Math.round((totalArs - pagadoArs) * 100) / 100;
+    const saldoUsd = esSinDeuda ? 0 : Math.round((totalUsd - pagadoUsd) * 100) / 100;
+
+    let estado = esSinDeuda ? "SIN_DEUDA" : "PENDIENTE";
+    if(!esSinDeuda){
+      if(saldoArs <= 0 && saldoUsd <= 0) estado = "PAGADA";
+      else if(pagadoArs > 0 || pagadoUsd > 0) estado = "PARCIAL";
+    }
+
     return {
       BOLETA_ID: b.BOLETA_ID,
       FECHA: _fechaComoTexto(b.FECHA),
@@ -1504,10 +1707,19 @@ function getBoletasProveedores(e){
       PROVEEDOR_CONTACTO: b.PROVEEDOR_CONTACTO,
       NUMERO_BOLETA: b.NUMERO_BOLETA,
       OBSERVACIONES: b.OBSERVACIONES,
-      TOTAL: total,
-      PAGADO: Math.round(pagado * 100) / 100,
-      SALDO: saldo,
+      TOTAL_ARS: totalArs,
+      TOTAL_USD: totalUsd,
+      PAGADO_ARS: Math.round(pagadoArsFinal * 100) / 100,
+      PAGADO_USD: Math.round(pagadoUsdFinal * 100) / 100,
+      SALDO_ARS: saldoArs,
+      SALDO_USD: saldoUsd,
+      // Se conservan TOTAL/PAGADO/SALDO (en pesos) por compatibilidad con
+      // pantallas/reportes viejos que todavía no distinguen moneda.
+      TOTAL: totalArs,
+      PAGADO: Math.round(pagadoArsFinal * 100) / 100,
+      SALDO: saldoArs,
       ESTADO: estado,
+      ORIGEN: b.ORIGEN || "PROVEEDOR",
       USUARIO: b.USUARIO
     };
   });
@@ -1548,15 +1760,13 @@ function getProveedoresConSaldo(){
   const hojaPagos = getOrCrearHojaPagosProveedor();
   const pagos = rowsToObjects(hojaPagos.getDataRange().getValues());
 
-  const pagadoPorBoleta = {};
-  pagos.forEach(p => {
-    const id = String(p.BOLETA_ID || "");
-    pagadoPorBoleta[id] = (pagadoPorBoleta[id] || 0) + Number(p.MONTO || 0);
-  });
-
   const porProveedor = {};
 
   boletas.forEach(b => {
+    // Igual que en getBoletasProveedores: la mercadería que vino de
+    // nuestra propia sucursal/depósito no genera deuda, así que no
+    // suma al saldo de ningún proveedor.
+    if(String(b.SIN_DEUDA || "").trim().toUpperCase() === "SI") return;
     const nombre = String(b.PROVEEDOR || "").trim();
     if(!nombre) return;
     const key = nombre.toLowerCase();
@@ -1567,22 +1777,27 @@ function getProveedoresConSaldo(){
         PROVEEDOR_CONTACTO: "",
         BOLETAS: 0,
         BOLETAS_PENDIENTES: 0,
-        TOTAL: 0,
-        PAGADO: 0,
+        TOTAL_ARS: 0,
+        TOTAL_USD: 0,
+        PAGADO_ARS: 0,
+        PAGADO_USD: 0,
         ULTIMA_FECHA: ""
       };
     }
 
     const entrada = porProveedor[key];
-    const total = Number(b.TOTAL || 0);
-    const pagado = pagadoPorBoleta[String(b.BOLETA_ID)] || 0;
-    const saldo = Math.round((total - pagado) * 100) / 100;
+    const { totalArs, totalUsd } = _totalesNativosBoleta(b.BOLETA_ID);
+    const { pagadoArs, pagadoUsd } = _pagadoNativoBoleta(b.BOLETA_ID, pagos);
+    const saldoArs = Math.round((totalArs - pagadoArs) * 100) / 100;
+    const saldoUsd = Math.round((totalUsd - pagadoUsd) * 100) / 100;
     const fecha = _fechaComoTexto(b.FECHA);
 
     entrada.BOLETAS += 1;
-    entrada.TOTAL += total;
-    entrada.PAGADO += pagado;
-    if(saldo > 0) entrada.BOLETAS_PENDIENTES += 1;
+    entrada.TOTAL_ARS += totalArs;
+    entrada.TOTAL_USD += totalUsd;
+    entrada.PAGADO_ARS += pagadoArs;
+    entrada.PAGADO_USD += pagadoUsd;
+    if(saldoArs > 0 || saldoUsd > 0) entrada.BOLETAS_PENDIENTES += 1;
 
     // Se queda con el contacto y la fecha de la boleta más reciente de este proveedor
     if(!entrada.ULTIMA_FECHA || fecha > entrada.ULTIMA_FECHA){
@@ -1594,24 +1809,37 @@ function getProveedoresConSaldo(){
   });
 
   const proveedores = Object.values(porProveedor).map(p => {
-    const total = Math.round(p.TOTAL * 100) / 100;
-    const pagado = Math.round(p.PAGADO * 100) / 100;
-    const saldo = Math.round((total - pagado) * 100) / 100;
+    const totalArs = Math.round(p.TOTAL_ARS * 100) / 100;
+    const totalUsd = Math.round(p.TOTAL_USD * 100) / 100;
+    const pagadoArs = Math.round(p.PAGADO_ARS * 100) / 100;
+    const pagadoUsd = Math.round(p.PAGADO_USD * 100) / 100;
+    const saldoArs = Math.round((totalArs - pagadoArs) * 100) / 100;
+    const saldoUsd = Math.round((totalUsd - pagadoUsd) * 100) / 100;
     return {
       PROVEEDOR: p.PROVEEDOR,
       PROVEEDOR_CONTACTO: p.PROVEEDOR_CONTACTO,
       BOLETAS: p.BOLETAS,
       BOLETAS_PENDIENTES: p.BOLETAS_PENDIENTES,
-      TOTAL: total,
-      PAGADO: pagado,
-      SALDO: saldo,
+      TOTAL_ARS: totalArs,
+      TOTAL_USD: totalUsd,
+      PAGADO_ARS: pagadoArs,
+      PAGADO_USD: pagadoUsd,
+      SALDO_ARS: saldoArs,
+      SALDO_USD: saldoUsd,
+      // Compatibilidad con pantallas viejas que solo mostraban pesos
+      TOTAL: totalArs,
+      PAGADO: pagadoArs,
+      SALDO: saldoArs,
       ULTIMA_FECHA: p.ULTIMA_FECHA
     };
   });
 
-  // Los que tienen más deuda primero; entre los que no deben nada, orden alfabético
+  // Los que tienen más deuda primero (sumando ambas monedas como
+  // referencia de orden); entre los que no deben nada, orden alfabético
   proveedores.sort((a, b) => {
-    if(b.SALDO !== a.SALDO) return b.SALDO - a.SALDO;
+    const deudaA = a.SALDO_ARS + a.SALDO_USD;
+    const deudaB = b.SALDO_ARS + b.SALDO_USD;
+    if(deudaB !== deudaA) return deudaB - deudaA;
     return String(a.PROVEEDOR).localeCompare(String(b.PROVEEDOR));
   });
 
@@ -1646,12 +1874,24 @@ function getDetalleBoletaProveedor(e){
   const hojaPagos = getOrCrearHojaPagosProveedor();
   const pagos = rowsToObjects(hojaPagos.getDataRange().getValues())
     .filter(p => String(p.BOLETA_ID) === boletaId)
-    .map(p => Object.assign({}, p, { FECHA: _fechaComoTexto(p.FECHA) }))
+    .map(p => Object.assign({}, p, {
+      FECHA: _fechaComoTexto(p.FECHA),
+      MONEDA: String(p.MONEDA || "ARS").trim().toUpperCase() === "USD" ? "USD" : "ARS"
+    }))
     .sort((a, b) => String(b.FECHA).localeCompare(String(a.FECHA)) || String(b.PAGO_ID).localeCompare(String(a.PAGO_ID)));
 
-  const total = Number(boleta.TOTAL || 0);
-  const pagado = pagos.reduce((acc, p) => acc + Number(p.MONTO || 0), 0);
-  const saldo = Math.round((total - pagado) * 100) / 100;
+  const esSinDeuda = String(boleta.SIN_DEUDA || "").trim().toUpperCase() === "SI";
+  const { totalArs, totalUsd } = _totalesNativosBoleta(boletaId);
+  const { pagadoArs, pagadoUsd } = esSinDeuda
+    ? { pagadoArs: totalArs, pagadoUsd: totalUsd }
+    : _pagadoNativoBoleta(boletaId, pagos);
+  const saldoArs = esSinDeuda ? 0 : Math.round((totalArs - pagadoArs) * 100) / 100;
+  const saldoUsd = esSinDeuda ? 0 : Math.round((totalUsd - pagadoUsd) * 100) / 100;
+
+  let estado = "PENDIENTE";
+  if(esSinDeuda) estado = "SIN_DEUDA";
+  else if(saldoArs <= 0 && saldoUsd <= 0) estado = "PAGADA";
+  else if(pagadoArs > 0 || pagadoUsd > 0) estado = "PARCIAL";
 
   return jsonResponse({
     success: true,
@@ -1664,10 +1904,18 @@ function getDetalleBoletaProveedor(e){
       OBSERVACIONES: boleta.OBSERVACIONES,
       USUARIO: boleta.USUARIO,
       FECHA_CREACION: boleta.FECHA_CREACION,
-      TOTAL: total,
-      PAGADO: Math.round(pagado * 100) / 100,
-      SALDO: saldo,
-      ESTADO: saldo <= 0 ? "PAGADA" : (pagado > 0 ? "PARCIAL" : "PENDIENTE")
+      ORIGEN: boleta.ORIGEN || "PROVEEDOR",
+      TOTAL_ARS: totalArs,
+      TOTAL_USD: totalUsd,
+      PAGADO_ARS: Math.round(pagadoArs * 100) / 100,
+      PAGADO_USD: Math.round(pagadoUsd * 100) / 100,
+      SALDO_ARS: saldoArs,
+      SALDO_USD: saldoUsd,
+      // Compatibilidad con pantallas viejas que solo mostraban pesos
+      TOTAL: totalArs,
+      PAGADO: Math.round(pagadoArs * 100) / 100,
+      SALDO: saldoArs,
+      ESTADO: estado
     },
     items: items,
     pagos: pagos
@@ -1691,6 +1939,7 @@ function registrarPagoProveedor(data){
 
   const boletaId = ((data && data.boletaId) || "").toString().trim();
   const monto = Number((data && data.monto) || 0);
+  const moneda = String((data && data.moneda) || "ARS").trim().toUpperCase() === "USD" ? "USD" : "ARS";
 
   if(!boletaId){
     return jsonResponse({ success:false, message:"Falta el ID de la boleta." });
@@ -1715,7 +1964,6 @@ function registrarPagoProveedor(data){
     const bHeader = filasBoletas[0];
     const bIdxId = bHeader.indexOf("BOLETA_ID");
     const bIdxProveedor = bHeader.indexOf("PROVEEDOR");
-    const bIdxTotal = bHeader.indexOf("TOTAL");
 
     let filaBoleta = null;
     for(let i = 1; i < filasBoletas.length; i++){
@@ -1729,19 +1977,21 @@ function registrarPagoProveedor(data){
     }
 
     const proveedor = String(filaBoleta[bIdxProveedor] || "");
-    const total = Number(filaBoleta[bIdxTotal] || 0);
 
+    const { totalArs, totalUsd } = _totalesNativosBoleta(boletaId);
     const hojaPagos = getOrCrearHojaPagosProveedor();
-    const pagosPrevios = rowsToObjects(hojaPagos.getDataRange().getValues())
-      .filter(p => String(p.BOLETA_ID) === boletaId)
-      .reduce((acc, p) => acc + Number(p.MONTO || 0), 0);
+    const pagosPrevios = rowsToObjects(hojaPagos.getDataRange().getValues());
+    const { pagadoArs, pagadoUsd } = _pagadoNativoBoleta(boletaId, pagosPrevios);
 
-    const saldoActual = Math.round((total - pagosPrevios) * 100) / 100;
+    const totalMoneda = moneda === "USD" ? totalUsd : totalArs;
+    const pagadoMoneda = moneda === "USD" ? pagadoUsd : pagadoArs;
+    const saldoActual = Math.round((totalMoneda - pagadoMoneda) * 100) / 100;
+    const simbolo = moneda === "USD" ? "US$" : "$";
 
     if(monto - saldoActual > 0.01){
       return jsonResponse({
         success:false,
-        message:"El monto ($" + monto.toLocaleString("es-AR") + ") supera el saldo pendiente de la boleta ($" + saldoActual.toLocaleString("es-AR") + ")."
+        message:"El monto (" + simbolo + monto.toLocaleString("es-AR") + ") supera el saldo pendiente en " + moneda + " de la boleta (" + simbolo + saldoActual.toLocaleString("es-AR") + ")."
       });
     }
 
@@ -1754,18 +2004,25 @@ function registrarPagoProveedor(data){
       boletaId,
       proveedor,
       monto,
+      moneda,
       (data.formaPago || "EFECTIVO").toString().trim(),
       (data.observaciones || "").toString().trim(),
       (data.usuario || "").toString().trim()
     ]);
 
-    const nuevoSaldo = Math.round((saldoActual - monto) * 100) / 100;
+    const nuevoSaldoMoneda = Math.round((saldoActual - monto) * 100) / 100;
+    // El resto de la boleta (la otra moneda) no cambia con este pago;
+    // se recalcula para saber si la boleta quedó totalmente pagada.
+    const saldoOtraMoneda = moneda === "USD"
+      ? Math.round((totalArs - pagadoArs) * 100) / 100
+      : Math.round((totalUsd - pagadoUsd) * 100) / 100;
 
     return jsonResponse({
       success: true,
       pagoId: pagoId,
-      nuevoSaldo: nuevoSaldo,
-      estado: nuevoSaldo <= 0 ? "PAGADA" : "PARCIAL"
+      moneda: moneda,
+      nuevoSaldo: nuevoSaldoMoneda,
+      estado: (nuevoSaldoMoneda <= 0 && saldoOtraMoneda <= 0) ? "PAGADA" : "PARCIAL"
     });
 
   } catch(error){
@@ -1833,11 +2090,11 @@ function getIngresosProductos(e){
    Se guarda en una hoja "CONFIGURACION" con formato clave/valor:
    CLAVE | VALOR
    Si la hoja no existe, se crea automáticamente con los valores
-   originales (JIREH) la primera vez que se pide la configuración.
+   por defecto (genéricos) la primera vez que se pide la configuración.
 ===================================================================== */
 
 const CONFIG_NEGOCIO_DEFAULTS = {
-  NOMBRE:     "JIREH",
+  NOMBRE:     "MI NEGOCIO",
   SUBTITULO:  "Punto de Venta",
   DIRECCION:  "",
   TELEFONO1:  "",
@@ -1854,7 +2111,7 @@ const CONFIG_NEGOCIO_DEFAULTS = {
   PEDIDO_MINIMO: 100000,
 
   // ---- Banner y tema del catálogo web (sección "Apariencia") ----
-  BANNER_TITULO:    "Mayorista Jireh",
+  BANNER_TITULO:    "",
   BANNER_SUBTITULO: "Catálogo Mayorista Online",
   BANNER_IMAGEN:    "",
   TEMA:             "navy",
@@ -1866,7 +2123,7 @@ const CONFIG_NEGOCIO_DEFAULTS = {
   GRAD_PERSONALIZADO: "NO",
   GRAD_A:           "#241536",
   GRAD_B:           "#3a2856",
-  NAVBAR_TEXTO:     "Jireh Mayorista",
+  NAVBAR_TEXTO:     "",
   // Ícono junto al nombre del negocio en el navbar del catálogo. Por
   // defecto NO es un carrito/bolsa — ya hay un botón de carrito al
   // lado, y usar el mismo tipo de ícono para las dos cosas confunde
@@ -1877,7 +2134,7 @@ const CONFIG_NEGOCIO_DEFAULTS = {
   // Son independientes de DIRECCION/TELEFONO1/TELEFONO2 de arriba, que son
   // los del encabezado del ticket impreso — esto es lo que ve el cliente
   // en la página pública.
-  BENEFICIO_WHATSAPP_NUMERO:  "5491140975795",
+  BENEFICIO_WHATSAPP_NUMERO:  "",
   BENEFICIO_INSTAGRAM_URL:    "",
   BENEFICIO_TELEFONO1:        "",
   BENEFICIO_TELEFONO2:        "",
@@ -1887,8 +2144,8 @@ const CONFIG_NEGOCIO_DEFAULTS = {
 
   // ---- Datos bancarios para el mensaje de WhatsApp que se manda al
   // cliente cuando un pedido queda en estado "Nuevo" (pedido en línea 2421 de admin.js) ----
-  CBU_TRANSFERENCIA:  "1910249655024901554778",
-  NOMBRE_TITULAR_CBU: "ESCALERA CARBAJAL DANIEL",
+  CBU_TRANSFERENCIA:  "",
+  NOMBRE_TITULAR_CBU: "",
 
   // ---- Franja superior de mensajes rotativos (arriba de todo, sobre
   // el navbar) — un mensaje por línea, separados por salto de línea ----
@@ -1904,30 +2161,30 @@ const CONFIG_NEGOCIO_DEFAULTS = {
   TRANSPORTES_NO_DISPONIBLES: "",
 
   // ---- Apariencia del panel admin (letra/ícono y nombre del sidebar) ----
-  SIDEBAR_MARK:   "J",
-  SIDEBAR_TEXTO:  "JIREH",
+  SIDEBAR_MARK:   "",
+  SIDEBAR_TEXTO:  "",
 
   // ---- Carpeta de Drive donde se guardan las fotos subidas desde "Nuevo Producto" ----
   DRIVE_CARPETA_PRODUCTOS_ID: "",
 
   // ---- Carpeta de Drive donde se guardan los PDF generados de cada pedido ----
-  DRIVE_CARPETA_PEDIDOS_ID: "1T4k00L3LIIyq0jId0A5mf6YOAWYngWmo",
+  DRIVE_CARPETA_PEDIDOS_ID: "",
 
   // ---- Textos del PDF de pedidos (el título y el WhatsApp del pie
   // toman directamente NOMBRE y BENEFICIO_WHATSAPP_NUMERO de arriba,
   // no duplican esos datos acá) ----
-  PEDIDO_PDF_SUBTITULO: "Distribuidora Mayorista",
+  PEDIDO_PDF_SUBTITULO: "",
   PEDIDO_PDF_PIE:       "Gracias por su compra.",
 
   // ---- URL pública del catálogo online (sin / al final). Se usa para
   // armar el link de los QR de "consultar precio" desde las etiquetas
   // del panel admin (apunta a precio.html en esa misma carpeta) ----
-  URL_CATALOGO: "https://horus254-svg.github.io/Jireh-Mayorista",
+  URL_CATALOGO: "",
 
   // ---- Nombre corto del negocio, usado en la pantalla de acceso del
   // panel de Reportes (login.html) — separado de SIDEBAR_TEXTO por si
   // el negocio quiere un nombre distinto ahí ----
-  NOMBRE_CORTO: "JIREH",
+  NOMBRE_CORTO: "",
 
   // ---- Íconos usados en el catálogo web y al compartir el link
   // (redes sociales, WhatsApp, buscadores) ----
@@ -1937,16 +2194,16 @@ const CONFIG_NEGOCIO_DEFAULTS = {
   // ---- SEO del catálogo web (título de pestaña, meta description,
   // palabras clave, y lo que se muestra al compartir el link en
   // WhatsApp/Facebook/X) ----
-  SEO_TITULO:       "Jireh Mayorista — Juguetes y Artículos Mayoristas | Envíos a todo el país",
-  SEO_DESCRIPCION:  "Catálogo mayorista de juguetes y artículos al por mayor. Comprá online con envíos a todo el país. Precios mayoristas, grandes cantidades y variedad de productos.",
-  SEO_KEYWORDS:     "juguetes mayoristas, mayorista juguetes, juguetes al por mayor, compra mayorista, artículos mayoristas, juguetes baratos, mayorista argentina, envíos todo el país",
+  SEO_TITULO:       "",
+  SEO_DESCRIPCION:  "",
+  SEO_KEYWORDS:     "",
 
   // ---- Footer del catálogo web (pie de página con 3 columnas + copyright) ----
-  FOOTER_TITULO_1:   "Jireh Mayorista",
-  FOOTER_TEXTO_1:    "Venta mayorista de juguetes y artículos al por mayor. Somos distribuidores con envíos a todo el país. Precios mayoristas, grandes cantidades y amplia variedad de productos para revendedores y comercios.",
-  FOOTER_TEXTO_2:    "Juguetes mayoristas · Artículos infantiles · Muñecos y peluches · Juegos de mesa · Juguetes educativos · Artículos de temporada · Productos para reventa",
-  FOOTER_TEXTO_3:    "Realizamos envíos a todo el país. Los pedidos se hacen directamente desde este catálogo online. Consultas y atención por WhatsApp. Pagos en efectivo, transferencia y tarjeta.",
-  FOOTER_COPYRIGHT:  "© 2026 Jireh Mayorista — Venta mayorista de juguetes · Argentina"
+  FOOTER_TITULO_1:   "",
+  FOOTER_TEXTO_1:    "",
+  FOOTER_TEXTO_2:    "",
+  FOOTER_TEXTO_3:    "",
+  FOOTER_COPYRIGHT:  ""
 };
 
 // Temas de color válidos para el catálogo web. Si en la hoja se guarda
@@ -2176,7 +2433,7 @@ function getImagenProxy(e){
 /** Carpeta de Drive donde vive el catálogo PDF. Configurable desde CONFIGURACION (clave DRIVE_CARPETA_CATALOGO_ID); si nunca se configuró, usa la misma carpeta que ya existe para los PDF de pedidos. */
 function getCarpetaCatalogoId(){
   return extraerIdCarpetaDrive(
-    leerClaveConfiguracion("DRIVE_CARPETA_CATALOGO_ID", "1T4k00L3LIIyq0jId0A5mf6YOAWYngWmo")
+    leerClaveConfiguracion("DRIVE_CARPETA_CATALOGO_ID", "")
   );
 }
 
@@ -2402,7 +2659,7 @@ function eliminarArchivoDriveDefinitivo(archivo){
  */
 function construirPDFCatalogoHTML(productos, imagenesPrecargadas){
 
-  const nombreNegocio = leerClaveConfiguracion("NOMBRE", "JIREH MAYORISTA");
+  const nombreNegocio = leerClaveConfiguracion("NOMBRE", "MI NEGOCIO");
 
   const fechaTexto = "Catálogo actualizado el " +
     Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy 'a las' HH:mm");
@@ -2497,7 +2754,7 @@ function escaparHtmlCatalogo(texto){
  */
 function construirPDFCatalogo(productos, imagenesPrecargadas){
 
-  const nombreNegocio = leerClaveConfiguracion("NOMBRE", "JIREH MAYORISTA");
+  const nombreNegocio = leerClaveConfiguracion("NOMBRE", "MI NEGOCIO");
 
   const docTemporal = DocumentApp.create("catalogo_tmp_" + new Date().getTime());
   const body = docTemporal.getBody();
@@ -2679,7 +2936,7 @@ function generarCatalogoPDFPorLotes(){
       return;
     }
 
-    const nombreNegocio = leerClaveConfiguracion("NOMBRE", "JIREH MAYORISTA");
+    const nombreNegocio = leerClaveConfiguracion("NOMBRE", "MI NEGOCIO");
 
     // Crea el Doc que se va a ir llenando a lo largo de los lotes
     const docTemporal = DocumentApp.create("catalogo_tmp_" + new Date().getTime());
@@ -3177,10 +3434,10 @@ function guardarConfiguracionNegocio(e){
       : (configGuardada.GRAD_PERSONALIZADO || "NO"),
     GRAD_A: valorOPreservado("gradA", "GRAD_A", "#241536"),
     GRAD_B: valorOPreservado("gradB", "GRAD_B", "#3a2856"),
-    NAVBAR_TEXTO:     valorOPreservado("navbarTexto", "NAVBAR_TEXTO", "Jireh Mayorista"),
+    NAVBAR_TEXTO:     valorOPreservado("navbarTexto", "NAVBAR_TEXTO", ""),
     NAVBAR_ICONO:     valorOPreservado("navbarIcono", "NAVBAR_ICONO", "🏬"),
 
-    BENEFICIO_WHATSAPP_NUMERO: valorOPreservado("beneficioWhatsappNumero", "BENEFICIO_WHATSAPP_NUMERO", "5491140975795"),
+    BENEFICIO_WHATSAPP_NUMERO: valorOPreservado("beneficioWhatsappNumero", "BENEFICIO_WHATSAPP_NUMERO", ""),
     BENEFICIO_INSTAGRAM_URL:   valorOPreservado("beneficioInstagramUrl", "BENEFICIO_INSTAGRAM_URL"),
     BENEFICIO_TELEFONO1:       valorOPreservado("beneficioTelefono1", "BENEFICIO_TELEFONO1"),
     BENEFICIO_TELEFONO2:       valorOPreservado("beneficioTelefono2", "BENEFICIO_TELEFONO2"),
@@ -3188,23 +3445,23 @@ function guardarConfiguracionNegocio(e){
     BENEFICIO_TEXTO_LIBRE1:    valorOPreservado("beneficioTextoLibre1", "BENEFICIO_TEXTO_LIBRE1"),
     BENEFICIO_TEXTO_LIBRE2:    valorOPreservado("beneficioTextoLibre2", "BENEFICIO_TEXTO_LIBRE2"),
 
-    CBU_TRANSFERENCIA:  valorOPreservado("cbuTransferencia", "CBU_TRANSFERENCIA", "1910249655024901554778"),
-    NOMBRE_TITULAR_CBU: valorOPreservado("nombreTitularCbu", "NOMBRE_TITULAR_CBU", "ESCALERA CARBAJAL DANIEL"),
+    CBU_TRANSFERENCIA:  valorOPreservado("cbuTransferencia", "CBU_TRANSFERENCIA", ""),
+    NOMBRE_TITULAR_CBU: valorOPreservado("nombreTitularCbu", "NOMBRE_TITULAR_CBU", ""),
 
     BANNER_TOP_MENSAJES: valorOPreservado("bannerTopMensajes", "BANNER_TOP_MENSAJES"),
     TRANSPORTES_NO_DISPONIBLES: valorOPreservado("transportesNoDisponibles", "TRANSPORTES_NO_DISPONIBLES"),
 
-    SIDEBAR_MARK:  valorOPreservado("sidebarMark", "SIDEBAR_MARK", "J"),
-    SIDEBAR_TEXTO: valorOPreservado("sidebarTexto", "SIDEBAR_TEXTO", "JIREH"),
+    SIDEBAR_MARK:  valorOPreservado("sidebarMark", "SIDEBAR_MARK", ""),
+    SIDEBAR_TEXTO: valorOPreservado("sidebarTexto", "SIDEBAR_TEXTO", ""),
 
     DRIVE_CARPETA_PRODUCTOS_ID: valorOPreservado("driveCarpetaProductosId", "DRIVE_CARPETA_PRODUCTOS_ID"),
-    DRIVE_CARPETA_PEDIDOS_ID:   valorOPreservado("driveCarpetaPedidosId", "DRIVE_CARPETA_PEDIDOS_ID", "1T4k00L3LIIyq0jId0A5mf6YOAWYngWmo"),
+    DRIVE_CARPETA_PEDIDOS_ID:   valorOPreservado("driveCarpetaPedidosId", "DRIVE_CARPETA_PEDIDOS_ID", ""),
 
-    PEDIDO_PDF_SUBTITULO: valorOPreservado("pedidoPdfSubtitulo", "PEDIDO_PDF_SUBTITULO", "Distribuidora Mayorista"),
+    PEDIDO_PDF_SUBTITULO: valorOPreservado("pedidoPdfSubtitulo", "PEDIDO_PDF_SUBTITULO", ""),
     PEDIDO_PDF_PIE:       valorOPreservado("pedidoPdfPie", "PEDIDO_PDF_PIE", "Gracias por su compra."),
 
-    URL_CATALOGO: valorOPreservado("urlCatalogo", "URL_CATALOGO", "https://horus254-svg.github.io/Jireh-Mayorista"),
-    NOMBRE_CORTO: valorOPreservado("nombreCorto", "NOMBRE_CORTO", "JIREH"),
+    URL_CATALOGO: valorOPreservado("urlCatalogo", "URL_CATALOGO", ""),
+    NOMBRE_CORTO: valorOPreservado("nombreCorto", "NOMBRE_CORTO", ""),
 
     ICONO_URL:          valorOPreservado("iconoUrl", "ICONO_URL", "icon-512.png"),
     WHATSAPP_ICONO_URL: valorOPreservado("whatsappIconoUrl", "WHATSAPP_ICONO_URL", "https://cdn-icons-png.flaticon.com/512/733/733585.png"),
@@ -3585,9 +3842,9 @@ function guardarPedidoAdmin(e){
 function testGuardarPedido() {
 
 const data = {
-nombre: "Victor",
-empresa: "Jireh",
-direccion: "Rivadavia 2555",
+nombre: "Cliente Prueba",
+empresa: "Empresa Prueba",
+direccion: "Calle Falsa 123",
 dni: "12345678",
 total: 10000,
 carrito: [
@@ -3635,20 +3892,18 @@ function generarPDFPedido(
 ){
 
   // La carpeta es configurable desde Configuración → Imágenes de
-  // productos (clave DRIVE_CARPETA_PEDIDOS_ID). Si nunca se tocó esa
-  // configuración, leerClaveConfiguracion devuelve el ID original que
-  // siempre usó el sistema, así que esto nunca rompe instalaciones
-  // existentes por no haber configurado nada todavía.
+  // productos (clave DRIVE_CARPETA_PEDIDOS_ID). Si nunca se configuró,
+  // no se usa ninguna carpeta por defecto.
   const carpetaId = extraerIdCarpetaDrive(
-    leerClaveConfiguracion("DRIVE_CARPETA_PEDIDOS_ID", "1T4k00L3LIIyq0jId0A5mf6YOAWYngWmo")
+    leerClaveConfiguracion("DRIVE_CARPETA_PEDIDOS_ID", "")
   );
 
   // El encabezado y pie del PDF de pedidos toman el nombre del negocio
   // y el WhatsApp ya configurados en otras partes del panel (no se
   // duplican esos datos en una clave aparte), y dos textos propios de
   // este PDF que sí son editables desde Configuración → PDF de pedidos.
-  const nombreNegocio    = leerClaveConfiguracion("NOMBRE", "JIREH MAYORISTA");
-  const whatsappNegocio  = leerClaveConfiguracion("BENEFICIO_WHATSAPP_NUMERO", "5491140975795");
+  const nombreNegocio    = leerClaveConfiguracion("NOMBRE", "MI NEGOCIO");
+  const whatsappNegocio  = leerClaveConfiguracion("BENEFICIO_WHATSAPP_NUMERO", "");
   const subtituloPdf     = leerClaveConfiguracion("PEDIDO_PDF_SUBTITULO", "Distribuidora Mayorista");
   const piePdf           = leerClaveConfiguracion("PEDIDO_PDF_PIE", "Gracias por su compra.");
 
@@ -3962,8 +4217,8 @@ function testPDF(){
     "TEST-001",
     new Date(),
     {
-      nombre:"Victor",
-      empresa:"Jireh",
+      nombre:"Cliente Prueba",
+      empresa:"Empresa Prueba",
       direccion:"Prueba",
       telefono:"123456",
       dni:"12345678",
@@ -3989,11 +4244,11 @@ function testPDF(){
 
 const CREDENCIALES_DEFAULT = {
   USUARIO: "admin",
-  PASSWORD: "Jireh2026",
+  PASSWORD: "admin2026",
   // Contraseña propia para stock.html — a propósito distinta de la
   // del panel completo, así se le puede dar a alguien de depósito sin
   // darle acceso a todo lo demás (ventas, clientes, configuración...).
-  STOCK_PASSWORD: "Deposito2026"
+  STOCK_PASSWORD: "deposito2026"
 };
 
 function getOrCrearHojaCredenciales(){
