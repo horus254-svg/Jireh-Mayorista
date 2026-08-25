@@ -73,6 +73,22 @@ async function resolverApiUrlBase(){
   return API_URL_BASE;
 }
 
+// Cachea en una sola Promise la llamada a "?action=configuracionNegocio":
+// tanto config.js como app.js (aplicarApariencia) necesitan esos mismos
+// datos, y sin este cache cada uno terminaba pegándole por separado a
+// Sheets — hasta 3 veces la misma consulta lenta en cada carga de
+// página. Con esto, la primera llamada dispara el fetch real y todas
+// las siguientes reciben la misma Promise ya en vuelo (o resuelta).
+let _configuracionNegocioPromise = null;
+
+async function obtenerConfiguracionNegocioCruda(apiUrl){
+  if(!_configuracionNegocioPromise){
+    _configuracionNegocioPromise = fetch(apiUrl + "?action=configuracionNegocio")
+      .then(res => res.json());
+  }
+  return _configuracionNegocioPromise;
+}
+
 /**
  * Trae la configuración real desde Sheets (a través de la API) y
  * actualiza CONFIG_NEGOCIO. Devuelve una Promise — cada página debe
@@ -90,8 +106,7 @@ async function cargarConfigNegocio(){
   }
 
   try{
-    const res = await fetch(apiUrl + "?action=configuracionNegocio");
-    const data = await res.json();
+    const data = await obtenerConfiguracionNegocioCruda(apiUrl);
     if(!data.success || !data.config) return CONFIG_NEGOCIO;
 
     const cfg = data.config;
