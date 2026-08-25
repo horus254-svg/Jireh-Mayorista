@@ -2112,7 +2112,7 @@ function renderBeneficioTextoLibre(idWrap, texto){
 
         wrap.innerHTML = `
             <a href="${escapeHtml(href)}" class="beneficio-item beneficio-link" target="_blank" rel="noopener">
-                <i class="bi ${escapeHtml(iconoClase)}"></i> <span>${escapeHtml(nombre)}</span>
+                <svg class="bi-icon"><use href="#ic-${escapeHtml(iconoClase.replace(/^bi-/, ""))}"></use></svg> <span>${escapeHtml(nombre)}</span>
             </a>
         `;
     } else {
