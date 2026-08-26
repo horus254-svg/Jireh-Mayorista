@@ -2341,21 +2341,28 @@ function cerrarModalDetallePedido() {
   document.getElementById("pedidoDetalleModalBackdrop").classList.remove("show");
   pedidoDetalleActual = null;
   _carritoEdicionPedido = null;
+  _descuentoEdicionPedido = null;
 }
 
 /* ===================== EDITAR ÍTEMS DE UN PEDIDO (solo estado NUEVO) ===================== */
 
 let _carritoEdicionPedido = null; // copia de trabajo mientras se edita — no toca pedidoDetalleActual hasta guardar
+let _descuentoEdicionPedido = null; // copia de trabajo del descuento — { monto, etiqueta }
 
 function activarEdicionItemsPedido() {
   if (!pedidoDetalleActual) return;
   // Copia de trabajo — si cancela, pedidoDetalleActual queda intacto
   _carritoEdicionPedido = pedidoDetalleActual.detalle.map(item => ({ ...item }));
+  _descuentoEdicionPedido = {
+    monto: Number(pedidoDetalleActual.pedido.DESCUENTO || 0),
+    etiqueta: pedidoDetalleActual.pedido.DESCUENTO_ETIQUETA || ""
+  };
   renderEdicionItemsPedido();
 }
 
 function cancelarEdicionItemsPedido() {
   _carritoEdicionPedido = null;
+  _descuentoEdicionPedido = null;
   abrirDetallePedido(pedidoDetalleActual.pedido.PEDIDO_ID); // vuelve a la vista normal, con los datos tal cual estaban
 }
 
@@ -2381,7 +2388,7 @@ function renderEdicionItemsPedido() {
     </tr>`).join("");
 
   const subtotal = _carritoEdicionPedido.reduce((acc, i) => acc + (Number(i.PRECIO) || 0) * (Number(i.cantidad) || 0), 0);
-  const descuento = Number(pedido.DESCUENTO || 0);
+  const descuento = Math.min(subtotal, Math.max(0, Number(_descuentoEdicionPedido.monto) || 0));
   const total = Math.max(0, subtotal - descuento);
 
   document.getElementById("pedidoDetalleBody").innerHTML = `
@@ -2412,13 +2419,26 @@ function renderEdicionItemsPedido() {
 
     <table style="width:100%; border-collapse:collapse; font-size:13.5px; margin-top:10px;">
       <tfoot>
-        ${descuento > 0 ? `
         <tr style="border-top:1px solid var(--slate-200);">
           <td colspan="4" style="padding-top:8px; color:var(--slate-500);">Subtotal</td>
           <td style="padding-top:8px; text-align:right; font-family:var(--font-mono); color:var(--slate-500);">${simbolo}${subtotal.toLocaleString("es-AR")}</td>
         </tr>
+      </tfoot>
+    </table>
+
+    <div class="d-flex gap-2 align-items-center mt-2">
+      <label style="font-size:12.5px; color:var(--red-500); font-weight:700; white-space:nowrap;">Descuento (${simbolo})</label>
+      <input type="number" min="0" step="1" value="${_descuentoEdicionPedido.monto || 0}" class="form-control form-control-sm" style="width:100px;"
+        onchange="_edicionPedidoCambiarDescuento('monto', this.value)">
+      <input type="text" placeholder="Motivo / etiqueta (opcional)" value="${escapeHtml(_descuentoEdicionPedido.etiqueta || "")}" class="form-control form-control-sm" style="flex:1;"
+        onchange="_edicionPedidoCambiarDescuento('etiqueta', this.value)">
+    </div>
+
+    <table style="width:100%; border-collapse:collapse; font-size:13.5px; margin-top:6px;">
+      <tfoot>
+        ${descuento > 0 ? `
         <tr>
-          <td colspan="4" style="padding-top:4px; color:var(--red-500); font-weight:700;">Descuento${pedido.DESCUENTO_ETIQUETA ? " (" + pedido.DESCUENTO_ETIQUETA + ")" : ""}</td>
+          <td colspan="4" style="padding-top:4px; color:var(--red-500); font-weight:700;">Descuento${_descuentoEdicionPedido.etiqueta ? " (" + escapeHtml(_descuentoEdicionPedido.etiqueta) + ")" : ""}</td>
           <td style="padding-top:4px; text-align:right; font-family:var(--font-mono); color:var(--red-500); font-weight:700;">-${simbolo}${descuento.toLocaleString("es-AR")}</td>
         </tr>` : ""}
         <tr style="border-top:2px solid var(--slate-200);">
@@ -2432,6 +2452,17 @@ function renderEdicionItemsPedido() {
       <button type="button" class="btn btn-outline-secondary btn-sm" onclick="cancelarEdicionItemsPedido()">Cancelar</button>
       <button type="button" class="btn btn-success btn-sm" id="btnGuardarEdicionItemsPedido" onclick="guardarEdicionItemsPedido()">💾 Guardar cambios</button>
     </div>`;
+}
+
+function _edicionPedidoCambiarDescuento(campo, valor) {
+  if (!_descuentoEdicionPedido) return;
+  if (campo === "monto") {
+    const n = Number(valor);
+    _descuentoEdicionPedido.monto = (isNaN(n) || n < 0) ? 0 : n;
+  } else if (campo === "etiqueta") {
+    _descuentoEdicionPedido.etiqueta = String(valor || "").trim();
+  }
+  renderEdicionItemsPedido();
 }
 
 function _edicionPedidoCambiarCampo(idx, campo, valor) {
@@ -2565,7 +2596,9 @@ async function guardarEdicionItemsPedido() {
       body: JSON.stringify({
         action: "editarItemsPedido",
         pedidoId,
-        carrito: _carritoEdicionPedido
+        carrito: _carritoEdicionPedido,
+        descuento: Number(_descuentoEdicionPedido && _descuentoEdicionPedido.monto) || 0,
+        descuentoEtiqueta: (_descuentoEdicionPedido && _descuentoEdicionPedido.etiqueta) || ""
       })
     }, { timeoutMs: 45000 });
     const data = await response.json();
@@ -2582,6 +2615,7 @@ async function guardarEdicionItemsPedido() {
     }
 
     _carritoEdicionPedido = null;
+    _descuentoEdicionPedido = null;
     invalidarCache("pedidos");
     cargarPedidos(); // refresca el total en la lista de atrás también
     abrirDetallePedido(pedidoId); // vuelve a la vista normal con los datos ya guardados
@@ -2599,6 +2633,7 @@ async function guardarEdicionItemsPedido() {
     toast("Se cortó la conexión esperando la respuesta — revisando si el cambio se guardó igual...", "error");
     try {
       _carritoEdicionPedido = null;
+      _descuentoEdicionPedido = null;
       invalidarCache("pedidos");
       await abrirDetallePedido(pedidoId);
     } catch (e2) {
