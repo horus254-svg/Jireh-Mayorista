@@ -8331,6 +8331,11 @@ function exportarReportePDF(cardId, tituloReporte) {
 
 let _rcCharts = {}; // instancias de Chart.js activas, para poder destruirlas antes de re-dibujar
 
+/** Días hacia adelante que "Sugerido reponer" y "Presupuesto sugerido" intentan
+ *  cubrir. Es independiente del rango de fechas de arriba: ese rango solo define
+ *  con qué venta diaria promedio se calcula, no para cuántos días se compra. */
+let _rcDiasCobertura = 30;
+
 function _rcRangoFechas() {
   const desde = document.getElementById("rcDesde").value;
   const hasta = document.getElementById("rcHasta").value;
@@ -8490,12 +8495,12 @@ function _renderReporteCompras(productos, dias, tendenciaPorCategoria) {
   const totalVendidos = productos.reduce((a,p)=>a+p.vendidos,0);
   const ticketProm = totalVendidos > 0 ? totalIngresos / totalVendidos : 0;
 
-  // presupuesto sugerido: para productos en rojo/amarillo/sin stock, cubrir 30 días de venta al precio unitario estimado
+  // presupuesto sugerido: para productos en rojo/amarillo/sin stock, cubrir N días (selector) de venta al precio unitario estimado
   const presupuesto = productos
     .filter(p => ["critico","atencion","sinstock"].includes(_rcEstado(p, dias)))
     .reduce((acc,p) => {
       const precioUnit = p.vendidos > 0 ? p.ingresos / p.vendidos : 0;
-      const faltante = Math.max(0, (_rcVentaDiaria(p, dias) * 30) - p.stock);
+      const faltante = Math.max(0, (_rcVentaDiaria(p, dias) * _rcDiasCobertura) - p.stock);
       return acc + faltante * precioUnit;
     }, 0);
 
@@ -8741,6 +8746,31 @@ function _rcRedibujarTendencia() {
 
 /** Re-renderiza SOLO la tabla semáforo aplicando los filtros de estado y cantidad,
  *  sin volver a pedir datos ni redibujar los gráficos. */
+/** Se llama al cambiar el selector "Cubrir próximos N días". No vuelve a pedir
+ *  datos al backend — recalcula con lo que ya está en memoria: el KPI de
+ *  presupuesto sugerido, la columna "Sugerido reponer" de la tabla, y el total
+ *  estimado de la lista de compra (si hay productos tildados). */
+function _rcCambiarDiasCobertura() {
+  const select = document.getElementById("rcDiasCobertura");
+  _rcDiasCobertura = Number(select?.value || 30);
+
+  const productos = _rcProductosActuales;
+  const dias = _rcDiasActuales;
+  if (productos && productos.length > 0) {
+    const presupuesto = productos
+      .filter(p => ["critico","atencion","sinstock"].includes(_rcEstado(p, dias)))
+      .reduce((acc,p) => {
+        const precioUnit = p.vendidos > 0 ? p.ingresos / p.vendidos : 0;
+        const faltante = Math.max(0, (_rcVentaDiaria(p, dias) * _rcDiasCobertura) - p.stock);
+        return acc + faltante * precioUnit;
+      }, 0);
+    actualizarElemento("rcKpiPresupuesto", "$" + Math.round(presupuesto).toLocaleString("es-AR"));
+  }
+
+  _rcAplicarFiltrosTabla();
+  _rcActualizarBarraSeleccion();
+}
+
 function _rcAplicarFiltrosTabla() {
   const productos = _rcProductosActuales;
   const dias = _rcDiasActuales;
@@ -8786,10 +8816,10 @@ function _rcAplicarFiltrosTabla() {
     const cob = _rcCobertura(p, dias);
     const cobTxt = cob === Infinity ? "—" : `~${Math.round(cob)} días`;
 
-    // Sugerido reponer: cuánto falta para cubrir 30 días de venta al ritmo actual.
+    // Sugerido reponer: cuánto falta para cubrir _rcDiasCobertura días de venta al ritmo actual.
     // Solo tiene sentido mostrarlo para lo que hay que reponer; en "OK" no se sugiere nada.
     const faltante = ["sinstock","critico","atencion"].includes(e)
-      ? Math.max(0, Math.round(_rcVentaDiaria(p, dias) * 30 - p.stock))
+      ? Math.max(0, Math.round(_rcVentaDiaria(p, dias) * _rcDiasCobertura - p.stock))
       : 0;
     const sugeridoTxt = faltante > 0 ? `<strong>${faltante.toLocaleString("es-AR")}</strong> uds.` : "—";
 
@@ -8870,7 +8900,7 @@ function _rcActualizarBarraSeleccion() {
     const p = _rcProductosActuales.find(x => String(x.codigo) === codigo);
     if (!p) return;
     const precioUnit = p.vendidos > 0 ? p.ingresos / p.vendidos : 0;
-    const faltante = Math.max(0, _rcVentaDiaria(p, dias) * 30 - p.stock);
+    const faltante = Math.max(0, _rcVentaDiaria(p, dias) * _rcDiasCobertura - p.stock);
     totalEstimado += faltante * precioUnit;
   });
 
@@ -8888,7 +8918,7 @@ async function _rcCopiarListaCompra() {
   _rcSeleccionados.forEach(codigo => {
     const p = _rcProductosActuales.find(x => String(x.codigo) === codigo);
     if (!p) return;
-    const faltante = Math.max(0, Math.round(_rcVentaDiaria(p, dias) * 30 - p.stock));
+    const faltante = Math.max(0, Math.round(_rcVentaDiaria(p, dias) * _rcDiasCobertura - p.stock));
     lineas.push(`${p.codigo} — ${p.nombre} — ${faltante > 0 ? faltante + " uds." : "a definir"}`);
   });
 

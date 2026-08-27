@@ -1620,8 +1620,16 @@
             <option value="todos">Todos</option>
           </select>
         </div>
+        <div>
+          <label class="form-label" style="font-size:12px; margin-bottom:2px;">Cubrir próximos</label>
+          <select id="rcDiasCobertura" class="form-select form-select-sm" style="max-width:150px;" onchange="_rcCambiarDiasCobertura()">
+            <option value="7">7 días</option>
+            <option value="15">15 días</option>
+            <option value="30" selected>30 días</option>
+          </select>
+        </div>
       </div>
-      <div class="text-muted mb-2" style="font-size:12px;">Ordenado por urgencia — cobertura = cuántos días dura el stock al ritmo de venta actual. Tildá los productos para armar la lista de compra.</div>
+      <div class="text-muted mb-2" style="font-size:12px;">Ordenado por urgencia — cobertura = cuántos días dura el stock al ritmo de venta actual. La venta diaria promedio sale del rango de fechas elegido arriba; "Cubrir próximos" define para cuántos días adelante calculamos el "Sugerido reponer". Tildá los productos para armar la lista de compra.</div>
 
       <!-- Barra de lista de compra (aparece cuando hay algo tildado) -->
       <div class="card p-2 mb-2" id="rcListaCompraBar" style="display:none; background:var(--slate-50); border-style:dashed;">
