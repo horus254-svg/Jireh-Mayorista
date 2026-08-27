@@ -2218,3 +2218,12 @@ kbd{
 #rcGraficosDetails[open] .rc-summary-caret{ transform:rotate(90deg); }
 .rc-kpi-clicable{ cursor:pointer; transition:transform .1s ease, box-shadow .1s ease; }
 .rc-kpi-clicable:hover{ transform:translateY(-2px); box-shadow:0 6px 16px rgba(0,0,0,.08); }
+
+/* ---- Reporte de Compras: tabla del semáforo con anchos fijos, para que no
+   se corte horizontalmente por nombres de producto largos. El nombre se
+   trunca a una línea con "..." y se ve completo al pasar el mouse (title). ---- */
+.rc-tabla-semaforo{ table-layout:fixed; }
+.rc-tabla-semaforo td, .rc-tabla-semaforo th{
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.rc-tabla-semaforo td:nth-child(3){ white-space:normal; } /* Producto: permitir 2 líneas si hace falta, pero acotado por el ancho de la columna */

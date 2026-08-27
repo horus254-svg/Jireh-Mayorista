@@ -8827,9 +8827,9 @@ function _rcAplicarFiltrosTabla() {
     return `
       <tr>
         <td><input type="checkbox" class="rc-check-fila" data-codigo="${escapeHtml(p.codigo)}" ${marcado ? "checked" : ""} onchange="_rcToggleSeleccion('${escapeHtml(p.codigo)}', this.checked)"></td>
-        <td class="mono">${escapeHtml(p.codigo)}</td>
-        <td>${escapeHtml(p.nombre)}</td>
-        <td>${escapeHtml(p.categoria)}</td>
+        <td class="mono" title="${escapeHtml(p.codigo)}">${escapeHtml(p.codigo)}</td>
+        <td title="${escapeHtml(p.nombre)}">${escapeHtml(p.nombre)}</td>
+        <td title="${escapeHtml(p.categoria)}">${escapeHtml(p.categoria)}</td>
         <td class="money">${p.vendidos.toLocaleString("es-AR")}</td>
         <td class="money">${p.stock.toLocaleString("es-AR")}</td>
         <td class="money">${cobTxt}</td>
