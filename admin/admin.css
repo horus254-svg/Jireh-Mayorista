@@ -2209,3 +2209,12 @@ kbd{
   padding:10px 18px;
 }
 .license-limited-banner .ic{ font-size:15px; }
+
+/* ---- Reporte de Compras: acordeón de gráficos + KPIs clicables ---- */
+#rcGraficosDetails summary{ outline:none; }
+#rcGraficosDetails summary::-webkit-details-marker{ display:none; }
+#rcGraficosDetails summary::marker{ content:""; }
+.rc-summary-caret{ display:inline-block; transition:transform .15s ease; }
+#rcGraficosDetails[open] .rc-summary-caret{ transform:rotate(90deg); }
+.rc-kpi-clicable{ cursor:pointer; transition:transform .1s ease, box-shadow .1s ease; }
+.rc-kpi-clicable:hover{ transform:translateY(-2px); box-shadow:0 6px 16px rgba(0,0,0,.08); }

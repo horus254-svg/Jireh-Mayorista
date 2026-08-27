@@ -3208,6 +3208,8 @@ function filtrarProductos() {
     filtrados = filtrados.filter(p => Number(p.STOCK ?? 0) < 0);
   } else if (estado === "sin_imagen_y_stock") {
     filtrados = filtrados.filter(p => !String(p.IMAGEN || "").trim() && Number(p.STOCK ?? 0) <= 0);
+  } else if (estado === "ocultos") {
+    filtrados = filtrados.filter(p => String(p.PUBLICADO || "").toUpperCase() !== "SI");
   }
 
   renderTablaProductos(filtrados);
@@ -8468,9 +8470,12 @@ function _renderReporteCompras(productos, dias, tendenciaPorCategoria) {
   _rcProductosActuales = productos || [];
   _rcDiasActuales = dias;
 
+  _rcSeleccionados.clear();
+  _rcActualizarBarraSeleccion();
+
   if (!productos || productos.length === 0) {
     document.getElementById("rcSemaforoTabla").innerHTML =
-      `<tr><td colspan="7" class="text-center text-muted py-3">Sin ventas para el rango elegido</td></tr>`;
+      `<tr><td colspan="9" class="text-center text-muted py-3">Sin ventas para el rango elegido</td></tr>`;
     ["rcKpiSinStock","rcKpiCritico"].forEach(id => actualizarElemento(id, 0));
     ["rcKpiTicket","rcKpiPresupuesto"].forEach(id => actualizarElemento(id, "$0"));
     Object.values(_rcCharts).forEach(c => c && c.destroy());
@@ -8499,6 +8504,34 @@ function _renderReporteCompras(productos, dias, tendenciaPorCategoria) {
   actualizarElemento("rcKpiTicket",     "$" + Math.round(ticketProm).toLocaleString("es-AR"));
   actualizarElemento("rcKpiPresupuesto","$" + Math.round(presupuesto).toLocaleString("es-AR"));
 
+  /* ---- Gráficos: los datos se guardan siempre, pero solo se dibujan si el
+     acordeón "Ver gráficos y tendencias" ya está abierto — dibujar un canvas
+     oculto (details cerrado = ancho 0) deja los charts rotos hasta que se
+     redimensiona la ventana. Si está cerrado, _rcDibujarGraficos() se llama
+     recién cuando el usuario lo abre (ver onclick del <summary>). ---- */
+  _rcDatosGraficosPendientes = { productos, tendenciaPorCategoria };
+  const detailsGraficos = document.getElementById("rcGraficosDetails");
+  if (detailsGraficos && detailsGraficos.open) {
+    _rcDibujarGraficos(productos, tendenciaPorCategoria);
+  }
+
+  /* ---- Tabla semáforo ---- */
+  _rcAplicarFiltrosTabla();
+}
+
+/* Datos en espera de dibujarse la primera vez que se abre el acordeón de gráficos */
+let _rcDatosGraficosPendientes = null;
+
+/** Se llama al abrir/cerrar el <details> de gráficos. Si se acaba de abrir y
+ *  todavía no se dibujó nada con los datos actuales, dibuja ahora que el
+ *  canvas ya tiene ancho real. */
+function _rcRedibujarSiEstaAbierto() {
+  const detailsGraficos = document.getElementById("rcGraficosDetails");
+  if (!detailsGraficos || !detailsGraficos.open || !_rcDatosGraficosPendientes) return;
+  _rcDibujarGraficos(_rcDatosGraficosPendientes.productos, _rcDatosGraficosPendientes.tendenciaPorCategoria);
+}
+
+function _rcDibujarGraficos(productos, tendenciaPorCategoria) {
   /* ---- Destruir gráficos previos antes de re-dibujar (evita fugas al cambiar de fecha) ---- */
   Object.values(_rcCharts).forEach(c => c && c.destroy());
   _rcCharts = {};
@@ -8552,8 +8585,7 @@ function _renderReporteCompras(productos, dias, tendenciaPorCategoria) {
   _rcTendenciaActual = tendenciaPorCategoria; // se guarda para poder redibujar al cambiar el selector Día/Semana
   _rcRedibujarTendencia();
 
-  /* ---- Tabla semáforo ---- */
-  _rcAplicarFiltrosTabla();
+  _rcDatosGraficosPendientes = null;
 }
 
 /* Estado en memoria de la tendencia, para redibujar sin re-pedir datos al cambiar el selector */
@@ -8716,26 +8748,35 @@ function _rcAplicarFiltrosTabla() {
   if (!tbody) return;
 
   if (!productos || productos.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-3">Sin ventas para el rango elegido</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-3">Sin ventas para el rango elegido</td></tr>`;
     return;
   }
 
   const filtroEstado = document.getElementById("rcFiltroEstado")?.value || "todos";
   const filtroCantidad = document.getElementById("rcFiltroCantidad")?.value || "10";
+  const busqueda = (document.getElementById("rcBuscarProducto")?.value || "").trim().toLowerCase();
 
+  // Sin stock se marca oscuro para distinguirlo de un rojo "crítico" pero
+  // todavía con algo de stock — son dos urgencias distintas de un vistazo.
   const estadoInfo = {
-    sinstock: { clase:"bg-danger",  texto:"Sin stock" },
-    critico:  { clase:"bg-danger",  texto:"Crítico" },
-    atencion: { clase:"bg-warning text-dark", texto:"Atención" },
-    ok:       { clase:"bg-success", texto:"OK" },
+    sinstock: { clase:"bg-dark",    texto:"🚫 Sin stock" },
+    critico:  { clase:"bg-danger",  texto:"🔴 Crítico" },
+    atencion: { clase:"bg-warning text-dark", texto:"🟡 Atención" },
+    ok:       { clase:"bg-success", texto:"🟢 OK" },
   };
 
   let filtrados = productos.filter(p => filtroEstado === "todos" || _rcEstado(p, dias) === filtroEstado);
+  if (busqueda) {
+    filtrados = filtrados.filter(p =>
+      String(p.nombre || "").toLowerCase().includes(busqueda) ||
+      String(p.codigo || "").toLowerCase().includes(busqueda));
+  }
   let ordenados = filtrados.sort((a,b)=> _rcCobertura(a, dias) - _rcCobertura(b, dias));
   if (filtroCantidad !== "todos") ordenados = ordenados.slice(0, Number(filtroCantidad));
 
   if (ordenados.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-3">Ningún producto en ese estado</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-3">Ningún producto en ese estado</td></tr>`;
+    _rcActualizarCheckTodos();
     return;
   }
 
@@ -8743,18 +8784,132 @@ function _rcAplicarFiltrosTabla() {
     const e = _rcEstado(p, dias);
     const info = estadoInfo[e];
     const cob = _rcCobertura(p, dias);
-    const cobTxt = cob === Infinity ? "—" : Math.round(cob) + " días";
+    const cobTxt = cob === Infinity ? "—" : `~${Math.round(cob)} días`;
+
+    // Sugerido reponer: cuánto falta para cubrir 30 días de venta al ritmo actual.
+    // Solo tiene sentido mostrarlo para lo que hay que reponer; en "OK" no se sugiere nada.
+    const faltante = ["sinstock","critico","atencion"].includes(e)
+      ? Math.max(0, Math.round(_rcVentaDiaria(p, dias) * 30 - p.stock))
+      : 0;
+    const sugeridoTxt = faltante > 0 ? `<strong>${faltante.toLocaleString("es-AR")}</strong> uds.` : "—";
+
+    const marcado = _rcSeleccionados.has(String(p.codigo));
     return `
       <tr>
+        <td><input type="checkbox" class="rc-check-fila" data-codigo="${escapeHtml(p.codigo)}" ${marcado ? "checked" : ""} onchange="_rcToggleSeleccion('${escapeHtml(p.codigo)}', this.checked)"></td>
         <td class="mono">${escapeHtml(p.codigo)}</td>
         <td>${escapeHtml(p.nombre)}</td>
         <td>${escapeHtml(p.categoria)}</td>
         <td class="money">${p.vendidos.toLocaleString("es-AR")}</td>
         <td class="money">${p.stock.toLocaleString("es-AR")}</td>
         <td class="money">${cobTxt}</td>
+        <td class="money">${sugeridoTxt}</td>
         <td><span class="badge ${info.clase}">${info.texto}</span></td>
       </tr>`;
   }).join("");
+
+  _rcActualizarCheckTodos();
+}
+
+/* ===================================================================
+   Lista de compra — tildar productos del semáforo (sin gráficos ni
+   modales, solo checkboxes) y copiar un resumen listo para mandar
+   al proveedor o pegar en una nota.
+=================================================================== */
+const _rcSeleccionados = new Set(); // códigos tildados, persiste entre re-renders por filtro/búsqueda
+
+function _rcToggleSeleccion(codigo, marcado) {
+  if (marcado) _rcSeleccionados.add(String(codigo));
+  else _rcSeleccionados.delete(String(codigo));
+  _rcActualizarCheckTodos();
+  _rcActualizarBarraSeleccion();
+}
+
+/** Tilda/destilda todas las filas actualmente visibles en la tabla (no las que
+ *  quedaron ocultas por el filtro), igual que el "seleccionar todos" de Productos. */
+function _rcToggleTodos(headerCheckbox) {
+  document.querySelectorAll(".rc-check-fila").forEach(chk => {
+    chk.checked = headerCheckbox.checked;
+    const codigo = chk.dataset.codigo;
+    if (headerCheckbox.checked) _rcSeleccionados.add(codigo);
+    else _rcSeleccionados.delete(codigo);
+  });
+  _rcActualizarBarraSeleccion();
+}
+
+/** Refleja en el checkbox de cabecera si todas/algunas/ninguna de las filas visibles están tildadas. */
+function _rcActualizarCheckTodos() {
+  const checkTodos = document.getElementById("rcCheckTodos");
+  if (!checkTodos) return;
+  const filas = Array.from(document.querySelectorAll(".rc-check-fila"));
+  if (filas.length === 0) { checkTodos.checked = false; checkTodos.indeterminate = false; return; }
+  const marcadas = filas.filter(f => f.checked).length;
+  checkTodos.checked = marcadas === filas.length;
+  checkTodos.indeterminate = marcadas > 0 && marcadas < filas.length;
+}
+
+function _rcVaciarSeleccion() {
+  _rcSeleccionados.clear();
+  document.querySelectorAll(".rc-check-fila").forEach(chk => chk.checked = false);
+  _rcActualizarCheckTodos();
+  _rcActualizarBarraSeleccion();
+}
+
+/** Muestra/oculta la barra "N seleccionados" y actualiza el total estimado de compra. */
+function _rcActualizarBarraSeleccion() {
+  const barra = document.getElementById("rcListaCompraBar");
+  const info = document.getElementById("rcListaCompraInfo");
+  if (!barra || !info) return;
+
+  const cantidad = _rcSeleccionados.size;
+  if (cantidad === 0) { barra.style.display = "none"; return; }
+
+  const dias = _rcDiasActuales;
+  let totalEstimado = 0;
+  _rcSeleccionados.forEach(codigo => {
+    const p = _rcProductosActuales.find(x => String(x.codigo) === codigo);
+    if (!p) return;
+    const precioUnit = p.vendidos > 0 ? p.ingresos / p.vendidos : 0;
+    const faltante = Math.max(0, _rcVentaDiaria(p, dias) * 30 - p.stock);
+    totalEstimado += faltante * precioUnit;
+  });
+
+  barra.style.display = "block";
+  info.textContent = `${cantidad} producto${cantidad === 1 ? "" : "s"} seleccionado${cantidad === 1 ? "" : "s"} · ≈$${Math.round(totalEstimado).toLocaleString("es-AR")} estimado`;
+}
+
+/** Arma un texto simple (código, nombre, cantidad sugerida) con los productos
+ *  tildados y lo copia al portapapeles — para pegarlo en un chat/nota al proveedor. */
+async function _rcCopiarListaCompra() {
+  if (_rcSeleccionados.size === 0) { toast("Tildá al menos un producto", "error"); return; }
+
+  const dias = _rcDiasActuales;
+  const lineas = [];
+  _rcSeleccionados.forEach(codigo => {
+    const p = _rcProductosActuales.find(x => String(x.codigo) === codigo);
+    if (!p) return;
+    const faltante = Math.max(0, Math.round(_rcVentaDiaria(p, dias) * 30 - p.stock));
+    lineas.push(`${p.codigo} — ${p.nombre} — ${faltante > 0 ? faltante + " uds." : "a definir"}`);
+  });
+
+  const texto = `Lista de compra (${lineas.length} productos)\n` + lineas.join("\n");
+
+  try {
+    await navigator.clipboard.writeText(texto);
+    toast("Lista de compra copiada al portapapeles", "success");
+  } catch (error) {
+    console.error("No se pudo copiar la lista de compra:", error);
+    toast("No se pudo copiar automáticamente — seleccioná y copiá el texto manualmente", "error");
+  }
+}
+
+/** Filtro rápido desde las tarjetas KPI "Sin stock" / "Cobertura < 7 días":
+ *  aplica el filtro de estado correspondiente y lleva la vista a la tabla. */
+function _rcFiltrarDesdeKpi(estado) {
+  const select = document.getElementById("rcFiltroEstado");
+  if (select) { select.value = estado; _rcAplicarFiltrosTabla(); }
+  const tabla = document.getElementById("rcSemaforoCard");
+  if (tabla) tabla.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 /* =====================================================================
@@ -8998,6 +9153,7 @@ function actualizarSeleccionEtiquetas() {
   const btnEtiquetas = document.getElementById("btnGenerarEtiquetas");
   const btnQR = document.getElementById("btnGenerarQR");
   const btnQROffline = document.getElementById("btnGenerarQROffline");
+  const btnHacerVisibles = document.getElementById("btnHacerVisibles");
 
   const cantidad = checks.length;
 
@@ -9012,6 +9168,90 @@ function actualizarSeleccionEtiquetas() {
   if (btnEtiquetas) btnEtiquetas.disabled = cantidad === 0;
   if (btnQR) btnQR.disabled = cantidad === 0;
   if (btnQROffline) btnQROffline.disabled = cantidad === 0;
+  if (btnHacerVisibles) btnHacerVisibles.disabled = cantidad === 0;
+}
+
+/**
+ * Publica (PUBLICADO = "SI") todos los productos tildados, sin tener
+ * que entrar a editarlos uno por uno. Pensado para usarse junto con
+ * el filtro "Ocultos (no publicados)": el usuario filtra, tilda los
+ * que quiere reactivar y aprieta este botón una sola vez.
+ *
+ * El backend (actualizarProducto) sobreescribe TODO el producto, así
+ * que cada llamada manda el registro completo tal cual está hoy en
+ * productosAdminGlobal, cambiando únicamente PUBLICADO a "SI".
+ */
+async function hacerVisiblesProductosSeleccionados() {
+  const codigos = obtenerCodigosSeleccionados();
+  if (codigos.length === 0) { toast("Seleccioná al menos un producto", "error"); return; }
+
+  const yaVisibles = codigos.filter(cod => {
+    const p = productosAdminGlobal.find(x => String(x.CODIGO) === String(cod));
+    return p && String(p.PUBLICADO || "").toUpperCase() === "SI";
+  });
+  const aActualizar = codigos.length - yaVisibles.length;
+
+  if (aActualizar === 0) {
+    toast("Los productos seleccionados ya estaban visibles", "success");
+    return;
+  }
+
+  const mensaje = codigos.length === 1
+    ? "¿Publicar este producto para que vuelva a verse en el catálogo/POS?"
+    : `¿Publicar ${codigos.length} productos seleccionados para que vuelvan a verse en el catálogo/POS?`;
+
+  confirmarAccion(mensaje, async () => {
+    const btn = document.getElementById("btnHacerVisibles");
+    const textoOriginal = btn ? btn.innerHTML : "";
+    if (btn) { btn.disabled = true; btn.innerHTML = "Publicando..."; }
+
+    let exitosos = 0, fallidos = 0;
+
+    // Uno por vez (no en paralelo) para no saturar el backend de Apps
+    // Script, que ya de por sí es lento con muchas requests simultáneas.
+    for (const codigo of codigos) {
+      const p = productosAdminGlobal.find(x => String(x.CODIGO) === String(codigo));
+      if (!p) { fallidos++; continue; }
+
+      try {
+        const params = new URLSearchParams({
+          action: "actualizarProducto",
+          rol: obtenerRolActual(),
+          codigoOriginal: p.CODIGO,
+          CODIGO: p.CODIGO,
+          PRODUCTO: p.PRODUCTO || "",
+          CATEGORIA: p.CATEGORIA || "",
+          ALIAS: p.ALIAS || "",
+          PRECIO: p.PRECIO ?? 0,
+          STOCK: p.STOCK ?? 0,
+          IMAGEN: p.IMAGEN || "",
+          PUBLICADO: "SI",
+          DESTACADO: p.DESTACADO || "NO",
+          OFERTA: p.OFERTA || "NO",
+          CODIGO_CAJA: p.CODIGO_CAJA || "",
+          UNIDADES_POR_CAJA: p.UNIDADES_POR_CAJA || 0,
+          PRECIO_CAJA: p.PRECIO_CAJA || 0
+        });
+        const response = await fetchAPI(API_URL + "?" + params.toString());
+        const data = await response.json();
+        if (data.success) exitosos++; else fallidos++;
+      } catch (error) {
+        console.error("Error al publicar producto", codigo, error);
+        fallidos++;
+      }
+    }
+
+    if (btn) { btn.disabled = false; btn.innerHTML = textoOriginal; }
+
+    if (fallidos === 0) {
+      toast(exitosos === 1 ? "1 producto publicado" : `${exitosos} productos publicados`, "success");
+    } else {
+      toast(`${exitosos} publicados, ${fallidos} con error`, exitosos > 0 ? "success" : "error");
+    }
+
+    productosPOS = []; // refrescar catálogo del POS en memoria
+    cargarProductos();
+  }, "👁️ Publicar productos");
 }
 
 /** Toggles every visible product checkbox via the header checkbox */
