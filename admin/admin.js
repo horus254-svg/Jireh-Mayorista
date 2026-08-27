@@ -7947,6 +7947,28 @@ function _getCacheReporte(key, ttlMs = 90000) {
   return (c && Date.now() - c.ts < ttlMs) ? c.data : null;
 }
 
+/* ---- Selector "10 últimos / 20 últimos / todos" para cada uno de los 6 reportes ---- */
+const _repLimites = { ventasPeriodo: 10, productos: 10, categorias: 10, formasPago: 10, cierres: 10, clientes: 10 };
+const _repDatosActuales = { ventasPeriodo: [], categorias: [], formasPago: [], cierres: [], clientes: [] };
+
+function _limitarReporte(lista, key) {
+  const lim = _repLimites[key];
+  return (lim === "all") ? lista : lista.slice(0, Number(lim));
+}
+
+/** Llamado por el <select> de cada reporte cuando el usuario elige 10 / 20 / todos. */
+function cambiarLimiteReporte(key, valor) {
+  _repLimites[key] = valor;
+  switch (key) {
+    case "ventasPeriodo": renderReporteVentasPeriodo(); break;
+    case "productos": renderReporteProductos(_repProductosDatosActuales, (document.getElementById("repProductosBuscador") || {}).value || ""); break;
+    case "categorias": renderReporteCategorias(); break;
+    case "formasPago": renderReporteFormasPago(); break;
+    case "cierres": renderReporteCierres(); break;
+    case "clientes": renderReporteClientes(); break;
+  }
+}
+
 /* ---- Reporte 1: Ventas por período ---- */
 async function cargarReporteVentasPeriodo() {
   const tbody = document.getElementById("repVentasPeriodoTabla");
@@ -7975,14 +7997,26 @@ function _aplicarReporteVentas(data, tbody, resumenWrap) {
     <div class="col-6 col-md-3"><div class="card p-2 text-center"><div class="text-muted" style="font-size:11.5px;">Total Pedidos</div><div class="money fw-bold">$${Number(r.totalPedidos || 0).toLocaleString("es-AR")}</div></div></div>
     <div class="col-6 col-md-3"><div class="card p-2 text-center"><div class="text-muted" style="font-size:11.5px;">Total general</div><div class="money fw-bold">$${Number(r.totalGeneral || 0).toLocaleString("es-AR")}</div></div></div>
     <div class="col-6 col-md-3"><div class="card p-2 text-center"><div class="text-muted" style="font-size:11.5px;">Ticket promedio</div><div class="money fw-bold">$${Number(r.ticketPromedio || 0).toLocaleString("es-AR")}</div></div></div>`;
-  if (!data.dias || data.dias.length === 0) {
+
+  // Más reciente arriba, como en el resto de las tablas de reportes
+  const diasOrdenados = data.dias ? [...data.dias].sort((a,b) => String(b.fecha).localeCompare(String(a.fecha))) : [];
+  _repDatosActuales.ventasPeriodo = diasOrdenados;
+  renderReporteVentasPeriodo();
+}
+
+/** Renderiza la tabla de ventas por período respetando el límite elegido (10 / 20 / todos). */
+function renderReporteVentasPeriodo() {
+  const tbody = document.getElementById("repVentasPeriodoTabla");
+  if (!tbody) return;
+  const diasOrdenados = _repDatosActuales.ventasPeriodo;
+
+  if (!diasOrdenados || diasOrdenados.length === 0) {
     tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-3">Sin ventas para el rango elegido</td></tr>`;
     return;
   }
 
-  // Más reciente arriba, como en el resto de las tablas de reportes
-  const diasOrdenados = [...data.dias].sort((a,b) => String(b.fecha).localeCompare(String(a.fecha)));
-  tbody.innerHTML = diasOrdenados.map(d => {
+  const lista = _limitarReporte(diasOrdenados, "ventasPeriodo");
+  tbody.innerHTML = lista.map(d => {
     const fecha = d.fecha ? new Date(d.fecha + "T12:00:00").toLocaleDateString("es-AR") : "—";
     return `
       <tr>
@@ -8053,7 +8087,8 @@ function renderReporteProductos(productos, filtro = "") {
     return;
   }
 
-  tbody.innerHTML = lista.map(p => `
+  const listaLimitada = _limitarReporte(lista, "productos");
+  tbody.innerHTML = listaLimitada.map(p => `
     <tr>
       <td class="mono">${escapeHtml(p.CODIGO)}</td>
       <td>${escapeHtml(p.PRODUCTO)}</td>
@@ -8080,23 +8115,32 @@ async function cargarReporteCategorias() {
     if (!data.success) return;
 
     sincronizarRangoReportes(data.desde, data.hasta);
-
-    if (!data.categorias || data.categorias.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="3" class="text-center text-muted py-3">Sin ventas para el rango elegido</td></tr>`;
-      return;
-    }
-
-    tbody.innerHTML = data.categorias.map(c => `
-      <tr>
-        <td>${escapeHtml(c.categoria)}</td>
-        <td class="money">${Number(c.cantidad || 0).toLocaleString("es-AR")}</td>
-        <td class="money">$${Number(c.ingresos || 0).toLocaleString("es-AR")}</td>
-      </tr>`).join("");
+    _repDatosActuales.categorias = data.categorias || [];
+    renderReporteCategorias();
 
   } catch (error) {
     console.error("Error al cargar reporte de ventas por categoría:", error);
     tbody.innerHTML = `<tr><td colspan="3" class="text-center text-muted py-3">Error al cargar el reporte</td></tr>`;
   }
+}
+
+function renderReporteCategorias() {
+  const tbody = document.getElementById("repCategoriasTabla");
+  if (!tbody) return;
+  const categorias = _repDatosActuales.categorias;
+
+  if (!categorias || categorias.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="3" class="text-center text-muted py-3">Sin ventas para el rango elegido</td></tr>`;
+    return;
+  }
+
+  const lista = _limitarReporte(categorias, "categorias");
+  tbody.innerHTML = lista.map(c => `
+    <tr>
+      <td>${escapeHtml(c.categoria)}</td>
+      <td class="money">${Number(c.cantidad || 0).toLocaleString("es-AR")}</td>
+      <td class="money">$${Number(c.ingresos || 0).toLocaleString("es-AR")}</td>
+    </tr>`).join("");
 }
 
 /* ---- Reporte 4: Formas de pago ---- */
@@ -8109,23 +8153,32 @@ async function cargarReporteFormasPago() {
     if (!data.success) return;
 
     sincronizarRangoReportes(data.desde, data.hasta);
-
-    if (!data.formas || data.formas.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="3" class="text-center text-muted py-3">Sin ventas para el rango elegido</td></tr>`;
-      return;
-    }
-
-    tbody.innerHTML = data.formas.map(f => `
-      <tr>
-        <td>${escapeHtml(f.forma)}</td>
-        <td class="money">${Number(f.cantidad || 0).toLocaleString("es-AR")}</td>
-        <td class="money">$${Number(f.total || 0).toLocaleString("es-AR")}</td>
-      </tr>`).join("");
+    _repDatosActuales.formasPago = data.formas || [];
+    renderReporteFormasPago();
 
   } catch (error) {
     console.error("Error al cargar reporte de formas de pago:", error);
     tbody.innerHTML = `<tr><td colspan="3" class="text-center text-muted py-3">Error al cargar el reporte</td></tr>`;
   }
+}
+
+function renderReporteFormasPago() {
+  const tbody = document.getElementById("repFormasPagoTabla");
+  if (!tbody) return;
+  const formas = _repDatosActuales.formasPago;
+
+  if (!formas || formas.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="3" class="text-center text-muted py-3">Sin ventas para el rango elegido</td></tr>`;
+    return;
+  }
+
+  const lista = _limitarReporte(formas, "formasPago");
+  tbody.innerHTML = lista.map(f => `
+    <tr>
+      <td>${escapeHtml(f.forma)}</td>
+      <td class="money">${Number(f.cantidad || 0).toLocaleString("es-AR")}</td>
+      <td class="money">$${Number(f.total || 0).toLocaleString("es-AR")}</td>
+    </tr>`).join("");
 }
 
 /* ---- Reporte 5: Historial de cierres de caja ---- */
@@ -8141,31 +8194,40 @@ async function cargarReporteCierres() {
     if (!data.success) return;
 
     sincronizarRangoReportes(data.desde, data.hasta);
-
-    if (!data.cierres || data.cierres.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-3">Sin cierres para el rango elegido</td></tr>`;
-      return;
-    }
-
-    tbody.innerHTML = data.cierres.map(c => {
-      const fecha = c.FECHA ? new Date(c.FECHA).toLocaleDateString("es-AR") : "—";
-      const totalDif = Number(c.TOTAL_DIFERENCIA || 0);
-      const claseDif = Math.abs(totalDif) < 1 ? "cc-dif-ok" : (totalDif > 0 ? "cc-dif-sobra" : "cc-dif-falta");
-      const signo = totalDif > 0 ? "+" : "";
-      return `
-      <tr>
-        <td>${escapeHtml(fecha)}</td>
-        <td class="money">$${Number(c.TOTAL_ESPERADO || 0).toLocaleString("es-AR")}</td>
-        <td class="money">$${Number(c.TOTAL_CONTADO || 0).toLocaleString("es-AR")}</td>
-        <td class="money ${claseDif}">${signo}$${Math.round(totalDif).toLocaleString("es-AR")}</td>
-        <td>${escapeHtml(c.VENDEDOR || "—")}</td>
-      </tr>`;
-    }).join("");
+    _repDatosActuales.cierres = data.cierres || [];
+    renderReporteCierres();
 
   } catch (error) {
     console.error("Error al cargar reporte de cierres de caja:", error);
     tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-3">Error al cargar el reporte</td></tr>`;
   }
+}
+
+function renderReporteCierres() {
+  const tbody = document.getElementById("repCierresTabla");
+  if (!tbody) return;
+  const cierres = _repDatosActuales.cierres;
+
+  if (!cierres || cierres.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-3">Sin cierres para el rango elegido</td></tr>`;
+    return;
+  }
+
+  const lista = _limitarReporte(cierres, "cierres");
+  tbody.innerHTML = lista.map(c => {
+    const fecha = c.FECHA ? new Date(c.FECHA).toLocaleDateString("es-AR") : "—";
+    const totalDif = Number(c.TOTAL_DIFERENCIA || 0);
+    const claseDif = Math.abs(totalDif) < 1 ? "cc-dif-ok" : (totalDif > 0 ? "cc-dif-sobra" : "cc-dif-falta");
+    const signo = totalDif > 0 ? "+" : "";
+    return `
+    <tr>
+      <td>${escapeHtml(fecha)}</td>
+      <td class="money">$${Number(c.TOTAL_ESPERADO || 0).toLocaleString("es-AR")}</td>
+      <td class="money">$${Number(c.TOTAL_CONTADO || 0).toLocaleString("es-AR")}</td>
+      <td class="money ${claseDif}">${signo}$${Math.round(totalDif).toLocaleString("es-AR")}</td>
+      <td>${escapeHtml(c.VENDEDOR || "—")}</td>
+    </tr>`;
+  }).join("");
 }
 
 /* ---- Reporte 6: Clientes que más compran ---- */
@@ -8181,24 +8243,33 @@ async function cargarReporteClientes() {
     if (!data.success) return;
 
     sincronizarRangoReportes(data.desde, data.hasta);
-
-    if (!data.clientes || data.clientes.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-3">Sin pedidos para el rango elegido</td></tr>`;
-      return;
-    }
-
-    tbody.innerHTML = data.clientes.map(c => `
-      <tr>
-        <td>${escapeHtml(c.CLIENTE)}</td>
-        <td>${escapeHtml(c.EMPRESA || "—")}</td>
-        <td class="money">${Number(c.PEDIDOS || 0).toLocaleString("es-AR")}</td>
-        <td class="money">$${Number(c.TOTAL || 0).toLocaleString("es-AR")}</td>
-      </tr>`).join("");
+    _repDatosActuales.clientes = data.clientes || [];
+    renderReporteClientes();
 
   } catch (error) {
     console.error("Error al cargar reporte de clientes:", error);
     tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-3">Error al cargar el reporte</td></tr>`;
   }
+}
+
+function renderReporteClientes() {
+  const tbody = document.getElementById("repClientesTabla");
+  if (!tbody) return;
+  const clientes = _repDatosActuales.clientes;
+
+  if (!clientes || clientes.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-3">Sin pedidos para el rango elegido</td></tr>`;
+    return;
+  }
+
+  const lista = _limitarReporte(clientes, "clientes");
+  tbody.innerHTML = lista.map(c => `
+    <tr>
+      <td>${escapeHtml(c.CLIENTE)}</td>
+      <td>${escapeHtml(c.EMPRESA || "—")}</td>
+      <td class="money">${Number(c.PEDIDOS || 0).toLocaleString("es-AR")}</td>
+      <td class="money">$${Number(c.TOTAL || 0).toLocaleString("es-AR")}</td>
+    </tr>`).join("");
 }
 
 /* ---- Exportar cualquiera de los 6 reportes a PDF ---- */
