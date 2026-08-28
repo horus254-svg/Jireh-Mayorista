@@ -73,22 +73,13 @@ async function fetchAPI(url, opciones = {}, config = {}) {
 }
 
 async function cargarConfigCliente() {
-  // Solo esperamos la API_URL (viene de config.json, es instantáneo:
-  // no depende de Sheets). El resto de CONFIG_NEGOCIO (textos, tema,
-  // SEO) se sigue cargando en segundo plano vía cargarConfigNegocio(),
-  // pero ya no bloqueamos acá — así cargarProductos() puede arrancar
-  // apenas tenemos la URL, sin esperar la respuesta lenta de Sheets.
-  if (typeof resolverApiUrlBase === "function") {
-    API_URL = await resolverApiUrlBase();
-    if (typeof CONFIG_NEGOCIO !== "undefined") {
-      CONFIG_NEGOCIO.API_URL = API_URL;
-    }
-  }
-  if (!API_URL) {
-    console.error("No se pudo obtener la API URL (falta config.js o config.json) — este catálogo no puede conectarse a ningún backend.");
-  }
   if (typeof cargarConfigNegocio === "function") {
-    cargarConfigNegocio(); // dispara en 2º plano; no se espera (usa cache compartido con aplicarApariencia)
+    await cargarConfigNegocio(); // de config.js — resuelve config.json y trae el resto de Sheets
+  }
+  if (typeof CONFIG_NEGOCIO !== "undefined" && CONFIG_NEGOCIO.API_URL) {
+    API_URL = CONFIG_NEGOCIO.API_URL;
+  } else {
+    console.error("No se pudo obtener la API URL (falta config.js o config.json) — este catálogo no puede conectarse a ningún backend.");
   }
 }
 
@@ -1322,9 +1313,24 @@ function sincronizarCarritoConStockActual(){
             return;
         }
 
-        // Actualiza el precio y el stock "de referencia" del ítem por si cambiaron
+        // Actualiza el precio y el stock "de referencia" del ítem por si cambiaron.
+        // Si el precio cambió, se avisa al cliente en vez de ajustarlo en silencio
+        // justo antes del checkout.
+        const precioAnterior = Number(item.PRECIO) || 0;
+        const precioCajaAnterior = Number(item.PRECIO_CAJA) || 0;
+
         item.PRECIO = actual.PRECIO;
         item.STOCK = stockActual;
+        if(item._esCaja) item.PRECIO_CAJA = actual.PRECIO_CAJA;
+
+        const precioCambio = Number(actual.PRECIO) !== precioAnterior ||
+            (item._esCaja && Number(actual.PRECIO_CAJA) !== precioCajaAnterior);
+
+        if(precioCambio){
+            huboAjustes = true;
+            const precioNuevo = item._esCaja ? item.PRECIO_CAJA : item.PRECIO;
+            avisos.push(`"${item.PRODUCTO}": el precio se actualizó a $${formatearPrecio(precioNuevo)}`);
+        }
 
         if(item.cantidad > stockActual){
             huboAjustes = true;
@@ -1735,9 +1741,8 @@ async function aplicarApariencia(){
 
     try{
 
-        const data = (typeof obtenerConfiguracionNegocioCruda === "function")
-            ? await obtenerConfiguracionNegocioCruda(API_URL)
-            : await (await fetchAPI(API_URL + "?action=configuracionNegocio")).json();
+        const res = await fetchAPI(API_URL + "?action=configuracionNegocio");
+        const data = await res.json();
 
         if(!data.success || !data.config) return;
 
@@ -2112,7 +2117,7 @@ function renderBeneficioTextoLibre(idWrap, texto){
 
         wrap.innerHTML = `
             <a href="${escapeHtml(href)}" class="beneficio-item beneficio-link" target="_blank" rel="noopener">
-                <svg class="bi-icon"><use href="#ic-${escapeHtml(iconoClase.replace(/^bi-/, ""))}"></use></svg> <span>${escapeHtml(nombre)}</span>
+                <i class="bi ${escapeHtml(iconoClase)}"></i> <span>${escapeHtml(nombre)}</span>
             </a>
         `;
     } else {
