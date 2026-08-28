@@ -73,13 +73,22 @@ async function fetchAPI(url, opciones = {}, config = {}) {
 }
 
 async function cargarConfigCliente() {
-  if (typeof cargarConfigNegocio === "function") {
-    await cargarConfigNegocio(); // de config.js — resuelve config.json y trae el resto de Sheets
+  // Solo esperamos la API_URL (viene de config.json, es instantáneo:
+  // no depende de Sheets). El resto de CONFIG_NEGOCIO (textos, tema,
+  // SEO) se sigue cargando en segundo plano vía cargarConfigNegocio(),
+  // pero ya no bloqueamos acá — así cargarProductos() puede arrancar
+  // apenas tenemos la URL, sin esperar la respuesta lenta de Sheets.
+  if (typeof resolverApiUrlBase === "function") {
+    API_URL = await resolverApiUrlBase();
+    if (typeof CONFIG_NEGOCIO !== "undefined") {
+      CONFIG_NEGOCIO.API_URL = API_URL;
+    }
   }
-  if (typeof CONFIG_NEGOCIO !== "undefined" && CONFIG_NEGOCIO.API_URL) {
-    API_URL = CONFIG_NEGOCIO.API_URL;
-  } else {
+  if (!API_URL) {
     console.error("No se pudo obtener la API URL (falta config.js o config.json) — este catálogo no puede conectarse a ningún backend.");
+  }
+  if (typeof cargarConfigNegocio === "function") {
+    cargarConfigNegocio(); // dispara en 2º plano; no se espera (usa cache compartido con aplicarApariencia)
   }
 }
 
@@ -1726,8 +1735,9 @@ async function aplicarApariencia(){
 
     try{
 
-        const res = await fetchAPI(API_URL + "?action=configuracionNegocio");
-        const data = await res.json();
+        const data = (typeof obtenerConfiguracionNegocioCruda === "function")
+            ? await obtenerConfiguracionNegocioCruda(API_URL)
+            : await (await fetchAPI(API_URL + "?action=configuracionNegocio")).json();
 
         if(!data.success || !data.config) return;
 
@@ -2102,7 +2112,7 @@ function renderBeneficioTextoLibre(idWrap, texto){
 
         wrap.innerHTML = `
             <a href="${escapeHtml(href)}" class="beneficio-item beneficio-link" target="_blank" rel="noopener">
-                <i class="bi ${escapeHtml(iconoClase)}"></i> <span>${escapeHtml(nombre)}</span>
+                <svg class="bi-icon"><use href="#ic-${escapeHtml(iconoClase.replace(/^bi-/, ""))}"></use></svg> <span>${escapeHtml(nombre)}</span>
             </a>
         `;
     } else {
