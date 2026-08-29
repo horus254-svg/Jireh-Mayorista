@@ -3459,9 +3459,13 @@
     </div>
     <div class="product-modal-body" style="display:flex;flex-direction:column;gap:14px;">
 
-      <!-- Descuento -->
+      <!-- Descuento / Recargo -->
       <div>
-        <div class="mfv-label">🏷️ Descuento (opcional)</div>
+        <div class="mfv-label">🏷️ Descuento o recargo (opcional)</div>
+        <div class="discount-mode-row">
+          <button class="discount-mode-btn active" id="mfvModoDescuento" data-modo="DESCUENTO" onclick="mfvElegirModo(this,'DESCUENTO')">➖ Descuento</button>
+          <button class="discount-mode-btn"        id="mfvModoRecargo"  data-modo="RECARGO"   onclick="mfvElegirModo(this,'RECARGO')">➕ Recargo</button>
+        </div>
         <div style="display:flex;gap:6px;align-items:center;">
           <button class="discount-type-btn active" id="mfvTipoPct" data-tipo="PORCENTAJE" onclick="mfvElegirTipo(this,'PORCENTAJE')">%</button>
           <button class="discount-type-btn"        id="mfvTipoMonto" data-tipo="MONTO"      onclick="mfvElegirTipo(this,'MONTO')">$</button>
@@ -3469,7 +3473,7 @@
           <button class="discount-clear" onclick="mfvLimpiarDescuento()">✕</button>
         </div>
         <input type="text" id="mfvDescuentoMotivo" class="form-control form-control-sm mt-1" placeholder="Motivo (opcional)">
-        <div id="mfvDescuentoInfo" style="font-size:12px;color:var(--red-500);margin-top:4px;display:none;"></div>
+        <div id="mfvDescuentoInfo" style="font-size:12px;margin-top:4px;display:none;"></div>
       </div>
 
       <!-- Forma de pago -->

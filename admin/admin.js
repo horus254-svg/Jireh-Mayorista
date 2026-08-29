@@ -5118,10 +5118,11 @@ let formaPagoPOS    = "EFECTIVO";
 let ultimoCodigoAgregadoPOS = null; // usado por el atajo +/- de cantidad
 let posTileFocusIdx  = -1;          // índice de la tarjeta con foco de teclado en el grid
 
-// Descuento aplicado al ticket actual
+// Descuento / recargo aplicado al ticket actual
 let descuentoTipoPOS   = "PORCENTAJE"; // "PORCENTAJE" | "MONTO"
 let descuentoValorPOS  = 0;            // valor ingresado (ej: 10 para 10%, o 500 para $500)
 let descuentoActivoPOS = false;
+let ajusteModoPOS      = "DESCUENTO";  // "DESCUENTO" | "RECARGO" — signo del ajuste aplicado
 
 /** Limpia el caché de productos del POS y recarga desde el backend */
 async function actualizarCatalogoPOSManual() {
@@ -5718,10 +5719,19 @@ function renderTicketPOS() {
 
   const rowDescuentoEl = document.getElementById("rowDescuentoPOS");
   const descuentoMontoEl = document.getElementById("descuentoMontoPOS");
+  const descuentoLabelEl = rowDescuentoEl ? rowDescuentoEl.querySelector("span:first-child") : null;
   if (rowDescuentoEl && descuentoMontoEl) {
-    if (descuentoActivoPOS && montoDescuento > 0) {
+    if (descuentoActivoPOS && montoDescuento !== 0) {
       rowDescuentoEl.style.display = "flex";
-      descuentoMontoEl.innerText = "-$" + montoDescuento.toLocaleString("es-AR");
+      if (montoDescuento > 0) {
+        if (descuentoLabelEl) descuentoLabelEl.textContent = "Descuento";
+        descuentoMontoEl.style.color = "var(--red-500)";
+        descuentoMontoEl.innerText = "-$" + montoDescuento.toLocaleString("es-AR");
+      } else {
+        if (descuentoLabelEl) descuentoLabelEl.textContent = "Recargo";
+        descuentoMontoEl.style.color = "var(--green-600)";
+        descuentoMontoEl.innerText = "+$" + Math.abs(montoDescuento).toLocaleString("es-AR");
+      }
     } else {
       rowDescuentoEl.style.display = "none";
     }
@@ -5750,18 +5760,28 @@ function renderTicketPOS() {
 
 /* ---- discount ---- */
 
-/** Computes the discount amount (clamped to the subtotal) and the resulting total */
+/**
+ * Computes the discount/surcharge amount and the resulting total.
+ * `montoDescuento` is the signed amount SUBTRACTED from the subtotal to get
+ * the total: positive for a discount (total = subtotal - montoDescuento),
+ * negative for a surcharge/"recargo" (total = subtotal + |montoDescuento|).
+ */
 function calcularDescuentoPOS(subtotal) {
   if (!descuentoActivoPOS || descuentoValorPOS <= 0) {
     return { montoDescuento: 0, total: subtotal };
   }
 
-  let monto = descuentoTipoPOS === "PORCENTAJE"
+  let montoBruto = descuentoTipoPOS === "PORCENTAJE"
     ? subtotal * (descuentoValorPOS / 100)
     : descuentoValorPOS;
+  montoBruto = Math.max(0, montoBruto); // nunca negativo
 
-  monto = Math.max(0, Math.min(monto, subtotal)); // nunca negativo ni mayor al subtotal
+  if (ajusteModoPOS === "RECARGO") {
+    // El recargo se suma sobre el subtotal; no tiene tope superior.
+    return { montoDescuento: -montoBruto, total: subtotal + montoBruto };
+  }
 
+  const monto = Math.min(montoBruto, subtotal); // el descuento no puede superar el subtotal
   return { montoDescuento: monto, total: subtotal - monto };
 }
 
@@ -5842,25 +5862,28 @@ function quitarDescuentoPOS() {
 function resetearDescuentoPOS() {
   descuentoActivoPOS = false;
   descuentoValorPOS = 0;
+  ajusteModoPOS = "DESCUENTO";
   const input = document.getElementById("descuentoValorInput");
   if (input) input.value = "";
   const motivo = document.getElementById("descuentoMotivoInput");
   if (motivo) motivo.value = "";
 }
 
-/** Returns a short human-readable label for the active discount, e.g. "10% (-$500)" or "-$300" */
+/** Returns a short human-readable label for the active discount/recargo, e.g. "10% (-$500)" or "+$300" */
 function obtenerEtiquetaDescuentoPOS(subtotal) {
   if (!descuentoActivoPOS || descuentoValorPOS <= 0) return "";
   const { montoDescuento } = calcularDescuentoPOS(subtotal);
   const motivo = (document.getElementById("descuentoMotivoInput") || {}).value || "";
+  const signo = montoDescuento > 0 ? "-" : "+";
+  const montoAbs = Math.round(Math.abs(montoDescuento)).toLocaleString("es-AR");
   let etiqueta = descuentoTipoPOS === "PORCENTAJE"
-    ? `${descuentoValorPOS}% (-$${Math.round(montoDescuento).toLocaleString("es-AR")})`
-    : `-$${Math.round(montoDescuento).toLocaleString("es-AR")}`;
+    ? `${descuentoValorPOS}% (${signo}$${montoAbs})`
+    : `${signo}$${montoAbs}`;
   if (motivo.trim()) etiqueta += ` — ${motivo.trim()}`;
   return etiqueta;
 }
 
-/** Keeps the toggle button label/style in sync with the current discount state */
+/** Keeps the toggle button label/style in sync with the current discount/recargo state */
 function actualizarUIDescuentoPOS() {
   const btn = document.getElementById("btnToggleDescuento");
   const label = document.getElementById("discountToggleLabel");
@@ -5868,9 +5891,10 @@ function actualizarUIDescuentoPOS() {
 
   if (descuentoActivoPOS && descuentoValorPOS > 0) {
     btn.classList.add("has-discount");
+    const palabra = ajusteModoPOS === "RECARGO" ? "Recargo" : "Descuento";
     label.innerText = descuentoTipoPOS === "PORCENTAJE"
-      ? `Descuento aplicado: ${descuentoValorPOS}%`
-      : `Descuento aplicado: $${descuentoValorPOS.toLocaleString("es-AR")}`;
+      ? `${palabra} aplicado: ${descuentoValorPOS}%`
+      : `${palabra} aplicado: $${descuentoValorPOS.toLocaleString("es-AR")}`;
   } else {
     btn.classList.remove("has-discount");
     label.innerText = "Agregar descuento";
@@ -5889,6 +5913,7 @@ function elegirFormaPago(el, valor) {
 
 /* ---- Modal Finalizar Venta ---- */
 let mfvTipoDescuento = "PORCENTAJE";
+let mfvModoDescuento = "DESCUENTO"; // "DESCUENTO" | "RECARGO"
 let mfvFormaPago = "EFECTIVO";
 
 function abrirModalFinalizarVenta() {
@@ -5910,6 +5935,12 @@ function abrirModalFinalizarVenta() {
   mfvTipoDescuento = descuentoTipoPOS || "PORCENTAJE";
   document.getElementById("mfvTipoPct").classList.toggle("active", mfvTipoDescuento === "PORCENTAJE");
   document.getElementById("mfvTipoMonto").classList.toggle("active", mfvTipoDescuento === "MONTO");
+
+  // Modo: descuento o recargo
+  mfvModoDescuento = ajusteModoPOS || "DESCUENTO";
+  document.getElementById("mfvModoDescuento").classList.toggle("active", mfvModoDescuento === "DESCUENTO");
+  document.getElementById("mfvModoRecargo").classList.toggle("active", mfvModoDescuento === "RECARGO");
+
   mfvActualizarDescuento();
 
   // Forma de pago
@@ -5967,25 +5998,42 @@ function mfvElegirTipo(btn, tipo) {
   mfvActualizarDescuento();
 }
 
+function mfvElegirModo(btn, modo) {
+  mfvModoDescuento = modo;
+  btn.closest(".product-modal-body").querySelectorAll(".discount-mode-btn").forEach(b =>
+    b.classList.toggle("active", b.dataset.modo === modo));
+  mfvActualizarDescuento();
+}
+
 function mfvLimpiarDescuento() {
   document.getElementById("mfvDescuentoValor").value = "";
   document.getElementById("mfvDescuentoMotivo").value = "";
+  mfvModoDescuento = "DESCUENTO";
+  document.getElementById("mfvModoDescuento").classList.add("active");
+  document.getElementById("mfvModoRecargo").classList.remove("active");
   mfvActualizarDescuento();
 }
 
 function mfvActualizarDescuento() {
   const subtotal = ticketPOS.reduce((a, i) => a + i.PRECIO * i.cantidad, 0);
   const val = Number(document.getElementById("mfvDescuentoValor").value) || 0;
-  let monto = 0;
-  if (mfvTipoDescuento === "PORCENTAJE") monto = subtotal * val / 100;
-  else monto = val;
-  monto = Math.min(monto, subtotal);
-  const total = subtotal - monto;
+  let montoBruto = 0;
+  if (mfvTipoDescuento === "PORCENTAJE") montoBruto = subtotal * val / 100;
+  else montoBruto = val;
+  montoBruto = Math.max(0, montoBruto);
+
+  const esRecargo = mfvModoDescuento === "RECARGO";
+  const monto = esRecargo ? montoBruto : Math.min(montoBruto, subtotal);
+  const total = esRecargo ? subtotal + monto : subtotal - monto;
+
   document.getElementById("mfvTotal").textContent = "$" + total.toLocaleString("es-AR");
   const info = document.getElementById("mfvDescuentoInfo");
   if (monto > 0) {
     info.style.display = "block";
-    info.textContent = `Descuento: -$${monto.toLocaleString("es-AR")} → Total: $${total.toLocaleString("es-AR")}`;
+    info.style.color = esRecargo ? "var(--green-600)" : "var(--red-500)";
+    const signo = esRecargo ? "+" : "-";
+    const etiqueta = esRecargo ? "Recargo" : "Descuento";
+    info.textContent = `${etiqueta}: ${signo}$${monto.toLocaleString("es-AR")} → Total: $${total.toLocaleString("es-AR")}`;
   } else {
     info.style.display = "none";
   }
@@ -6017,6 +6065,7 @@ async function confirmarFinalizarVenta() {
   const motivoDescuento = document.getElementById("mfvDescuentoMotivo").value;
   if (valDescuento && Number(valDescuento) > 0) {
     descuentoTipoPOS = mfvTipoDescuento;
+    ajusteModoPOS = mfvModoDescuento;
     if (document.getElementById("descuentoValorInput"))
       document.getElementById("descuentoValorInput").value = valDescuento;
     if (document.getElementById("descuentoMotivoInput"))
@@ -6107,7 +6156,7 @@ async function confirmarFinalizarVenta() {
           action: "guardarVenta",
           total: total,
           formaPago: formaPagoPOS,
-          observaciones: etiquetaDescuento ? "Descuento: " + etiquetaDescuento : "",
+          observaciones: etiquetaDescuento ? (ajusteModoPOS === "RECARGO" ? "Recargo: " : "Descuento: ") + etiquetaDescuento : "",
           carrito: itemsSnapshot,
           clienteVentaId: clienteVentaId
         })
@@ -6138,7 +6187,7 @@ async function confirmarFinalizarVenta() {
     // perdido la respuesta.
     encolarVentaPendiente({
       clienteVentaId, total, formaPago: formaPagoPOS,
-      observaciones: etiquetaDescuento ? "Descuento: " + etiquetaDescuento : "",
+      observaciones: etiquetaDescuento ? (ajusteModoPOS === "RECARGO" ? "Recargo: " : "Descuento: ") + etiquetaDescuento : "",
       carrito: itemsSnapshot
     });
     toast("📴 Sin conexión — la venta se guardó localmente y se subirá sola al reconectar", "error");
@@ -6408,15 +6457,19 @@ function mostrarRecibo(ventaId, items, total, subtotal, montoDescuento, recibido
       </tr>`;
   });
 
-  if (montoDescuento > 0) {
+  if (montoDescuento !== 0) {
+    const esRecargo = montoDescuento < 0;
+    const color = esRecargo ? "var(--green-600)" : "var(--red-500)";
+    const etiqueta = esRecargo ? "Recargo" : "Descuento";
+    const signo = esRecargo ? "+" : "-";
     html += `
       <tr>
         <td>Subtotal</td>
         <td style="text-align:right;">$${Number(subtotal).toLocaleString("es-AR")}</td>
       </tr>
       <tr>
-        <td style="color:var(--red-500);">Descuento</td>
-        <td style="text-align:right;color:var(--red-500);">-$${Math.round(montoDescuento).toLocaleString("es-AR")}</td>
+        <td style="color:${color};">${etiqueta}</td>
+        <td style="text-align:right;color:${color};">${signo}$${Math.round(Math.abs(montoDescuento)).toLocaleString("es-AR")}</td>
       </tr>`;
   }
 
@@ -6489,18 +6542,21 @@ function buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, cf
       </tr>`;
   });
 
-  const tieneDescuento = descuento && Number(descuento.monto) > 0;
+  const tieneDescuento = descuento && Number(descuento.monto) !== 0;
+  const esRecargoPrint = tieneDescuento && Number(descuento.monto) < 0;
 
   let filasTotales = "";
   if (tieneDescuento) {
+    const etiquetaFila = esRecargoPrint ? "Recargo" : "Descuento";
+    const signoFila = esRecargoPrint ? "+" : "-";
     filasTotales += `
       <tr>
         <td>Subtotal</td>
         <td style="text-align:right;">$${subtotal.toLocaleString("es-AR")}</td>
       </tr>
       <tr>
-        <td>Descuento${descuento.etiqueta ? " (" + escapeHtml(descuento.etiqueta) + ")" : ""}</td>
-        <td style="text-align:right;">-$${Math.round(descuento.monto).toLocaleString("es-AR")}</td>
+        <td>${etiquetaFila}${descuento.etiqueta ? " (" + escapeHtml(descuento.etiqueta) + ")" : ""}</td>
+        <td style="text-align:right;">${signoFila}$${Math.round(Math.abs(descuento.monto)).toLocaleString("es-AR")}</td>
       </tr>`;
   }
   filasTotales += `
@@ -6658,12 +6714,15 @@ function buildThermalESCPOS(ventaId, items, total, formaPago, fecha, descuento, 
     b.row(`${item.cantidad} x $${money(item.PRECIO)}`, "$" + money(sub));
   });
 
-  const tieneDescuento = descuento && Number(descuento.monto) > 0;
+  const tieneDescuento = descuento && Number(descuento.monto) !== 0;
   if (tieneDescuento) {
+    const esRecargoESC = Number(descuento.monto) < 0;
     b.sep();
     b.row("Subtotal", "$" + money(subtotal));
-    const etiquetaDesc = descuento.etiqueta ? `Descuento (${descuento.etiqueta})` : "Descuento";
-    b.row(etiquetaDesc, "-$" + money(descuento.monto));
+    const palabraAjuste = esRecargoESC ? "Recargo" : "Descuento";
+    const etiquetaDesc = descuento.etiqueta ? `${palabraAjuste} (${descuento.etiqueta})` : palabraAjuste;
+    const signoESC = esRecargoESC ? "+" : "-";
+    b.row(etiquetaDesc, signoESC + "$" + money(Math.abs(descuento.monto)));
   }
 
   b.sepSolid();
@@ -6980,7 +7039,7 @@ function imprimirTicketThermal() {
   const { montoDescuento, total } = calcularDescuentoPOS(subtotal);
   const etiqueta = obtenerEtiquetaDescuentoPOS(subtotal);
   _ejecutarImpresion("PREVIO", ticketPOS, total, formaPagoPOS, new Date(),
-    montoDescuento > 0 ? { monto: montoDescuento, etiqueta } : null);
+    montoDescuento !== 0 ? { monto: montoDescuento, etiqueta } : null);
 }
 
 /** Print after a completed sale (from receipt modal) */
@@ -6988,7 +7047,7 @@ function imprimirUltimoRecibo() {
   if (!ultimaVentaImprimible) { toast("No hay venta para imprimir", "error"); return; }
   const u = ultimaVentaImprimible;
   _ejecutarImpresion(u.ventaId, u.items, u.total, u.formaPago, u.fecha,
-    u.descuento > 0 ? { monto: u.descuento, etiqueta: u.descuentoEtiqueta } : null);
+    u.descuento !== 0 ? { monto: u.descuento, etiqueta: u.descuentoEtiqueta } : null);
 }
 
 /** Print a sale from the dashboard recent-sales table or the Ventas POS history */
@@ -10312,7 +10371,7 @@ async function consultarCobroMercadoPagoPolling() {
                 action: "guardarVenta",
                 total: total,
                 formaPago: "TRANSFERENCIA",
-                observaciones: etiquetaDescuento ? "Descuento: " + etiquetaDescuento : "",
+                observaciones: etiquetaDescuento ? (ajusteModoPOS === "RECARGO" ? "Recargo: " : "Descuento: ") + etiquetaDescuento : "",
                 carrito: itemsSnapshot,
                 clienteVentaId: clienteVentaIdMP
               })
