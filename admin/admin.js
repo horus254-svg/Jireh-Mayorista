@@ -8889,10 +8889,10 @@ function _rcAplicarFiltrosTabla() {
         <td class="mono" title="${escapeHtml(p.codigo)}">${escapeHtml(p.codigo)}</td>
         <td title="${escapeHtml(p.nombre)}">${escapeHtml(p.nombre)}</td>
         <td title="${escapeHtml(p.categoria)}">${escapeHtml(p.categoria)}</td>
-        <td class="money">${p.vendidos.toLocaleString("es-AR")}</td>
-        <td class="money">${p.stock.toLocaleString("es-AR")}</td>
-        <td class="money">${cobTxt}</td>
-        <td class="money">${sugeridoTxt}</td>
+        <td class="money" data-label="Vendidos">${p.vendidos.toLocaleString("es-AR")}</td>
+        <td class="money" data-label="Stock">${p.stock.toLocaleString("es-AR")}</td>
+        <td class="money" data-label="Cobertura">${cobTxt}</td>
+        <td class="money" data-label="Sugerido reponer">${sugeridoTxt}</td>
         <td><span class="badge ${info.clase}">${info.texto}</span></td>
       </tr>`;
   }).join("");

@@ -2055,7 +2055,71 @@ kbd{
   .mc-form-row .form-control{ min-width:0; width:100%; }
 }
 
-/* ===================== PEDIDOS — CARD LIST ===================== */
+/* ===================== REPORTE DE COMPRAS — TABLA "QUÉ REPONER" ===================== */
+/* En mobile la tabla se deforma (demasiadas columnas angostas), así que se
+   convierte en una lista de tarjetas: cada <tr> pasa a ser una tarjeta y cada
+   <td> muestra su etiqueta (data-label) al lado del valor. */
+@media (max-width:768px){
+  .rc-tabla-semaforo{ width:100%; }
+  .rc-tabla-semaforo colgroup{ display:none; }
+  .rc-tabla-semaforo thead{ display:none; }
+  .rc-tabla-semaforo tbody{ display:block; }
+
+  .rc-tabla-semaforo tr{
+    display:flex; flex-wrap:wrap; align-items:center;
+    gap:0 10px; position:relative;
+    background:#fff; border:1.5px solid var(--slate-200); border-radius:10px;
+    padding:10px 12px 8px; margin-bottom:10px;
+  }
+  /* Fila de "sin resultados / cargando" (colspan único): mantenerla simple */
+  .rc-tabla-semaforo tr:has(td[colspan]){ display:block; padding:14px; }
+
+  .rc-tabla-semaforo td{
+    border:none !important; padding:3px 0 !important; background:transparent !important;
+  }
+
+  /* Estado: arriba a la derecha, como badge de la tarjeta */
+  .rc-tabla-semaforo td:nth-child(9){ order:1; margin-left:auto; padding-bottom:6px !important; }
+
+  /* Checkbox: arriba a la izquierda */
+  .rc-tabla-semaforo td:nth-child(1){ order:2; padding-bottom:6px !important; }
+
+  /* Producto: título de la tarjeta, ocupa todo el ancho */
+  .rc-tabla-semaforo td:nth-child(3){
+    order:3; width:100%; font-weight:700; font-size:14px; color:var(--navy-900);
+    white-space:normal; overflow:visible; text-overflow:unset;
+  }
+
+  /* Código y categoría: subtítulo chico */
+  .rc-tabla-semaforo td:nth-child(2), .rc-tabla-semaforo td:nth-child(4){
+    width:auto; font-size:11px; color:var(--slate-500);
+  }
+  .rc-tabla-semaforo td:nth-child(2){ order:4; }
+  .rc-tabla-semaforo td:nth-child(2)::after{ content:"·"; margin:0 5px; color:var(--slate-300); }
+  .rc-tabla-semaforo td:nth-child(4){ order:5; }
+
+  /* Vendidos / Stock / Cobertura / Sugerido: grilla de datos 2x2 con etiqueta */
+  .rc-tabla-semaforo td:nth-child(5),
+  .rc-tabla-semaforo td:nth-child(6),
+  .rc-tabla-semaforo td:nth-child(7),
+  .rc-tabla-semaforo td:nth-child(8){
+    width:50%; margin-top:8px; padding-top:8px !important;
+    border-top:1px dashed var(--slate-100) !important;
+    font-size:13px;
+  }
+  .rc-tabla-semaforo td:nth-child(5){ order:6; }
+  .rc-tabla-semaforo td:nth-child(6){ order:7; }
+  .rc-tabla-semaforo td:nth-child(7){ order:8; }
+  .rc-tabla-semaforo td:nth-child(8){ order:9; }
+
+  .rc-tabla-semaforo td[data-label]::before{
+    content:attr(data-label); display:block;
+    font-size:10px; font-weight:700; text-transform:uppercase;
+    letter-spacing:.02em; color:var(--slate-400); margin-bottom:1px;
+  }
+}
+
+
 
 .pedido-card{
   background:#fff;
