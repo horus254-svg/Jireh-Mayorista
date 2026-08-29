@@ -230,6 +230,16 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
+/** Igual que escapeHtml, pero además neutraliza el apóstrofe (como entidad
+ *  HTML &#39;, que el navegador decodifica de nuevo a ' al leer el atributo).
+ *  Usar SIEMPRE que un valor se inserte dentro de un string JS delimitado
+ *  por comillas simples dentro de un onclick/onchange generado con innerHTML
+ *  — si no, un apóstrofe en el dato (código, nombre, motivo, etc.) corta el
+ *  string antes de tiempo y rompe el atributo con "missing ) after argument list". */
+function escapeJsAttr(text) {
+  return escapeHtml(text).replace(/'/g, "&#39;");
+}
+
 /**
  * Devuelve una versión "demorada" de una función: si se la llama
  * varias veces seguidas (por ejemplo, una vez por cada tecla mientras
@@ -3051,9 +3061,9 @@ function renderTablaProductos(lista) {
         <td>${stockBadge}</td>
         <td><span class="badge ${publicado ? "bg-success" : "bg-secondary"}">${publicado ? "Publicado" : "Oculto"}</span></td>
         <td class="celda-acciones-producto">
-          <button class="btn btn-outline-success btn-sm btn-accion-producto" onclick="abrirModalStock('${escapeHtml(p.CODIGO)}')" title="Sumar stock">📦 <span class="btn-accion-texto">Stock</span></button>
-          <button class="btn btn-primary btn-sm btn-accion-producto ms-2" onclick="editarProducto('${escapeHtml(p.CODIGO)}')" title="Editar">✏️ <span class="btn-accion-texto">Editar</span></button>
-          <button class="btn btn-danger btn-sm btn-accion-producto ms-2" onclick="eliminarProducto('${escapeHtml(p.CODIGO)}')" title="Eliminar">🗑️ <span class="btn-accion-texto">Eliminar</span></button>
+          <button class="btn btn-outline-success btn-sm btn-accion-producto" onclick="abrirModalStock('${escapeJsAttr(p.CODIGO)}')" title="Sumar stock">📦 <span class="btn-accion-texto">Stock</span></button>
+          <button class="btn btn-primary btn-sm btn-accion-producto ms-2" onclick="editarProducto('${escapeJsAttr(p.CODIGO)}')" title="Editar">✏️ <span class="btn-accion-texto">Editar</span></button>
+          <button class="btn btn-danger btn-sm btn-accion-producto ms-2" onclick="eliminarProducto('${escapeJsAttr(p.CODIGO)}')" title="Eliminar">🗑️ <span class="btn-accion-texto">Eliminar</span></button>
         </td>`;
       frag.appendChild(tr);
     }
@@ -4319,11 +4329,11 @@ function renderTablaClientes(lista) {
     }
 
     const botones = c.CLIENTE_ID
-      ? `<button class="btn btn-outline-secondary btn-sm" onclick="abrirModalDetalleCliente('${escapeHtml(c.CLIENTE_ID)}')">Ver cuenta</button>
-         <button class="btn btn-warning btn-sm" onclick="abrirModalDeudaExtraDirecto('${escapeHtml(c.CLIENTE_ID)}', '${escapeHtml(c.NOMBRE || c.CLIENTE)}')">+ Deuda</button>
-         <button class="btn btn-primary btn-sm" onclick="abrirModalEditarCliente('${escapeHtml(c.CLIENTE_ID)}')">Editar</button>
-         <button class="btn btn-danger btn-sm" onclick="eliminarClienteForm('${escapeHtml(c.CLIENTE_ID)}', '${escapeHtml(c.NOMBRE)}')">Eliminar</button>`
-      : `<button class="btn btn-outline-success btn-sm" onclick="marcarClienteDesdeHistorialACredito('${escapeHtml(c.DNI)}')">Marcar a crédito</button>`;
+      ? `<button class="btn btn-outline-secondary btn-sm" onclick="abrirModalDetalleCliente('${escapeJsAttr(c.CLIENTE_ID)}')">Ver cuenta</button>
+         <button class="btn btn-warning btn-sm" onclick="abrirModalDeudaExtraDirecto('${escapeJsAttr(c.CLIENTE_ID)}', '${escapeJsAttr(c.NOMBRE || c.CLIENTE)}')">+ Deuda</button>
+         <button class="btn btn-primary btn-sm" onclick="abrirModalEditarCliente('${escapeJsAttr(c.CLIENTE_ID)}')">Editar</button>
+         <button class="btn btn-danger btn-sm" onclick="eliminarClienteForm('${escapeJsAttr(c.CLIENTE_ID)}', '${escapeJsAttr(c.NOMBRE)}')">Eliminar</button>`
+      : `<button class="btn btn-outline-success btn-sm" onclick="marcarClienteDesdeHistorialACredito('${escapeJsAttr(c.DNI)}')">Marcar a crédito</button>`;
 
       const cardHtml = `
     <div class="pedido-card ${bordeClase}">
@@ -5196,7 +5206,7 @@ function construirCategoriasPOS() {
   if (categorias.size === 0) { cont.innerHTML = ""; return; }
   let html = `<div class="cat-chip active" data-cat="TODAS" onclick="filtrarCategoriaPOS('TODAS', this)">Todas</div>`;
   categorias.forEach(c => {
-    html += `<div class="cat-chip" data-cat="${escapeHtml(c)}" onclick="filtrarCategoriaPOS('${escapeHtml(c)}', this)">${escapeHtml(c)}</div>`;
+    html += `<div class="cat-chip" data-cat="${escapeHtml(c)}" onclick="filtrarCategoriaPOS('${escapeJsAttr(c)}', this)">${escapeHtml(c)}</div>`;
   });
   cont.innerHTML = html;
 }
@@ -5345,7 +5355,7 @@ function renderPosGrid(filtroTexto) {
           <span class="tile-price">$${Number(p.PRECIO || 0).toLocaleString("es-AR")}</span>
           ${stockBadge}
         </div>
-        ${obtenerRolActual() === "vendedor" ? "" : `<button type="button" class="tile-edit" data-idx="${idx}" title="Editar precio y stock" onclick="event.stopPropagation(); abrirEdicionRapidaPOS('${escapeHtml(p.CODIGO)}');">✏️</button>`}
+        ${obtenerRolActual() === "vendedor" ? "" : `<button type="button" class="tile-edit" data-idx="${idx}" title="Editar precio y stock" onclick="event.stopPropagation(); abrirEdicionRapidaPOS('${escapeJsAttr(p.CODIGO)}');">✏️</button>`}
         ${Number(p.UNIDADES_POR_CAJA) > 0 ? `<button type="button" class="tile-caja" title="Agregar 1 caja (${p.UNIDADES_POR_CAJA} uds) a $${Number(p.PRECIO_CAJA || 0).toLocaleString("es-AR")}" onclick="event.stopPropagation(); agregarCajaAlTicket(productosPOS.find(x => String(x.CODIGO)==='${escapeHtml(p.CODIGO)}'));">📦x${p.UNIDADES_POR_CAJA}</button>` : ""}
         <span class="tile-add">+</span>
       </div>`;
@@ -8885,7 +8895,7 @@ function _rcAplicarFiltrosTabla() {
     const marcado = _rcSeleccionados.has(String(p.codigo));
     return `
       <tr>
-        <td><input type="checkbox" class="rc-check-fila" data-codigo="${escapeHtml(p.codigo)}" ${marcado ? "checked" : ""} onchange="_rcToggleSeleccion('${escapeHtml(p.codigo)}', this.checked)"></td>
+        <td><input type="checkbox" class="rc-check-fila" data-codigo="${escapeHtml(p.codigo)}" ${marcado ? "checked" : ""} onchange="_rcToggleSeleccion('${escapeJsAttr(p.codigo)}', this.checked)"></td>
         <td class="mono" title="${escapeHtml(p.codigo)}">${escapeHtml(p.codigo)}</td>
         <td title="${escapeHtml(p.nombre)}">${escapeHtml(p.nombre)}</td>
         <td title="${escapeHtml(p.categoria)}">${escapeHtml(p.categoria)}</td>
@@ -9119,7 +9129,7 @@ function renderTablaMovimientosCaja(lista) {
       </td>
       <td>${escapeHtml(m.VENDEDOR || "—")}</td>
       <td>${(esVendedorRol || !m.MOVIMIENTO_ID) ? "" : `<button class="btn btn-outline-danger btn-sm"
-        onclick="confirmarEliminarMovimiento('${escapeHtml(m.MOVIMIENTO_ID)}', '${escapeHtml(m.MOTIVO || "")}')">✕</button>`}</td>
+        onclick="confirmarEliminarMovimiento('${escapeJsAttr(m.MOVIMIENTO_ID)}', '${escapeJsAttr(m.MOTIVO || "")}')">✕</button>`}</td>
     </tr>`;
   });
 
@@ -11439,7 +11449,7 @@ async function cargarUsuarios() {
         <td>${String(u.ACTIVO || "SI").toUpperCase() === "NO" ? '<span class="badge bg-secondary">Inactivo</span>' : '<span class="badge bg-success">Activo</span>'}</td>
         <td>
           <button class="btn btn-sm btn-outline-primary" onclick="abrirModalEditarUsuario('${u.USUARIO_ID}')">✏️</button>
-          <button class="btn btn-sm btn-outline-danger" onclick="eliminarUsuarioClick('${u.USUARIO_ID}', '${escapeHtml(u.NOMBRE || "")}')">🗑️</button>
+          <button class="btn btn-sm btn-outline-danger" onclick="eliminarUsuarioClick('${u.USUARIO_ID}', '${escapeJsAttr(u.NOMBRE || "")}')">🗑️</button>
         </td>
       </tr>`).join("");
 
