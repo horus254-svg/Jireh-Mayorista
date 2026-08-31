@@ -3486,6 +3486,19 @@
         </div>
       </div>
 
+      <!-- Solo visible con Transferencia elegida y Mercado Pago configurado.
+           Sin esto, la venta quedaba obligada a generar el QR sí o sí, y si
+           esa generación fallaba (o el cliente ya había transferido directo
+           al alias, sin escanear nada), no había forma de simplemente
+           registrar la venta. -->
+      <div id="mfvQrWrap" style="display:none;">
+        <div class="mfv-label">📲 ¿Cómo se cobra la transferencia?</div>
+        <div class="discount-mode-row">
+          <button type="button" class="discount-mode-btn" id="mfvQrNo" data-modo="NO" onclick="mfvElegirGenerarQR(false)">✅ Ya me transfirió</button>
+          <button type="button" class="discount-mode-btn" id="mfvQrSi" data-modo="SI" onclick="mfvElegirGenerarQR(true)">🔲 Generar QR</button>
+        </div>
+      </div>
+
       <!-- Recibido / Cambio — solo efectivo -->
       <div id="mfvRecibidoWrap">
         <div class="mfv-label">💵 Efectivo recibido</div>

@@ -1195,6 +1195,8 @@ tr.fila-arrastrable{ cursor:default; }
 .discount-mode-btn:hover{ border-color:var(--slate-300); }
 .discount-mode-btn.active[data-modo="DESCUENTO"]{ background:var(--red-500); border-color:var(--red-500); color:#fff; }
 .discount-mode-btn.active[data-modo="RECARGO"]{ background:var(--green-600); border-color:var(--green-600); color:#fff; }
+.discount-mode-btn.active[data-modo="NO"]{ background:var(--green-600); border-color:var(--green-600); color:#fff; }
+.discount-mode-btn.active[data-modo="SI"]{ background:var(--navy-900); border-color:var(--navy-900); color:#fff; }
 
 .discount-type-row{ display:flex; gap:5px; align-items:center; }
 .discount-type-btn{

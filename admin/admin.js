@@ -5967,6 +5967,11 @@ function elegirFormaPago(el, valor) {
 let mfvTipoDescuento = "PORCENTAJE";
 let mfvModoDescuento = "DESCUENTO"; // "DESCUENTO" | "RECARGO"
 let mfvFormaPago = "EFECTIVO";
+let mfvMpDisponible = false; // cacheado al abrir el modal — ¿hay MP configurado y usable?
+let mfvGenerarQR = false;    // elección del cajero cuando la forma de pago es TRANSFERENCIA:
+                              // true = generar QR para que el cliente escanee y pague ahí mismo;
+                              // false (default) = el cliente ya transfirió directo al alias/CVU,
+                              // registrar la venta sin pasar por Mercado Pago.
 
 function abrirModalFinalizarVenta() {
   if (ticketPOS.length === 0) { toast("El ticket está vacío", "error"); return; }
@@ -6002,6 +6007,15 @@ function abrirModalFinalizarVenta() {
   });
   mfvMostrarRecibido();
 
+  // QR de Mercado Pago para Transferencia — se resetea a "sin QR" cada vez
+  // que se abre el modal, y se consulta si MP está disponible en segundo
+  // plano (no bloquea la apertura del modal) para decidir si mostrar el
+  // selector o no.
+  mfvGenerarQR = false;
+  mfvMpDisponible = false;
+  mfvActualizarVisibilidadQR();
+  verificarMpDisponibleParaModal();
+
   // Recibido
   document.getElementById("mfvRecibido").value = "";
   document.getElementById("mfvCambio").textContent = "—";
@@ -6032,7 +6046,43 @@ function mfvElegirPago(btn, valor) {
   document.querySelectorAll("#mfvPayMethods .pay-method-btn").forEach(b =>
     b.classList.toggle("active", b.dataset.val === valor));
   mfvMostrarRecibido();
+  mfvActualizarVisibilidadQR();
   if (valor === "EFECTIVO") setTimeout(() => document.getElementById("mfvRecibido").focus(), 50);
+}
+
+/** Consulta (una sola vez por apertura del modal) si Mercado Pago está configurado y usable, sin bloquear la apertura del modal */
+async function verificarMpDisponibleParaModal() {
+  const bridge = window.veekpos || window.posOffline;
+  if (!bridge || typeof bridge.mercadoPagoDisponible !== "function") {
+    mfvMpDisponible = false;
+  } else {
+    try {
+      mfvMpDisponible = await bridge.mercadoPagoDisponible();
+    } catch (error) {
+      mfvMpDisponible = false;
+    }
+  }
+  mfvActualizarVisibilidadQR();
+}
+
+/** Muestra/oculta el selector "Generar QR / Ya me transfirió" según la forma de pago elegida y si MP está disponible */
+function mfvActualizarVisibilidadQR() {
+  const wrap = document.getElementById("mfvQrWrap");
+  if (!wrap) return;
+
+  const mostrar = mfvFormaPago === "TRANSFERENCIA" && mfvMpDisponible;
+  wrap.style.display = mostrar ? "block" : "none";
+  if (!mostrar) mfvGenerarQR = false; // si se oculta (no hay MP, o cambiaron de forma de pago), nunca queda "generar QR" activo por error
+
+  const btnSi = document.getElementById("mfvQrSi");
+  const btnNo = document.getElementById("mfvQrNo");
+  if (btnSi) btnSi.classList.toggle("active", mfvGenerarQR);
+  if (btnNo) btnNo.classList.toggle("active", !mfvGenerarQR);
+}
+
+function mfvElegirGenerarQR(valor) {
+  mfvGenerarQR = valor;
+  mfvActualizarVisibilidadQR();
 }
 
 function mfvMostrarRecibido() {
@@ -6137,8 +6187,14 @@ async function confirmarFinalizarVenta() {
 
   cerrarModalFinalizarVenta();
 
-  // Si es TRANSFERENCIA y MercadoPago está configurado → mostrar QR antes de registrar
-  if (mfvFormaPago === "TRANSFERENCIA") {
+  // Si es TRANSFERENCIA y el cajero eligió generar el QR (ver selector
+  // "¿Cómo se cobra la transferencia?" en el modal) → mostrar QR antes de
+  // registrar. Si no lo eligió (o MP no está disponible), la venta sigue
+  // de largo y se registra directo como transferencia manual — antes esto
+  // era obligatorio siempre que MP estuviera configurado, y si la
+  // generación del QR fallaba por cualquier motivo, la venta quedaba
+  // completamente bloqueada sin forma de simplemente registrarla.
+  if (mfvFormaPago === "TRANSFERENCIA" && mfvGenerarQR) {
     const bridge = window.veekpos || window.posOffline;
     if (bridge && typeof bridge.mercadoPagoDisponible === "function") {
       const mpDisponible = await bridge.mercadoPagoDisponible().catch(() => false);
