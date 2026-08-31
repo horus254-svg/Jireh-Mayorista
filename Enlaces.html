@@ -153,6 +153,28 @@ body{
 .link-btn.catalogo .link-sub{color:rgba(255,255,255,.65);}
 .link-btn.catalogo .link-arrow{color:rgba(255,255,255,.65);}
 .link-btn.catalogo .link-ico{background:var(--gold-500);color:var(--navy-950);}
+
+/* ---- Temas de color (mismo criterio que el catálogo: se activan
+   con data-tema="azul|verde|rojo" en <body>; sin el atributo se usa
+   la paleta navy original) ---- */
+body[data-tema="azul"]{
+    --navy-950:#0b1f3a;
+    --navy-800:#16335c;
+    --indigo-600:#2f7df5;
+    --indigo-700:#1f63d1;
+}
+body[data-tema="verde"]{
+    --navy-950:#0c2417;
+    --navy-800:#16402a;
+    --indigo-600:#1fa257;
+    --indigo-700:#168447;
+}
+body[data-tema="rojo"]{
+    --navy-950:#2a0f12;
+    --navy-800:#481a1f;
+    --indigo-600:#e0413f;
+    --indigo-700:#bf2e2e;
+}
 .link-label{flex:1;}
 .link-sub{
     display:block;
@@ -254,7 +276,6 @@ body{
     <div class="header">
         <div class="avatar" id="avatar"><span id="avatarInicial">?</span></div>
         <h1 class="nombre" id="nombreNegocio">Cargando…</h1>
-        <p class="subtitulo" id="subtituloNegocio"></p>
     </div>
 
     <div id="estadoCarga" class="estado">Cargando enlaces…</div>
@@ -354,8 +375,19 @@ async function cargarLanding(){
     // Cabecera
     document.title = config.nombre || "Enlaces";
     document.getElementById("nombreNegocio").textContent = config.nombre || "";
-    document.getElementById("subtituloNegocio").textContent = config.subtitulo || "";
-    document.getElementById("footerTexto").textContent = config.nombre ? ("© " + new Date().getFullYear() + " " + config.nombre) : "";
+    document.getElementById("footerTexto").textContent = config.footerCopyright || (config.nombre ? ("© " + new Date().getFullYear() + " " + config.nombre) : "");
+
+    // Tema de color: mismo mecanismo que el catálogo (data-tema en
+    // <body>). Si el negocio activó un gradiente propio (Apariencia →
+    // "Gradiente propio"), ese pisa directamente navy-950/navy-800,
+    // sin importar el tema elegido.
+    if(config.tema && config.tema !== "navy"){
+        document.body.setAttribute("data-tema", config.tema);
+    }
+    if(config.gradPersonalizado && config.gradA && config.gradB){
+        document.body.style.setProperty("--navy-950", config.gradA);
+        document.body.style.setProperty("--navy-800", config.gradB);
+    }
 
     const avatarEl = document.getElementById("avatar");
     if(config.iconoUrl){
