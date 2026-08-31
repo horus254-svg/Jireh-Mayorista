@@ -219,6 +219,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   setupScannerListener();
+  suscribirseATransferenciasMP();
 });
 
 
@@ -1393,6 +1394,47 @@ function toast(mensaje, tipo) {
     el.style.opacity = "0";
     setTimeout(() => el.remove(), 250);
   }, 2600);
+}
+
+/**
+ * Toca un beep corto y agudo (dos tonos ascendentes) para acompañar el
+ * aviso de "transferencia recibida" — sin depender de ningún archivo de
+ * audio propio. Si el navegador bloqueó el audio por falta de interacción
+ * previa del usuario (autoplay policy), falla en silencio: el toast visual
+ * ya avisa igual.
+ */
+function sonarBeepTransferencia() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [880, 1160].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.15, ctx.currentTime + i * 0.14);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.14 + 0.13);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(ctx.currentTime + i * 0.14);
+      osc.stop(ctx.currentTime + i * 0.14 + 0.14);
+    });
+  } catch (error) { /* sin audio disponible, no es crítico */ }
+}
+
+/**
+ * Solo tiene efecto dentro de la app de escritorio (Electron), que es la
+ * única que monitorea transferencias de Mercado Pago (ver main.js →
+ * gestionarMonitoreoTransferenciasMP). En la versión web esta función no
+ * hace nada porque window.veekpos no existe ahí.
+ */
+function suscribirseATransferenciasMP() {
+  if (!window.veekpos || !window.veekpos.onTransferenciaRecibida) return;
+
+  window.veekpos.onTransferenciaRecibida((t) => {
+    const monto = "$" + Number(t.monto).toLocaleString("es-AR");
+    const quien = t.pagador ? ` de ${t.pagador}` : "";
+    toast(`💸 Transferencia recibida: ${monto}${quien}`, "success");
+    sonarBeepTransferencia();
+  });
 }
 
 /* ===================== METRICAS ===================== */
