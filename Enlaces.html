@@ -326,14 +326,17 @@ async function cargarLanding(){
     try{
         const cfgRes = await fetch("config.json", { cache: "no-store" });
         const cfg = await cfgRes.json();
-        apiUrl = cfg.API_URL;
+        // El config.json de este sitio usa "apiUrl" (camelCase); se
+        // acepta también "API_URL" por si en otra instalación se llamó
+        // distinto.
+        apiUrl = cfg.apiUrl || cfg.API_URL || "";
     }catch(e){
         estadoEl.textContent = "No se pudo cargar config.json.";
         return;
     }
 
     if(!apiUrl){
-        estadoEl.textContent = "Falta configurar API_URL en config.json.";
+        estadoEl.textContent = "Falta configurar la URL de la API en config.json.";
         return;
     }
 
