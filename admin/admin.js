@@ -10432,6 +10432,8 @@ async function iniciarCobroMercadoPago(total) {
 
     mpReferenciaActual = referencia;
     document.getElementById("mpQrImagen").src = resultado.qrImagenDataUrl;
+    mpPollingIniciadoEn = Date.now();
+    mpProcesandoConfirmacion = false;
     mpPollingIntervalId = setInterval(consultarCobroMercadoPagoPolling, 3000);
 
   } catch (error) {
@@ -10449,12 +10451,46 @@ let mpPollingIntervalId = null;
 let mpReferenciaActual  = null;
 let mpVentaEnCurso      = null; // { subtotal, total, itemsSnapshot, recibido }
 
+// Dos problemas reales que tenía este polling, arreglados acá:
+//
+// 1) RACE CONDITION que podía duplicar la venta: setInterval no espera a
+//    que termine la vuelta anterior. Si una consulta a Mercado Pago tarda
+//    más de 3 segundos (red lenta), podían quedar DOS llamadas a
+//    consultarCobroQR "en el aire" al mismo tiempo; si ambas contestaban
+//    "pagada: true" (algo totalmente posible ya que consultan lo mismo),
+//    las dos ejecutaban el bloque de éxito completo → la venta se
+//    guardaba DOS VECES en el backend. `mpProcesandoConfirmacion` corta
+//    esto: se chequea antes Y después del await, así que la segunda
+//    llamada que ya estaba en vuelo cuando la primera confirmó el pago,
+//    al volver de su propio await, ve el flag ya en true y no hace nada.
+//
+// 2) Sin límite de tiempo: si el cliente nunca paga (se arrepiente, no
+//    tiene señal, lo que sea), el polling seguía cada 3 segundos PARA
+//    SIEMPRE, sin avisarle nada al cajero, hasta que alguien tocara
+//    "Cancelar" a mano. `mpPollingIniciadoEn` + el timeout de abajo lo
+//    cortan solos con un aviso, después de 10 minutos sin confirmación.
+let mpProcesandoConfirmacion = false;
+let mpPollingIniciadoEn = null;
+const MP_POLLING_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutos
+
 async function consultarCobroMercadoPagoPolling() {
-  if (!mpReferenciaActual) return;
+  if (!mpReferenciaActual || mpProcesandoConfirmacion) return;
+
+  if (mpPollingIniciadoEn && (Date.now() - mpPollingIniciadoEn) > MP_POLLING_TIMEOUT_MS) {
+    mostrarErrorCobroMercadoPago("Pasaron 10 minutos sin confirmar el pago. Si el cliente todavía va a pagar, generá el QR de nuevo.");
+    return;
+  }
+
   try {
     const bridge = window.veekpos || window.posOffline;
     const resultado = await bridge.consultarCobroQR(mpReferenciaActual);
+
+    // Otra vuelta del intervalo ya se adelantó y confirmó el pago mientras
+    // esta esperaba su propia respuesta — no hacer nada, ya se procesó.
+    if (mpProcesandoConfirmacion) return;
+
     if (resultado.success && resultado.pagada) {
+      mpProcesandoConfirmacion = true; // a partir de acá, ninguna otra vuelta en vuelo va a duplicar esto (ver comentario arriba)
       detenerPollingMercadoPago();
       document.getElementById("mpQrBackdrop").classList.remove("show");
       toast("Pago de Mercado Pago confirmado ✓", "success");
@@ -10532,6 +10568,8 @@ async function consultarCobroMercadoPagoPolling() {
 
 function mostrarErrorCobroMercadoPago(mensaje) {
   detenerPollingMercadoPago();
+  mpProcesandoConfirmacion = false;
+  mpPollingIniciadoEn = null;
   const el = document.getElementById("mpQrEsperando");
   const err = document.getElementById("mpQrError");
   const txt = document.getElementById("mpQrErrorTexto");
@@ -10546,6 +10584,8 @@ function detenerPollingMercadoPago() {
 
 function cancelarCobroMercadoPago() {
   detenerPollingMercadoPago();
+  mpProcesandoConfirmacion = false;
+  mpPollingIniciadoEn = null;
   const backdrop = document.getElementById("mpQrBackdrop");
   if (backdrop) backdrop.classList.remove("show");
   mpReferenciaActual = null;
