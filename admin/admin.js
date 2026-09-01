@@ -1905,15 +1905,12 @@ function mostrarSeccion(id) {
       }
       // Tarjeta licencia
       if (typeof mostrarEstadoLicenciaEnConfig === "function") mostrarEstadoLicenciaEnConfig();
-      // Tarjeta multicaja — OCULTA a propósito: el guardado de esta
-      // config (actualizarVisibilidadCampoNombreCaja / guardarConfigRed)
-      // nunca se terminó de implementar, y la función de red local en
-      // sí (el servidor HTTP que compartiría stock/ventas entre varias
-      // cajas) tampoco está construida del lado de Electron. Mostrar
-      // este formulario llevaba a un error real al tocarlo — mejor no
-      // ofrecer una función que en los hechos no hace nada.
-      // const tRed = document.getElementById("cardMultiCajaRed");
-      // if (tRed) tRed.style.display = "block";
+      // Tarjeta multicaja
+      const tRed = document.getElementById("cardMultiCajaRed");
+      if (tRed) {
+        tRed.style.display = "block";
+        cargarConfigRedForm();
+      }
       // Tarjeta MercadoPago
       const tMp = document.getElementById("cardMercadoPago");
       if (tMp) {
@@ -10285,6 +10282,91 @@ async function activarLicencia() {
 /* =========================================================
    MERCADO PAGO — Cobro con QR (integrado desde pos-offline)
 ========================================================= */
+
+/**
+ * Muestra u oculta el campo "Nombre de esta caja" según el rol elegido
+ * — solo el servidor necesita un nombre propio (es el que se anuncia
+ * por la red para que los clientes lo encuentren, ver local-discovery.js
+ * → iniciarAnuncioServidor). Una caja cliente no anuncia nada, así que
+ * no necesita nombre.
+ */
+function actualizarVisibilidadCampoNombreCaja(rol) {
+  const campo = document.getElementById("campoNombreCaja");
+  if (campo) campo.style.display = rol === "servidor" ? "block" : "none";
+}
+
+/** Carga el estado actual de la config de red al abrir la tarjeta — rol guardado, nombre de caja, y a quién está viendo (servidor propio o servidor encontrado) */
+async function cargarConfigRedForm() {
+  const bridge = window.veekpos || window.posOffline;
+  if (!bridge) return;
+
+  const estadoEl = document.getElementById("estadoRedLocal");
+
+  try {
+    const { rol, nombreCaja } = await bridge.obtenerRolRed();
+    document.getElementById("cfgRolRed").value = rol || "";
+    document.getElementById("cfgNombreCaja").value = nombreCaja || "";
+    actualizarVisibilidadCampoNombreCaja(rol || "");
+
+    if (!estadoEl) return;
+
+    if (rol === "servidor") {
+      const { ip, puertoHttp } = await bridge.obtenerIpLocal();
+      estadoEl.innerHTML = ip
+        ? `🟢 Esta caja es el <b>servidor</b>. Las demás cajas (y la pantalla del cliente, si usás una) se conectan solas por red — si necesitás la dirección a mano: <code>${ip}:${puertoHttp}</code>`
+        : `🟢 Esta caja es el <b>servidor</b>, pero no se pudo detectar la IP de red local (¿está conectada a wifi/cable?).`;
+
+    } else if (rol === "cliente") {
+      const estado = await bridge.obtenerEstadoConexionRed();
+      if (estado.conectado) {
+        estadoEl.textContent = "🟢 Conectada al servidor correctamente.";
+      } else if (estado.servidorConocido) {
+        estadoEl.textContent = "🟡 Se encontró un servidor en la red, pero no responde ahora mismo.";
+      } else {
+        estadoEl.textContent = "🟡 Buscando el servidor en la red local...";
+      }
+
+    } else {
+      const mpConfigurado = await bridge.mercadoPagoDisponible?.().catch(() => false);
+      const { ip, puertoHttp } = await bridge.obtenerIpLocal().catch(() => ({ ip: null }));
+
+      if (mpConfigurado) {
+        estadoEl.innerHTML = ip
+          ? `⚪ Modo independiente — esta caja no comparte datos con otras por red local. La pantalla del cliente para QR sí está activa (hay Mercado Pago configurado): <code>${ip}:${puertoHttp}</code>`
+          : `⚪ Modo independiente. La pantalla del cliente debería estar activa, pero no se pudo detectar la IP de red local (¿está conectada a wifi/cable?).`;
+      } else {
+        estadoEl.innerHTML = ip
+          ? `⚪ Modo independiente — esta caja no comparte datos con otras por red local. La pantalla del cliente para QR no está activa todavía porque no hay Mercado Pago configurado (IP de esta caja, por si la necesitás más adelante: <code>${ip}:${puertoHttp}</code>).`
+          : `⚪ Modo independiente — esta caja no comparte datos con otras por red local. La pantalla del cliente para QR no está activa (no hay Mercado Pago configurado).`;
+      }
+    }
+  } catch (error) {
+    if (estadoEl) estadoEl.textContent = "No se pudo cargar el estado de la red.";
+  }
+}
+
+/** Guarda el rol de red elegido (botón "Guardar configuración de red") */
+async function guardarConfigRed() {
+  const bridge = window.veekpos || window.posOffline;
+  if (!bridge) return;
+
+  const rol = document.getElementById("cfgRolRed").value;
+  const nombreCaja = document.getElementById("cfgNombreCaja").value.trim();
+
+  if (rol === "servidor" && !nombreCaja) {
+    toast("Ponele un nombre a esta caja (ej: Caja 1)", "error");
+    return;
+  }
+
+  try {
+    await bridge.fijarRolRed(rol, nombreCaja);
+    toast("Configuración de red guardada", "success");
+    await cargarConfigRedForm();
+  } catch (error) {
+    toast("No se pudo guardar la configuración de red", "error");
+  }
+}
+
 
 async function mostrarEstadoMercadoPagoEnConfig() {
   const box = document.getElementById("mpEstadoBox");
