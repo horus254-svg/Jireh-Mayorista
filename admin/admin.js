@@ -10415,6 +10415,38 @@ async function quitarConfigMercadoPago() {
 
 /* ===================== RED LOCAL MULTI-CAJA (Configuración) ===================== */
 
+/**
+ * DIAGNÓSTICO — abre el mismo modal de cobro con QR, pero con una imagen
+ * falsa (un SVG armado acá mismo, sin pedirle nada a Mercado Pago) y sin
+ * arrancar el polling real. Sirve para probar el comportamiento del modal
+ * (por ejemplo, si el botón "Cancelar" responde) sin necesitar tener
+ * Mercado Pago configurado ni depender de la red — así se puede descartar
+ * rápido si un problema es del modal en sí o de la integración con MP.
+ *
+ * A propósito NO toca mpReferenciaActual ni arranca mpPollingIntervalId:
+ * sin una referencia real no hay nada que consultar, así que el polling
+ * ni se inicia — "Cancelar" acá prueba exactamente el mismo camino de
+ * limpieza (detenerPollingMercadoPago, sacar la clase "show", resetear
+ * los flags) que un cobro real, sin arriesgar nada del carrito actual.
+ */
+function abrirModalQRDePrueba() {
+  const svgFalso = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="240" height="240">
+      <rect width="240" height="240" fill="#eef2ff"/>
+      <text x="120" y="112" text-anchor="middle" font-family="monospace" font-size="16" fill="#1e293b">QR DE PRUEBA</text>
+      <text x="120" y="136" text-anchor="middle" font-family="monospace" font-size="12" fill="#64748b">(no es un cobro real)</text>
+    </svg>
+  `)}`;
+
+  document.getElementById("mpQrMontoLabel").textContent = "$0 (prueba)";
+  document.getElementById("mpQrError").style.display = "none";
+  document.getElementById("mpQrEsperando").style.display = "block";
+  document.getElementById("mpQrImagen").src = svgFalso;
+  document.getElementById("mpQrBackdrop").classList.add("show");
+
+  toast("🧪 Modal de prueba — este QR no cobra nada de verdad", "info");
+}
+
 async function iniciarCobroMercadoPago(total) {
   document.getElementById("mpQrMontoLabel").textContent = "$" + Number(total).toLocaleString("es-AR");
   document.getElementById("mpQrError").style.display = "none";
@@ -10590,6 +10622,7 @@ function detenerPollingMercadoPago() {
 }
 
 function cancelarCobroMercadoPago() {
+  console.log("🔴 cancelarCobroMercadoPago() se ejecutó"); // TEMPORAL — sacar una vez confirmado el diagnóstico
   detenerPollingMercadoPago();
   mpProcesandoConfirmacion = false;
   mpPollingIniciadoEn = null;
