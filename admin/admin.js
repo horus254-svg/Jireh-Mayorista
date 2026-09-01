@@ -6187,6 +6187,16 @@ async function confirmarFinalizarVenta() {
 
   cerrarModalFinalizarVenta();
 
+  // Subtotal/total (con descuento o recargo ya aplicado) — se calcula ACÁ,
+  // antes de decidir el camino de QR o el directo, porque ambos lo
+  // necesitan. Antes estaba declarado más abajo (en la sección
+  // "OPTIMISTIC"), y la rama de QR lo usaba desde arriba sin que existiera
+  // todavía — un ReferenceError garantizado ("Cannot access 'total' before
+  // initialization") cada vez que se intentaba generar el QR.
+  const subtotal = ticketPOS.reduce((acc, item) => acc + (item.PRECIO * item.cantidad), 0);
+  const { montoDescuento, total } = calcularDescuentoPOS(subtotal);
+  const etiquetaDescuento = obtenerEtiquetaDescuentoPOS(subtotal);
+
   // Si es TRANSFERENCIA y el cajero eligió generar el QR (ver selector
   // "¿Cómo se cobra la transferencia?" en el modal) → mostrar QR antes de
   // registrar. Si no lo eligió (o MP no está disponible), la venta sigue
@@ -6206,9 +6216,6 @@ async function confirmarFinalizarVenta() {
   }
 
   // ── OPTIMISTIC: calcular todo localmente y mostrar el recibo al instante ──
-  const subtotal = ticketPOS.reduce((acc, item) => acc + (item.PRECIO * item.cantidad), 0);
-  const { montoDescuento, total } = calcularDescuentoPOS(subtotal);
-  const etiquetaDescuento = obtenerEtiquetaDescuentoPOS(subtotal);
   const itemsSnapshot = [...ticketPOS];
   const fechaVenta = new Date();
   const ventaIdTemp = "VEN-" + Date.now().toString().slice(-6);
