@@ -10444,6 +10444,15 @@ function abrirModalQRDePrueba() {
   document.getElementById("mpQrImagen").src = svgFalso;
   document.getElementById("mpQrBackdrop").classList.add("show");
 
+  // Empuja el mismo QR falso a la pantalla/tablet del cliente (si hay
+  // una conectada) — así también se puede probar esa parte sin
+  // necesitar Mercado Pago configurado. Si no hay bridge (versión web)
+  // o la tablet no está conectada, no pasa nada, es un no-op seguro.
+  const bridge = window.veekpos || window.posOffline;
+  if (bridge && typeof bridge.mostrarQrDePruebaEnPantalla === "function") {
+    bridge.mostrarQrDePruebaEnPantalla(svgFalso, 0).catch(() => {});
+  }
+
   toast("🧪 Modal de prueba — este QR no cobra nada de verdad", "info");
 }
 
@@ -10622,7 +10631,6 @@ function detenerPollingMercadoPago() {
 }
 
 function cancelarCobroMercadoPago() {
-  console.log("🔴 cancelarCobroMercadoPago() se ejecutó"); // TEMPORAL — sacar una vez confirmado el diagnóstico
   detenerPollingMercadoPago();
   mpProcesandoConfirmacion = false;
   mpPollingIniciadoEn = null;
@@ -10630,6 +10638,16 @@ function cancelarCobroMercadoPago() {
   if (backdrop) backdrop.classList.remove("show");
   mpReferenciaActual = null;
   mpVentaEnCurso = null;
+
+  // Avisa también a la pantalla/tablet del cliente (si hay una conectada)
+  // que este cobro se canceló, para que no se quede mostrando un QR
+  // muerto — ver local-server.js → limpiarQrActivo. No pasa nada si no
+  // hay ninguna pantalla conectada, ni si esto corre en la versión web.
+  const bridge = window.veekpos || window.posOffline;
+  if (bridge && typeof bridge.cancelarCobroQR === "function") {
+    bridge.cancelarCobroQR().catch(() => {});
+  }
+
   toast("Cobro cancelado — el ticket sigue abierto", "info");
 }
 
