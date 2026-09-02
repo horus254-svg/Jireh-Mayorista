@@ -5300,6 +5300,12 @@ function palabraCoincideTolerantePOS(palabraBusqueda, palabraTexto) {
   if (!palabraBusqueda) return true;
   if (palabraTexto.includes(palabraBusqueda)) return true;
   if (palabraBusqueda.length < 3) return false; // muy corta -> el fuzzy da falsos positivos
+  // Un código de barras escaneado (solo dígitos, 6+ caracteres) no
+  // tiene "typos" que tolerar — si no matcheó literal arriba, no va a
+  // matchear con Levenshtein tampoco. Evita correr la comparación
+  // difusa contra cada palabra de cada producto del catálogo en cada
+  // tecla del escaneo (el costo que hacía sentir lento el escaneo).
+  if (/^\d{6,}$/.test(palabraBusqueda)) return false;
   const maxDist = palabraBusqueda.length <= 5 ? 1 : 2;
   return distanciaLevenshteinPOS(palabraBusqueda, palabraTexto, maxDist) <= maxDist;
 }
@@ -5317,14 +5323,25 @@ function productoCoincideBusquedaPOS(producto, filtroTexto) {
   const texto = normalizarBusquedaPOS(filtroTexto);
   if (!texto) return true;
 
-  const textoCompleto = normalizarBusquedaPOS(
-    [producto.CODIGO, producto.PRODUCTO, producto.CATEGORIA, producto.ALIAS].join(" ")
-  );
+  // El texto normalizado (y sus palabras) de cada producto no cambia
+  // entre tecla y tecla — se calcula una sola vez y se guarda en el
+  // propio producto. Con ~2000 productos, recalcular esto (lowercase +
+  // sacar tildes + unir 4 campos) en CADA letra tipeada era el costo
+  // real de la búsqueda por nombre; cacheado, cada tecla solo hace la
+  // comparación en sí.
+  let textoCompleto = producto._textoBusquedaPOS;
+  if (textoCompleto === undefined) {
+    textoCompleto = normalizarBusquedaPOS(
+      [producto.CODIGO, producto.PRODUCTO, producto.CATEGORIA, producto.ALIAS].join(" ")
+    );
+    producto._textoBusquedaPOS = textoCompleto;
+    producto._palabrasBusquedaPOS = textoCompleto.split(/\s+/).filter(Boolean);
+  }
 
   // Camino rápido: la frase completa tipeada aparece tal cual
   if (textoCompleto.includes(texto)) return true;
 
-  const palabrasTexto = textoCompleto.split(/\s+/).filter(Boolean);
+  const palabrasTexto = producto._palabrasBusquedaPOS;
   const palabrasBusqueda = texto.split(/\s+/).filter(Boolean);
 
   // Cada palabra tipeada tiene que encontrar alguna palabra del
@@ -5359,7 +5376,7 @@ function renderPosGrid(filtroTexto) {
   }
 
   let html = "";
-  const visibleList = lista.slice(0, 60);
+  const visibleList = lista.slice(0, 30);
 
   visibleList.forEach((p, idx) => {
     const stock     = p.STOCK !== undefined ? Number(p.STOCK) : null;
@@ -5428,7 +5445,12 @@ function onPosInputKeyup(e) {
     if (valor !== "") {
       agregarProductoPorCodigo(valor);
       input.value = "";
-      renderPosGrid();
+      // Con debounce en vez de render inmediato: si se están
+      // escaneando varios productos seguidos (típico en el POS), esto
+      // evita reconstruir hasta 60 tarjetas de la grilla en CADA
+      // escaneo — solo se reconstruye una vez, 150ms después del
+      // último escaneo de la tanda.
+      renderPosGridConDemora("");
     }
     return;
   }
@@ -5586,6 +5608,10 @@ async function guardarEdicionRapidaPOS() {
     producto.PRECIO = Number(precio);
     producto.STOCK = Number(stock);
     producto.ALIAS = alias;
+    // El código o el alias pueden haber cambiado: invalidar el texto
+    // de búsqueda cacheado para que no quede buscando por el dato viejo.
+    producto._textoBusquedaPOS = undefined;
+    producto._palabrasBusquedaPOS = undefined;
     // Si el producto editado ya estaba en el ticket actual, el código
     // ahí también tiene que actualizarse — si no, quedaría apuntando
     // a un código que ya no existe más en productosPOS.
