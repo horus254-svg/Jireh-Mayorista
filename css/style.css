@@ -978,6 +978,59 @@ select:focus-visible{
     will-change:transform;
 }
 
+/* ---- Miniaturas de imágenes / colores del Quick View ---- */
+
+.qv-thumbs{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    margin-top:10px;
+}
+
+.qv-thumbs:empty{
+    display:none;
+}
+
+.qv-thumb{
+    width:56px;
+    height:56px;
+    padding:0;
+    border-radius:10px;
+    border:2px solid transparent;
+    background:#fff;
+    overflow:hidden;
+    cursor:pointer;
+    flex:0 0 auto;
+    transition:border-color .15s ease, transform .1s ease;
+}
+
+.qv-thumb img{
+    width:100%;
+    height:100%;
+    object-fit:contain;
+    display:block;
+}
+
+.qv-thumb:hover{
+    transform:translateY(-2px);
+}
+
+.qv-thumb.active{
+    border-color:var(--brand, #6c3ce9);
+    box-shadow:0 0 0 1px var(--brand, #6c3ce9);
+}
+
+.qv-color-actual{
+    font-size:.85rem;
+    color:var(--ink-600);
+    margin-top:8px;
+}
+
+.qv-color-actual span{
+    font-weight:600;
+    color:var(--ink-900);
+}
+
 .qv-titulo{
     font-weight:700;
     color:var(--ink-900);
@@ -1165,6 +1218,14 @@ select:focus-visible{
 .cart-item-name{
     font-weight:700;
     font-size:.95rem;
+}
+
+.cart-item-color{
+    display:block;
+    font-weight:500;
+    font-size:.8rem;
+    color:var(--ink-600);
+    margin-top:2px;
 }
 
 .cart-item-subtotal{

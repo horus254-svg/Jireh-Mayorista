@@ -603,6 +603,16 @@
                             <div id="qv-imagen-zoom-wrap" class="qv-imagen-zoom-wrap">
                                 <img id="qv-imagen" src="" alt="" class="qv-img" loading="lazy">
                             </div>
+
+                            <!-- Miniaturas de imágenes adicionales (variantes/colores). Se
+                                 completan dinámicamente en renderGaleriaQuickView() (app.js).
+                                 Si el producto tiene una sola imagen, este bloque queda vacío
+                                 y oculto. -->
+                            <div id="qv-thumbs" class="qv-thumbs"></div>
+
+                            <div id="qv-color-actual" class="qv-color-actual d-none">
+                                Color: <span id="qv-color-actual-nombre"></span>
+                            </div>
                         </div>
 
                         <div class="qv-col-info">
