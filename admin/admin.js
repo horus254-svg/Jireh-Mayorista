@@ -3293,6 +3293,9 @@ function nuevoProducto() {
   document.getElementById("pmImagenPreview").innerHTML = "🖼️";
   document.getElementById("pmImagenStatus").textContent = "";
   document.getElementById("pmImagenStatus").className = "pm-image-status";
+  document.getElementById("pmColorPrimario").value = "";
+  document.getElementById("pmGaleriaWrap").innerHTML = "";
+  _pmGaleriaContador = 0;
   document.getElementById("pmPublicado").checked = true;
   document.getElementById("pmDestacado").checked = false;
   document.getElementById("pmOferta").checked = false;
@@ -3325,6 +3328,10 @@ function editarProducto(codigo) {
   document.getElementById("pmImagenArchivo").value = "";
   document.getElementById("pmImagenStatus").textContent = "";
   document.getElementById("pmImagenStatus").className = "pm-image-status";
+  document.getElementById("pmColorPrimario").value = p.COLOR || "";
+  document.getElementById("pmGaleriaWrap").innerHTML = "";
+  _pmGaleriaContador = 0;
+  parsearGaleriaAdminString(p.IMAGENES).forEach(f => agregarFilaGaleria(f.color, f.url));
   document.getElementById("pmPublicado").checked = String(p.PUBLICADO || "").toUpperCase() === "SI";
   document.getElementById("pmDestacado").checked = String(p.DESTACADO || "").toUpperCase() === "SI";
   document.getElementById("pmOferta").checked = String(p.OFERTA || "").toUpperCase() === "SI";
@@ -3454,6 +3461,117 @@ function actualizarPreviewImagenProducto() {
   preview.innerHTML = `<img src="${escapeHtml(url)}" alt="" onerror="this.parentElement.innerHTML='⚠️';">`;
 }
 
+/* ===================== GALERÍA DE COLORES / IMÁGENES ADICIONALES ===================== */
+/* Cada producto puede tener, además de la foto principal (pmImagen), otras
+   fotos asociadas a un color — se muestran como miniaturas en el Quick View
+   del catálogo web. Se guardan todas juntas en la columna IMAGENES de la
+   hoja PRODUCTOS, con el formato "url1|color1, url2|color2, ...". */
+
+let _pmGaleriaContador = 0;
+
+/** Arma un string "url|color, url|color, ..." a partir de una lista de {url, color} — inverso de parsearGaleriaAdminString() */
+function armarGaleriaAdminString(filas) {
+  return filas
+    .filter(f => f.url)
+    .map(f => f.url + (f.color ? "|" + f.color : ""))
+    .join(", ");
+}
+
+/** Parsea el string guardado en IMAGENES de vuelta a [{url, color}, ...] */
+function parsearGaleriaAdminString(texto) {
+  return String(texto || "")
+    .split(",")
+    .map(entrada => entrada.trim())
+    .filter(Boolean)
+    .map(entrada => {
+      const [url, color] = entrada.split("|");
+      return { url: (url || "").trim(), color: (color || "").trim() };
+    });
+}
+
+/** Agrega una fila vacía (o pre-cargada, en modo edición) a la galería de colores */
+function agregarFilaGaleria(color, url) {
+  const wrap = document.getElementById("pmGaleriaWrap");
+  if (!wrap) return;
+
+  const n = ++_pmGaleriaContador;
+
+  const fila = document.createElement("div");
+  fila.className = "pm-galeria-row";
+  fila.dataset.fila = n;
+  fila.innerHTML = `
+    <div class="pm-galeria-preview" id="pmGalPreview_${n}">🖼️</div>
+    <div style="flex:1; min-width:0;">
+      <div class="row g-2">
+        <div class="col-6">
+          <input type="text" class="form-control form-control-sm" id="pmGalColor_${n}" placeholder="Color (ej: Rojo)" value="${escapeHtml(color || "")}">
+        </div>
+        <div class="col-6">
+          <input type="file" class="form-control form-control-sm" accept="image/*" onchange="onSeleccionarArchivoImagenGaleria(event, ${n})">
+        </div>
+      </div>
+      <input type="text" class="form-control form-control-sm mt-1" id="pmGalUrl_${n}" placeholder="o pegá una URL de imagen" value="${escapeHtml(url || "")}" oninput="actualizarPreviewGaleria(${n})">
+      <div class="pm-image-status" id="pmGalStatus_${n}"></div>
+    </div>
+    <button type="button" class="btn btn-sm btn-outline-danger pm-galeria-quitar" onclick="quitarFilaGaleria(${n})" title="Quitar este color">✕</button>
+  `;
+
+  wrap.appendChild(fila);
+  actualizarPreviewGaleria(n);
+}
+
+function quitarFilaGaleria(n) {
+  const fila = document.querySelector(`.pm-galeria-row[data-fila="${n}"]`);
+  if (fila) fila.remove();
+}
+
+function actualizarPreviewGaleria(n) {
+  const url = (document.getElementById(`pmGalUrl_${n}`) || {}).value || "";
+  const preview = document.getElementById(`pmGalPreview_${n}`);
+  if (!preview) return;
+  const limpia = url.trim();
+  if (!limpia) { preview.innerHTML = "🖼️"; return; }
+  preview.innerHTML = `<img src="${escapeHtml(limpia)}" alt="" onerror="this.parentElement.innerHTML='⚠️';">`;
+}
+
+/** Handles the file picker de una fila de la galería: recorta y sube igual que la foto principal */
+function onSeleccionarArchivoImagenGaleria(event, n) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+
+  const statusEl = document.getElementById(`pmGalStatus_${n}`);
+
+  if (!file.type.startsWith("image/")) {
+    if (statusEl) { statusEl.className = "pm-image-status error"; statusEl.textContent = "Elegí un archivo de imagen (jpg, png, webp)."; }
+    event.target.value = "";
+    return;
+  }
+
+  const TAMANO_ORIGINAL_MAXIMO_MB = 20;
+  if (file.size > TAMANO_ORIGINAL_MAXIMO_MB * 1024 * 1024) {
+    if (statusEl) { statusEl.className = "pm-image-status error"; statusEl.textContent = `⚠️ El archivo pesa demasiado (máx. ${TAMANO_ORIGINAL_MAXIMO_MB}MB). Elegí una foto más liviana.`; }
+    event.target.value = "";
+    return;
+  }
+
+  abrirRecorteImagenProducto(file, event.target, {
+    urlInputId: `pmGalUrl_${n}`,
+    previewId: `pmGalPreview_${n}`,
+    statusId: `pmGalStatus_${n}`
+  });
+}
+
+/** Junta las filas de la galería que están cargadas en el modal en el string que se manda al backend */
+function obtenerGaleriaDesdeFormulario() {
+  const filas = Array.from(document.querySelectorAll("#pmGaleriaWrap .pm-galeria-row")).map(fila => {
+    const n = fila.dataset.fila;
+    const url = (document.getElementById(`pmGalUrl_${n}`) || {}).value || "";
+    const color = (document.getElementById(`pmGalColor_${n}`) || {}).value || "";
+    return { url: url.trim(), color: color.trim() };
+  });
+  return armarGaleriaAdminString(filas);
+}
+
 /**
  * Redimensiona y comprime una imagen en el navegador antes de subirla,
  * para que una foto de celular de varios MB no tarde una eternidad en
@@ -3547,12 +3665,13 @@ async function onSeleccionarArchivoImagenProducto(event) {
 }
 
 /** Sube (comprime + manda a Drive) el blob YA recortado por el editor de recorte */
-async function subirImagenProductoRecortada(blob, inputEl) {
-  const statusEl = document.getElementById("pmImagenStatus");
+async function subirImagenProductoRecortada(blob, inputEl, destino) {
+  destino = destino || _DESTINO_IMAGEN_PRINCIPAL;
+  const statusEl = document.getElementById(destino.statusId);
 
   // Local preview inmediata, mientras se comprime y sube en segundo plano
   const localUrl = URL.createObjectURL(blob);
-  const preview = document.getElementById("pmImagenPreview");
+  const preview = document.getElementById(destino.previewId);
   if (preview) preview.innerHTML = `<img src="${localUrl}" alt="">`;
 
   if (statusEl) { statusEl.className = "pm-image-status uploading"; statusEl.textContent = "⏳ Optimizando imagen..."; }
@@ -3589,7 +3708,8 @@ async function subirImagenProductoRecortada(blob, inputEl) {
       return;
     }
 
-    document.getElementById("pmImagen").value = data.url;
+    const urlInput = document.getElementById(destino.urlInputId);
+    if (urlInput) urlInput.value = data.url;
     if (statusEl) { statusEl.className = "pm-image-status success"; statusEl.textContent = `✓ Imagen subida (${pesoFinalKB}KB)`; }
 
   } catch (error) {
@@ -3606,15 +3726,23 @@ async function subirImagenProductoRecortada(blob, inputEl) {
    imagen y ajusta el zoom dentro de un marco cuadrado fijo; al confirmar, se
    genera un canvas cuadrado recortado que después pasa por comprimirImagenProducto(). */
 
-let _cropState = null; // { file, imgEl, natW, natH, vp, scale, minScale, maxScale, tx, ty, inputEl, dragging, dragStartX, dragStartY, txStart, tyStart }
+let _cropState = null; // { file, imgEl, natW, natH, vp, scale, minScale, maxScale, tx, ty, inputEl, destino, dragging, dragStartX, dragStartY, txStart, tyStart }
 let _cropListenersListos = false;
 
-function abrirRecorteImagenProducto(file, inputEl) {
+// Destino por defecto del recorte: la foto principal del producto.
+// Las filas de la galería de colores pasan su propio destino (ver
+// agregarFilaGaleria / onSeleccionarArchivoImagenGaleria) para que el
+// mismo editor de recorte suba a su URL/preview/estado en vez de
+// pisar siempre la foto principal.
+const _DESTINO_IMAGEN_PRINCIPAL = { urlInputId: "pmImagen", previewId: "pmImagenPreview", statusId: "pmImagenStatus" };
+
+function abrirRecorteImagenProducto(file, inputEl, destino) {
+  destino = destino || _DESTINO_IMAGEN_PRINCIPAL;
   const backdrop = document.getElementById("cropImagenModalBackdrop");
   const imgEl = document.getElementById("cropImgEl");
   if (!backdrop || !imgEl) {
     // Fallback de seguridad: si el modal no está en el HTML, subimos sin recortar.
-    subirImagenProductoRecortada(file, inputEl);
+    subirImagenProductoRecortada(file, inputEl, destino);
     return;
   }
 
@@ -3637,7 +3765,7 @@ function abrirRecorteImagenProducto(file, inputEl) {
       scale: minScale, minScale, maxScale: minScale * 4,
       tx: (vp - natW * minScale) / 2,
       ty: (vp - natH * minScale) / 2,
-      inputEl,
+      inputEl, destino,
       dragging: false, dragStartX: 0, dragStartY: 0, txStart: 0, tyStart: 0
     };
 
@@ -3770,12 +3898,13 @@ function confirmarRecorteImagenProducto() {
   const backdrop = document.getElementById("cropImagenModalBackdrop");
   const urlOriginal = s.imgEl.src;
   const inputEl = s.inputEl;
+  const destino = s.destino;
 
   canvas.toBlob(blob => {
     if (backdrop) backdrop.classList.remove("show");
     URL.revokeObjectURL(urlOriginal);
     _cropState = null;
-    if (blob) subirImagenProductoRecortada(blob, inputEl);
+    if (blob) subirImagenProductoRecortada(blob, inputEl, destino);
   }, "image/jpeg", 0.92);
 }
 
@@ -4147,6 +4276,8 @@ async function guardarProductoForm() {
   const precio   = document.getElementById("pmPrecio").value;
   const stock    = document.getElementById("pmStock").value;
   const imagen   = document.getElementById("pmImagen").value.trim();
+  const colorPrimario = document.getElementById("pmColorPrimario").value.trim();
+  const imagenes = obtenerGaleriaDesdeFormulario();
   const publicado = document.getElementById("pmPublicado").checked ? "SI" : "NO";
   const destacado  = document.getElementById("pmDestacado").checked ? "SI" : "NO";
   const oferta     = document.getElementById("pmOferta").checked ? "SI" : "NO";
@@ -4180,6 +4311,8 @@ async function guardarProductoForm() {
       PRECIO: precio || 0,
       STOCK: stock || 0,
       IMAGEN: imagen,
+      COLOR: colorPrimario,
+      IMAGENES: imagenes,
       PUBLICADO: publicado,
       DESTACADO: destacado,
       OFERTA: oferta,

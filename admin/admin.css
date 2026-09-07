@@ -1968,6 +1968,25 @@ kbd{
 .pm-image-status.success{ color:var(--green-600); }
 .pm-image-status.error{ color:var(--red-500); }
 
+/* ---- Galería de colores/imágenes adicionales del producto ---- */
+
+.pm-galeria-row{
+  display:flex; align-items:flex-start; gap:10px;
+  padding:10px; margin-top:8px;
+  border:1px solid var(--slate-200); border-radius:var(--radius-sm);
+  background:var(--slate-50);
+}
+.pm-galeria-preview{
+  width:64px; height:64px; flex-shrink:0;
+  border-radius:8px; background:#fff;
+  border:1px solid var(--slate-200);
+  display:flex; align-items:center; justify-content:center;
+  font-size:24px; color:var(--slate-300);
+  overflow:hidden;
+}
+.pm-galeria-preview img{ width:100%; height:100%; object-fit:cover; display:block; }
+.pm-galeria-quitar{ flex-shrink:0; align-self:flex-start; }
+
 /* ===================== APARIENCIA — imagen del banner (recorte + preview) ===================== */
 
 /* Marco de recorte panorámico: mismo ratio que el hero de escritorio real

@@ -2785,6 +2785,19 @@
           </div>
         </div>
         <div class="pm-image-status" id="pmImagenStatus"></div>
+        <div class="mt-2">
+          <label class="form-label" style="font-size:12px;">Color de esta foto <span class="text-muted" style="font-size:11px;">(opcional — si el producto tiene un solo color, dejalo vacío)</span></label>
+          <input type="text" class="form-control form-control-sm" id="pmColorPrimario" placeholder="Ej: Rojo" style="max-width:220px;">
+        </div>
+      </div>
+
+      <div class="mt-3">
+        <label class="form-label">
+          Otros colores / imágenes adicionales
+          <span class="text-muted" style="font-size:11px;">(opcional — en el catálogo aparecen como miniaturas debajo de la foto principal; al elegir una, el color queda como característica del pedido)</span>
+        </label>
+        <div id="pmGaleriaWrap"></div>
+        <button type="button" class="btn btn-sm btn-outline-secondary mt-2" onclick="agregarFilaGaleria()">+ Agregar color</button>
       </div>
 
       <div class="row g-2 mt-2">
