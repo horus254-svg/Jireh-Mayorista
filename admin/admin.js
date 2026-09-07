@@ -5146,6 +5146,7 @@ function imprimirEtiquetaEnvio(datos) {
       border: 2px solid #000;
       border-radius: 4mm;
       page-break-inside: avoid;
+      color: #000;
     ">
 
       <!-- Franja frágil / cabecera -->
