@@ -7397,6 +7397,51 @@ function imprimirVentaDesdeData(ventaObj) {
   );
 }
 
+/**
+ * Estima el alto real del ticket (en micrones) a partir de la
+ * cantidad de líneas que va a tener el contenido, en vez de usar
+ * siempre un alto fijo de 297mm (largo A4) para cualquier venta.
+ *
+ * Por qué no se mide el DOM: ya se probó (ver nota en
+ * _imprimirConDialogo) y resultó frágil, porque el frame de
+ * impresión está oculto y "mostrarlo" para medir su scrollHeight es
+ * poco confiable. Esta función en cambio calcula el alto a partir de
+ * los mismos datos con los que se arma el HTML (buildThermalHTML) —
+ * sin tocar el DOM, así que es determinística.
+ *
+ * Por qué importa para la velocidad: con impresión silenciosa
+ * (bridge.imprimirSilencioso), el alto de página que se le pasa al
+ * driver de la impresora es el alto de "hoja" que Windows va a
+ * intentar imprimir. Con un ticket de 3 productos pero alto fijo de
+ * 297mm, el driver puede alimentar papel de más (o demorar el corte)
+ * hasta completar esa altura, aunque el contenido real termine mucho
+ * antes — eso es lo que hace sentir lenta la salida física del
+ * ticket. Ajustando el alto al contenido real, el driver corta apenas
+ * termina de imprimir lo que hay.
+ */
+function estimarAltoTicketVentaMicrones(items, descuento, cambioData, cfg) {
+  const cfgReal = cfg || obtenerConfigNegocio();
+
+  let lineas = 6; // nombre del negocio, separador, fecha, N° de venta, forma de pago, separador
+  if (cfgReal.subtitulo) lineas++;
+  if (cfgReal.direccion) lineas++;
+  if (cfgReal.telefono1 || cfgReal.telefono2) lineas++;
+
+  lineas += (items ? items.length : 0) * 2; // cada producto ocupa 2 líneas: nombre, y cantidad x precio
+  if (descuento && Number(descuento.monto) !== 0) lineas += 2; // fila de "Subtotal" + fila de descuento/recargo
+  lineas += 1; // fila de TOTAL
+  if (cambioData && cambioData.recibido > 0) lineas += 2; // Recibido + Cambio
+
+  lineas += 2; // separador final + primera línea del pie
+  if (cfgReal.pie) lineas++;
+
+  const ALTO_LINEA_MM = 4.6; // alto aproximado de una línea a 80mm, fuente ~9-10pt
+  const MARGEN_MM = 12;      // margen de seguridad: feed final, espaciados entre bloques, etc.
+
+  const altoMm = Math.max(40, lineas * ALTO_LINEA_MM + MARGEN_MM); // nunca menos de 40mm (ticket mínimo)
+  return Math.round(Math.min(altoMm, 297) * 1000); // nunca más que el tope anterior (297mm) — red de seguridad
+}
+
 function _ejecutarImpresion(ventaId, items, total, formaPago, fecha, descuento) {
   const cambioData = obtenerDatosCambio();
 
@@ -7416,23 +7461,53 @@ function _ejecutarImpresion(ventaId, items, total, formaPago, fecha, descuento) 
     }
   };
 
+  const altoEstimadoMicrones = estimarAltoTicketVentaMicrones(items, descuento, cambioData);
+
   if (usbPrintHabilitado() && puertoImpresoraUSB) {
     const bytes = buildThermalESCPOS(ventaId, items, total, formaPago, fecha, descuento);
     enviarBytesAImpresoraUSB(bytes)
       .catch(error => {
         console.error("Error al imprimir por USB:", error);
-        return _imprimirConDialogo(buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, null, cambioData));
+        return _imprimirConDialogo(buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, null, cambioData), altoEstimadoMicrones);
       })
       .finally(liberar);
     return;
   }
 
-  _imprimirConDialogo(buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, null, cambioData))
+  // Impresora térmica instalada como impresora de Windows (no Web
+  // Serial): si el bridge de Electron soporta impresión RAW, se
+  // prueba primero — son los mismos bytes ESC/POS que ya arma
+  // buildThermalESCPOS para el camino USB de arriba, pero escritos
+  // directo en la cola de la impresora en vez de por puerto serie.
+  // Es mucho más rápido que el camino de abajo (que renderiza la
+  // página completa en Chromium antes de imprimir) porque no pasa por
+  // ese renderizado. Si no está disponible (paquete nativo no
+  // instalado en esta PC) o falla, se cae solo al camino de siempre.
+  const bridge = window.veekpos || window.posOffline;
+  const nombreImpresora = localStorage.getItem("veekpos_impresora") || "";
+
+  if (bridge && typeof bridge.imprimirDirectoRaw === "function" && nombreImpresora) {
+    const bytesRaw = buildThermalESCPOS(ventaId, items, total, formaPago, fecha, descuento);
+    bridge.imprimirDirectoRaw({ deviceName: nombreImpresora, bytes: bytesRaw })
+      .then(resultado => {
+        if (resultado && resultado.success) return;
+        console.warn("Impresión RAW no disponible o falló, se usa el camino anterior:", resultado && resultado.errorType);
+        return _imprimirConDialogo(buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, null, cambioData), altoEstimadoMicrones);
+      })
+      .catch(error => {
+        console.error("Error al imprimir RAW:", error);
+        return _imprimirConDialogo(buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, null, cambioData), altoEstimadoMicrones);
+      })
+      .finally(liberar);
+    return;
+  }
+
+  _imprimirConDialogo(buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, null, cambioData), altoEstimadoMicrones)
     .finally(liberar);
 }
 
 /** Falls back to the regular browser print dialog (used when USB printing is off, unsupported, or fails) */
-async function _imprimirConDialogo(html) {
+async function _imprimirConDialogo(html, altoMicronesEstimado) {
   const frame = document.getElementById("thermalPrintFrame");
   if (!frame) { toast("Error: frame de impresión no encontrado", "error"); return; }
 
@@ -7455,15 +7530,21 @@ async function _imprimirConDialogo(html) {
   }
 
   // NOTA: acá hubo dos intentos de calcular el alto real del ticket
-  // (midiendo scrollHeight) para no pedirle a Windows una página más
-  // grande de lo necesario y así imprimir más rápido. Los dos
-  // terminaron cortando o desalineando tickets reales — medir el alto
-  // de un elemento que normalmente está oculto (display:none) es
-  // frágil: para que la medición sea correcta hay que "mostrarlo"
-  // brevemente, y esa manipulación de estilos resultó nada confiable
-  // en la práctica. Se vuelve a un alto fijo, simple y sin trucos:
-  // menos veloz en teoría, pero nunca corta ni desalinea un ticket.
-  const altoMicrones = 297000; // 297mm (largo A4) — margen de sobra para cualquier ticket, incluido el de cierre de caja
+  // MIDIENDO EL DOM (scrollHeight) para no pedirle a Windows una
+  // página más grande de lo necesario. Los dos terminaron cortando o
+  // desalineando tickets reales — medir el alto de un elemento que
+  // normalmente está oculto (display:none) es frágil: para que la
+  // medición sea correcta hay que "mostrarlo" brevemente, y esa
+  // manipulación de estilos resultó nada confiable en la práctica.
+  //
+  // Esto es distinto: no se mide el DOM, se ESTIMA a partir de los
+  // datos del ticket (estimarAltoTicketVentaMicrones, calculado en
+  // _ejecutarImpresion antes de armar el HTML) — determinístico, sin
+  // tocar estilos ni depender de timing de renderizado. Si por lo que
+  // sea no llega un estimado (ej. ticket de cierre de caja, que no lo
+  // calcula), se mantiene el alto fijo de 297mm como red de
+  // seguridad, igual que antes.
+  const altoMicrones = altoMicronesEstimado || 297000;
 
   // Asegura que, si se cae al diálogo normal (window.print más abajo),
   // la página tenga el tamaño térmico (80mm) y no el A4 que pudo haber
