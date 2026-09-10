@@ -804,6 +804,25 @@ html,body{
 .product-tile:hover{ border-color:var(--navy-700); box-shadow:var(--shadow-sm); transform:translateY(-1px); }
 .product-tile:active{ background:var(--blue-50); }
 
+/* Tile pineado (el último producto agregado) dentro de la grilla
+   normal de productos — ver productoPineadoPOS/limpiarPineadoPOS en
+   admin.js. Mismo tamaño y layout que un .product-tile normal, solo
+   con un borde destacado y una etiqueta arriba. */
+.product-tile-pinned{
+  border-color:var(--blue-400, #60a5fa);
+  box-shadow:0 0 0 1px var(--blue-400, #60a5fa);
+}
+.tile-pinned-badge{
+  position:absolute;
+  top:-9px; left:8px;
+  background:var(--blue-500, #3b82f6);
+  color:#fff;
+  font-size:10px; font-weight:600;
+  padding:1px 7px;
+  border-radius:999px;
+  line-height:1.5;
+}
+
 .product-tile .tile-edit{
   position:absolute;
   top:6px;
