@@ -5307,6 +5307,43 @@ let descuentoValorPOS  = 0;            // valor ingresado (ej: 10 para 10%, o 50
 let descuentoActivoPOS = false;
 let ajusteModoPOS      = "DESCUENTO";  // "DESCUENTO" | "RECARGO" — signo del ajuste aplicado
 
+/**
+ * Índice CODIGO -> producto y CODIGO_CAJA -> producto, para no hacer
+ * un Array.find() (O(n) sobre ~2000 productos) en cada escaneo. Se
+ * reconstruye solo, y una sola vez, la primera vez que se necesita
+ * después de que productosPOS cambió de referencia (recarga de
+ * catálogo) — se compara por referencia, así que no hace falta tocar
+ * cada uno de los puntos donde se reasigna productosPOS.
+ */
+let _productosPOSMapaCodigo = null;
+let _productosPOSMapaCaja = null;
+let _productosPOSMapaRef = null;
+
+function _asegurarMapasProductosPOS() {
+  if (_productosPOSMapaRef === productosPOS) return;
+  _productosPOSMapaCodigo = new Map();
+  _productosPOSMapaCaja = new Map();
+  for (const p of productosPOS) {
+    _productosPOSMapaCodigo.set(String(p.CODIGO).trim().toLowerCase(), p);
+    if (p.CODIGO_CAJA && Number(p.UNIDADES_POR_CAJA) > 0) {
+      _productosPOSMapaCaja.set(String(p.CODIGO_CAJA).trim().toLowerCase(), p);
+    }
+  }
+  _productosPOSMapaRef = productosPOS;
+}
+
+/** Busca un producto por CODIGO (unitario) en O(1) en vez de recorrer todo productosPOS */
+function buscarProductoPOSPorCodigo(codigo) {
+  _asegurarMapasProductosPOS();
+  return _productosPOSMapaCodigo.get(String(codigo).trim().toLowerCase()) || null;
+}
+
+/** Busca un producto por CODIGO_CAJA (código de la caja/bulto cerrado) en O(1) */
+function buscarProductoPOSPorCodigoCaja(codigo) {
+  _asegurarMapasProductosPOS();
+  return _productosPOSMapaCaja.get(String(codigo).trim().toLowerCase()) || null;
+}
+
 /** Limpia el caché de productos del POS y recarga desde el backend */
 async function actualizarCatalogoPOSManual() {
   try { localStorage.removeItem("veekpos_productos_cache"); } catch(e) {}
@@ -5605,13 +5642,11 @@ async function agregarProductoPorCodigo(codigo) {
   if (codigo === "") return;
   await asegurarProductosPOS();
 
-  const producto = productosPOS.find(p => String(p.CODIGO).trim().toLowerCase() === codigo.toLowerCase());
+  const producto = buscarProductoPOSPorCodigo(codigo);
   if (producto) { agregarProductoPOS(producto.CODIGO); return; }
 
   // No matcheó el código unitario — probar si es el código de la caja/bulto cerrado
-  const productoPorCaja = productosPOS.find(p =>
-    String(p.CODIGO_CAJA || "").trim().toLowerCase() === codigo.toLowerCase() && Number(p.UNIDADES_POR_CAJA) > 0
-  );
+  const productoPorCaja = buscarProductoPOSPorCodigoCaja(codigo);
   if (productoPorCaja) { agregarCajaAlTicket(productoPorCaja); return; }
 
   toast(`Producto no encontrado: ${codigo}`, "error");
@@ -5770,7 +5805,7 @@ async function guardarEdicionRapidaPOS() {
 
 function agregarProductoPOS(codigo) {
   codigo = String(codigo).trim();
-  const producto = productosPOS.find(p => String(p.CODIGO).trim() === codigo);
+  const producto = buscarProductoPOSPorCodigo(codigo);
   if (!producto) { toast("Producto no encontrado", "error"); return; }
   const stock = producto.STOCK !== undefined ? Number(producto.STOCK) : null;
   if (stock !== null && stock <= 0) {
