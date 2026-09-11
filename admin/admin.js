@@ -5470,14 +5470,21 @@ function distanciaLevenshteinPOS(a, b, maxDist) {
 function palabraCoincideTolerantePOS(palabraBusqueda, palabraTexto) {
   if (!palabraBusqueda) return true;
   if (palabraTexto.includes(palabraBusqueda)) return true;
-  if (palabraBusqueda.length < 3) return false; // muy corta -> el fuzzy da falsos positivos
+  // Palabras cortas (<=4 letras) quedan fuera del fuzzy: una distancia
+  // de 1 sobre 3-4 letras es 25-33% del texto tipeado y generaba
+  // falsos positivos ("pan" encontrando "van", "can", "fan", "pin",
+  // etc.). Para estas, solo vale el match literal de arriba.
+  if (palabraBusqueda.length <= 4) return false;
   // Un código de barras escaneado (solo dígitos, 6+ caracteres) no
   // tiene "typos" que tolerar — si no matcheó literal arriba, no va a
   // matchear con Levenshtein tampoco. Evita correr la comparación
   // difusa contra cada palabra de cada producto del catálogo en cada
   // tecla del escaneo (el costo que hacía sentir lento el escaneo).
   if (/^\d{6,}$/.test(palabraBusqueda)) return false;
-  const maxDist = palabraBusqueda.length <= 5 ? 1 : 2;
+  // A partir de 5 letras se tolera 1 error; recién a partir de 8 se
+  // tolera 2 (antes era a partir de 6, demasiado laxo: "cocina" (6)
+  // llegaba a matchear "colina" o "cadena" con solo 2 letras en común).
+  const maxDist = palabraBusqueda.length <= 7 ? 1 : 2;
   return distanciaLevenshteinPOS(palabraBusqueda, palabraTexto, maxDist) <= maxDist;
 }
 
@@ -5880,8 +5887,19 @@ function mostrarUltimoEscaneado(producto) {
   // productos seguidos, no tiene sentido reconstruir toda la grilla en
   // CADA escaneo — se reconstruye una sola vez, 150ms después del
   // último de la tanda.
+  //
+  // Si el producto ya es el pineado actual (p. ej. se clickeó varias
+  // veces seguidas el mismo tile para sumar cantidad), NO se vuelve a
+  // reordenar/reconstruir la grilla: ya está en la posición 0, así que
+  // reconstruirla no cambia nada visualmente pero sí recrea el <div>
+  // del tile, lo que producía el "salto" que impedía encadenar varios
+  // clicks sobre el mismo producto.
+  const yaEstabaPineado = productoPineadoPOS &&
+    String(productoPineadoPOS.CODIGO).trim() === String(producto.CODIGO).trim();
   productoPineadoPOS = producto;
-  renderPosGridConDemora(document.getElementById("posBusqueda")?.value.trim() || "");
+  if (!yaEstabaPineado) {
+    renderPosGridConDemora(document.getElementById("posBusqueda")?.value.trim() || "");
+  }
 
   const thumb = document.getElementById("scanResultThumb");
   const imagenUrl = producto.IMAGEN ? String(producto.IMAGEN).trim() : "";
