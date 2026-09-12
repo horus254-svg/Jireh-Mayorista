@@ -3279,6 +3279,7 @@ let productosAdminGlobal = [];
 
 /** Opens the modal in "create" mode */
 function nuevoProducto() {
+  window._pmStockOriginal = null; // no aplica en modo creación — ver editarProducto
   document.getElementById("productModalTitle").textContent = "+ Nuevo Producto";
   document.getElementById("pmCodigoOriginal").value = "";
   document.getElementById("pmCodigo").value = "";
@@ -3315,6 +3316,14 @@ function nuevoProducto() {
 function editarProducto(codigo) {
   const p = productosAdminGlobal.find(x => String(x.CODIGO) === String(codigo));
   if (!p) { toast("No se encontró el producto para editar", "error"); return; }
+
+  // Se guarda el stock TAL COMO estaba al abrir el formulario — se usa
+  // al guardar para mandar solo la DIFERENCIA (delta) en vez de un
+  // valor absoluto. Si se mandara el valor absoluto y otra caja vendió
+  // este mismo producto mientras el formulario estaba abierto, guardar
+  // pisaría ese stock más nuevo con el que se vio acá, desactualizado.
+  // Ver guardarProductoForm en pos-offline.js.
+  window._pmStockOriginal = Number(p.STOCK || 0);
 
   document.getElementById("productModalTitle").textContent = "✏️ Editar Producto";
   document.getElementById("pmCodigoOriginal").value = p.CODIGO;
@@ -5631,9 +5640,9 @@ function renderPosGrid(filtroTexto) {
     const producto = visibleList[idx];
     if (producto) {
       tile.dataset.codigo = producto.CODIGO;
-      tile.addEventListener("click", () => agregarProductoPOS(producto.CODIGO));
+      tile.addEventListener("click", () => agregarProductoPOS(producto.CODIGO, false));
       tile.addEventListener("keydown", e => {
-        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); agregarProductoPOS(producto.CODIGO); }
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); agregarProductoPOS(producto.CODIGO, false); }
       });
     }
   });
@@ -5839,7 +5848,7 @@ async function guardarEdicionRapidaPOS() {
   }
 }
 
-function agregarProductoPOS(codigo) {
+function agregarProductoPOS(codigo, pinear = true) {
   codigo = String(codigo).trim();
   const producto = buscarProductoPOSPorCodigo(codigo);
   if (!producto) { toast("Producto no encontrado", "error"); return; }
@@ -5860,7 +5869,7 @@ function agregarProductoPOS(codigo) {
   }
   renderTicketPOS();
   flashTile(codigo);
-  mostrarUltimoEscaneado(producto);
+  mostrarUltimoEscaneado(producto, pinear);
   ultimoCodigoAgregadoPOS = codigo;
   scrollTicketAlProducto(codigo);
 
@@ -5875,30 +5884,31 @@ function scrollTicketAlProducto(codigo) {
 }
 
 /** Updates the "last scanned product" panel with its photo, name, code and price */
-function mostrarUltimoEscaneado(producto) {
+function mostrarUltimoEscaneado(producto, pinear = true) {
   const panel = document.getElementById("scanResultPanel");
   if (!panel) return;
 
-  // Además de la tarjeta de arriba, este producto queda pineado como
-  // primer tile de la grilla hasta el próximo escaneo o hasta vaciar/
-  // finalizar la venta (ver limpiarPineadoPOS). Se usa la versión con
-  // demora (no renderPosGrid directo) por la misma razón que ya
-  // explicaba onPosInputKeyup más abajo: si se están escaneando varios
-  // productos seguidos, no tiene sentido reconstruir toda la grilla en
-  // CADA escaneo — se reconstruye una sola vez, 150ms después del
-  // último de la tanda.
+  // El pineo (mover este producto al primer tile de la grilla, ver
+  // limpiarPineadoPOS) solo se hace cuando el producto se agregó por
+  // escaneo/código tipeado (pinear=true, el valor por defecto): ahí
+  // tiene sentido, porque el usuario no está mirando/clickeando la
+  // grilla, así que reordenarla para tener el último escaneado a mano
+  // no interfiere con nada.
   //
-  // Si el producto ya es el pineado actual (p. ej. se clickeó varias
-  // veces seguidas el mismo tile para sumar cantidad), NO se vuelve a
-  // reordenar/reconstruir la grilla: ya está en la posición 0, así que
-  // reconstruirla no cambia nada visualmente pero sí recrea el <div>
-  // del tile, lo que producía el "salto" que impedía encadenar varios
-  // clicks sobre el mismo producto.
-  const yaEstabaPineado = productoPineadoPOS &&
-    String(productoPineadoPOS.CODIGO).trim() === String(producto.CODIGO).trim();
-  productoPineadoPOS = producto;
-  if (!yaEstabaPineado) {
-    renderPosGridConDemora(document.getElementById("posBusqueda")?.value.trim() || "");
+  // Cuando se agrega clickeando directamente un tile de la grilla
+  // (pinear=false, ver el listener de click más abajo), NO se pinea ni
+  // se reordena: si se moviera el producto a la posición 0 en cada
+  // click, un segundo click rápido en el mismo lugar de la pantalla
+  // terminaba clickeando OTRO producto (el que quedó bajo el dedo/
+  // cursor tras el reorden). La grilla debe quedarse quieta para poder
+  // clickear el mismo producto varias veces seguidas.
+  if (pinear) {
+    const yaEstabaPineado = productoPineadoPOS &&
+      String(productoPineadoPOS.CODIGO).trim() === String(producto.CODIGO).trim();
+    productoPineadoPOS = producto;
+    if (!yaEstabaPineado) {
+      renderPosGridConDemora(document.getElementById("posBusqueda")?.value.trim() || "");
+    }
   }
 
   const thumb = document.getElementById("scanResultThumb");
@@ -8095,7 +8105,7 @@ function agregarProductoEnFoco() {
   const tiles = Array.from(document.querySelectorAll("#posProductGrid .product-tile:not(.disabled)"));
   const tile = tiles[posTileFocusIdx];
   if (!tile || !tile.dataset.codigo) return;
-  agregarProductoPOS(tile.dataset.codigo);
+  agregarProductoPOS(tile.dataset.codigo, false);
 }
 
 function setScannerStatus(estado) {
