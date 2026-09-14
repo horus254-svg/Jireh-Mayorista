@@ -39,7 +39,33 @@ let API_URL = "";
  *   revisar si se guardó o no antes de reintentar a mano.
  */
 async function fetchAPI(url, opciones = {}, config = {}) {
-  const esLectura = !opciones.method || opciones.method === "GET";
+  // El backend (code.gs) está armado sobre doGet con ?action=..., así
+  // que la GRAN MAYORÍA de las mutaciones (actualizarProducto,
+  // guardarProducto, sumarStockProducto, guardarPedidoAdmin, etc.)
+  // viajan como GET, sin `method: "POST"` — el método HTTP solo no
+  // alcanza para distinguir lectura de escritura acá. Antes, cualquier
+  // mutación por GET se trataba como "lectura": timeout corto (10s,
+  // insuficiente si el backend tarda por contención de lock — hasta
+  // 20-30s, ver code.gs) y, peor, REINTENTO AUTOMÁTICO al vencer ese
+  // timeout — exactamente lo que el comentario de más arriba dice que
+  // nunca hay que hacer con una mutación (puede duplicarla), y lo que
+  // generaba el caso real: el cambio sí llegaba a guardarse en Sheets,
+  // pero el cliente ya había abortado pensando que era una lectura y
+  // mostraba "error de conexión".
+  //
+  // Por eso, además del método HTTP, se mira el nombre de la acción en
+  // la URL: en este backend las mutaciones siempre arrancan con un
+  // verbo (guardar/actualizar/eliminar/crear/editar/registrar/...),
+  // mientras que las lecturas son sustantivos (productos, pedidos,
+  // clientes...). Si matchea un verbo de mutación, se trata como
+  // mutación SIN IMPORTAR el método HTTP.
+  const accionUrl = (() => {
+    try { return new URL(url, window.location.href).searchParams.get("action") || ""; }
+    catch (e) { return ""; }
+  })();
+  const esMutacionPorNombre = /^(guardar|actualizar|eliminar|crear|editar|registrar|cambiar|anular|borrar|marcar|activar|fijar|probar|cancelar|confirmar|aplicar|reordenar|subir|migrar|inicializar|sumar)/i.test(accionUrl);
+
+  const esLectura = (!opciones.method || opciones.method === "GET") && !esMutacionPorNombre;
   const timeoutMs = config.timeoutMs || (esLectura ? 10000 : 20000);
   const maxIntentos = esLectura ? (config.reintentos ?? 2) : 1;
 
