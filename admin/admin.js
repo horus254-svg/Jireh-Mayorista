@@ -2720,6 +2720,60 @@ async function guardarEdicionItemsPedido() {
   }
 }
 
+/**
+ * Etiqueta de envío MANUAL — misma plantilla A4 que imprimirEtiquetaEnvio
+ * (la que ya se usa desde el detalle de un pedido en estado PREPARANDO),
+ * pero sin depender de que exista un pedido real: para envíos que no
+ * salieron del catálogo web (ej. se tomó el pedido por teléfono o
+ * WhatsApp). No crea ningún registro en Pedidos ni toca stock — es
+ * pura utilidad de impresión, todo queda en el navegador.
+ */
+function abrirModalEtiquetaManual() {
+  ["etqManualCliente", "etqManualDni", "etqManualTelefono", "etqManualDireccion",
+   "etqManualLocalidad", "etqManualCP", "etqManualProvincia", "etqManualTransporte",
+   "etqManualReferencia"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = "";
+  });
+  document.getElementById("etiquetaManualModalBackdrop").classList.add("show");
+  setTimeout(() => document.getElementById("etqManualCliente")?.focus(), 50);
+}
+
+function cerrarModalEtiquetaManual() {
+  document.getElementById("etiquetaManualModalBackdrop").classList.remove("show");
+}
+
+function generarEtiquetaManual() {
+  const val = id => (document.getElementById(id)?.value || "").trim();
+
+  const cliente = val("etqManualCliente");
+  if (!cliente) {
+    toast("Ingresá el nombre del destinatario", "error");
+    document.getElementById("etqManualCliente")?.focus();
+    return;
+  }
+
+  // Si no se cargó una referencia a mano, se genera una localmente
+  // (timestamp) solo para tener algo que mostrar en el código de
+  // barras — no es un ID de pedido real, no queda guardado en
+  // ningún lado más que en esta etiqueta impresa.
+  const referencia = val("etqManualReferencia") || ("MANUAL-" + Date.now());
+
+  imprimirEtiquetaEnvio({
+    pedidoId: referencia,
+    cliente,
+    telefono: val("etqManualTelefono"),
+    direccion: val("etqManualDireccion"),
+    localidad: val("etqManualLocalidad"),
+    provincia: val("etqManualProvincia"),
+    codigoPostal: val("etqManualCP"),
+    dni: val("etqManualDni"),
+    transporte: val("etqManualTransporte")
+  });
+
+  cerrarModalEtiquetaManual();
+}
+
 function imprimirEtiquetaDesdeDetalle() {
   if (!pedidoDetalleActual) return;
   const p = pedidoDetalleActual.pedido;

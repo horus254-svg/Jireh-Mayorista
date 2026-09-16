@@ -513,6 +513,7 @@
     <div class="page-header">
       <div><h1>Pedidos</h1><div class="sub">Seguimiento y estado de pedidos del catálogo web</div></div>
       <div class="d-flex gap-2">
+        <button class="btn btn-outline-primary btn-sm" onclick="abrirModalEtiquetaManual()">🏷️ Etiqueta manual</button>
         <button class="btn btn-outline-danger btn-sm" id="btnEliminarPedidosCancelados" onclick="eliminarPedidosCancelados()">🗑️ Eliminar cancelados</button>
         <button class="btn btn-outline-secondary btn-sm" onclick="recargarPedidos()">↻ Actualizar</button>
       </div>
@@ -3431,6 +3432,70 @@
       <button class="btn btn-outline-secondary" id="btnImprimirEtiquetaDetalle" onclick="imprimirEtiquetaDesdeDetalle()">Imprimir etiqueta</button>
       <button class="btn btn-outline-primary" id="btnEditarItemsPedido" style="display:none;" onclick="activarEdicionItemsPedido()">✏️ Editar ítems</button>
       <button class="btn btn-success" onclick="imprimirNotaPedidoA4()">Imprimir pedido (A4)</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ===== MODAL ETIQUETA DE ENVÍO MANUAL =====
+     Genera una etiqueta A4 (misma plantilla que imprimirEtiquetaEnvio,
+     la que ya se usa para pedidos en estado PREPARANDO) pero a partir de
+     datos cargados a mano, sin necesidad de que exista un pedido real
+     detrás — para envíos que no salieron del catálogo web (ej. un
+     pedido que se tomó por teléfono o WhatsApp). No crea ningún
+     registro en Pedidos ni toca stock: es solo una utilidad de
+     impresión. -->
+<div class="product-modal-backdrop" id="etiquetaManualModalBackdrop">
+  <div class="product-modal" style="max-width:460px;">
+    <div class="product-modal-header">
+      <h6>🏷️ Etiqueta de envío manual</h6>
+      <button onclick="cerrarModalEtiquetaManual()">✕</button>
+    </div>
+    <div class="product-modal-body">
+      <div class="mb-2">
+        <label class="form-label">Nombre del destinatario <span class="text-danger">*</span></label>
+        <input type="text" class="form-control" id="etqManualCliente" placeholder="Nombre y apellido, o razón social">
+      </div>
+      <div class="row g-2 mb-2">
+        <div class="col-6">
+          <label class="form-label">DNI/CUIT</label>
+          <input type="text" class="form-control" id="etqManualDni" placeholder="20123456789">
+        </div>
+        <div class="col-6">
+          <label class="form-label">Teléfono</label>
+          <input type="text" class="form-control" id="etqManualTelefono" placeholder="11-1234-5678">
+        </div>
+      </div>
+      <div class="mb-2">
+        <label class="form-label">Dirección</label>
+        <input type="text" class="form-control" id="etqManualDireccion" placeholder="Calle, número, piso/depto">
+      </div>
+      <div class="row g-2 mb-2">
+        <div class="col-7">
+          <label class="form-label">Localidad</label>
+          <input type="text" class="form-control" id="etqManualLocalidad" placeholder="">
+        </div>
+        <div class="col-5">
+          <label class="form-label">Código Postal</label>
+          <input type="text" class="form-control" id="etqManualCP" placeholder="">
+        </div>
+      </div>
+      <div class="mb-2">
+        <label class="form-label">Provincia</label>
+        <input type="text" class="form-control" id="etqManualProvincia" placeholder="">
+      </div>
+      <div class="mb-2">
+        <label class="form-label">Transporte <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+        <input type="text" class="form-control" id="etqManualTransporte" placeholder="Ej: Correo Argentino, Andreani...">
+      </div>
+      <div class="mb-2">
+        <label class="form-label">Referencia <span class="text-muted" style="font-size:11px;">(opcional — se muestra en el código de barras; si se deja vacío se genera una automática)</span></label>
+        <input type="text" class="form-control" id="etqManualReferencia" placeholder="Ej: número de pedido, de WhatsApp, etc.">
+      </div>
+    </div>
+    <div class="product-modal-actions">
+      <button class="btn btn-outline-secondary" onclick="cerrarModalEtiquetaManual()">Cancelar</button>
+      <button class="btn btn-success" onclick="generarEtiquetaManual()">🖨️ Generar e imprimir</button>
     </div>
   </div>
 </div>
