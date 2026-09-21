@@ -2216,13 +2216,20 @@ function recargarVentasPOSHistorial() {
 
 async function cambiarEstado(pedidoId, estado) {
   try {
-    const response = await fetch(
+    const response = await fetchAPI(
       API_URL +
       "?action=actualizarEstado" +
       "&pedidoId=" + encodeURIComponent(pedidoId) +
       "&estado="   + encodeURIComponent(estado)
     );
-    const data = await response.json();
+    let data;
+    try {
+      data = await response.json();
+    } catch (error) {
+      console.error("Respuesta no era JSON válido en cambiarEstado:", error);
+      toast("Error de conexión", "error");
+      return;
+    }
     if (!data.success) { toast("No se pudo actualizar el pedido", "error"); return; }
     // Actualizar en memoria sin recargar todo
     const p = pedidosGlobal.find(x => x.PEDIDO_ID === pedidoId);
