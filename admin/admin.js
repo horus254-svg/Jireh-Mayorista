@@ -8219,10 +8219,16 @@ function cerrarShortcutsHelp(e) {
   if (e.target.id === "shortcutsHelpBackdrop") e.target.classList.remove("show");
 }
 
-/* ---- camera-based scanning ---- */
+/* ---- camera-based scanning ----
+   iOS Safari (y Firefox) no implementan BarcodeDetector nativo, así que
+   usamos ese cuando existe (Chrome/Edge en Android y desktop, más rápido
+   por ser nativo) y si no, caemos a ZXing-js, que decodifica en JS puro
+   y funciona en cualquier navegador con getUserMedia, incluido iOS Safari. */
 
 let camaraStream = null;
-let camaraDetectorTimer = null;
+let camaraDetectorTimer = null;   // usado por la rama BarcodeDetector nativo
+let zxingReader = null;           // usado por la rama fallback ZXing
+let camaraScanActivo = false;     // evita agregar el mismo código dos veces al cerrar
 
 async function abrirCamaraScan() {
   const backdrop  = document.getElementById("scanModalBackdrop");
@@ -8230,43 +8236,114 @@ async function abrirCamaraScan() {
   const video     = document.getElementById("scanVideo");
 
   backdrop.classList.add("show");
+  camaraScanActivo = true;
 
-  if (!("BarcodeDetector" in window)) {
+  // getUserMedia requiere HTTPS (o localhost) — en iOS, además, ni siquiera
+  // existe el objeto si la página no es segura, así que lo detectamos antes
+  // de pedir permiso de cámara para dar un mensaje claro.
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     videoWrap.innerHTML = `
       <div class="scan-unsupported">
-        Tu navegador no soporta el escaneo por cámara nativo.<br>
-        Usá un lector USB, o Chrome/Edge en Android.
+        El escaneo por cámara requiere una conexión segura (HTTPS).<br>
+        Usá un lector USB o accedé al panel por https.
       </div>`;
     return;
   }
 
   try {
-    camaraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+    camaraStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: "environment" } },
+      audio: false
+    });
     video.srcObject = camaraStream;
+    // iOS Safari necesita el play() explícito incluso con autoplay+playsinline
+    try { await video.play(); } catch (e) { /* algunos navegadores ya lo reproducen solos */ }
+
     setScannerStatus("camera");
     document.getElementById("btnCameraScan").classList.add("active");
 
-    const detector = new BarcodeDetector({
-      formats: ["ean_13","ean_8","upc_a","upc_e","code_128","code_39","qr_code","itf"]
-    });
-
-    camaraDetectorTimer = setInterval(async () => {
-      try {
-        const codigos = await detector.detect(video);
-        if (codigos.length > 0) {
-          const valor = codigos[0].rawValue;
-          cerrarCamaraScan();
-          agregarProductoPorCodigo(valor);
-        }
-      } catch (err) { /* frame errors expected */ }
-    }, 350);
+    if ("BarcodeDetector" in window) {
+      iniciarDeteccionNativa(video);
+    } else {
+      await iniciarDeteccionZXing(video);
+    }
 
   } catch (error) {
     console.error("Error de cámara:", error);
-    videoWrap.innerHTML = `
+    const permisoDenegado = error && (error.name === "NotAllowedError" || error.name === "PermissionDeniedError");
+    videoWrap.innerHTML = permisoDenegado
+      ? `<div class="scan-unsupported">
+           Se denegó el acceso a la cámara.<br>
+           En iOS: Ajustes → Safari (o la app) → Cámara → Permitir.<br>
+           En Android: tocá el candado en la barra de direcciones → Permisos → Cámara.
+         </div>`
+      : `<div class="scan-unsupported">
+           No se pudo acceder a la cámara.<br>
+           Revisá los permisos del navegador e intentá de nuevo.
+         </div>`;
+  }
+}
+
+function iniciarDeteccionNativa(video) {
+  const detector = new BarcodeDetector({
+    formats: ["ean_13","ean_8","upc_a","upc_e","code_128","code_39","qr_code","itf"]
+  });
+
+  camaraDetectorTimer = setInterval(async () => {
+    try {
+      const codigos = await detector.detect(video);
+      if (codigos.length > 0) {
+        const valor = codigos[0].rawValue;
+        cerrarCamaraScan();
+        agregarProductoPorCodigo(valor);
+      }
+    } catch (err) { /* frame errors expected */ }
+  }, 350);
+}
+
+async function iniciarDeteccionZXing(video) {
+  if (typeof ZXingBrowser === "undefined" && typeof ZXing === "undefined") {
+    document.getElementById("scanVideoWrap").innerHTML = `
       <div class="scan-unsupported">
-        No se pudo acceder a la cámara.<br>
-        Revisá los permisos del navegador e intentá de nuevo.
+        No se pudo cargar el motor de escaneo.<br>
+        Verificá tu conexión a internet e intentá de nuevo.
+      </div>`;
+    return;
+  }
+
+  try {
+    // El paquete UMD de zxing-library expone la librería como `ZXing`
+    const ZXingLib = (typeof ZXingBrowser !== "undefined") ? ZXingBrowser : ZXing;
+    const hints = new Map();
+    const formatos = [
+      ZXingLib.BarcodeFormat.EAN_13, ZXingLib.BarcodeFormat.EAN_8,
+      ZXingLib.BarcodeFormat.UPC_A, ZXingLib.BarcodeFormat.UPC_E,
+      ZXingLib.BarcodeFormat.CODE_128, ZXingLib.BarcodeFormat.CODE_39,
+      ZXingLib.BarcodeFormat.QR_CODE, ZXingLib.BarcodeFormat.ITF
+    ];
+    hints.set(ZXingLib.DecodeHintType.POSSIBLE_FORMATS, formatos);
+    hints.set(ZXingLib.DecodeHintType.TRY_HARDER, true);
+
+    zxingReader = new ZXingLib.BrowserMultiFormatReader(hints);
+
+    // decodeFromVideoElementContinuously reutiliza el stream de video ya
+    // asignado a <video> (no vuelve a pedir permiso de cámara) y llama al
+    // callback en cada frame; seguimos escaneando hasta encontrar un match.
+    zxingReader.decodeFromVideoElementContinuously(video, (result, err) => {
+      if (result && camaraScanActivo) {
+        const valor = result.getText ? result.getText() : result.text;
+        cerrarCamaraScan();
+        agregarProductoPorCodigo(valor);
+      }
+      // NotFoundException se dispara en casi todos los frames sin código
+      // visible: es esperable, no un error real.
+    });
+  } catch (error) {
+    console.error("Error iniciando ZXing:", error);
+    document.getElementById("scanVideoWrap").innerHTML = `
+      <div class="scan-unsupported">
+        No se pudo iniciar el escaneo en este navegador.<br>
+        Usá un lector USB, o Chrome/Edge en Android.
       </div>`;
   }
 }
@@ -8274,8 +8351,13 @@ async function abrirCamaraScan() {
 function cerrarCamaraScan() {
   const backdrop = document.getElementById("scanModalBackdrop");
   backdrop.classList.remove("show");
+  camaraScanActivo = false;
 
   if (camaraDetectorTimer) { clearInterval(camaraDetectorTimer); camaraDetectorTimer = null; }
+  if (zxingReader) {
+    try { zxingReader.reset(); } catch (e) { /* noop */ }
+    zxingReader = null;
+  }
   if (camaraStream) { camaraStream.getTracks().forEach(t => t.stop()); camaraStream = null; }
 
   document.getElementById("btnCameraScan").classList.remove("active");
