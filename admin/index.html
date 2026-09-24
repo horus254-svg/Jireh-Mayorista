@@ -622,6 +622,24 @@
       </div>
     </div>
 
+    <!-- ===== Tipo de cambio del día: automático y editable. Completa solo los campos "Tipo de cambio" de esta sección ===== -->
+    <div class="card p-3 mb-3" id="ingresoTcCard">
+      <div class="d-flex flex-wrap align-items-end gap-2">
+        <div>
+          <label class="form-label mb-1">💵 Dólar</label>
+          <div style="font-size:14px; font-weight:700; line-height:1.1;" id="ingresoTcTipoNombre">Oficial</div>
+          <a href="#" style="font-size:11px;" onclick="tcIrAConfiguracion(); return false;">cambiar en Configuración</a>
+        </div>
+        <div>
+          <label class="form-label mb-1">Tipo de cambio (editable)</label>
+          <input type="number" class="form-control form-control-sm" id="ingresoTcValor" min="0" step="0.01" placeholder="Ej: 1500" style="width:150px;" oninput="tcEditarManual(this.value)">
+        </div>
+        <button class="btn btn-outline-secondary btn-sm" onclick="tcActualizarAutomatico(false)">↻ Traer cotización</button>
+        <span id="ingresoTcEstado" class="text-muted" style="font-size:12px;"></span>
+      </div>
+      <div class="form-text" style="font-size:11.5px;">Se completa solo (valor de venta del día) y se usa en todos los campos "Tipo de cambio" de esta sección cuando el costo está en dólares. Podés cambiarlo acá o directamente en cada producto.</div>
+    </div>
+
     <!-- ===== Cabecera de la boleta: proveedor / fecha / N° de boleta, común a todos los productos que se van a cargar ===== -->
     <div class="card p-3 mb-3">
       <h6 class="mb-2">1) Datos de la boleta / remito</h6>
@@ -659,6 +677,20 @@
         ✓ Esta mercadería viene de nuestra propia sucursal/depósito — no se va a generar deuda con proveedor.
       </div>
       <div class="mt-2" style="font-size:12.5px;" id="ipbEstadoBoleta"></div>
+    </div>
+
+    <!-- ===== Carga por foto (OCR gratis con Tesseract.js): lee la lista del proveedor y la vuelca al carrito de la boleta ===== -->
+    <div class="card p-3 mb-3" id="ocrCard">
+      <h6 class="mb-2">📷 Cargar desde foto o PDF de la lista del proveedor <span class="badge bg-secondary">gratis</span></h6>
+      <div class="d-flex gap-2 flex-wrap align-items-center">
+        <input type="file" id="ocrArchivo" accept="image/*,application/pdf,.pdf" class="form-control" style="max-width:340px" onchange="ocrProcesarArchivo(event)">
+        <span id="ocrEstado" class="text-muted" style="font-size:13px;"></span>
+        <label class="d-flex align-items-center gap-1 ms-auto" style="font-size:13px; cursor:pointer;" title="Muestra lo que lee el OCR y lo compara con lo esperado, sin agregar nada a la boleta ni a la base de datos">
+          <input type="checkbox" id="ocrModoPrueba"> 🧪 Modo prueba (no guarda nada)
+        </label>
+      </div>
+      <div class="progress mt-2" id="ocrProgWrap" style="height:6px; display:none;"><div class="progress-bar" id="ocrProg" style="width:0%"></div></div>
+      <div class="form-text" style="font-size:11.5px;"><b>PDF:</b> se lee el texto directamente, con los valores exactos. <b>Foto:</b> de frente, con buena luz y sin sombras (mejor si es solo la tabla). Reconoce producto, código, cantidad y precio de ingreso; vas a poder revisar, corregir nombres y cargar los precios de venta antes de agregarlo a la boleta.</div>
     </div>
 
     <!-- ===== Alta de cada producto de la boleta: se van acumulando en el carrito de abajo ===== -->
@@ -2203,6 +2235,27 @@
     <div class="cfg-tab-pane" id="cfgTab-productos">
 
       <div class="card p-3 mb-3">
+        <h6 style="margin-bottom:6px;">💵 Dólar de referencia (tipo de cambio)</h6>
+        <p class="text-muted" style="font-size:12.5px; margin-top:-2px; margin-bottom:14px;">
+          Qué cotización se trae sola como tipo de cambio en Ingreso de Productos (se usa el valor de <b>venta</b> del día). Igual lo podés editar en cada ingreso.
+        </p>
+        <div class="mb-2">
+          <label class="form-label">Tipo de dólar</label>
+          <select class="form-select" id="cfgDolarTipo">
+            <option value="oficial">Oficial</option>
+            <option value="blue">Blue</option>
+            <option value="bolsa">MEP (Bolsa)</option>
+            <option value="mayorista">Mayorista</option>
+            <option value="tarjeta">Tarjeta</option>
+          </select>
+          <div class="form-text" id="cfgDolarHoy" style="font-size:12px;"></div>
+        </div>
+        <div class="d-flex justify-content-end">
+          <button class="btn btn-success" id="btnGuardarDolarTipo" onclick="guardarDolarTipoForm()">💾 Guardar dólar de referencia</button>
+        </div>
+      </div>
+
+      <div class="card p-3 mb-3">
         <h6 style="margin-bottom:14px;">🖼️ Imágenes de productos</h6>
         <p class="text-muted" style="font-size:12.5px; margin-top:-8px; margin-bottom:14px;">
           Las fotos que subís desde "Nuevo Producto" se guardan en esta carpeta de tu Google Drive. Pegá el link de la carpeta (o solo el ID) — tiene que ser una carpeta de la misma cuenta de Google donde está la planilla.
@@ -3610,6 +3663,90 @@
     <button class="pay-method-btn" data-val="TARJETA" onclick="elegirFormaPago(this,'TARJETA')"></button>
   </div>
 </div>
+<!-- ===== MODAL: REVISAR LO LEÍDO POR OCR (foto de lista de proveedor) ===== -->
+<div class="product-modal-backdrop" id="ocrModalBackdrop">
+  <div class="product-modal" style="max-width:980px; width:96vw;">
+    <div class="product-modal-header"><h6 id="ocrModalTitulo">📷 Revisá lo que leyó la foto</h6><button onclick="ocrCerrar()">✕</button></div>
+    <div class="product-modal-body" style="max-height:72vh; overflow:auto;">
+
+      <!-- ===== Panel de PRUEBA: solo se ve con "Modo prueba" tildado. No escribe nada en la boleta ni en la base de datos ===== -->
+      <div id="ocrPanelPrueba" class="mb-3" style="display:none;">
+        <div class="alert alert-info py-2 mb-2" style="font-size:12.5px;">🧪 <b>Modo prueba</b>: no se agrega nada a la boleta ni a la base de datos. Comparás lo que leyó el OCR contra lo que esperabas.</div>
+        <div class="row g-2 mb-2">
+          <div class="col-md-6">
+            <div class="fw-semibold" style="font-size:12.5px;">Foto original</div>
+            <img id="ocrImgOriginal" alt="Foto original" style="max-width:100%; max-height:220px; border:1px solid #ddd; border-radius:6px;">
+          </div>
+          <div class="col-md-6">
+            <div class="fw-semibold" style="font-size:12.5px;">Lo que ve el OCR (ya procesada)</div>
+            <img id="ocrImgProcesada" alt="Imagen procesada" style="max-width:100%; max-height:220px; border:1px solid #ddd; border-radius:6px;">
+          </div>
+        </div>
+        <div id="ocrStats" class="mb-2" style="font-size:12.5px;"></div>
+        <label class="form-label mb-1">Resultado esperado <span class="text-muted fw-normal">(una línea por producto: <code>nombre ; cantidad ; costo</code> — o <code>código ; nombre ; cantidad ; costo</code> — o pegá la línea tal cual está en la lista)</span></label>
+        <textarea id="ocrEsperado" class="form-control" rows="5" style="font-family:monospace; font-size:12px;" placeholder="Coca Cola 500ml ; 12 ; 1250,50&#10;Yerba Playadito 1kg ; 10 ; 4200"></textarea>
+        <div class="d-flex gap-2 flex-wrap mt-2">
+          <button class="btn btn-primary btn-sm" onclick="ocrCompararConEsperado()">⚖️ Comparar con lo esperado</button>
+          <button class="btn btn-outline-secondary btn-sm" onclick="ocrCopiarResultadoPrueba()">📋 Copiar resultado (JSON)</button>
+        </div>
+        <div id="ocrComparacion" class="mt-2"></div>
+        <hr>
+      </div>
+
+      <div class="row g-2 mb-2">
+        <div class="col-md-3">
+          <label class="form-label">Moneda del costo de ingreso</label>
+          <select class="form-select form-select-sm" id="ocrMoneda" onchange="ocrCambioMoneda()">
+            <option value="ARS">Pesos (ARS)</option>
+            <option value="USD">Dólares (USD)</option>
+          </select>
+        </div>
+        <div class="col-md-3" id="ocrTcWrap" style="display:none;">
+          <label class="form-label">Tipo de cambio</label>
+          <input type="number" class="form-control form-control-sm" id="ocrTc" placeholder="Ej: 1250" oninput="ocrRenderTabla()">
+        </div>
+      </div>
+      <div class="text-muted mb-2" style="font-size:12.5px;">El costo de ingreso puede estar en pesos o en dólares (elegilo arriba); el <b>precio de venta se carga siempre en pesos (ARS)</b>. Las filas en amarillo tienen datos que faltan. Destildá las que no sean productos (encabezados, totales, etc.).</div>
+      <div class="table-responsive">
+        <table class="table table-sm table-striped">
+          <thead><tr><th></th><th>Código</th><th>Producto</th><th style="width:90px;">Cant.</th><th style="width:130px;" id="ocrThCosto">Costo unit. (ARS)</th><th style="width:130px;">Precio venta (ARS)</th><th>Estado</th></tr></thead>
+          <tbody id="ocrTabla"></tbody>
+        </table>
+      </div>
+      <details class="mt-2" id="ocrDetalleTexto">
+        <summary style="cursor:pointer; font-size:13px;">Ver / corregir el texto leído</summary>
+        <textarea id="ocrTextoCrudo" class="form-control mt-2" rows="8" style="font-family:monospace; font-size:12px;"></textarea>
+        <button class="btn btn-outline-secondary btn-sm mt-2" onclick="ocrReprocesarTexto()">↻ Volver a armar la tabla con este texto</button>
+      </details>
+    </div>
+    <div class="product-modal-actions">
+      <button class="btn btn-outline-secondary" onclick="ocrCerrar()">Cancelar</button>
+      <button class="btn btn-success" id="ocrBtnAgregar" onclick="ocrAgregarABoleta()">➕ Agregar a la boleta</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Burbuja de cotizaciones del dólar (POS y Dashboard, solo con internet) ===== -->
+<style>
+#dolarBurbuja{position:fixed;left:calc(var(--sidebar-w,248px) + 14px);bottom:14px;z-index:900;display:none;font-family:var(--font-ui,system-ui,sans-serif);}
+#dolarBurbuja.visible{display:block;}
+#dolarBurbuja .db-card{background:#fff;border:1px solid var(--slate-200,#e2e6ed);border-radius:14px;box-shadow:0 6px 20px rgba(11,22,51,.16);padding:8px 12px;cursor:pointer;min-width:150px;}
+#dolarBurbuja .db-tit{font-size:11px;font-weight:700;color:var(--slate-500,#6b7585);display:flex;justify-content:space-between;gap:10px;margin-bottom:3px;}
+#dolarBurbuja .db-fila{display:flex;justify-content:space-between;gap:14px;font-size:13px;line-height:1.55;}
+#dolarBurbuja .db-fila b{font-family:var(--font-mono,monospace);font-weight:600;}
+#dolarBurbuja.min .db-fila,#dolarBurbuja.min .db-tit span:last-child{display:none;}
+#dolarBurbuja.min .db-card{min-width:0;padding:6px 10px;border-radius:999px;}
+#dolarBurbuja.min .db-tit{margin:0;}
+@media(max-width:768px){#dolarBurbuja{left:10px;bottom:calc(var(--bottomnav-h,64px) + 10px);}}
+@media print{#dolarBurbuja{display:none !important;}}
+</style>
+<div id="dolarBurbuja" title="Cotización del dólar (venta). Tocá para minimizar">
+  <div class="db-card" onclick="dolarBurbujaAlternar()">
+    <div class="db-tit"><span>💵 Dólar hoy</span><span id="dbHora"></span></div>
+    <div id="dbFilas"></div>
+  </div>
+</div>
+
 <!-- ===== THERMAL PRINT FRAME ===== -->
 <div id="thermalPrintFrame"></div>
 

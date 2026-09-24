@@ -891,6 +891,10 @@ function cargarAparienciaForm(cfg) {
   const cfgPedidoMinimoEl = document.getElementById("cfgPedidoMinimo");
   if (cfgPedidoMinimoEl && cfg.pedidoMinimo !== undefined) cfgPedidoMinimoEl.value = cfg.pedidoMinimo;
 
+  // Dólar de referencia (tipo de cambio de Ingreso de Productos)
+  const cfgDolarTipoEl = document.getElementById("cfgDolarTipo");
+  if (cfgDolarTipoEl) { cfgDolarTipoEl.value = tcTipoConfigurado(); dolarMostrarValoresHoy(); }
+
   // Popup promocional
   const popupActivo = document.getElementById("cfgPopupActivo");
   const popupImagen = document.getElementById("cfgPopupImagen");
@@ -1875,11 +1879,13 @@ function mostrarSeccion(id) {
     a.classList.toggle("active", a.getAttribute("data-target") === id);
   });
 
+  dolarBurbujaAlCambiarSeccion(id);
   if (id === "pedidos")   cargarSiVencido("pedidos", cargarPedidos);
   if (id === "productos") cargarSiVencido("productos", cargarProductos);
   if (id === "ingresoProductos") {
     cargarProductos();
     cargarHistorialIngresos();
+    tcAlAbrirSeccion();
     const ipbFecha = document.getElementById("ipbFecha");
     if (ipbFecha && !ipbFecha.value) ipbFecha.value = _hoyISO();
     setTimeout(() => document.getElementById("ipCodigoScan")?.focus(), 100);
@@ -11366,11 +11372,273 @@ async function ejecutarMigracionFormaPago() {
 =================================================================== */
 
 let ingresosProductosGlobal = [];
+
+/* ---------------------------------------------------------------------
+   TIPO DE CAMBIO AUTOMÁTICO (sección Ingreso de Productos)
+   Trae la cotización del día (valor de VENTA) de DolarApi y completa solo los campos "Tipo de cambio"
+   de la sección: el del formulario manual (ipTipoCambio) y el de la revisión por foto/PDF (ocrTc).
+   Todo sigue siendo editable: en la barra de arriba (pisa los de abajo) o en cada campo (solo ese).
+   Si no hay internet o la API falla, se usa el último valor guardado y se puede cargar a mano.
+--------------------------------------------------------------------- */
+const TC_API = "https://dolarapi.com/v1/dolares/";
+const TC_LS_KEY = "vpos_tc_ingreso";
+const TC_CAMPOS = ["ipTipoCambio", "ocrTc"];
+const TC_TIPOS = { oficial: "Oficial", blue: "Blue", bolsa: "MEP (Bolsa)", mayorista: "Mayorista", tarjeta: "Tarjeta" };
+const TC_TIPO_LS = "vpos_dolar_tipo";
+let ingresoTC = { valor: 0, tipo: "oficial", manual: false, dia: "", fecha: "", ultimaAuto: 0, fallo: false };
+
+function tcCargarLocal() {
+  try {
+    const o = JSON.parse(localStorage.getItem(TC_LS_KEY) || "null");
+    if (o && typeof o === "object") Object.assign(ingresoTC, o);
+  } catch (e) { /* sin almacenamiento: se trabaja en memoria */ }
+}
+function tcGuardarLocal() {
+  try { localStorage.setItem(TC_LS_KEY, JSON.stringify(ingresoTC)); } catch (e) { /* no pasa nada */ }
+}
+
+/** Refleja el estado en la barra de arriba */
+function tcRender() {
+  const nom = document.getElementById("ingresoTcTipoNombre");
+  const inp = document.getElementById("ingresoTcValor");
+  const est = document.getElementById("ingresoTcEstado");
+  if (!nom || !inp || !est) return;
+  nom.textContent = TC_TIPOS[ingresoTC.tipo] || TC_TIPOS.oficial;
+  if (document.activeElement !== inp) inp.value = ingresoTC.valor || "";
+  const cuando = ingresoTC.fecha && !isNaN(new Date(ingresoTC.fecha))
+    ? new Date(ingresoTC.fecha).toLocaleString("es-AR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "";
+  if (ingresoTC.manual) {
+    est.innerHTML = '<span class="badge bg-warning text-dark">editado a mano</span> hoy — "Traer cotización" vuelve al valor automático';
+  } else if (ingresoTC.fallo) {
+    est.innerHTML = '<span class="badge bg-danger">sin conexión</span> ' + (ingresoTC.valor ? "usando el último valor guardado" + (cuando ? " (" + cuando + ")" : "") + " — podés editarlo" : "cargalo a mano");
+  } else if (ingresoTC.valor) {
+    est.textContent = "Automático · DolarApi" + (cuando ? " · actualizado " + cuando : "");
+  } else {
+    est.textContent = "Todavía sin cotización";
+  }
+}
+
+/** ¿Está el campo en uso? (solo se completan los campos cuyo costo está en dólares) */
+function tcCampoActivo(id) {
+  const sel = document.getElementById(id === "ocrTc" ? "ocrMoneda" : "ipMoneda");
+  return !!sel && sel.value === "USD";
+}
+
+/** Completa un campo con el valor actual si está vacío o si nunca lo tocaste a mano */
+function tcPrellenarCampo(id) {
+  const el = document.getElementById(id);
+  if (!el || !(ingresoTC.valor > 0) || !tcCampoActivo(id)) return;
+  if (!el.value || !el.dataset.tcLocal) el.value = ingresoTC.valor;
+}
+
+/** Propaga el valor a los campos de la sección. forzar=true también pisa los que editaste a mano en cada producto */
+function tcAplicarACampos(forzar) {
+  if (!(ingresoTC.valor > 0)) return;
+  TC_CAMPOS.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el || !tcCampoActivo(id)) return;
+    if (forzar) delete el.dataset.tcLocal;
+    if (!el.dataset.tcLocal) el.value = ingresoTC.valor;
+  });
+  if (document.getElementById("ocrTabla")) ocrRenderTabla();   // actualiza los equivalentes en pesos de la revisión
+}
+
+/** Trae la cotización de venta del tipo elegido. silencioso=true: sin avisos ni pisar lo que editaste a mano */
+async function tcActualizarAutomatico(silencioso) {
+  const tipo = tcTipoConfigurado();
+  const ctrl = new AbortController();
+  const corte = setTimeout(() => ctrl.abort(), 8000);
+  try {
+    const res = await fetch(TC_API + encodeURIComponent(tipo), { signal: ctrl.signal });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const d = await res.json();
+    const venta = Number(d.venta);
+    if (!(venta > 0)) throw new Error("cotización inválida");
+    if (tipo !== tcTipoConfigurado()) return;   // respuesta vieja: en el medio cambió el tipo de dólar
+    ingresoTC = { valor: venta, tipo, manual: false, dia: "", fecha: d.fechaActualizacion || new Date().toISOString(), ultimaAuto: Date.now(), fallo: false };
+    tcGuardarLocal();
+    tcRender();
+    tcAplicarACampos(!silencioso);
+  } catch (e) {
+    console.warn("Tipo de cambio automático:", e);
+    ingresoTC.fallo = true;
+    ingresoTC.tipo = tipo;
+    tcRender();
+    if (!silencioso) toast("No se pudo traer la cotización automática. Se mantiene el último valor; podés cargarlo a mano.", "error");
+  } finally {
+    clearTimeout(corte);
+  }
+}
+
+/** Escribiste el tipo de cambio en la barra: vale para hoy y se usa en todos los campos de abajo */
+function tcEditarManual(v) {
+  ingresoTC.valor = Number(v) || 0;
+  ingresoTC.manual = true;
+  ingresoTC.fallo = false;
+  ingresoTC.dia = _hoyISO();
+  tcGuardarLocal();
+  tcRender();
+  tcAplicarACampos(true);
+}
+
+/** Tipo de dólar elegido en Configuración (oficial, blue, MEP...). Si el servidor todavía no lo guarda, se usa el de este equipo */
+function tcTipoConfigurado() {
+  let t = "";
+  try { t = String((obtenerConfigNegocio() || {}).dolarTipo || "").toLowerCase(); } catch (e) { /* sin config cargada */ }
+  if (!TC_TIPOS[t]) { try { t = localStorage.getItem(TC_TIPO_LS) || ""; } catch (e) { t = ""; } }
+  return TC_TIPOS[t] ? t : "oficial";
+}
+
+/** Atajo desde la barra: abre Configuración > Productos y Pedidos, donde se elige el tipo de dólar */
+function tcIrAConfiguracion() {
+  mostrarSeccion("configuracion");
+  setTimeout(() => {
+    const btn = document.querySelector('.cfg-tab-btn[data-cfg-tab="productos"]');
+    if (btn) mostrarConfigTab("productos", btn);
+  }, 60);
+}
+
+/** Configuración: muestra cuánto vale hoy cada tipo de dólar para ayudar a elegir */
+async function dolarMostrarValoresHoy() {
+  const el = document.getElementById("cfgDolarHoy");
+  if (!el) return;
+  try {
+    const res = await fetch(TC_API.replace(/\/$/, ""));
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const lista = await res.json();
+    const partes = Object.keys(TC_TIPOS).map(casa => {
+      const d = (Array.isArray(lista) ? lista : []).find(x => x.casa === casa);
+      return d && Number(d.venta) > 0 ? `${TC_TIPOS[casa]} $${Number(d.venta).toLocaleString("es-AR")}` : null;
+    }).filter(Boolean);
+    el.textContent = partes.length ? "Valor de venta hoy: " + partes.join(" · ") : "";
+  } catch (e) {
+    el.textContent = "";      // sin conexión: el selector funciona igual
+  }
+}
+
+/* ---------- Burbuja con los 4 dólares principales (solo en POS y Dashboard, y solo con internet) ---------- */
+const DB_TIPOS = ["oficial", "blue", "bolsa", "tarjeta"];
+const DB_LS_MIN = "vpos_dolar_burbuja_min";
+let dbDatos = null;            // { oficial: 1535, ... } o null si no hay datos
+let dbSeccion = "";
+let dbTimer = null;
+
+function dolarBurbujaRender() {
+  const el = document.getElementById("dolarBurbuja");
+  if (!el) return;
+  const visible = (dbSeccion === "pos" || dbSeccion === "dashboard") && navigator.onLine !== false && !!dbDatos;
+  el.classList.toggle("visible", visible);
+  if (!visible) return;
+  document.getElementById("dbFilas").innerHTML = DB_TIPOS.filter(t => dbDatos[t] > 0).map(t =>
+    `<div class="db-fila"><span>${TC_TIPOS[t]}</span><b>$${Number(dbDatos[t]).toLocaleString("es-AR")}</b></div>`).join("");
+  const h = document.getElementById("dbHora");
+  if (h && dbDatos._hora) h.textContent = dbDatos._hora;
+  let min = false;
+  try { min = localStorage.getItem(DB_LS_MIN) === "1"; } catch (e) {}
+  el.classList.toggle("min", min);
+}
+
+function dolarBurbujaAlternar() {
+  const el = document.getElementById("dolarBurbuja");
+  if (!el) return;
+  const min = !el.classList.contains("min");
+  el.classList.toggle("min", min);
+  try { localStorage.setItem(DB_LS_MIN, min ? "1" : "0"); } catch (e) {}
+}
+
+async function dolarBurbujaActualizar() {
+  if (navigator.onLine === false) { dolarBurbujaRender(); return; }
+  const ctrl = new AbortController();
+  const corte = setTimeout(() => ctrl.abort(), 8000);
+  try {
+    const res = await fetch(TC_API.replace(/\/$/, ""), { signal: ctrl.signal });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const lista = await res.json();
+    const datos = {};
+    DB_TIPOS.forEach(t => {
+      const d = (Array.isArray(lista) ? lista : []).find(x => x.casa === t);
+      if (d && Number(d.venta) > 0) datos[t] = Number(d.venta);
+    });
+    if (Object.keys(datos).length) {
+      datos._hora = new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+      dbDatos = datos;
+    }
+  } catch (e) {
+    dbDatos = null;            // sin datos confiables: la burbuja se esconde
+  } finally {
+    clearTimeout(corte);
+    dolarBurbujaRender();
+  }
+}
+
+/** Se llama en cada cambio de sección: la burbuja solo aparece en POS y Dashboard */
+function dolarBurbujaAlCambiarSeccion(id) {
+  dbSeccion = id;
+  if (!dbTimer) {
+    dbTimer = setInterval(() => { if (dbSeccion === "pos" || dbSeccion === "dashboard") dolarBurbujaActualizar(); }, 10 * 60 * 1000);
+    window.addEventListener("online", dolarBurbujaActualizar);
+    window.addEventListener("offline", dolarBurbujaRender);
+  }
+  if (id === "pos" || id === "dashboard") {
+    if (!dbDatos) dolarBurbujaActualizar(); else dolarBurbujaRender();
+  } else dolarBurbujaRender();
+}
+
+/** Configuración: guarda el tipo de dólar de referencia (compartido por todos los equipos si el servidor lo soporta) */
+async function guardarDolarTipoForm() {
+  const sel = document.getElementById("cfgDolarTipo");
+  if (!sel) return;
+  const tipo = TC_TIPOS[sel.value] ? sel.value : "oficial";
+  try { localStorage.setItem(TC_TIPO_LS, tipo); } catch (e) { /* no pasa nada */ }
+
+  const btn = document.getElementById("btnGuardarDolarTipo");
+  const textoOriginal = btn ? btn.innerHTML : "";
+  if (btn) { btn.disabled = true; btn.innerHTML = "Guardando..."; }
+  try {
+    const params = new URLSearchParams({ action: "guardarConfiguracionNegocio", dolarTipo: tipo });
+    const response = await fetchConReintento(API_URL + "?" + params.toString());
+    const data = await response.json();
+    if (!data.success) { toast(data.message || "No se pudo guardar el dólar de referencia", "error"); return; }
+
+    configNegocioCache = { ...configNegocioCache, dolarTipo: tipo };
+    // Cambió el dólar de referencia: el ingreso de productos vuelve al valor automático de ese tipo
+    ingresoTC.tipo = tipo; ingresoTC.manual = false; ingresoTC.ultimaAuto = 0;
+    tcGuardarLocal();
+    tcRender();
+    toast(`Dólar de referencia: ${TC_TIPOS[tipo]}`, "success");
+  } catch (error) {
+    console.error("Error al guardar el dólar de referencia:", error);
+    toast("Error de conexión al guardar el dólar de referencia", "error");
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = textoOriginal; }
+  }
+}
+
+/** Se llama al entrar a Ingreso de Productos */
+function tcAlAbrirSeccion() {
+  if (!tcAlAbrirSeccion._listo) {
+    tcCargarLocal();
+    // Si tocás a mano un campo de tipo de cambio de abajo, esa carga no se pisa con las actualizaciones automáticas
+    TC_CAMPOS.forEach(id => document.getElementById(id)?.addEventListener("input", ev => { ev.target.dataset.tcLocal = "1"; }));
+    tcAlAbrirSeccion._listo = true;
+  }
+  // Un valor editado a mano solo vale el día en que se cargó
+  if (ingresoTC.manual && ingresoTC.dia !== _hoyISO()) ingresoTC.manual = false;
+  // Si en Configuración cambió el tipo de dólar, se vuelve al valor automático del nuevo tipo
+  const tipoCfg = tcTipoConfigurado();
+  if (ingresoTC.tipo !== tipoCfg) { ingresoTC.tipo = tipoCfg; ingresoTC.manual = false; ingresoTC.ultimaAuto = 0; }
+  tcRender();
+  const vencida = !ingresoTC.ultimaAuto || (Date.now() - ingresoTC.ultimaAuto) > 30 * 60 * 1000;
+  if (!ingresoTC.manual && vencida) tcActualizarAutomatico(true);
+}
+
 function onCambioMonedaIngreso() {
   const moneda = document.getElementById("ipMoneda").value;
   const wrap = document.getElementById("ipTipoCambioWrap");
   if (wrap) wrap.style.display = moneda === "USD" ? "" : "none";
-  if (moneda !== "USD") document.getElementById("ipTipoCambio").value = "";
+  const tc = document.getElementById("ipTipoCambio");
+  if (moneda !== "USD") { tc.value = ""; delete tc.dataset.tcLocal; }
+  else tcPrellenarCampo("ipTipoCambio");            // en dólares: se completa con el tipo de cambio del día
 }
 
 function onCambioOrigenBoleta() {
@@ -11649,6 +11917,933 @@ function vaciarCarritoBoleta() {
   if (ipCarritoBoleta.length && !confirm("¿Vaciar todos los productos cargados en esta boleta?")) return;
   ipCarritoBoleta = [];
   renderCarritoBoleta();
+}
+
+/* =====================================================================
+   OCR de listas de proveedores -> carrito de "Ingreso de Productos"
+   Gratis: Tesseract.js corre en el navegador/Electron, sin servidor ni API key.
+   Flujo: foto -> OCR -> tabla editable de revisión -> "Agregar a la boleta"
+   (empuja a ipCarritoBoleta, así guardar/stock/deuda funcionan igual que siempre).
+   El HTML (tarjeta #ocrCard y modal #ocrModalBackdrop) está en index.html.
+===================================================================== */
+const OCR_TESSERACT_SRC = "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
+let ocrFilas = [];
+let ocrModoPruebaActivo = false;   // true = "Modo prueba": muestra y compara, pero NO agrega nada a la boleta ni a la base
+let ocrUltimaLectura = null;       // { ms, confianza, texto, archivo } de la última foto leída (para stats y JSON)
+let ocrImgOriginalURL = null;
+// pdf.js: lee el texto de PDFs digitales directamente (sin OCR, sin errores de dígitos)
+const OCR_PDFJS_SRC = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js";
+const OCR_PDFJS_WORKER = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
+let ocrPdfWorkerListo = false;
+
+/** Minúsculas, sin tildes ni signos: para comparar encabezados y nombres */
+function ocrNorm(t) {
+  return normalizarBusquedaPOS(t).replace(/[^a-z0-9ñ ]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
+/** Carga el motor OCR recién la primera vez que se usa (no pesa en el resto del panel) */
+function ocrCargarTesseract() {
+  return new Promise((resolve, reject) => {
+    if (window.Tesseract) return resolve();
+    const s = document.createElement("script");
+    s.src = OCR_TESSERACT_SRC;
+    s.onload = resolve;
+    s.onerror = () => reject(new Error("No se pudo cargar el motor OCR (se necesita internet la primera vez)"));
+    document.head.appendChild(s);
+  });
+}
+
+/** Escala + escala de grises + estirado de contraste: mejora bastante la lectura de fotos de celular */
+async function ocrPreprocesarImagen(file) {
+  const img = await createImageBitmap(file);
+  const escala = Math.max(0.5, Math.min(3, 2400 / Math.max(img.width, img.height)));
+  const c = document.createElement("canvas");
+  c.width = Math.round(img.width * escala);
+  c.height = Math.round(img.height * escala);
+  const ctx = c.getContext("2d");
+  ctx.drawImage(img, 0, 0, c.width, c.height);
+  const id = ctx.getImageData(0, 0, c.width, c.height);
+  const d = id.data, hist = new Array(256).fill(0);
+  for (let i = 0; i < d.length; i += 4) {
+    const g = Math.round(0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]);
+    d[i] = d[i + 1] = d[i + 2] = g;
+    hist[g]++;
+  }
+  const total = d.length / 4;
+  let acc = 0, lo = 0, hi = 255;
+  for (let v = 0; v < 256; v++) { acc += hist[v]; if (acc >= total * 0.02) { lo = v; break; } }
+  acc = 0;
+  for (let v = 255; v >= 0; v--) { acc += hist[v]; if (acc >= total * 0.02) { hi = v; break; } }
+  const rango = Math.max(1, hi - lo);
+  for (let i = 0; i < d.length; i += 4) {
+    const g = Math.max(0, Math.min(255, ((d[i] - lo) * 255) / rango));
+    d[i] = d[i + 1] = d[i + 2] = g;
+  }
+  const bandas = ocrInvertirFranjasOscuras(d, c.width, c.height);
+  c._lineas = ocrBorrarLineasTabla(d, c.width, c.height);
+  c._lineas.bandas = bandas;
+  ctx.putImageData(id, 0, 0);
+  return c;
+}
+
+/** Encabezados con fondo oscuro y letra blanca: el OCR no los lee. Se invierten esas franjas para que quede letra negra sobre blanco */
+function ocrInvertirFranjasOscuras(d, w, h) {
+  const bandas = [];
+  const oscura = new Array(h).fill(false);
+  for (let y = 0; y < h; y++) {
+    let n = 0;
+    for (let x = 0; x < w; x += 2) if (d[(y * w + x) * 4] < 110) n++;
+    oscura[y] = n > (w / 2) * 0.5;
+  }
+  let ini = -1;
+  for (let y = 0; y <= h; y++) {
+    const o = y < h && oscura[y];
+    if (o && ini < 0) ini = y;
+    if (!o && ini >= 0) {
+      if (y - ini >= 10) bandas.push([ini, y]);
+      if (y - ini >= 10) for (let yy = ini; yy < y; yy++) for (let x = 0; x < w; x++) { const i = (yy * w + x) * 4; d[i] = d[i + 1] = d[i + 2] = 255 - d[i]; }
+      ini = -1;
+    }
+  }
+  return bandas;
+}
+
+/** Borra las líneas largas (bordes de la tabla): confunden al OCR ("|", "1", "l") y pegan las columnas */
+function ocrBorrarLineasTabla(d, w, h) {
+  const oscuro = (x, y) => d[(y * w + x) * 4] < 120;
+  const minV = Math.max(50, Math.round(h * 0.05)), minH = Math.max(80, Math.round(w * 0.06));
+  const marcar = new Uint8Array(w * h);
+  const vx = new Uint8Array(w), hy = new Uint8Array(h);
+  for (let x = 0; x < w; x++) {                       // verticales
+    let ini = -1;
+    for (let y = 0; y <= h; y++) {
+      const o = y < h && oscuro(x, y);
+      if (o && ini < 0) ini = y;
+      if (!o && ini >= 0) { if (y - ini >= minV) { vx[x] = 1; for (let k = ini; k < y; k++) marcar[k * w + x] = 1; } ini = -1; }
+    }
+  }
+  for (let y = 0; y < h; y++) {                       // horizontales
+    let ini = -1;
+    for (let x = 0; x <= w; x++) {
+      const o = x < w && oscuro(x, y);
+      if (o && ini < 0) ini = x;
+      if (!o && ini >= 0) { if (x - ini >= minH) { hy[y] = 1; for (let k = ini; k < x; k++) marcar[y * w + k] = 1; } ini = -1; }
+    }
+  }
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {   // se borra la línea y 2 px alrededor (las líneas de foto son gruesas)
+    let borrar = false;
+    for (let k = -2; k <= 2 && !borrar; k++) {
+      if (x + k >= 0 && x + k < w && marcar[y * w + x + k]) borrar = true;
+      if (!borrar && y + k >= 0 && y + k < h && marcar[(y + k) * w + x]) borrar = true;
+    }
+    if (borrar) { const i = (y * w + x) * 4; d[i] = d[i + 1] = d[i + 2] = 255; }
+  }
+  // posiciones de las líneas (una por grupo de píxeles contiguos): sirven para reconstruir la grilla de la tabla
+  const centros = v => { const r = []; let ini = -1; for (let i = 0; i <= v.length; i++) { const o = i < v.length && v[i]; if (o && ini < 0) ini = i; if (!o && ini >= 0) { r.push((ini + i - 1) / 2); ini = -1; } } return r; };
+  return { xs: centros(vx), ys: centros(hy) };
+}
+
+/** "1.234,50" / "1,234.50" / "1234" -> número */
+function ocrNumeroAR(s) {
+  s = String(s).replace(/[^\d.,]/g, "");
+  if (!s) return NaN;
+  const c = s.lastIndexOf(","), d = s.lastIndexOf(".");
+  if (c > -1 && d > -1) {
+    const dec = c > d ? "," : ".", mil = dec === "," ? "." : ",";
+    s = s.split(mil).join("").replace(dec, ".");
+  } else if (c > -1) {
+    s = /,\d{1,2}$/.test(s) ? s.replace(/\./g, "").replace(",", ".") : s.replace(/,/g, "");
+  } else if (d > -1) {
+    s = /^\d{1,3}(\.\d{3})+$/.test(s) ? s.replace(/\./g, "") : s;
+  }
+  return parseFloat(s);
+}
+const ocrEsNumero = t => /^\d[\d.,]*$/.test(t);
+
+/** Una línea de texto -> { codigo, nombre, cantidad, precio } (o null si no parece un producto).
+    Cubre layouts tipo: [código] [cant] descripción precio [subtotal] */
+function ocrParsearLinea(linea) {
+  // Tokens limpios: sin bordes de tabla (| _), sin $ y sin corchetes que el OCR mete pegados a las palabras
+  // (se sacan los signos sueltos pegados a los bordes de cada palabra: "38.43}" -> "38.43", "‘" -> nada)
+  const t = linea.replace(/[|_]/g, " ").replace(/\$/g, " ").trim().split(/\s+/)
+    .map(x => x.replace(/^[^0-9A-Za-zÁÉÍÓÚÑáéíóúñ]+|[^0-9A-Za-zÁÉÍÓÚÑáéíóúñ]+$/g, "")).filter(Boolean);
+  if (t.length < 2 || !/[a-zA-ZáéíóúñÁÉÍÓÚÑ]{3,}/.test(t.join(" "))) return null;
+  // Encabezados y totales (PRODUCTO / CANT / PRECIO / SUBTOTAL / IVA...) no son productos
+  if (/^(pedido|producto|descripci[oó]n|art[ií]culo|detalle|c[oó]digo|cant\.?|cantidad|sub\s?total|total|iva|remito|fecha|cliente)\b/i.test(t.join(" "))) return null;
+
+  // Columnas "Pedido" y "Fecha" al principio (ej: PED-581808 11/09/2026 ...): no son parte del producto
+  // (la fecha se detecta de forma tolerante porque el OCR suele leerla mal: "/11/09/2026", "111/09/2026")
+  const esFecha = x => /\d{1,3}[\/.-]\d{2}[\/.-]\d{4}$/.test(x);
+  if (t.length > 3 && esFecha(t[1]) && /^[A-Za-z]{1,4}-?[A-Za-z0-9]{3,}$/.test(t[0])) { t.shift(); t.shift(); }
+  else if (t.length > 3 && esFecha(t[0])) t.shift();
+
+  let codigo = "", qty = null;
+  if (/^\d{6,14}$/.test(t[0])) codigo = t.shift();
+  else if (/^[A-Za-z]{1,4}-?\d{2,}$/.test(t[0]) && t.length > 2) codigo = t.shift();
+
+  if (t.length > 2 && /^\d{1,4}[xX]?$/.test(t[0])) { qty = parseInt(t[0], 10); t.shift(); }
+
+  // Números del final: [cantidad] [precio] [subtotal]  (a veces también el código de la columna "Código")
+  const crudos = [];
+  while (t.length > 1 && ocrEsNumero(t[t.length - 1]) && crudos.length < 3) crudos.unshift(t.pop());
+
+  // Código al final: muchos proveedores repiten el código al final del nombre Y en su propia columna.
+  // Solo se lo toma como código si aparece repetido, para no confundir "Coca Cola 500" con un código.
+  const esCod = x => /^\d{3,}$/.test(x);
+  const pegado = t.length > 2 ? t[t.length - 1].match(/^(\d{3,})\1$/) : null;   // "53505350" = repetido + código, pegados
+  if (!codigo && pegado) { codigo = pegado[1]; t.pop(); }
+  else if (!codigo) {
+    if (crudos.length === 3 && t.length > 2 && esCod(crudos[0]) && t[t.length - 1] === crudos[0]) {
+      codigo = crudos.shift(); t.pop();                       // falta el subtotal: [código, cant, precio]
+    } else if (t.length > 2 && esCod(t[t.length - 1]) && t[t.length - 2] === t[t.length - 1]) {
+      codigo = t.pop(); t.pop();                              // cant, precio, subtotal completos
+    }
+  }
+
+  const nums = crudos.map(ocrNumeroAR);
+  let precio = null, qtyCruda = null;
+  if (qty !== null) precio = nums.length ? nums[0] : null;
+  else if (nums.length >= 3) { qty = nums[0]; qtyCruda = crudos[0]; precio = nums[1]; }
+  else if (nums.length === 2) {
+    // [cantidad, precio] si la 1ª es entera y la 2ª parece precio (mayor o con decimales); si no, [precio, subtotal]
+    if (Number.isInteger(nums[0]) && nums[0] <= 999 && (nums[1] > nums[0] || !Number.isInteger(nums[1]))) { qty = nums[0]; qtyCruda = crudos[0]; precio = nums[1]; }
+    else precio = nums[0];
+  } else if (nums.length === 1) precio = nums[0];
+  // Una cantidad con cero adelante ("0007120") o gigante ("11802142") es un código y una cantidad que el OCR pegó:
+  // mejor dejarla vacía (queda marcada en amarillo para completar) que cargar un dato equivocado.
+  if (qty !== null && ((qtyCruda && /^0\d/.test(qtyCruda)) || qty > 99999)) qty = null;
+
+  const nombre = t.join(" ").replace(/\s+[xX×]$/, "").replace(/[-–—:.,;]+$/, "").trim();
+  if (nombre.length < 3) return null;
+  return { codigo, nombre, cantidad: qty, precio: (precio === null || isNaN(precio)) ? null : precio };
+}
+
+/** Busca el producto existente: por código exacto y, si no, por nombre parecido (>= 70% de coincidencia) */
+function ocrBuscarProductoExistente(fila) {
+  const prods = productosAdminGlobal || [];
+  if (fila.codigo) {
+    const p = prods.find(x => String(x.CODIGO).trim() === fila.codigo);
+    if (p) return p;
+  }
+  const toks = ocrNorm(fila.nombre).split(" ").filter(w => w.length > 2);
+  if (!toks.length) return null;
+  let mejor = null, mejorScore = 0;
+  for (const p of prods) {
+    // Solo palabras de 3+ letras; la coincidencia parcial (una dentro de la otra) exige 4+ para que
+    // "a", "x", "de" o un nombre vacío no den falsos "Existente" con cualquier texto basura.
+    const pt = ocrNorm(p.PRODUCTO).split(" ").filter(x => x.length > 2);
+    const hit = toks.filter(w => pt.some(x => x === w || (Math.min(x.length, w.length) >= 4 && (x.includes(w) || w.includes(x))))).length;
+    const score = hit / toks.length;
+    if (hit >= Math.min(2, toks.length) && score > mejorScore) { mejorScore = score; mejor = p; }
+  }
+  return mejorScore >= 0.7 ? mejor : null;
+}
+
+/** Agrega a cada fila: si ya existe en tu base (matchCodigo), si está tildada y el precio de venta (vacío por ahora) */
+function ocrEnriquecerFilas(filas) {
+  return filas.map(f => {
+    const m = ocrBuscarProductoExistente(f);
+    return Object.assign(f, { matchCodigo: m ? String(m.CODIGO) : "", incluir: true, precioVenta: f.precioVenta ?? null });
+  });
+}
+
+/** Texto -> filas. Si el texto viene de un PDF (celdas separadas por " | ") usa las columnas; si no, lee línea por línea */
+function ocrTextoAFilas(texto) {
+  const lineas = String(texto || "").split(/\r?\n/);
+  let filas = [];
+  if (lineas.some(l => l.includes(" | "))) {
+    const celdas = lineas.filter(l => l.trim()).map(l => l.split(" | ").map(s => ({ str: s.trim() })));
+    filas = ocrFilasDesdeCeldas(celdas);
+  }
+  if (!filas.length) filas = lineas.map(l => ocrParsearLinea(l)).filter(Boolean);
+  return ocrEnriquecerFilas(filas);
+}
+
+/* ---------------- PDF: lectura directa del texto por columnas (sin OCR) ---------------- */
+
+/** ¿Qué columna es? (producto / código / cantidad / precio / subtotal), según el texto del encabezado */
+function ocrRolDeEncabezado(txt) {
+  const t = ocrNorm(txt);
+  if (!t) return "";
+  if (/^(sub ?total|total|importe|monto)\b/.test(t)) return "subtotal";
+  if (/^(producto|descripcion|articulo|detalle|item|nombre|mercaderia)\b/.test(t)) return "nombre";
+  if (/^(codigo|cod|sku|ean|barras|ref|referencia)\b/.test(t)) return "codigo";
+  if (/^(cantidad|cant|unidades|uds|qty|bultos)\b/.test(t)) return "cantidad";
+  if (/^(precio|costo|p unit|pu|unitario|valor)\b/.test(t)) return "precio";
+  // Fotos: el OCR a veces escribe mal el encabezado ("Cantided", "Preclo"): se acepta con hasta 2 letras distintas
+  if (/^[a-z]{4,10}$/.test(t)) {
+    const dist = (x, y) => {
+      const m = Array.from({ length: x.length + 1 }, (_, i) => [i]);
+      for (let j = 1; j <= y.length; j++) m[0][j] = j;
+      for (let i = 1; i <= x.length; i++) for (let j = 1; j <= y.length; j++)
+        m[i][j] = Math.min(m[i - 1][j] + 1, m[i][j - 1] + 1, m[i - 1][j - 1] + (x[i - 1] === y[j - 1] ? 0 : 1));
+      return m[x.length][y.length];
+    };
+    const cand = { producto: "nombre", codigo: "codigo", cantidad: "cantidad", precio: "precio", subtotal: "subtotal" };
+    for (const k of Object.keys(cand)) if (dist(t, k) <= (k.length >= 7 ? 2 : 1)) return cand[k];
+  }
+  return "otro";
+}
+
+/** Items de texto del PDF (con posición) -> filas de celdas [{str,x0,x1}], de arriba hacia abajo y de izquierda a derecha */
+function ocrAgruparItemsEnFilas(items) {
+  const lim = items.filter(i => i.str && i.str.trim() !== "").sort((a, b) => b.y - a.y);
+  const grupos = [];
+  lim.forEach(it => {
+    const g = grupos.find(g => Math.abs(g.y - it.y) <= Math.max(2, (it.h || 8) * 0.4));
+    if (g) g.items.push(it); else grupos.push({ y: it.y, items: [it] });
+  });
+  grupos.sort((a, b) => b.y - a.y);
+  return grupos.map(g => {
+    g.items.sort((a, b) => a.x - b.x);
+    const celdas = [];
+    g.items.forEach(it => {
+      const alto = it.h || 8;
+      const ult = celdas[celdas.length - 1];
+      const hueco = ult ? it.x - ult.x1 : Infinity;
+      if (ult && hueco <= alto * 0.35) {              // mismo texto partido en trozos: se une
+        ult.str += (hueco > alto * 0.12 ? " " : "") + it.str.trim();
+        ult.x1 = it.x + it.w;
+      } else celdas.push({ str: it.str.trim(), x0: it.x, x1: it.x + it.w });
+    });
+    celdas.y0 = Math.min(...g.items.map(i => i.top !== undefined ? i.top : Infinity));   // solo fotos: franja vertical de la fila
+    celdas.y1 = Math.max(...g.items.map(i => i.bot !== undefined ? i.bot : -Infinity));
+    return celdas;
+  });
+}
+
+/** Filas de celdas -> productos. Detecta la fila de encabezado (Producto/Código/Cantidad/Precio) y arma cada producto por columna */
+function ocrFilasDesdeCeldas(filasCeldas) {
+  // 1) Cada fila de encabezado abre un bloque con las filas de datos que le siguen (sirve para PDFs de varias páginas)
+  const bloques = [];
+  let actual = null;
+  for (const celdas of filasCeldas) {
+    const roles = celdas.map(c => ocrRolDeEncabezado(c.str));
+    const clave = roles.filter(r => r === "nombre" || r === "codigo" || r === "cantidad" || r === "precio").length;
+    if (roles.includes("nombre") && clave >= 3) {
+      actual = { cols: celdas.map((c, i) => ({ rol: roles[i], x0: c.x0, x1: c.x1, txt: c.str })), filas: [] };
+      bloques.push(actual);
+    } else if (actual) actual.filas.push(celdas);
+  }
+
+  const out = [];
+  bloques.forEach(b => {
+    // Encabezados pegados en una sola celda ("Codigo Cantidad"): si las filas de datos tienen más celdas que el
+    // encabezado, se separa esa celda en una columna por palabra (repartiendo el ancho según las letras).
+    const frecuencias = {};
+    b.filas.forEach(f => { if (f.length >= 4) frecuencias[f.length] = (frecuencias[f.length] || 0) + 1; });
+    const m = Number(Object.keys(frecuencias).sort((p, q) => frecuencias[q] - frecuencias[p])[0] || 0);
+    if (m > b.cols.length) {
+      const nuevas = [];
+      b.cols.forEach(col => {
+        const pal = String(col.txt || "").split(/\s+/).filter(Boolean);
+        const rolesP = pal.map(ocrRolDeEncabezado);
+        const separable = pal.length >= 2 && rolesP.every(r => r && r !== "otro" && r !== "subtotal") && new Set(rolesP).size === pal.length;
+        if (!separable) { nuevas.push(col); return; }
+        const total = pal.join("").length;
+        const conPos = typeof col.x0 === "number" && typeof col.x1 === "number";
+        let acum = 0;
+        pal.forEach((w, k) => {
+          const x0 = conPos ? col.x0 + (col.x1 - col.x0) * acum / total : undefined;
+          acum += w.length;
+          const x1 = conPos ? col.x0 + (col.x1 - col.x0) * acum / total : undefined;
+          nuevas.push({ rol: rolesP[k], x0, x1, txt: w });
+        });
+      });
+      if (nuevas.length === m) b.cols = nuevas;      // solo si con la separación las columnas coinciden con las filas
+    }
+    const n = b.cols.length;
+    // 2) Rango horizontal de cada columna = encabezado + lo que ocupan sus datos en las filas completas.
+    //    Así los números alineados a la derecha (o textos a la izquierda) igual caen en su columna.
+    const rangos = b.cols.map(c => ({ x0: c.x0, x1: c.x1 }));
+    const completas = b.filas.filter(f => f.length === n && f.every(c => c.x0 !== undefined));
+    if (completas.length) rangos.forEach((r, i) => {
+      completas.forEach(f => { r.x0 = Math.min(r.x0, f[i].x0); r.x1 = Math.max(r.x1, f[i].x1); });
+    });
+
+    b.filas.forEach(celdas => {
+      // Texto sin posiciones (reprocesado a mano) y celdas de menos: no hay cómo saber cuál falta -> parser de líneas
+      if (celdas.length !== n && celdas.every(c => c.x0 === undefined)) {
+        const f = ocrParsearLinea(celdas.map(c => c.str).join(" "));
+        if (f) out.push(f);
+        return;
+      }
+      const porRol = {};
+      if (celdas.length === n) {
+        celdas.forEach((c, i) => { porRol[b.cols[i].rol] = c.str; });        // misma cantidad de celdas: por orden
+      } else {
+        celdas.forEach(c => {                                                 // si no (celda vacía): por posición horizontal
+          if (c.x0 === undefined) return;
+          let mejor = -1, mejorSolape = 0;
+          rangos.forEach((r, i) => {
+            const solape = Math.min(c.x1, r.x1) - Math.max(c.x0, r.x0);
+            if (solape > mejorSolape) { mejorSolape = solape; mejor = i; }
+          });
+          if (mejor < 0) {                                                    // sin solape: la columna más cercana
+            let dmin = Infinity;
+            rangos.forEach((r, i) => { const d = Math.max(r.x0 - c.x1, c.x0 - r.x1, 0); if (d < dmin) { dmin = d; mejor = i; } });
+          }
+          if (mejor >= 0) { const r = b.cols[mejor].rol; porRol[r] = (porRol[r] ? porRol[r] + " " : "") + c.str; }
+        });
+      }
+
+      let nombre = String(porRol.nombre || "").trim();
+      const cant = ocrNumeroAR(porRol.cantidad || "");
+      const precio = ocrNumeroAR(porRol.precio || "");
+      if (!/[a-zA-ZáéíóúñÁÉÍÓÚÑ]{3,}/.test(nombre)) return;                 // fila vacía, total, etc.
+      if (isNaN(cant) && isNaN(precio)) return;
+      let codigo = String(porRol.codigo || "").trim();
+      // Si el nombre es tan largo que se mete debajo de la celda del código, el PDF lo entrega todo junto
+      // ("…TSV5350 5350 5350" = nombre + código repetido + código): se separa el código del final.
+      // (el código puede venir separado por espacio "…5350 5350" o pegado "…53505350" = repetido + código)
+      if (!codigo) {
+        const mc = nombre.match(/^(.*\S)\s+(\d{3,})\s+\2$/) || nombre.match(/^(.*\S)\s+(\d{3,})\2$/);
+        if (mc) { nombre = mc[1]; codigo = mc[2]; }
+      }
+      // Muchos proveedores repiten el código al final del nombre: se saca de ahí (ya está en su columna)
+      if (codigo && nombre.endsWith(" " + codigo)) nombre = nombre.slice(0, -codigo.length).trim();
+      out.push({ codigo, nombre, cantidad: isNaN(cant) ? null : cant, precio: isNaN(precio) ? null : precio });
+    });
+  });
+  return out;
+}
+
+/** Recorre todas las páginas del PDF y devuelve las filas de celdas */
+async function ocrExtraerCeldasPDF(pdf) {
+  const filasCeldas = [];
+  for (let n = 1; n <= pdf.numPages; n++) {
+    const page = await pdf.getPage(n);
+    const tc = await page.getTextContent();
+    const items = tc.items.filter(i => typeof i.str === "string").map(i => ({
+      str: i.str, x: i.transform[4], y: i.transform[5], w: i.width, h: i.height || Math.abs(i.transform[3]) || 8
+    }));
+    ocrAgruparItemsEnFilas(items).forEach(r => filasCeldas.push(r));
+  }
+  return filasCeldas;
+}
+
+/** Carga pdf.js recién cuando se sube un PDF por primera vez */
+async function ocrCargarPdfJs() {
+  if (!window.pdfjsLib) {
+    await new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = OCR_PDFJS_SRC;
+      s.onload = resolve;
+      s.onerror = () => reject(new Error("No se pudo cargar el lector de PDF (se necesita internet la primera vez)"));
+      document.head.appendChild(s);
+    });
+  }
+  if (!ocrPdfWorkerListo) {
+    try {   // el worker se baja como texto y se levanta desde un blob (los navegadores no permiten workers de otro dominio)
+      const r = await fetch(OCR_PDFJS_WORKER);
+      const blob = new Blob([await r.text()], { type: "text/javascript" });
+      pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(blob);
+    } catch (e) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = OCR_PDFJS_WORKER;
+    }
+    ocrPdfWorkerListo = true;
+  }
+}
+
+/** PDF -> { texto, filasCeldas, vista } (vista = imagen de la 1ª página, para el modo prueba) */
+async function ocrLeerPDF(file) {
+  await ocrCargarPdfJs();
+  const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+  const filasCeldas = await ocrExtraerCeldasPDF(pdf);
+  let vista = "";
+  try {
+    const page = await pdf.getPage(1);
+    const vp = page.getViewport({ scale: 1.3 });
+    const cv = document.createElement("canvas");
+    cv.width = vp.width; cv.height = vp.height;
+    await page.render({ canvasContext: cv.getContext("2d"), viewport: vp }).promise;
+    vista = cv.toDataURL("image/jpeg", 0.8);
+  } catch (e) { /* la vista previa es opcional */ }
+  const texto = filasCeldas.map(r => r.map(c => c.str).join(" | ")).join("\n");
+  return { texto, filasCeldas, vista, paginas: pdf.numPages };
+}
+
+function ocrRenderTabla() {
+  const tb = document.getElementById("ocrTabla");
+  if (!tb) return;
+  const prods = productosAdminGlobal || [];
+  // El costo puede estar en ARS o USD (selector de arriba); el precio de venta es SIEMPRE en pesos
+  const usd = document.getElementById("ocrMoneda")?.value === "USD";
+  const tc = Number(document.getElementById("ocrTc")?.value || 0);
+  const thCosto = document.getElementById("ocrThCosto");
+  if (thCosto) thCosto.textContent = usd ? "Costo unit. (USD)" : "Costo unit. (ARS)";
+  tb.innerHTML = ocrFilas.map((f, i) => {
+    const falta = !f.cantidad || !f.precio;
+    const equivARS = (usd && tc > 0 && f.precio)
+      ? `<div class="text-muted" style="font-size:11px;">≈ $${(Math.round(f.precio * tc * 100) / 100).toLocaleString("es-AR")} ARS</div>` : "";
+    const ex = f.matchCodigo ? prods.find(p => String(p.CODIGO).trim() === String(f.matchCodigo).trim()) : null;
+    const phVenta = ex ? "actual: " + ex.PRECIO : "opcional";
+    return `<tr style="${falta ? "background:#fff8e1;" : ""}">
+      <td><input type="checkbox" ${f.incluir ? "checked" : ""} onchange="ocrEditarFila(${i},'incluir',this.checked)"></td>
+      <td><input class="form-control form-control-sm mono" value="${escapeHtml(f.matchCodigo || f.codigo || "")}" onchange="ocrEditarFila(${i},'codigo',this.value)"></td>
+      <td><input class="form-control form-control-sm" value="${escapeHtml(f.nombre)}" onchange="ocrEditarFila(${i},'nombre',this.value)"></td>
+      <td><input type="number" min="1" class="form-control form-control-sm" value="${f.cantidad ?? ""}" onchange="ocrEditarFila(${i},'cantidad',this.value)"></td>
+      <td><input type="number" min="0" step="any" class="form-control form-control-sm" value="${f.precio ?? ""}" onchange="ocrEditarFila(${i},'precio',this.value)">${equivARS}</td>
+      <td><input type="number" min="0" step="any" class="form-control form-control-sm" placeholder="${escapeHtml(phVenta)}" value="${f.precioVenta ?? ""}" onchange="ocrEditarFila(${i},'precioVenta',this.value)"></td>
+      <td>${f.matchCodigo ? '<span class="badge bg-success">Existente</span>' : '<span class="badge bg-warning text-dark">Nuevo</span>'}</td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="7" class="text-center text-muted py-3">No se pudo reconocer ningún producto. Probá con una foto más nítida (o un PDF) o corregí el texto de abajo.</td></tr>`;
+  if (ocrModoPruebaActivo) ocrActualizarStats();
+}
+
+/* ---------------- MODO PRUEBA: comparar lo leído contra lo esperado (no escribe nada) ---------------- */
+
+/** Muestra u oculta el panel de prueba y el botón "Agregar a la boleta" según el modo */
+function ocrConfigurarModalSegunModo(prueba) {
+  ocrModoPruebaActivo = !!prueba;
+  tcPrellenarCampo("ocrTc");     // si la moneda de la revisión ya estaba en dólares, trae el tipo de cambio del día
+  document.getElementById("ocrPanelPrueba").style.display = prueba ? "" : "none";
+  document.getElementById("ocrBtnAgregar").style.display = prueba ? "none" : "";
+  document.getElementById("ocrModalTitulo").textContent = prueba ? "🧪 Prueba de lectura (no se guarda nada)" : "📷 Revisá lo que leyó la foto";
+  document.getElementById("ocrDetalleTexto").open = !!prueba;
+  document.getElementById("ocrComparacion").innerHTML = "";
+}
+
+function ocrActualizarStats() {
+  const el = document.getElementById("ocrStats");
+  if (!el || !ocrUltimaLectura) return;
+  const lineas = (document.getElementById("ocrTextoCrudo").value || "").split(/\r?\n/).filter(l => l.trim()).length;
+  const completas = ocrFilas.filter(f => f.cantidad && f.precio).length;
+  const conf = ocrUltimaLectura.confianza;
+  const colorConf = conf >= 85 ? "#15803d" : conf >= 65 ? "#b45309" : "#b91c1c";
+  el.innerHTML =
+    (conf === null
+      ? `<b>Origen:</b> <span style="color:#15803d; font-weight:700;">texto digital del PDF (sin OCR)</span> · `
+      : `<b>Confianza del OCR:</b> <span style="color:${colorConf}; font-weight:700;">${Math.round(conf)}%</span> · `) +
+    `<b>Tiempo:</b> ${(ocrUltimaLectura.ms / 1000).toFixed(1)} s · ` +
+    `<b>Líneas de texto:</b> ${lineas} · ` +
+    `<b>Filas interpretadas:</b> ${ocrFilas.length} (${completas} con cantidad y costo)`;
+}
+
+/** Texto "esperado" -> filas. Acepta "nombre ; cant ; costo", "código ; nombre ; cant ; costo" o la línea tal cual de la lista */
+function ocrParsearEsperado(texto) {
+  return String(texto || "").split(/\r?\n/).map(l => l.trim()).filter(Boolean).map(l => {
+    if (/[;\t]/.test(l)) {
+      const p = l.split(/[;\t]/).map(x => x.trim());
+      const conCodigo = p.length >= 4;
+      const nombre = conCodigo ? p[1] : p[0];
+      const cant = ocrNumeroAR(conCodigo ? p[2] : p[1]);
+      const costo = ocrNumeroAR(conCodigo ? p[3] : p[2]);
+      return { codigo: conCodigo ? p[0] : "", nombre, cantidad: isNaN(cant) ? null : cant, precio: isNaN(costo) ? null : costo };
+    }
+    return ocrParsearLinea(l) || { codigo: "", nombre: l, cantidad: null, precio: null };
+  });
+}
+
+/** Parecido entre dos nombres (0 a 1): tokens en común / tokens totales */
+function ocrParecidoNombres(a, b) {
+  const ta = new Set(ocrNorm(a).split(" ").filter(Boolean));
+  const tb = new Set(ocrNorm(b).split(" ").filter(Boolean));
+  if (!ta.size || !tb.size) return 0;
+  let comunes = 0;
+  ta.forEach(w => { if (tb.has(w)) comunes++; });
+  return comunes / new Set([...ta, ...tb]).size;
+}
+
+function ocrCompararConEsperado() {
+  const cont = document.getElementById("ocrComparacion");
+  const esperadas = ocrParsearEsperado(document.getElementById("ocrEsperado").value);
+  if (!esperadas.length) { cont.innerHTML = `<div class="text-muted" style="font-size:12.5px;">Pegá arriba lo que esperabas que leyera (una línea por producto).</div>`; return; }
+
+  const usadas = new Set();
+  const iguales = (a, b) => a !== null && b !== null && a !== undefined && b !== undefined && Math.abs(Number(a) - Number(b)) < 0.01;
+  let okNombre = 0, okCant = 0, okCosto = 0, encontradas = 0;
+  const celda = (ok, txt) => `<td style="background:${ok ? "#dcfce7" : "#fee2e2"};">${ok ? "✓" : "✗"} ${txt}</td>`;
+
+  const filasHtml = esperadas.map(e => {
+    let mejor = -1, mejorScore = 0;
+    ocrFilas.forEach((f, i) => {
+      if (usadas.has(i)) return;
+      const s = ocrParecidoNombres(e.nombre, f.nombre);
+      if (s > mejorScore) { mejorScore = s; mejor = i; }
+    });
+    if (mejor === -1 || mejorScore < 0.4) {
+      return `<tr><td>${escapeHtml(e.nombre)}<br><span class="text-muted">${e.cantidad ?? "?"} × ${e.precio ?? "?"}</span></td>
+        <td colspan="4" style="background:#fee2e2;">✗ No apareció en lo leído</td></tr>`;
+    }
+    usadas.add(mejor);
+    encontradas++;
+    const f = ocrFilas[mejor];
+    const nOk = mejorScore >= 0.8, cOk = iguales(e.cantidad, f.cantidad), pOk = iguales(e.precio, f.precio);
+    if (nOk) okNombre++; if (cOk) okCant++; if (pOk) okCosto++;
+    return `<tr>
+      <td>${escapeHtml(e.nombre)}<br><span class="text-muted">${e.cantidad ?? "?"} × ${e.precio ?? "?"}</span></td>
+      <td>${escapeHtml(f.nombre)}<br><span class="text-muted">${f.cantidad ?? "?"} × ${f.precio ?? "?"}</span></td>
+      ${celda(nOk, Math.round(mejorScore * 100) + "%")}
+      ${celda(cOk, `${e.cantidad ?? "?"} / ${f.cantidad ?? "?"}`)}
+      ${celda(pOk, `${e.precio ?? "?"} / ${f.precio ?? "?"}`)}
+    </tr>`;
+  }).join("");
+
+  const sobrantes = ocrFilas.filter((f, i) => !usadas.has(i));
+  const total = esperadas.length;
+  cont.innerHTML = `
+    <div class="mb-2" style="font-size:13px;">
+      <b>Resumen:</b> encontrados <b>${encontradas}/${total}</b> · nombre correcto <b>${okNombre}/${total}</b> ·
+      cantidad correcta <b>${okCant}/${total}</b> · costo correcto <b>${okCosto}/${total}</b> ·
+      filas de más (leídas pero no esperadas) <b>${sobrantes.length}</b>
+    </div>
+    <div class="table-responsive"><table class="table table-sm" style="font-size:12.5px;">
+      <thead><tr><th>Esperado</th><th>Leído</th><th>Nombre</th><th>Cant. (esp / leída)</th><th>Costo (esp / leído)</th></tr></thead>
+      <tbody>${filasHtml}</tbody>
+    </table></div>
+    ${sobrantes.length ? `<div style="font-size:12.5px;"><b>Filas leídas que no estaban en lo esperado:</b><ul class="mb-0">${sobrantes.map(f => `<li>${escapeHtml(f.nombre)} <span class="text-muted">(${f.cantidad ?? "?"} × ${f.precio ?? "?"})</span></li>`).join("")}</ul></div>` : ""}`;
+
+  console.log("[OCR prueba] esperado vs leído", { esperadas, leidas: ocrFilas });
+}
+
+/** Copia al portapapeles todo lo necesario para analizar una lectura (texto crudo, filas, confianza, tiempo) */
+function ocrCopiarResultadoPrueba() {
+  const payload = {
+    archivo: ocrUltimaLectura?.archivo || null,
+    confianzaOCR: ocrUltimaLectura ? Math.round(ocrUltimaLectura.confianza) : null,
+    tiempoMs: ocrUltimaLectura?.ms ?? null,
+    textoCrudo: document.getElementById("ocrTextoCrudo").value,
+    filasInterpretadas: ocrFilas.map(f => ({ codigo: f.codigo || f.matchCodigo || "", nombre: f.nombre, cantidad: f.cantidad, costo: f.precio, existente: !!f.matchCodigo })),
+    esperado: document.getElementById("ocrEsperado").value
+  };
+  const texto = JSON.stringify(payload, null, 2);
+  const respaldo = () => {
+    const ta = document.createElement("textarea");
+    ta.value = texto; document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); toast("Resultado copiado", "success"); } catch (e) { toast("No se pudo copiar", "error"); }
+    ta.remove();
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(texto).then(() => toast("Resultado copiado", "success")).catch(respaldo);
+  } else respaldo();
+}
+
+function ocrEditarFila(i, campo, valor) {
+  const f = ocrFilas[i];
+  if (!f) return;
+  if (campo === "incluir") f.incluir = !!valor;
+  else if (campo === "cantidad" || campo === "precio" || campo === "precioVenta") f[campo] = valor === "" ? null : Number(valor);
+  else if (campo === "codigo") {
+    f.codigo = String(valor).trim();
+    const m = (productosAdminGlobal || []).find(p => String(p.CODIGO).trim() === f.codigo);
+    f.matchCodigo = m ? String(m.CODIGO) : "";
+  } else f[campo] = valor;
+  ocrRenderTabla();
+}
+
+function ocrCambioMoneda() {
+  const usd = document.getElementById("ocrMoneda").value === "USD";
+  document.getElementById("ocrTcWrap").style.display = usd ? "" : "none";
+  if (usd) tcPrellenarCampo("ocrTc");   // en dólares: se completa con el tipo de cambio del día (editable)
+  ocrRenderTabla();   // actualiza el encabezado (ARS/USD) y el equivalente en pesos de cada costo
+}
+
+function ocrCerrar() {
+  document.getElementById("ocrModalBackdrop").classList.remove("show");
+}
+
+function ocrReprocesarTexto() {
+  const texto = document.getElementById("ocrTextoCrudo").value;
+  // PDF sin cambios en el texto: se reusan las posiciones originales de cada celda (más preciso que releer el texto)
+  if (ocrUltimaLectura?.filasCeldas && texto === ocrUltimaLectura.texto) {
+    ocrFilas = ocrEnriquecerFilas(ocrFilasDesdeCeldas(ocrUltimaLectura.filasCeldas));
+  } else {
+    ocrFilas = ocrTextoAFilas(texto);
+  }
+  ocrRenderTabla();
+}
+
+/** Foto elegida -> OCR -> abre el modal de revisión */
+async function ocrProcesarArchivo(ev) {
+  const file = ev.target.files && ev.target.files[0];
+  if (!file) return;
+  const estado = document.getElementById("ocrEstado");
+  const wrap = document.getElementById("ocrProgWrap");
+  const barra = document.getElementById("ocrProg");
+  const modoPrueba = !!document.getElementById("ocrModoPrueba")?.checked;
+  wrap.style.display = "";
+  barra.style.width = "0%";
+  try {
+    if (!productosAdminGlobal || !productosAdminGlobal.length) await cargarProductos();
+
+    // ---- PDF: se lee el texto directamente (sin OCR): exacto y casi instantáneo ----
+    if (file.type === "application/pdf" || /\.pdf$/i.test(file.name)) {
+      estado.textContent = "⏳ Leyendo PDF...";
+      const t0pdf = performance.now();
+      const pdf = await ocrLeerPDF(file);
+      if (!pdf.filasCeldas.length) {
+        throw new Error("Este PDF no tiene texto (es una imagen escaneada). Sacale una captura de la tabla y subila como imagen.");
+      }
+      let filas = ocrEnriquecerFilas(ocrFilasDesdeCeldas(pdf.filasCeldas));
+      if (!filas.length) filas = ocrTextoAFilas(pdf.texto);   // sin encabezado reconocible: se prueba línea por línea
+      estado.textContent = "✓ Listo";
+      ocrUltimaLectura = { ms: performance.now() - t0pdf, confianza: null, texto: pdf.texto, archivo: file.name, filasCeldas: pdf.filasCeldas };
+      ocrConfigurarModalSegunModo(modoPrueba);
+      if (modoPrueba) {
+        document.getElementById("ocrImgOriginal").src = pdf.vista || "";
+        document.getElementById("ocrImgProcesada").style.display = "none";
+        console.log("[OCR prueba] texto del PDF:\n" + pdf.texto);
+      }
+      ocrFilas = filas;
+      document.getElementById("ocrTextoCrudo").value = pdf.texto;
+      ocrRenderTabla();
+      document.getElementById("ocrModalBackdrop").classList.add("show");
+      return;
+    }
+
+    // ---- Foto: OCR con Tesseract ----
+    estado.textContent = "⏳ Cargando motor OCR...";
+    await ocrCargarTesseract();
+    estado.textContent = "⏳ Preparando imagen...";
+    const canvas = await ocrPreprocesarImagen(file);
+
+    const worker = await Tesseract.createWorker("spa", 1, {
+      logger: m => {
+        if (m.status === "recognizing text") {
+          const pct = Math.round(m.progress * 100);
+          barra.style.width = pct + "%";
+          estado.textContent = "⏳ Leyendo... " + pct + "%";
+        }
+      }
+    });
+    await worker.setParameters({ tessedit_pageseg_mode: "6", preserve_interword_spaces: "1" });
+    const t0 = performance.now();
+    const { data } = await worker.recognize(canvas);
+    const ms = performance.now() - t0;
+
+    estado.textContent = "✓ Listo";
+    ocrUltimaLectura = { ms, confianza: data.confidence || 0, texto: data.text, archivo: file.name };
+    ocrConfigurarModalSegunModo(modoPrueba);
+    if (modoPrueba) {
+      // Fotos lado a lado: la original y la que realmente recibió el OCR (después del preprocesado)
+      if (ocrImgOriginalURL) URL.revokeObjectURL(ocrImgOriginalURL);
+      ocrImgOriginalURL = URL.createObjectURL(file);
+      document.getElementById("ocrImgOriginal").src = ocrImgOriginalURL;
+      document.getElementById("ocrImgProcesada").style.display = "";
+      document.getElementById("ocrImgProcesada").src = canvas.toDataURL("image/jpeg", 0.85);
+      console.log("[OCR prueba] texto crudo:\n" + data.text, { confianza: data.confidence, ms });
+    }
+    // Se intenta leer la tabla por columnas (nombre, código, cantidad, precio). Si no se reconoce el encabezado, se lee línea por línea.
+    let filasFoto = [];
+    let textoFoto = data.text;
+    try {
+      const progreso = p => { estado.textContent = "⏳ Leyendo tabla... " + Math.round(p * 100) + "%"; };
+      const grilla = await ocrFotoPorCuadricula(worker, canvas, progreso);
+      if (grilla.length) {
+        filasFoto = ocrEnriquecerFilas(grilla);
+        textoFoto = grilla.map(f => [f.codigo, f.nombre, f.cantidad, f.precio].join(" | ")).join("\n");
+      } else {
+        const filasCeldas = await ocrFotoAFilasCeldas(worker, canvas, data.words, progreso);
+        filasFoto = ocrEnriquecerFilas(ocrFilasDesdeCeldas(filasCeldas));
+        if (filasFoto.length) textoFoto = filasCeldas.map(f => f.map(c => c.str).join(" | ")).join("\n");
+      }
+    } catch (e) { console.warn("OCR por columnas:", e); }
+    await worker.terminate();
+    ocrFilas = filasFoto.length ? filasFoto : ocrTextoAFilas(data.text);
+    ocrUltimaLectura.texto = textoFoto;
+    document.getElementById("ocrTextoCrudo").value = textoFoto;
+    ocrRenderTabla();
+    document.getElementById("ocrModalBackdrop").classList.add("show");
+  } catch (e) {
+    console.error("OCR:", e);
+    estado.textContent = "";
+    toast(e.message || "No se pudo leer la imagen", "error");
+  } finally {
+    wrap.style.display = "none";
+    ev.target.value = "";
+  }
+}
+
+/** Lee una zona del canvas (agrandada) con las letras permitidas indicadas; psm 7 = una sola línea */
+async function ocrLeerCelda(worker, canvas, x0, y0, x1, y1, lista, psm, mult) {
+  const pad = 8;
+  x0 = Math.max(0, Math.floor(x0)); y0 = Math.max(0, Math.floor(y0));
+  x1 = Math.min(canvas.width, Math.ceil(x1)); y1 = Math.min(canvas.height, Math.ceil(y1));
+  const w = x1 - x0, h = y1 - y0;
+  if (w < 4 || h < 4) return "";
+  const k = Math.max(1, Math.min(5, (mult || 1) * 100 / h));
+  const c = document.createElement("canvas");
+  c.width = Math.round(w * k) + pad * 2; c.height = Math.round(h * k) + pad * 2;
+  const ctx = c.getContext("2d");
+  ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height);
+  ctx.drawImage(canvas, x0, y0, w, h, pad, pad, Math.round(w * k), Math.round(h * k));
+  // Si no lee nada (pasa con números cortos como "1"), se reintenta con otros modos de lectura
+  for (const modo of [psm || 7, lista ? 8 : 6, 13]) {
+    await worker.setParameters({ tessedit_char_whitelist: lista || "", tessedit_pageseg_mode: String(modo) });
+    const { data } = await worker.recognize(c);
+    const t = String(data.text || "").replace(/\s+/g, " ").trim();
+    if (t) return t;
+  }
+  return "";
+}
+const OCR_LISTA_NUM = "0123456789$.,", OCR_LISTA_ENT = "0123456789", OCR_LISTA_COD = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_./";
+/** Los números se leen 3 veces a distinta escala y gana la lectura que más se repite (una sola lectura confunde "142" con "442") */
+async function ocrLeerCeldaNumerica(worker, canvas, x0, y0, x1, y1, soloEnteros) {
+  const lista = soloEnteros ? OCR_LISTA_ENT : OCR_LISTA_NUM;
+  const lecturas = [];
+  for (const m of [1.3, 1, 0.8]) {
+    const t = (await ocrLeerCelda(worker, canvas, x0, y0, x1, y1, lista, 7, m)).replace(/\s+/g, "");
+    if (t) lecturas.push(t);
+  }
+  if (!lecturas.length) return "";
+  const cuenta = {};
+  lecturas.forEach(t => { cuenta[t] = (cuenta[t] || 0) + 1; });
+  return lecturas.slice().sort((a, b) => cuenta[b] - cuenta[a])[0];   // sort estable: si empatan, queda la primera
+}
+
+/**
+ * Foto de una tabla con bordes: con las líneas se arma la grilla y se lee cada celda por separado
+ * (nombre, código, cantidad y precio; las demás columnas se ignoran). Mucho más confiable que leer toda la hoja de corrido.
+ * Devuelve [] si no parece una tabla con grilla.
+ */
+async function ocrFotoPorCuadricula(worker, canvas, alProgreso) {
+  const L = canvas._lineas;
+  if (!L || L.xs.length < 5 || L.ys.length < 4) return [];
+  // Bordes que la foto recortada no muestra: el borde superior del encabezado oscuro y el borde derecho de la imagen
+  const xs = L.xs.slice(), ys = L.ys.slice();
+  const b0 = (L.bandas || [])[0];      // encabezado oscuro: sus dos bordes son límites de fila aunque no se hayan detectado como línea
+  if (b0) {
+    for (let i = ys.length - 1; i >= 0; i--) if (ys[i] >= b0[0] - 4 && ys[i] <= b0[1] + 6) ys.splice(i, 1);
+    ys.unshift(b0[1] + 2); ys.unshift(b0[0]);
+  }
+  if (canvas.width - xs[xs.length - 1] >= 20) xs.push(canvas.width - 2);
+  if (xs[0] >= 20) xs.unshift(1);
+  const tramos = (v, min) => { const r = []; for (let i = 0; i < v.length - 1; i++) if (v[i + 1] - v[i] >= min) r.push([v[i] + 3, v[i + 1] - 3]); return r; };
+  const cols = tramos(xs, 14), filas = tramos(ys, 14);
+  if (cols.length < 4 || filas.length < 2) return [];
+
+  // 1) Encabezado: qué es cada columna
+  const enc = filas[0];
+  const roles = [];
+  for (const [xa, xb] of cols) roles.push(xb - xa < 40 ? "" : ocrRolDeEncabezado(await ocrLeerCelda(worker, canvas, xa, enc[0], xb, enc[1], "", 7)));
+  // El nombre es la columna más ancha: si su título salió ilegible, se deduce
+  if (roles.indexOf("nombre") < 0) {
+    let mejor = -1;
+    cols.forEach(([xa, xb], i) => { if ((roles[i] === "" || roles[i] === "otro") && (mejor < 0 || xb - xa > cols[mejor][1] - cols[mejor][0])) mejor = i; });
+    if (mejor >= 0) roles[mejor] = "nombre";
+  }
+  const iNom = roles.indexOf("nombre");
+  if (iNom < 0) return [];
+  // Una columna ilegible entre el nombre y la cantidad casi seguro es el código
+  if (roles.indexOf("codigo") < 0) {
+    const iCant = roles.indexOf("cantidad");
+    const cand = roles.map((r, i) => (i > iNom && (iCant < 0 || i < iCant) && r === "otro") ? i : -1).filter(i => i >= 0);
+    if (cand.length === 1) roles[cand[0]] = "codigo";
+  }
+  // El precio va pegado a la derecha de la cantidad: si su título salió ilegible, se deduce por la posición
+  if (roles.indexOf("precio") < 0 && roles.indexOf("cantidad") >= 0) {
+    const i = roles.indexOf("cantidad") + 1;
+    if (i < roles.length - 1 && (roles[i] === "" || roles[i] === "otro")) roles[i] = "precio";
+  }
+  const idx = r => roles.indexOf(r);
+  if (idx("cantidad") < 0 || idx("precio") < 0) return [];
+
+  // 2) Cada fila de datos, solo las 4 columnas que importan
+  const out = [];
+  for (let n = 1; n < filas.length; n++) {
+    const [ya, yb] = filas[n];
+    const celda = (r, lista) => ocrLeerCelda(worker, canvas, cols[idx(r)][0], ya, cols[idx(r)][1], yb, lista, (yb - ya) > 70 && r === "nombre" ? 6 : 7);
+    const nombre = await celda("nombre", "");
+    const cantTxt = await ocrLeerCeldaNumerica(worker, canvas, cols[idx("cantidad")][0], ya, cols[idx("cantidad")][1], yb, true);
+    const precioTxt = await ocrLeerCeldaNumerica(worker, canvas, cols[idx("precio")][0], ya, cols[idx("precio")][1], yb, false);
+    const codigo = idx("codigo") >= 0 ? (await celda("codigo", OCR_LISTA_COD)).replace(/\s/g, "") : "";
+    if (alProgreso) alProgreso(n / (filas.length - 1));
+    if (!nombre && !cantTxt) continue;                   // fila vacía / total
+    if (nombre.length < 3 && !cantTxt) continue;
+    let cantidad = cantTxt ? parseInt(cantTxt, 10) : NaN;
+    if (!(cantidad > 0) || cantidad > 99999 || /^0\d/.test(cantTxt)) cantidad = NaN;
+    const precio = precioTxt ? ocrNumeroAR(precioTxt) : NaN;
+    let nom = nombre;
+    if (codigo && nom.endsWith(" " + codigo)) nom = nom.slice(0, -codigo.length).trim();
+    out.push({ codigo, nombre: nom, cantidad: isNaN(cantidad) ? null : cantidad, precio: isNaN(precio) ? null : precio });
+  }
+  return out;
+}
+
+/** Palabras con posición (OCR de foto) -> filas de celdas, igual que las de un PDF; después se relee cada cantidad/precio celda por celda */
+async function ocrFotoAFilasCeldas(worker, canvas, palabras, alProgreso) {
+  const items = (palabras || []).filter(p => p.bbox && /[A-Za-z0-9$]/.test(p.text || "")).map(p => ({
+    str: p.text.trim(), x: p.bbox.x0, w: p.bbox.x1 - p.bbox.x0,
+    y: -(p.bbox.y0 + p.bbox.y1) / 2, h: p.bbox.y1 - p.bbox.y0, top: p.bbox.y0, bot: p.bbox.y1
+  }));
+  const filas = ocrAgruparItemsEnFilas(items);
+  const iEnc = filas.findIndex(celdas => {
+    const roles = celdas.map(c => ocrRolDeEncabezado(c.str));
+    return roles.includes("nombre") && roles.filter(r => r === "cantidad" || r === "precio" || r === "codigo").length >= 2;
+  });
+  if (iEnc < 0) return filas;
+  const cols = filas[iEnc].map(c => ({ rol: ocrRolDeEncabezado(c.str), x0: c.x0, x1: c.x1 }));
+  const numericas = cols.filter(c => c.rol === "cantidad" || c.rol === "precio");
+  // los límites de cada columna: desde el borde derecho de la anterior hasta el borde derecho propio (los números van a la derecha)
+  const rango = col => {
+    const i = cols.indexOf(col);
+    const izq = i > 0 ? (cols[i - 1].x1 + col.x0) / 2 : col.x0 - 20;
+    const der = i < cols.length - 1 ? (col.x1 + cols[i + 1].x0) / 2 : col.x1 + 30;
+    return [Math.min(izq, col.x0 - 10), der];
+  };
+  const dataFilas = filas.slice(iEnc + 1).filter(f => f.y0 !== undefined && isFinite(f.y0));
+  let hechos = 0;
+  for (const fila of dataFilas) {
+    for (const col of numericas) {
+      const [xa, xb] = rango(col);
+      const txt = await ocrLeerCeldaNumerica(worker, canvas, xa, fila.y0 - 3, xb, fila.y1 + 3, col.rol === "cantidad");
+      // Se saca lo que se había leído mal en esa zona y se pone la lectura celda por celda
+      for (let k = fila.length - 1; k >= 0; k--) { const cx = (fila[k].x0 + fila[k].x1) / 2; if (cx >= xa && cx <= xb) fila.splice(k, 1); }
+      if (txt) fila.push({ str: txt, x0: col.x0, x1: col.x1 });
+    }
+    fila.sort((a, b) => a.x0 - b.x0);
+    hechos++;
+    if (alProgreso) alProgreso(hechos / dataFilas.length);
+  }
+  return filas;
+}
+
+/** Vuelca las filas tildadas al carrito de la boleta (sin tocar el backend todavía) */
+function ocrAgregarABoleta() {
+  // Red de seguridad: en modo prueba jamás se toca el carrito ni la base
+  if (ocrModoPruebaActivo) { toast("Modo prueba: no se agrega nada a la boleta", "error"); return; }
+  const moneda = document.getElementById("ocrMoneda").value === "USD" ? "USD" : "ARS";
+  const tc = Number(document.getElementById("ocrTc").value || 0);
+  if (moneda === "USD" && tc <= 0) { toast("Ingresá el tipo de cambio para precios en dólares", "error"); return; }
+
+  const elegidas = ocrFilas.filter(f => f.incluir);
+  if (!elegidas.length) { toast("No hay filas tildadas", "error"); return; }
+
+  for (const f of elegidas) {
+    if (!f.nombre || !String(f.nombre).trim()) { toast("Hay una fila tildada sin nombre de producto", "error"); return; }
+    if (!f.cantidad || f.cantidad <= 0 || !f.precio || f.precio <= 0) {
+      toast(`Falta cantidad o costo en "${f.nombre}"`, "error"); return;
+    }
+  }
+
+  const prods = productosAdminGlobal || [];
+  elegidas.forEach(f => {
+    const codigoFila = String(f.codigo || f.matchCodigo || "").trim();
+    const existente = codigoFila ? (prods.find(p => String(p.CODIGO).trim() === codigoFila) || null) : null;
+    const precioARS = moneda === "USD" ? f.precio * tc : f.precio;
+    // Precio de venta: SIEMPRE en pesos. Si lo cargaste, se usa tal cual. Si no lo cargaste y el producto es NUEVO con
+    // costo en dólares, se manda el costo ya convertido a pesos como precio provisorio (si no, el sistema usaría el
+    // número en dólares como si fueran pesos). En productos existentes, vacío = no se toca su precio actual.
+    let precioVentaARS = (f.precioVenta !== null && f.precioVenta !== undefined && f.precioVenta > 0) ? f.precioVenta : null;
+    if (precioVentaARS === null && !existente && moneda === "USD") precioVentaARS = Math.round(precioARS * 100) / 100;
+    ipCarritoBoleta.push({
+      codigo: existente ? String(existente.CODIGO) : codigoFila,
+      producto: existente ? existente.PRODUCTO : f.nombre,
+      categoria: existente ? (existente.CATEGORIA || "") : "",
+      moneda,
+      precio: f.precio,
+      tipoCambio: moneda === "USD" ? tc : null,
+      precioARS,
+      precioVenta: precioVentaARS,   // siempre en pesos (ver arriba)
+      cantidad: f.cantidad,
+      esNuevo: !existente
+    });
+  });
+
+  renderCarritoBoleta();
+  ocrCerrar();
+  toast(`${elegidas.length} producto(s) agregados a la boleta`, "success");
 }
 
 /** Manda TODA la boleta (cabecera + todos los productos del carrito) al backend en un solo documento */
