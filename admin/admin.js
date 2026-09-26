@@ -2882,6 +2882,270 @@ function imprimirNotaPedidoA4() {
   setTimeout(() => window.print(), 120);
 }
 
+/* ====================================================================
+ * REMITO sobre formulario preimpreso (Jireh, 168x204mm, cod. 091)
+ * Imprime SOLO los datos variables en la posición exacta del formulario.
+ * Coordenadas en mm medidas desde la esquina superior izquierda de la hoja
+ * A4 (la hoja del remito se carga como si fuera A4, pegada a la esquina).
+ * y = línea base del texto. Ajuste fino: REMITO_OFFSET (mm) guardado por navegador.
+ * ==================================================================== */
+const REMITO_POS = {
+  dia:        { x: 110.9, y: 28.5 },
+  mes:        { x: 129.1, y: 28.5 },
+  anio:       { x: 144.1, y: 28.5 },
+  cliente:    { x: 27.4,  y: 48.0 },
+  domicilio:  { x: 27.4,  y: 53.5 },
+  localidad:  { x: 28.0,  y: 58.8 },
+  telefono:   { x: 119.3, y: 58.8 },
+  provincia:  { x: 27.4,  y: 63.9 },
+  cuit:       { x: 102.4, y: 72.0 },
+  transporte: { x: 33.3,  y: 175.6 },
+  ivaCF:      { x: 43.9,  y: 69.2 },   // centro del casillero
+  ivaRI:      { x: 75.0,  y: 68.7 },
+  ivaEX:      { x: 43.9,  y: 73.0 },
+  ivaMT:      { x: 75.0,  y: 72.9 },
+  filasY0: 92.0, filasDy: 5.62, filasN: 13,
+  cantX: 20.5, descX: 31.9, descW: 123
+};
+const REMITO_OFFSET_KEY = "jireh_remito_offset";
+
+function _remitoOffset() {
+  try {
+    const o = JSON.parse(localStorage.getItem(REMITO_OFFSET_KEY) || "{}");
+    return { x: Number(o.x) || 0, y: Number(o.y) || 0 };
+  } catch (e) { return { x: 0, y: 0 }; }
+}
+
+function _remitoTxt(pos, texto, extra) {
+  if (texto === undefined || texto === null || String(texto) === "") return "";
+  const o = _remitoOffset();
+  return `<div style="position:absolute; left:${(pos.x + o.x).toFixed(2)}mm; top:${(pos.y + o.y - 3.4).toFixed(2)}mm; height:4mm; line-height:4mm; white-space:nowrap; font-size:10pt; ${extra || ""}">${escapeHtml(String(texto))}</div>`;
+}
+
+function _remitoMarca(pos) {
+  const o = _remitoOffset();
+  return `<div style="position:absolute; left:${(pos.x + o.x - 2).toFixed(2)}mm; top:${(pos.y + o.y - 2).toFixed(2)}mm; width:4mm; height:4mm; line-height:4mm; text-align:center; font-size:11pt; font-weight:700;">X</div>`;
+}
+
+/** Arma el HTML de la hoja (A4, margen 0) a partir de los datos del formulario. */
+function _remitoHTML(d) {
+  const P = REMITO_POS, o = _remitoOffset();
+  let h = `<div style="position:relative; width:210mm; height:297mm; font-family:Arial,Helvetica,sans-serif; color:#000; overflow:hidden;">`;
+  h += _remitoTxt(P.dia, d.dia) + _remitoTxt(P.mes, d.mes) + _remitoTxt(P.anio, d.anio);
+  h += _remitoTxt(P.cliente, d.cliente) + _remitoTxt(P.domicilio, d.domicilio);
+  h += _remitoTxt(P.localidad, d.localidad) + _remitoTxt(P.telefono, d.telefono);
+  h += _remitoTxt(P.provincia, d.provincia) + _remitoTxt(P.cuit, d.cuit);
+  h += _remitoTxt(P.transporte, d.transporte);
+  const iva = { CF: P.ivaCF, RI: P.ivaRI, EX: P.ivaEX, MT: P.ivaMT }[d.iva];
+  if (iva) h += _remitoMarca(iva);
+  if (d.bultos) {
+    h += `<div style="position:absolute; left:${(P.cantX - 9 + o.x).toFixed(2)}mm; top:${(P.filasY0 + 5 * P.filasDy + o.y - 13).toFixed(2)}mm; width:18mm; text-align:center; font-size:46pt; font-weight:700; line-height:1;">${escapeHtml(String(d.bultos))}</div>`;
+  }
+  (d.filas || []).slice(0, P.filasN).forEach((f, i) => {
+    const y = P.filasY0 + i * P.filasDy;
+    if (f.cant !== "" && f.cant != null) {
+      h += _remitoTxt({ x: P.cantX - 8, y }, f.cant, "width:16mm; text-align:center;");
+    }
+    h += _remitoTxt({ x: P.descX, y }, f.desc, `max-width:${P.descW}mm; overflow:hidden;`);
+  });
+  if (d.calibracion) {
+    // Cruces en cada punto de anclaje para superponer contra el formulario
+    Object.keys(P).forEach(k => {
+      const p = P[k]; if (!p || p.x === undefined) return;
+      h += `<div style="position:absolute; left:${(p.x + o.x - 2).toFixed(2)}mm; top:${(p.y + o.y - 0.15).toFixed(2)}mm; width:4mm; height:0.3mm; background:#e00;"></div>`;
+      h += `<div style="position:absolute; left:${(p.x + o.x - 0.15).toFixed(2)}mm; top:${(p.y + o.y - 2).toFixed(2)}mm; width:0.3mm; height:4mm; background:#e00;"></div>`;
+    });
+  }
+  return h + `</div>`;
+}
+
+function _remitoImprimir(html) {
+  const thermal = document.getElementById("thermalPrintFrame");
+  if (thermal) thermal.innerHTML = "";
+  document.getElementById("etiquetasPrintArea").innerHTML = html;
+  _setPrintPageSize("REMITO");
+  setTimeout(() => window.print(), 120);
+}
+
+let _remitoPedido = null;
+
+function abrirRemitoDesdeDetalle() {
+  if (!pedidoDetalleActual) return;
+  const { pedido, detalle } = pedidoDetalleActual;
+  _remitoPedido = { pedido, detalle };
+  const hoy = new Date();
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v ?? ""; };
+
+  _remitoAsegurarModal();
+  set("rmDia", String(hoy.getDate()).padStart(2, "0"));
+  set("rmMes", String(hoy.getMonth() + 1).padStart(2, "0"));
+  set("rmAnio", String(hoy.getFullYear()).slice(-2));
+  set("rmCliente", pedido.CLIENTE);
+  set("rmDomicilio", pedido.DIRECCION);
+  set("rmLocalidad", pedido.LOCALIDAD);
+  set("rmProvincia", pedido.PROVINCIA);
+  set("rmTelefono", pedido.TELEFONO);
+  set("rmCuit", pedido.DNI);
+  set("rmTransporte", pedido.EMPRESA);
+  set("rmIva", "");
+  set("rmValor", "");
+  set("rmBultos", 1);
+  set("rmDespacho", "");
+  const off = _remitoOffset();
+  set("rmOffX", off.x); set("rmOffY", off.y);
+  remitoCargarResumen();
+  document.getElementById("remitoModalBackdrop").classList.add("show");
+}
+
+function cerrarModalRemito() {
+  document.getElementById("remitoModalBackdrop").classList.remove("show");
+}
+
+function _remitoRenderFilas(filas) {
+  const cont = document.getElementById("rmFilas");
+  let html = "";
+  for (let i = 0; i < REMITO_POS.filasN; i++) {
+    const f = filas[i] || { cant: "", desc: "" };
+    html += `<div style="display:flex; gap:6px; margin-bottom:4px;">
+      <input class="form-control rm-cant" style="width:64px; text-align:center;" value="${escapeHtml(String(f.cant ?? ""))}" placeholder="Cant.">
+      <input class="form-control rm-desc" style="flex:1;" value="${escapeHtml(String(f.desc ?? ""))}" placeholder="Descripción (línea ${i + 1})">
+    </div>`;
+  }
+  cont.innerHTML = html;
+}
+
+function _remitoNumLetras(n) {
+  n = parseInt(n, 10);
+  const u = ["cero","un","dos","tres","cuatro","cinco","seis","siete","ocho","nueve","diez","once","doce","trece","catorce","quince","dieciséis","diecisiete","dieciocho","diecinueve","veinte","veintiún","veintidós","veintitrés","veinticuatro","veinticinco","veintiséis","veintisiete","veintiocho","veintinueve"];
+  const dec = ["","","","treinta","cuarenta","cincuenta","sesenta","setenta","ochenta","noventa"];
+  if (isNaN(n) || n < 1) return "";
+  if (n < 30) return u[n];
+  if (n < 100) { const r = n % 10; return dec[Math.floor(n / 10)] + (r ? " y " + (r === 1 ? "un" : u[r]) : ""); }
+  return String(n);
+}
+
+function remitoCargarResumen() {
+  const b = parseInt((document.getElementById("rmBultos") || {}).value, 10) || 1;
+  const ico = ((document.getElementById("rmDespacho") || {}).value || "").replace(/\D/g, "");
+  const letras = _remitoNumLetras(b);
+  const L = letras.charAt(0).toUpperCase() + letras.slice(1);
+  const filas = [
+    { cant: "", desc: `${L} ${b === 1 ? "bulto" : "bultos"} total de mercadería` },
+    { cant: "", desc: "Origen nacional y extranjero" },
+    { cant: "", desc: "Rubro: juguetería, regalería y bazar" },
+    { cant: "", desc: "Aduana Bs. As." },
+    { cant: "", desc: "N° Despacho" }
+  ];
+  if (ico) filas.push({ cant: "", desc: "ICO: " + (ico.length > 4 ? ico.slice(0, 4) + " " + ico.slice(4) : ico) });
+  _remitoRenderFilas(filas);
+}
+
+function remitoCargarProductos() {
+  if (!_remitoPedido) return;
+  const items = _remitoPedido.detalle || [];
+  const filas = items.map(it => ({ cant: it.cantidad, desc: it.PRODUCTO }));
+  if (filas.length > REMITO_POS.filasN) {
+    toast(`El pedido tiene ${filas.length} ítems y el formulario solo ${REMITO_POS.filasN} líneas. Se cargaron las primeras ${REMITO_POS.filasN}; usá "Resumen" o imprimí en 2 hojas.`, "error");
+  }
+  document.getElementById("rmBultos").value = "";
+  _remitoRenderFilas(filas);
+}
+
+function _remitoLeerForm() {
+  const v = id => (document.getElementById(id).value || "").trim();
+  const cants = [...document.querySelectorAll("#rmFilas .rm-cant")].map(e => e.value.trim());
+  const descs = [...document.querySelectorAll("#rmFilas .rm-desc")].map(e => e.value.trim());
+  let filas = cants.map((c, i) => ({ cant: c, desc: descs[i] })).filter(f => f.cant || f.desc);
+  const valor = v("rmValor");
+  if (valor) filas.push({ cant: "", desc: "Mercadería en tránsito $" + valor });
+  return {
+    dia: v("rmDia"), mes: v("rmMes"), anio: v("rmAnio"),
+    cliente: v("rmCliente"), domicilio: v("rmDomicilio"), localidad: v("rmLocalidad"),
+    provincia: v("rmProvincia"), telefono: v("rmTelefono"), cuit: v("rmCuit"),
+    transporte: v("rmTransporte"), iva: v("rmIva"), bultos: v("rmBultos"), filas
+  };
+}
+
+function _remitoGuardarOffset() {
+  const x = parseFloat(document.getElementById("rmOffX").value) || 0;
+  const y = parseFloat(document.getElementById("rmOffY").value) || 0;
+  try { localStorage.setItem(REMITO_OFFSET_KEY, JSON.stringify({ x, y })); } catch (e) {}
+}
+
+function remitoImprimir() {
+  _remitoGuardarOffset();
+  const d = _remitoLeerForm();
+  if (d.filas.length > REMITO_POS.filasN) {
+    toast(`Hay más de ${REMITO_POS.filasN} líneas: no entran en el formulario.`, "error");
+    return;
+  }
+  _remitoImprimir(_remitoHTML(d));
+}
+
+/** Hoja de prueba: datos de ejemplo + cruces rojas en cada punto de anclaje. */
+function remitoImprimirPrueba() {
+  _remitoGuardarOffset();
+  const d = _remitoLeerForm();
+  d.calibracion = true;
+  if (!d.cliente) d.cliente = "CLIENTE DE PRUEBA";
+  if (!d.filas.length) d.filas = [{ cant: 1, desc: "Línea de prueba 1" }, { cant: 2, desc: "Línea de prueba 2" }];
+  if (!d.iva) d.iva = "RI";
+  _remitoImprimir(_remitoHTML(d));
+}
+
+function _remitoAsegurarModal() {
+  if (document.getElementById("remitoModalBackdrop")) return;
+  const div = document.createElement("div");
+  div.className = "product-modal-backdrop";
+  div.id = "remitoModalBackdrop";
+  const campo = (id, label, extra) => `<div style="flex:1; min-width:140px;"><label style="font-size:12px; color:#64748b;">${label}</label><input id="${id}" class="form-control" ${extra || ""}></div>`;
+  div.innerHTML = `
+  <div class="product-modal" style="width:min(640px, 96vw);">
+    <div class="product-modal-header"><h6>Imprimir remito (formulario preimpreso)</h6><button onclick="cerrarModalRemito()">✕</button></div>
+    <div class="product-modal-body" style="overflow:auto;">
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
+        ${campo("rmDia", "Día", 'style="max-width:70px;"')}${campo("rmMes", "Mes", 'style="max-width:70px;"')}${campo("rmAnio", "Año", 'style="max-width:70px;"')}
+        <div style="flex:2; min-width:200px;"><label style="font-size:12px; color:#64748b;">Condición IVA (casillero)</label>
+          <select id="rmIva" class="form-select"><option value="">Sin marcar</option><option value="CF">Cons. Final</option><option value="RI">Resp. Inscripto</option><option value="EX">Exento</option><option value="MT">Resp. Monotributo</option></select></div>
+      </div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
+        ${campo("rmCliente", "Señor/es")}${campo("rmCuit", "C.U.I.T. Nº")}
+      </div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
+        ${campo("rmDomicilio", "Domicilio")}${campo("rmLocalidad", "Localidad")}
+      </div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
+        ${campo("rmProvincia", "Provincia")}${campo("rmTelefono", "Tel.")}${campo("rmTransporte", "Transportista")}
+      </div>
+      <div style="display:flex; align-items:center; gap:8px; margin:12px 0 6px;">
+        <strong style="font-size:13px;">Cantidad / Descripción</strong>
+        <button class="btn btn-outline-secondary btn-sm" type="button" onclick="remitoCargarResumen()">Resumen (1 bulto)</button>
+        <button class="btn btn-outline-secondary btn-sm" type="button" onclick="remitoCargarProductos()">Cargar productos del pedido</button>
+      </div>
+      <div id="rmFilas" style="max-height:230px; overflow:auto;"></div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">
+        ${campo("rmBultos", "Cantidad de bultos (número grande + en letras)", 'type="number" min="1" oninput="remitoCargarResumen()"')}
+        ${campo("rmDespacho", "N° ICO (8 dígitos, se parte en 4 + 4)", 'maxlength="8" placeholder="opcional" oninput="remitoCargarResumen()"')}
+      </div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">
+        ${campo("rmValor", "Valor declarado ($) — agrega “Mercadería en tránsito $…”")}
+      </div>
+      <details style="margin-top:12px;"><summary style="cursor:pointer; font-size:13px;">Calibración de impresora (mm)</summary>
+        <div style="display:flex; gap:8px; align-items:flex-end; margin-top:8px;">
+          ${campo("rmOffX", "Desplazar →  (mm, + derecha)", 'type="number" step="0.5"')}${campo("rmOffY", "Desplazar ↓  (mm, + abajo)", 'type="number" step="0.5"')}
+          <button class="btn btn-outline-secondary" type="button" onclick="remitoImprimirPrueba()">Hoja de prueba</button>
+        </div>
+        <div style="font-size:12px;color:#64748b;margin-top:4px;">Imprimí la prueba en una hoja común, superponela al formulario a contraluz y corregí el desfasaje.</div>
+      </details>
+    </div>
+    <div class="product-modal-actions">
+      <button class="btn btn-outline-secondary" onclick="cerrarModalRemito()">Cancelar</button>
+      <button class="btn btn-success" onclick="remitoImprimir()">Imprimir remito</button>
+    </div>
+  </div>`;
+  document.body.appendChild(div);
+}
+
 /**
  * Normaliza un número de teléfono argentino al formato internacional
  * que requiere wa.me (sin +, sin espacios, con código de país).
@@ -7115,7 +7379,9 @@ function _setPrintPageSize(size) {
     tag.id = "dynamicPrintPageSize";
     document.head.appendChild(tag);
   }
-  tag.textContent = size === "A4"
+  tag.textContent = size === "REMITO"
+    ? "@media print { @page { size:A4; margin:0; } }"
+    : size === "A4"
     ? "@media print { @page { size:A4; margin:8mm; } }"
     : "@media print { @page { size:80mm auto; margin:0; } }";
 }
