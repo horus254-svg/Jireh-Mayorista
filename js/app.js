@@ -1748,7 +1748,7 @@ async function checkoutWhatsapp(){
     let total = 0;
     estado.carrito.forEach(item => { total += item.PRECIO * item.cantidad; });
 
-    if(total < 100000){
+    if(total < pedidoMinimo){
         const falta2 = pedidoMinimo - total;
         mostrarToast(`Te faltan $${formatearPrecio(falta2)} para llegar al pedido mínimo de $${formatearPrecio(pedidoMinimo)}.`, "error");
         desactivarCargaCheckout();
