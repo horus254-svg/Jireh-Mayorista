@@ -1920,16 +1920,40 @@ window.addEventListener("resize", function(){
    admin, así ambos quedan siempre sincronizados.
 ========================================================= */
 
+const CLAVE_CACHE_CONFIG = "config_negocio_cache_v1";
+
 async function aplicarApariencia(){
+
+    // Si ya visitó antes, se aplica al instante la última config guardada
+    // (incluye el pedido mínimo) y luego se refresca desde el servidor.
+    try{
+        const previa = JSON.parse(localStorage.getItem(CLAVE_CACHE_CONFIG) || "null");
+        if(previa && typeof previa === "object") aplicarConfigApariencia(previa);
+    }catch(e){ /* caché ilegible: se ignora */ }
 
     try{
 
-        const res = await fetchAPI(API_URL + "?action=configuracionNegocio");
+        // 30 s: Apps Script en frío puede pasar los 10 s; abortar antes
+        // dejaba la config (y el pedido mínimo) sin cargar.
+        const res = await fetchAPI(API_URL + "?action=configuracionNegocio", {}, { timeoutMs: 30000 });
         const data = await res.json();
 
         if(!data.success || !data.config) return;
 
-        const cfg = data.config;
+        try{ localStorage.setItem(CLAVE_CACHE_CONFIG, JSON.stringify(data.config)); }catch(e){}
+
+        aplicarConfigApariencia(data.config);
+
+    }catch(err){
+        // Si falla, la página sigue mostrando los valores fijos del HTML
+        // (o la última config guardada en este navegador).
+        console.error("No se pudo cargar la apariencia desde Sheets:", err);
+    }
+}
+
+function aplicarConfigApariencia(cfg){
+
+    try{
 
         // --- Tema de color ---
         const tema = (cfg.tema || "navy").toLowerCase();
@@ -2011,8 +2035,7 @@ async function aplicarApariencia(){
         aplicarBeneficios(cfg);
 
     }catch(err){
-        // Si falla, la página sigue mostrando los valores fijos del HTML.
-        console.error("No se pudo cargar la apariencia desde Sheets:", err);
+        console.error("No se pudo aplicar la apariencia:", err);
     }
 }
 
