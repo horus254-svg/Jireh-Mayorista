@@ -63,7 +63,10 @@ let CONFIG_NEGOCIO = { ...CONFIG_NEGOCIO_RESPALDO };
 async function resolverApiUrlBase(){
   if(API_URL_BASE) return API_URL_BASE;
   try{
-    const res = await fetch("config.json?_=" + Date.now(), { cache: "no-store" });
+    // "no-cache" revalida con el servidor (barato: 304) pero deja que el CDN
+    // y el navegador lo sirvan sin golpear el origen en cada visita.
+    // Antes se usaba ?_=Date.now(), que anulaba todo cache con mucho tráfico.
+    const res = await fetch("config.json", { cache: "no-cache" });
     if(res.ok){
       const cfg = await res.json();
       if(cfg.apiUrl) API_URL_BASE = cfg.apiUrl;
@@ -82,6 +85,16 @@ async function resolverApiUrlBase(){
  * Se usa para el campo "URL del catálogo" de Sheets, que se carga a
  * mano y puede o no traer la barra final.
  */
+/**
+ * Devuelve la URL solo si es http(s); si no (javascript:, data:, etc.)
+ * devuelve "". Se usa para cualquier link/imagen que venga de Sheets,
+ * que es un dato editable y no debe poder inyectar esquemas peligrosos.
+ */
+function urlSegura(url){
+  const u = String(url || "").trim();
+  return /^https?:\/\//i.test(u) ? u : "";
+}
+
 function normalizarUrlConBarraFinal(url){
   const limpia = String(url || "").trim();
   if(!limpia) return "";
@@ -100,11 +113,17 @@ async function obtenerConfiguracionNegocioCruda(apiUrl){
   if(!_configuracionNegocioPromise){
     const lectura = API_URL_LECTURA_BASE || apiUrl;
     _configuracionNegocioPromise = fetch(lectura + "?action=configuracionNegocio")
-      .then(res => res.json())
+      .then(res => { if(!res.ok) throw new Error("HTTP " + res.status); return res.json(); })
       .catch(err => {
         // Si el Worker falla, se reintenta directo contra Apps Script.
         if(lectura === apiUrl) throw err;
         return fetch(apiUrl + "?action=configuracionNegocio").then(res => res.json());
+      })
+      .catch(err => {
+        // No dejar una promesa fallida cacheada para siempre: el próximo
+        // intento vuelve a pedirla.
+        _configuracionNegocioPromise = null;
+        throw err;
       });
   }
   return _configuracionNegocioPromise;
@@ -147,9 +166,9 @@ async function cargarConfigNegocio(){
       // schema.url, y (indirectamente, vía app.js) las URLs canónicas
       // de producto.
       URL_SITIO: normalizarUrlConBarraFinal(cfg.urlCatalogo) || CONFIG_NEGOCIO_RESPALDO.URL_SITIO,
-      WHATSAPP_NUMERO: cfg.beneficioWhatsappNumero || CONFIG_NEGOCIO_RESPALDO.WHATSAPP_NUMERO,
-      WHATSAPP_ICONO_URL: cfg.whatsappIconoUrl || CONFIG_NEGOCIO_RESPALDO.WHATSAPP_ICONO_URL,
-      ICONO_URL: cfg.iconoUrl || CONFIG_NEGOCIO_RESPALDO.ICONO_URL,
+      WHATSAPP_NUMERO: String(cfg.beneficioWhatsappNumero || "").replace(/[^\d]/g, "") || CONFIG_NEGOCIO_RESPALDO.WHATSAPP_NUMERO,
+      WHATSAPP_ICONO_URL: urlSegura(cfg.whatsappIconoUrl) || CONFIG_NEGOCIO_RESPALDO.WHATSAPP_ICONO_URL,
+      ICONO_URL: (urlSegura(cfg.iconoUrl) || (cfg.iconoUrl && !/^[a-z]+:/i.test(String(cfg.iconoUrl).trim()) ? String(cfg.iconoUrl).trim() : "")) || CONFIG_NEGOCIO_RESPALDO.ICONO_URL,
 
       SEO_TITULO: cfg.seoTitulo || CONFIG_NEGOCIO_RESPALDO.SEO_TITULO,
       SEO_DESCRIPCION: cfg.seoDescripcion || CONFIG_NEGOCIO_RESPALDO.SEO_DESCRIPCION,

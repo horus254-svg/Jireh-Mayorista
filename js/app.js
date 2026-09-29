@@ -98,10 +98,34 @@ const PLACEHOLDER_IMG = "data:image/svg+xml;base64," + btoa(
     "</svg>"
 );
 
+/**
+ * Lee el carrito guardado en el navegador de forma defensiva: el
+ * localStorage lo puede editar cualquiera (o quedar corrupto de una
+ * versión anterior), así que se valida cada ítem. Un JSON roto ya no
+ * deja la página en blanco. Igual, el servidor debe recalcular
+ * precios y stock al guardar el pedido — esto es solo higiene local.
+ */
+function leerCarritoGuardado(){
+    try{
+        const crudo = JSON.parse(localStorage.getItem("carrito") || "[]");
+        if(!Array.isArray(crudo)) return [];
+        return crudo
+            .filter(it => it && typeof it === "object" && it.CODIGO !== undefined)
+            .map(it => ({
+                ...it,
+                cantidad: Math.max(1, Math.min(100000, parseInt(it.cantidad, 10) || 1)),
+                PRECIO: Math.max(0, Number(it.PRECIO) || 0)
+            }))
+            .slice(0, 300);
+    }catch(e){
+        return [];
+    }
+}
+
 const estado = {
     productos: [],
     productosVisibles: [],
-    carrito: JSON.parse(localStorage.getItem("carrito")) || [],
+    carrito: leerCarritoGuardado(),
     busqueda: "",
     categoria: "",
     precioMin: null,
@@ -142,6 +166,19 @@ function escapeHtml(str){
 
 function formatearPrecio(valor){
     return Number(valor || 0).toLocaleString("es-AR");
+}
+
+/** Solo permite http(s); cualquier otro esquema (javascript:, data:) se descarta */
+function urlHttpSegura(url){
+    const u = String(url || "").trim();
+    return /^https?:\/\//i.test(u) ? u : "";
+}
+
+/** Minúsculas y sin acentos, para buscar "camion" y encontrar "Camión" */
+function normalizarBusqueda(texto){
+    return String(texto || "")
+        .toLowerCase()
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
 function obtenerEstadoStock(stock){
@@ -245,6 +282,12 @@ async function cargarProductos(){
     const previo = leerCatalogoLocal();
     if(previo){
         procesarProductos(previo);
+        // Ya hay algo para mostrar: se quita la pantalla de carga al instante
+        const catRapido = document.getElementById("loadingCat");
+        if(catRapido){
+            catRapido.style.opacity = "0";
+            setTimeout(() => catRapido.remove(), 500);
+        }
     }else{
         mostrarSkeleton();
     }
@@ -298,7 +341,12 @@ function procesarProductos(listaProductos){
         );
 
         estado.productos = productosConStock
-        .map(p => ({ ...p, _esNuevo: codigosNuevos.has(String(p.CODIGO)) }))
+        .map(p => ({
+            ...p,
+            _esNuevo: codigosNuevos.has(String(p.CODIGO)),
+            // Índice de búsqueda precalculado una sola vez (nombre, código, categoría)
+            _busqueda: normalizarBusqueda([p.PRODUCTO, p.CODIGO, p.CATEGORIA, p.SUBCATEGORIA].join(" "))
+        }))
         .sort((a,b)=>{
 
             const esDestacadaA = String(a.DESTACADO || "").trim().toUpperCase() === "SI";
@@ -412,9 +460,8 @@ function aplicarFiltros(){
     }
 
     if(estado.busqueda){
-        lista = lista.filter(p =>
-            String(p.PRODUCTO || "").toLowerCase().includes(estado.busqueda)
-        );
+        const terminos = normalizarBusqueda(estado.busqueda).split(/\s+/).filter(Boolean);
+        lista = lista.filter(p => terminos.every(t => (p._busqueda || "").includes(t)));
     }
 
     if(estado.precioMin !== null){
@@ -543,7 +590,7 @@ function mostrarProductos(lista){
         const codigo = escapeHtml(p.CODIGO);
         const nombre = escapeHtml(p.PRODUCTO);
         const categoria = escapeHtml(p.CATEGORIA);
-        const imagen = imgOptimizada(p.IMAGEN || "", 480);
+        const imagen = escapeHtml(imgOptimizada(urlHttpSegura(p.IMAGEN), 480));
 
         const stock = obtenerEstadoStock(p.STOCK);
 
@@ -789,7 +836,7 @@ function renderGaleriaQuickView(producto){
                 data-index="${i}"
                 aria-label="${item.color ? "Ver color " + escapeHtml(item.color) : "Ver imagen " + (i + 1)}"
                 title="${escapeHtml(item.color || "")}">
-                <img src="${item.url}" alt="${escapeHtml(item.color || producto.PRODUCTO || "")}" loading="lazy"
+                <img src="${escapeHtml(urlHttpSegura(item.url))}" alt="${escapeHtml(item.color || producto.PRODUCTO || "")}" loading="lazy"
                     onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'">
             </button>
         `).join("");
@@ -930,7 +977,7 @@ function renderRelacionados(producto){
             data-code="${escapeHtml(p.CODIGO)}"
             aria-label="Ver ${escapeHtml(p.PRODUCTO)}">
             <img
-                src="${imgOptimizada(p.IMAGEN || "", 240)}"
+                src="${escapeHtml(imgOptimizada(urlHttpSegura(p.IMAGEN), 240))}"
                 alt="${escapeHtml(p.PRODUCTO)}"
                 loading="lazy"
                 decoding="async"
@@ -1584,7 +1631,7 @@ function abrirCarrito(){
 
                     <img
                         class="cart-item-thumb"
-                        src="${imgOptimizada(item.IMAGEN || "", 160)}"
+                        src="${escapeHtml(imgOptimizada(urlHttpSegura(item.IMAGEN), 160))}"
                         alt="${escapeHtml(item.PRODUCTO)}"
                         loading="lazy"
                         decoding="async"
@@ -1935,16 +1982,18 @@ Subtotal: $${formatearPrecio(subtotal)}
    VOLVER ARRIBA
 ========================================================= */
 
+let _scrollPendiente = false;
 window.addEventListener("scroll", function(){
 
-    const btn = document.getElementById("scroll-top-btn");
-
-    if(window.scrollY > 400){
-        btn.classList.remove("d-none");
-    }else{
-        btn.classList.add("d-none");
-    }
-});
+    // passive + una sola actualización por frame: no frena el scroll
+    if(_scrollPendiente) return;
+    _scrollPendiente = true;
+    requestAnimationFrame(function(){
+        _scrollPendiente = false;
+        const btn = document.getElementById("scroll-top-btn");
+        if(btn) btn.classList.toggle("d-none", window.scrollY <= 400);
+    });
+}, { passive: true });
 
 /* =========================================================
    SINCRONIZACIÓN AL VOLVER A LA PÁGINA
@@ -1952,7 +2001,7 @@ window.addEventListener("scroll", function(){
 
 window.addEventListener("pageshow", function(){
 
-    estado.carrito = JSON.parse(localStorage.getItem("carrito")) || [];
+    estado.carrito = leerCarritoGuardado();
 
     actualizarContador();
 });
@@ -1989,8 +2038,14 @@ async function aplicarApariencia(){
 
         // 30 s: Apps Script en frío puede pasar los 10 s; abortar antes
         // dejaba la config (y el pedido mínimo) sin cargar.
-        const res = await fetchAPI(API_URL_LECTURA + "?action=configuracionNegocio", {}, { timeoutMs: 30000 });
-        const data = await res.json();
+        // Reutiliza la misma promesa que config.js (una sola consulta por carga)
+        let data;
+        if(typeof obtenerConfiguracionNegocioCruda === "function"){
+            data = await obtenerConfiguracionNegocioCruda(API_URL);
+        }else{
+            const res = await fetchAPI(API_URL_LECTURA + "?action=configuracionNegocio", {}, { timeoutMs: 30000 });
+            data = await res.json();
+        }
 
         if(!data.success || !data.config) return;
 
@@ -2133,7 +2188,9 @@ function aplicarBeneficios(cfg){
     }
 
     // --- Instagram ---
-    const instagramUrl = (cfg.beneficioInstagramUrl || "").trim();
+    const instagramRaw = (cfg.beneficioInstagramUrl || "").trim();
+    // Puede ser "@usuario" (solo texto, sin link) o una URL http(s); nunca javascript:
+    const instagramUrl = (/^[a-z][a-z0-9+.-]*:/i.test(instagramRaw) && !urlHttpSegura(instagramRaw)) ? "" : instagramRaw;
     const instagramEl = document.getElementById("beneficio-instagram");
     const instagramTextoEl = document.getElementById("beneficio-instagram-texto");
 
@@ -2377,7 +2434,7 @@ function renderBeneficioTextoLibre(idWrap, texto){
 
         wrap.innerHTML = `
             <a href="${escapeHtml(href)}" class="beneficio-item beneficio-link" target="_blank" rel="noopener">
-                <i class="bi ${escapeHtml(iconoClase)}"></i> <span>${escapeHtml(nombre)}</span>
+                <svg class="bi-icon"><use href="#${escapeHtml(iconoClase.replace(/^bi-/, "ic-"))}"></use></svg> <span>${escapeHtml(nombre)}</span>
             </a>
         `;
     } else {
@@ -2495,8 +2552,11 @@ async function ejecutarConsultaPedido() {
   btn.textContent = "Consultando...";
 
   try {
-    const response = await fetch(
-      API_URL + "?action=consultarPedido&pedidoId=" + encodeURIComponent(pedidoId) + "&dni=" + encodeURIComponent(dni)
+    // Con timeout (fetchAPI). Va directo a Apps Script, NUNCA por el caché:
+    // son datos personales. Se limita en el servidor/Worker el número de intentos.
+    const response = await fetchAPI(
+      API_URL + "?action=consultarPedido&pedidoId=" + encodeURIComponent(pedidoId) + "&dni=" + encodeURIComponent(dni),
+      {}, { timeoutMs: 20000, reintentos: 1 }
     );
     const data = await response.json();
 
@@ -2515,24 +2575,24 @@ async function ejecutarConsultaPedido() {
 
     const itemsHtml = items.map(i =>
       `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #eee;font-size:13px;">
-        <span>${i.cantidad}x ${i.PRODUCTO}</span>
+        <span>${escapeHtml(i.cantidad)}x ${escapeHtml(i.PRODUCTO)}</span>
         <span style="font-weight:600;">${simbolo}${Number(i.subtotal || 0).toLocaleString("es-AR")}</span>
       </div>`
     ).join("");
 
-    const envioHtml = [pedido.DIRECCION, pedido.LOCALIDAD, pedido.PROVINCIA].filter(Boolean).join(", ");
+    const envioHtml = escapeHtml([pedido.DIRECCION, pedido.LOCALIDAD, pedido.PROVINCIA].filter(Boolean).join(", "));
 
     document.getElementById("consultaResultadoBody").innerHTML = `
       <div style="border-radius:12px;background:#f7f8fa;padding:16px;margin-bottom:12px;">
-        <div style="font-size:11px;font-weight:700;color:#6b7585;letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px;">${pedido.PEDIDO_ID} · ${fecha}</div>
-        <div style="font-size:17px;font-weight:800;color:#0b1633;margin-bottom:8px;">${pedido.NOMBRE}</div>
+        <div style="font-size:11px;font-weight:700;color:#6b7585;letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px;">${escapeHtml(pedido.PEDIDO_ID)} · ${escapeHtml(fecha)}</div>
+        <div style="font-size:17px;font-weight:800;color:#0b1633;margin-bottom:8px;">${escapeHtml(pedido.NOMBRE)}</div>
         <div style="display:inline-block;padding:4px 14px;border-radius:20px;font-size:12px;font-weight:700;background:${estado.bg};color:${estado.color};">
-          ${estado.texto}
+          ${escapeHtml(estado.texto)}
         </div>
       </div>
 
       ${envioHtml ? `<div style="font-size:13px;color:#6b7585;margin-bottom:4px;">📍 ${envioHtml}</div>` : ""}
-      ${pedido.EMPRESA ? `<div style="font-size:13px;color:#6b7585;margin-bottom:12px;">🚚 Transporte: ${pedido.EMPRESA}</div>` : `<div style="margin-bottom:12px;"></div>`}
+      ${pedido.EMPRESA ? `<div style="font-size:13px;color:#6b7585;margin-bottom:12px;">🚚 Transporte: ${escapeHtml(pedido.EMPRESA)}</div>` : `<div style="margin-bottom:12px;"></div>`}
 
       <div style="background:#fff;border-radius:10px;padding:12px;border:1px solid #e2e6ed;">
         <div style="font-size:12px;font-weight:700;color:#6b7585;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">Resumen del pedido</div>
@@ -2578,6 +2638,7 @@ function esUrlDeVideo(url) {
 }
 
 function mostrarPopupPromo(url, tipo) {
+  url = urlHttpSegura(url);
   if (!url) return;
   const popup = document.getElementById("popupPromo");
   const img = document.getElementById("popupPromoImg");

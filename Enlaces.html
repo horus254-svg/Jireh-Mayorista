@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Enlaces</title>
+<meta name="referrer" content="strict-origin-when-cross-origin">
 <meta name="robots" content="index, follow">
 <meta name="theme-color" content="#241536">
 <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
@@ -326,6 +327,14 @@ const ICONOS = {
     geo: '<svg viewBox="0 0 16 16"><path d="M8 16s6-5.686 6-10A6 6 0 0 0 2 6c0 4.314 6 10 6 10m0-7a3 3 0 1 1 0-6 3 3 0 0 1 0 6"/></svg>'
 };
 
+function urlSegura(url){
+    const u = String(url || "").trim();
+    return /^https?:\/\//i.test(u) ? u : "";
+}
+function escapeAttr(t){
+    return String(t == null ? "" : t).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
 function detectarRed(url){
     let host = "";
     try{ host = new URL(url).hostname.toLowerCase(); }catch(e){ host = url.toLowerCase(); }
@@ -362,7 +371,7 @@ function crearLinkItem({clase, icono, titulo, sub, href, onClick}){
     if(onClick) el.addEventListener("click", onClick);
     el.innerHTML = `
         <span class="link-ico">${icono}</span>
-        <span class="link-label">${titulo}${sub ? `<span class="link-sub">${sub}</span>` : ""}</span>
+        <span class="link-label">${escapeAttr(titulo)}${sub ? `<span class="link-sub">${escapeAttr(sub)}</span>` : ""}</span>
         <span class="link-arrow">›</span>
     `;
     li.appendChild(el);
@@ -380,7 +389,8 @@ async function cargarLanding(){
         // El config.json de este sitio usa "apiUrl" (camelCase); se
         // acepta también "API_URL" por si en otra instalación se llamó
         // distinto.
-        apiUrl = cfg.apiUrl || cfg.API_URL || "";
+        // Se lee por el Worker con caché si existe (mucho tráfico); si no, Apps Script.
+        apiUrl = cfg.apiUrlLectura || cfg.apiUrl || cfg.API_URL || "";
     }catch(e){
         estadoEl.textContent = "No se pudo cargar config.json.";
         return;
@@ -420,8 +430,8 @@ async function cargarLanding(){
     }
 
     const avatarEl = document.getElementById("avatar");
-    if(config.iconoUrl){
-        avatarEl.innerHTML = `<img src="${config.iconoUrl}" alt="${config.nombre || ""}">`;
+    if(config.iconoUrl && (urlSegura(config.iconoUrl) || !/^[a-z][a-z0-9+.-]*:/i.test(config.iconoUrl))){
+        avatarEl.innerHTML = `<img src="${escapeAttr(config.iconoUrl)}" alt="${escapeAttr(config.nombre)}">`;
     }else{
         document.getElementById("avatarInicial").textContent = (config.nombre || "?").trim().charAt(0).toUpperCase();
     }
@@ -429,7 +439,7 @@ async function cargarLanding(){
     // Botones
     listaEl.innerHTML = "";
 
-    if(config.urlCatalogo){
+    if(urlSegura(config.urlCatalogo)){
         listaEl.appendChild(crearLinkItem({
             clase: "catalogo",
             icono: ICONOS.catalogo,
@@ -445,7 +455,7 @@ async function cargarLanding(){
             icono: ICONOS.whatsapp,
             titulo: "WhatsApp",
             sub: "Escribinos directo",
-            href: "https://wa.me/" + config.whatsappNumero
+            href: "https://wa.me/" + String(config.whatsappNumero).replace(/[^\d]/g, "")
         }));
     }
 
@@ -453,6 +463,7 @@ async function cargarLanding(){
     // enlace mirando su dominio, así no depende de en qué columna de
     // la hoja lo haya cargado el negocio.
     (config.enlaces || []).forEach(url => {
+        if(!urlSegura(url)) return; // ignora javascript:, data:, etc.
         const red = detectarRed(url);
         listaEl.appendChild(crearLinkItem({
             clase: red.clase,

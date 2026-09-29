@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="config.js"></script>
+<meta name="referrer" content="strict-origin-when-cross-origin">
 
 <style>
 
@@ -181,8 +182,6 @@ body{
 
 <script>
 
-const API_URL = CONFIG_NEGOCIO.API_URL;
-
 function formatearPrecio(valor){
     return Number(valor || 0).toLocaleString("es-AR");
 }
@@ -213,14 +212,26 @@ async function cargarPrecio(){
     const params = new URLSearchParams(window.location.search);
     const codigo = (params.get("codigo") || "").trim();
 
-    if(!codigo){
+    if(!codigo || codigo.length > 60){
         mostrarError("Este link no tiene un código de producto válido.");
         return;
     }
 
     try{
 
-        const res = await fetch(API_URL + "?action=producto&codigo=" + encodeURIComponent(codigo));
+        // Antes API_URL se leía al cargar el script, cuando todavía estaba vacía
+        // (la config se carga después), y se pegaba directo a Apps Script.
+        // Ahora se espera la config y se lee por el Worker con caché.
+        await cargarConfigNegocio();
+        const base = CONFIG_NEGOCIO.API_URL_LECTURA || CONFIG_NEGOCIO.API_URL;
+        if(!base){ mostrarError("Este sitio todavía no está configurado."); return; }
+
+        const ctl = new AbortController();
+        const timer = setTimeout(() => ctl.abort(), 15000);
+        let res;
+        try{
+            res = await fetch(base + "?action=producto&codigo=" + encodeURIComponent(codigo), { signal: ctl.signal });
+        }finally{ clearTimeout(timer); }
         const data = await res.json();
 
         if(!data.success || !data.producto){
@@ -230,7 +241,7 @@ async function cargarPrecio(){
 
         const p = data.producto;
         const stock = obtenerEstadoStock(p.STOCK);
-        const imagenUrl = p.IMAGEN ? String(p.IMAGEN).trim() : "";
+        const imagenUrl = /^https?:\/\//i.test(String(p.IMAGEN || "").trim()) ? String(p.IMAGEN).trim() : "";
 
         document.getElementById("precioCard").innerHTML = `
             <div class="precio-imagen-wrap">
@@ -241,7 +252,7 @@ async function cargarPrecio(){
             ${p.CATEGORIA ? `<div class="precio-categoria">${escapeHtml(p.CATEGORIA)}</div>` : ""}
             <div class="precio-nombre">${escapeHtml(p.PRODUCTO)}</div>
             <div class="precio-monto">$${formatearPrecio(p.PRECIO)}</div>
-            ${stock ? `<div class="precio-stock ${stock.clase}">${stock.texto}</div>` : ""}
+            ${stock ? `<div class="precio-stock ${stock.clase}">${escapeHtml(stock.texto)}</div>` : ""}
             <div class="precio-codigo">${escapeHtml(p.CODIGO)}</div>
         `;
 
