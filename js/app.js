@@ -204,16 +204,68 @@ function mostrarSkeleton(n){
     document.getElementById("sin-resultados").classList.add("d-none");
 }
 
+const CLAVE_CACHE_CATALOGO = "catalogo_cache_v1";
+
+function leerCatalogoLocal(){
+    try{
+        const c = JSON.parse(localStorage.getItem(CLAVE_CACHE_CATALOGO) || "null");
+        return c && Array.isArray(c.productos) && c.productos.length ? c.productos : null;
+    }catch(e){ return null; }
+}
+
+function guardarCatalogoLocal(productos){
+    try{ localStorage.setItem(CLAVE_CACHE_CATALOGO, JSON.stringify({ t: Date.now(), productos })); }
+    catch(e){ /* sin espacio o modo privado: se ignora */ }
+}
+
 async function cargarProductos(){
 
-    mostrarSkeleton();
+    // Si ya visitó antes, se muestra al instante el último catálogo
+    // guardado y se actualiza en segundo plano (así no espera al servidor).
+    const previo = leerCatalogoLocal();
+    if(previo){
+        procesarProductos(previo);
+    }else{
+        mostrarSkeleton();
+    }
 
     try{
 
-        const res = await fetchAPI(API_URL + "?action=productos");
+        // Apps Script en frío puede tardar más de 10 s; cortar antes solo
+        // descartaba una respuesta que estaba por llegar. 30 s y 1 reintento.
+        const res = await fetchAPI(API_URL + "?action=productos", {}, { timeoutMs: 30000, reintentos: 2 });
         const data = await res.json();
 
-        const productosConStock = (data.productos || [])
+        if(!data || data.success === false || !Array.isArray(data.productos)){
+            throw new Error("Respuesta inválida del catálogo");
+        }
+
+        guardarCatalogoLocal(data.productos);
+        procesarProductos(data.productos);
+
+    }catch(err){
+
+        console.error(err);
+
+        if(!previo){
+            document.getElementById("productos").innerHTML = "";
+            mostrarToast("No pudimos cargar el catálogo. Revisá tu conexión y volvé a intentar.", "error");
+        }
+
+    } finally {
+
+        // Ocultar el loading cat al terminar — con o sin error
+        const cat = document.getElementById("loadingCat");
+        if(cat){
+            cat.style.opacity = "0";
+            setTimeout(() => cat.remove(), 500);
+        }
+    }
+}
+
+function procesarProductos(listaProductos){
+
+        const productosConStock = (listaProductos || [])
             .filter(p => Number(String(p.STOCK).trim()) > 0);
 
         // Los productos nuevos se agregan siempre al final de la hoja
@@ -244,24 +296,6 @@ async function cargarProductos(){
 
         renderChips();
         aplicarFiltros();
-
-    }catch(err){
-
-        console.error(err);
-
-        document.getElementById("productos").innerHTML = "";
-
-        mostrarToast("No pudimos cargar el catálogo. Revisá tu conexión y volvé a intentar.", "error");
-
-    } finally {
-
-        // Ocultar el loading cat al terminar — con o sin error
-        const cat = document.getElementById("loadingCat");
-        if(cat){
-            cat.style.opacity = "0";
-            setTimeout(() => cat.remove(), 500);
-        }
-    }
 }
 
 /* =========================================================
