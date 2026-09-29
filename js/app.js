@@ -204,6 +204,22 @@ function mostrarSkeleton(n){
     document.getElementById("sin-resultados").classList.add("d-none");
 }
 
+/**
+ * Las imágenes subidas desde el panel se sirven desde
+ * lh3.googleusercontent.com/d/ID en su tamaño ORIGINAL (fotos de varios
+ * MB). En el celular, bajar decenas de esas por datos móviles es lo que
+ * más tarda. Google permite pedir la misma imagen ya redimensionada
+ * agregando "=wANCHO" — se aplica solo a esas URLs; cualquier otra URL
+ * (o una que ya tenga tamaño) se devuelve igual.
+ */
+function imgOptimizada(url, ancho){
+    let u = String(url || "");
+    if(u.indexOf("lh3.googleusercontent.com/d/") === -1) return u;
+    u = u.replace(/=w\d+$/, ""); // si ya venía redimensionada (ej. desde el Quick View), se parte de la original
+    if(u.indexOf("=") !== -1) return u; // ya tiene otro parámetro de tamaño propio
+    return u + "=w" + ancho;
+}
+
 const CLAVE_CACHE_CATALOGO = "catalogo_cache_v1";
 
 function leerCatalogoLocal(){
@@ -523,7 +539,7 @@ function mostrarProductos(lista){
         const codigo = escapeHtml(p.CODIGO);
         const nombre = escapeHtml(p.PRODUCTO);
         const categoria = escapeHtml(p.CATEGORIA);
-        const imagen = p.IMAGEN || "";
+        const imagen = imgOptimizada(p.IMAGEN || "", 480);
 
         const stock = obtenerEstadoStock(p.STOCK);
 
@@ -543,6 +559,7 @@ function mostrarProductos(lista){
                         src="${imagen}"
                         alt="${nombre}"
                         loading="lazy"
+                        decoding="async"
                         onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'">
                 </div>
 
@@ -740,7 +757,7 @@ function renderGaleriaQuickView(producto){
 
         const item = galeria[index] || { url: producto.IMAGEN || "", color: "" };
 
-        img.src = item.url;
+        img.src = imgOptimizada(item.url, 900);
         img.alt = producto.PRODUCTO || "";
         img.onerror = function(){ this.onerror = null; this.src = PLACEHOLDER_IMG; };
 
@@ -909,9 +926,10 @@ function renderRelacionados(producto){
             data-code="${escapeHtml(p.CODIGO)}"
             aria-label="Ver ${escapeHtml(p.PRODUCTO)}">
             <img
-                src="${p.IMAGEN || ""}"
+                src="${imgOptimizada(p.IMAGEN || "", 240)}"
                 alt="${escapeHtml(p.PRODUCTO)}"
                 loading="lazy"
+                decoding="async"
                 onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'">
             <span class="qv-relacionado-nombre">${escapeHtml(p.PRODUCTO)}</span>
             <span class="qv-relacionado-precio">$${formatearPrecio(p.PRECIO)}</span>
@@ -1149,7 +1167,7 @@ function abrirProductoDesdeURL(){
 document.getElementById("qv-agregar").addEventListener("click", function(){
 
     const cantidad = parseInt(document.getElementById("qv-cantidad").value) || 1;
-    const imagenActual = document.getElementById("qv-imagen").src;
+    const imagenActual = String(document.getElementById("qv-imagen").src || "").replace(/=w\d+$/, ""); // se guarda la URL original, no la redimensionada del visor
 
     agregarAlCarrito(qvProductoActual, cantidad, qvColorSeleccionado, imagenActual);
 
@@ -1562,9 +1580,10 @@ function abrirCarrito(){
 
                     <img
                         class="cart-item-thumb"
-                        src="${item.IMAGEN || ""}"
+                        src="${imgOptimizada(item.IMAGEN || "", 160)}"
                         alt="${escapeHtml(item.PRODUCTO)}"
                         loading="lazy"
+                        decoding="async"
                         onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'">
 
                     <div class="cart-item-info">
