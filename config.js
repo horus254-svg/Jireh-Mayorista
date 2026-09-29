@@ -18,6 +18,7 @@
  */
 
 let API_URL_BASE = "";
+let API_URL_LECTURA_BASE = ""; // Worker de Cloudflare (solo lecturas del catálogo); si falta, se lee de API_URL
 
 // Valores de respaldo, usados únicamente si falla la conexión con
 // Sheets (sin internet, la API caída, etc.) — así ninguna página
@@ -66,6 +67,7 @@ async function resolverApiUrlBase(){
     if(res.ok){
       const cfg = await res.json();
       if(cfg.apiUrl) API_URL_BASE = cfg.apiUrl;
+      if(cfg.apiUrlLectura) API_URL_LECTURA_BASE = cfg.apiUrlLectura;
     }
   }catch(error){
     console.error("No se pudo leer config.json para obtener la API URL:", error);
@@ -96,8 +98,14 @@ let _configuracionNegocioPromise = null;
 
 async function obtenerConfiguracionNegocioCruda(apiUrl){
   if(!_configuracionNegocioPromise){
-    _configuracionNegocioPromise = fetch(apiUrl + "?action=configuracionNegocio")
-      .then(res => res.json());
+    const lectura = API_URL_LECTURA_BASE || apiUrl;
+    _configuracionNegocioPromise = fetch(lectura + "?action=configuracionNegocio")
+      .then(res => res.json())
+      .catch(err => {
+        // Si el Worker falla, se reintenta directo contra Apps Script.
+        if(lectura === apiUrl) throw err;
+        return fetch(apiUrl + "?action=configuracionNegocio").then(res => res.json());
+      });
   }
   return _configuracionNegocioPromise;
 }
@@ -111,6 +119,7 @@ async function obtenerConfiguracionNegocioCruda(apiUrl){
  */
 async function cargarConfigNegocio(){
   const apiUrl = await resolverApiUrlBase();
+  CONFIG_NEGOCIO.API_URL_LECTURA = API_URL_LECTURA_BASE || apiUrl;
   CONFIG_NEGOCIO.API_URL = apiUrl; // disponible ya mismo, sin esperar a Sheets
 
   if(!apiUrl){
@@ -126,6 +135,7 @@ async function cargarConfigNegocio(){
 
     CONFIG_NEGOCIO = {
       API_URL: apiUrl,
+      API_URL_LECTURA: API_URL_LECTURA_BASE || apiUrl,
       NOMBRE_NEGOCIO: cfg.nombre || CONFIG_NEGOCIO_RESPALDO.NOMBRE_NEGOCIO,
       NOMBRE_CORTO: cfg.nombreCorto || CONFIG_NEGOCIO_RESPALDO.NOMBRE_CORTO,
       TEMA: cfg.tema || CONFIG_NEGOCIO_RESPALDO.TEMA,

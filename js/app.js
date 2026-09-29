@@ -30,6 +30,9 @@ function normalizarTextoTransporte(texto){
 // este catálogo no tiene forma de saber a qué backend pertenece, así
 // que no debe intentar hablar con el de otra instalación.
 let API_URL = "";
+// Solo para LECTURAS del catálogo (Worker de Cloudflare con caché). Los pedidos y
+// todo lo que escribe siguen yendo a API_URL (Apps Script).
+let API_URL_LECTURA = "";
 
 /**
  * Reemplazo de fetch() para las llamadas al backend, con timeout
@@ -78,6 +81,7 @@ async function cargarConfigCliente() {
   }
   if (typeof CONFIG_NEGOCIO !== "undefined" && CONFIG_NEGOCIO.API_URL) {
     API_URL = CONFIG_NEGOCIO.API_URL;
+    API_URL_LECTURA = CONFIG_NEGOCIO.API_URL_LECTURA || CONFIG_NEGOCIO.API_URL;
   } else {
     console.error("No se pudo obtener la API URL (falta config.js o config.json) — este catálogo no puede conectarse a ningún backend.");
   }
@@ -249,7 +253,7 @@ async function cargarProductos(){
 
         // Apps Script en frío puede tardar más de 10 s; cortar antes solo
         // descartaba una respuesta que estaba por llegar. 30 s y 1 reintento.
-        const res = await fetchAPI(API_URL + "?action=productos", {}, { timeoutMs: 30000, reintentos: 2 });
+        const res = await fetchAPI(API_URL_LECTURA + "?action=productos", {}, { timeoutMs: 30000, reintentos: 2 });
         const data = await res.json();
 
         if(!data || data.success === false || !Array.isArray(data.productos)){
@@ -1954,7 +1958,7 @@ async function aplicarApariencia(){
 
         // 30 s: Apps Script en frío puede pasar los 10 s; abortar antes
         // dejaba la config (y el pedido mínimo) sin cargar.
-        const res = await fetchAPI(API_URL + "?action=configuracionNegocio", {}, { timeoutMs: 30000 });
+        const res = await fetchAPI(API_URL_LECTURA + "?action=configuracionNegocio", {}, { timeoutMs: 30000 });
         const data = await res.json();
 
         if(!data.success || !data.config) return;
@@ -2370,7 +2374,7 @@ async function descargarCatalogoPDF(){
 
     try{
 
-        const response = await fetchAPI(API_URL + "?action=catalogoPDFInfo");
+        const response = await fetchAPI(API_URL_LECTURA + "?action=catalogoPDFInfo");
         const data = await response.json();
 
         if(!data.success){

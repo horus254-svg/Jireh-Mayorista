@@ -1,9 +1,10 @@
 {
   "empresa": "Jireh Mayorista",
-  "apiUrl": "https://veek-api.veek254.workers.dev/",
+  "apiUrl": "https://script.google.com/macros/s/AKfycbw1eY_mXImG503rU0Cqddx1WBuGIOhxaW_SXGoIMsug_CjsSC-HLsb2XzYwrovaGBU/exec",
   "moneda": "ARS",
   "whatsapp": "",
   "direccion": "",
   "version": "1.0",
-  "generadoEn": "2026-07-09"
+  "generadoEn": "2026-07-09",
+  "apiUrlLectura": "https://veek-api.veek254.workers.dev/"
 }
