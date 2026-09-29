@@ -1805,12 +1805,9 @@ async function checkoutWhatsapp(){
     let total = 0;
     estado.carrito.forEach(item => { total += item.PRECIO * item.cantidad; });
 
-    if(total < pedidoMinimo){
-        const falta2 = pedidoMinimo - total;
-        mostrarToast(`Te faltan $${formatearPrecio(falta2)} para llegar al pedido mínimo de $${formatearPrecio(pedidoMinimo)}.`, "error");
-        desactivarCargaCheckout();
-        return;
-    }
+    // El mínimo NO se bloquea acá con el valor local (puede estar viejo
+    // en caché y frenar pedidos válidos tras bajar el mínimo). La decisión
+    // final la toma el servidor con el valor vigente de la hoja.
 
     try{
 
@@ -1819,26 +1816,59 @@ async function checkoutWhatsapp(){
         // de URL de Safari/iOS y el pedido fallaba sin guardarse. Con el
         // carrito en el body, no hay ese límite. El backend (doPost) ya
         // espera exactamente este formato para action: "guardarPedido".
-        const response = await fetchAPI(API_URL, {
-            method: "POST",
-            headers: { "Content-Type": "text/plain;charset=utf-8" }, // evita que el navegador dispare un preflight CORS contra Apps Script
-            body: JSON.stringify({
-                action: "guardarPedido",
-                nombre,
-                empresa,
-                direccion,
-                localidad,
-                provincia,
-                codigoPostal,
-                telefono,
-                dni,
-                total,
-                carrito: estado.carrito
-            })
+        // idOperacion: identifica ESTE intento de pedido. Si la respuesta se
+        // pierde (timeout / mala señal) y se reintenta, el servidor devuelve
+        // el pedido ya guardado en vez de duplicarlo.
+        if(!estado.idOperacionPedido){
+            estado.idOperacionPedido = (window.crypto && crypto.randomUUID)
+                ? crypto.randomUUID().replace(/-/g, "")
+                : ("op" + Date.now().toString(36) + Math.random().toString(36).slice(2, 10));
+        }
+        const cuerpoPedido = JSON.stringify({
+            action: "guardarPedido",
+            idOperacion: estado.idOperacionPedido,
+            nombre,
+            empresa,
+            direccion,
+            localidad,
+            provincia,
+            codigoPostal,
+            telefono,
+            dni,
+            total,
+            carrito: estado.carrito
         });
-        const resultado = await response.json();
+
+        let resultado = null;
+        let ultimoError = null;
+        for(let intento = 1; intento <= 2 && !resultado; intento++){
+            try{
+                const response = await fetchAPI(API_URL, {
+                    method: "POST",
+                    headers: { "Content-Type": "text/plain;charset=utf-8" }, // evita preflight CORS contra Apps Script
+                    body: cuerpoPedido
+                }, { timeoutMs: 45000, reintentos: 0 });
+                resultado = await response.json();
+            }catch(errIntento){
+                ultimoError = errIntento;
+                console.warn("Intento " + intento + " de guardar pedido falló:", errIntento);
+            }
+        }
+        if(!resultado) throw ultimoError || new Error("Sin respuesta del servidor");
+
+        // Si el servidor informa un pedido mínimo distinto al que teníamos
+        // (config vieja en caché), se actualiza y se avisa.
+        if(resultado.pedidoMinimo !== undefined && !isNaN(Number(resultado.pedidoMinimo))){
+            pedidoMinimo = Number(resultado.pedidoMinimo);
+            try{
+                const previa = JSON.parse(localStorage.getItem(CLAVE_CACHE_CONFIG) || "null");
+                if(previa){ previa.pedidoMinimo = pedidoMinimo; localStorage.setItem(CLAVE_CACHE_CONFIG, JSON.stringify(previa)); }
+            }catch(e){}
+            if(typeof actualizarContador === "function") actualizarContador();
+        }
 
         if(!resultado.success){
+            if(resultado.pedidoMinimo === undefined) estado.idOperacionPedido = null; // error definitivo: el próximo intento es un pedido nuevo
             mostrarToast(resultado.message || "No se pudo guardar el pedido. Intentá de nuevo.", "error");
             desactivarCargaCheckout();
             return;
@@ -1873,6 +1903,7 @@ Subtotal: $${formatearPrecio(subtotal)}
 💰 TOTAL: $${formatearPrecio(total)}
 `;
 
+        estado.idOperacionPedido = null;
         estado.carrito = [];
         localStorage.removeItem("carrito");
         guardarCarrito();
