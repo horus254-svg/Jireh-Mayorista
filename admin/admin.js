@@ -66,7 +66,7 @@ async function fetchAPI(url, opciones = {}, config = {}) {
   const esMutacionPorNombre = /^(guardar|actualizar|eliminar|crear|editar|registrar|cambiar|anular|borrar|marcar|activar|fijar|probar|cancelar|confirmar|aplicar|reordenar|subir|migrar|inicializar|sumar)/i.test(accionUrl);
 
   const esLectura = (!opciones.method || opciones.method === "GET") && !esMutacionPorNombre;
-  const timeoutMs = config.timeoutMs || (esLectura ? 10000 : 20000);
+  const timeoutMs = config.timeoutMs || (esLectura ? 25000 : 30000);
   const maxIntentos = esLectura ? (config.reintentos ?? 2) : 1;
 
   let ultimoError;
@@ -155,7 +155,7 @@ function iniciarPollingSecciones() {
 
   setTimeout(() => {
     ejecutarPollingSecciones();
-    setInterval(ejecutarPollingSecciones, 15000); // 15 s — near real-time without hammering the API
+    setInterval(ejecutarPollingSecciones, 30000); // 15 s — near real-time without hammering the API
   }, offsetInicial);
 }
 
@@ -2191,7 +2191,7 @@ async function _eliminarPedidosCanceladosConfirmado() {
         headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify({ action: "eliminarPedidosCancelados", rol: obtenerRolActual() })
       },
-      { timeoutMs: 20000 }
+      { timeoutMs: 30000 }
     );
     const data = await response.json();
 
@@ -2226,7 +2226,9 @@ async function cambiarEstado(pedidoId, estado) {
       API_URL +
       "?action=actualizarEstado" +
       "&pedidoId=" + encodeURIComponent(pedidoId) +
-      "&estado="   + encodeURIComponent(estado)
+      "&estado="   + encodeURIComponent(estado),
+      {},
+      { timeoutMs: 30000 }
     );
     let data;
     try {
@@ -8650,7 +8652,7 @@ function cerrarCamaraScan() {
 let cierreCajaResumenActual = null; // último resumen "esperado" cargado del backend
 
 /** Loads today's expected totals by payment method and pre-fills the form */
-async function cargarResumenCierreCaja(fecha) {
+async function cargarResumenCierreCaja(fecha, forzar = false) {
   const estadoEl = document.getElementById("cierreCajaEstado");
 
   // Caché por fecha — 90 segundos (el cierre rara vez cambia en segundos,
@@ -8659,7 +8661,7 @@ async function cargarResumenCierreCaja(fecha) {
   const CACHE_TTL = 90 * 1000;
 
   try {
-    const raw = localStorage.getItem(CACHE_KEY);
+    const raw = forzar ? null : localStorage.getItem(CACHE_KEY);
     if (raw) {
       const { ts, data } = JSON.parse(raw);
       if (Date.now() - ts < CACHE_TTL) {
