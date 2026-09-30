@@ -155,7 +155,7 @@ function iniciarPollingSecciones() {
 
   setTimeout(() => {
     ejecutarPollingSecciones();
-    setInterval(ejecutarPollingSecciones, 60000); // 60 s — menos carga sobre Apps Script
+    setInterval(ejecutarPollingSecciones, 30000); // 15 s — near real-time without hammering the API
   }, offsetInicial);
 }
 
@@ -220,29 +220,32 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Verificar licencia (solo en Electron con window.veekpos disponible)
   aplicarEstadoLicencia();
 
-  mostrarSeccion("dashboard");
-  cargarConfigNegocioDesdeBackend();
-  reconectarImpresoraUSBSiPosible();
-  // Antes esto esperaba a que terminaran las métricas para recién
-  // ahí arrancar el pedido de ventas POS — dos idas y vueltas al
-  // backend en serie, una atrás de la otra, aunque no dependen entre
-  // sí. Ahora arrancan las dos al mismo tiempo: el dashboard queda
-  // listo en lo que tarda la más lenta de las dos, no en la suma.
-  await Promise.all([cargarMetricas(), cargarVentasPOS()]);
-  iniciarPollingSecciones();
+  // Pantalla inicial: el POS (si el rol lo permite; si no, el dashboard).
+  // Nada de lo que sigue bloquea el arranque: antes se esperaba a las
+  // metricas/ventas del dashboard (Apps Script, ~20s) antes de quitar la
+  // pantalla de carga, aunque el usuario ni estuviera en el dashboard.
+  // En Electron, pos-offline.js se inyecta desde preload.js y envuelve
+  // asegurarProductosPOS (catalogo desde SQLite). Se espera (max 3s) a que
+  // este listo, para no abrir el POS con la version online lenta.
+  if (window.veekpos || window.posOffline) {
+    for (let i = 0; i < 60 && !window.__posOfflineListo; i++) await new Promise(r => setTimeout(r, 50));
+  }
+  mostrarSeccion(seccionPermitidaParaRol("pos") ? "pos" : "dashboard");
 
-  // Si quedaron ventas pendientes de sincronizar de una sesión
-  // anterior (por ejemplo, se cerró la app en medio de un corte de
-  // conexión), mostrar el aviso y probar subirlas ahora.
-  actualizarBadgeVentasPendientes(_leerColaVentasPendientes().length);
-  sincronizarVentasPendientes();
-
-  // Ocultar el loading cat una vez que el dashboard cargó
+  // Quitar el loading ya mismo
   const cat = document.getElementById("loadingCat");
   if (cat) {
     cat.style.opacity = "0";
     setTimeout(() => cat.remove(), 500);
   }
+
+  cargarConfigNegocioDesdeBackend();
+  reconectarImpresoraUSBSiPosible();
+  iniciarPollingSecciones();
+
+  // Ventas pendientes de sesiones anteriores: aviso + reintento en segundo plano
+  actualizarBadgeVentasPendientes(_leerColaVentasPendientes().length);
+  sincronizarVentasPendientes();
 
   setupScannerListener();
   suscribirseATransferenciasMP();
@@ -1897,6 +1900,7 @@ function mostrarSeccion(id) {
   });
 
   dolarBurbujaAlCambiarSeccion(id);
+  if (id === "dashboard") cargarSiVencido("dashboard", () => { cargarMetricas(); cargarVentasPOS(); });
   if (id === "pedidos")   cargarSiVencido("pedidos", cargarPedidos);
   if (id === "productos") cargarSiVencido("productos", cargarProductos);
   if (id === "ingresoProductos") {
@@ -2520,7 +2524,6 @@ function renderEdicionItemsPedido() {
         <input type="text" id="edicionPedidoBuscarProducto" class="form-control form-control-sm" placeholder="🔍 Código o nombre del producto a agregar..."
           autocomplete="off" oninput="_edicionPedidoActualizarResultados()" onkeydown="if(event.key==='Enter'){event.preventDefault(); _edicionPedidoAgregarProducto();}">
         <button type="button" class="btn btn-outline-primary btn-sm" style="white-space:nowrap;" onclick="_edicionPedidoAgregarProducto()">+ Agregar</button>
-        <button type="button" class="btn btn-outline-secondary btn-sm" style="white-space:nowrap;" title="Agregar una caja cerrada al precio por caja" onclick="_edicionPedidoAgregarProducto(true)">📦 Caja</button>
       </div>
       <div id="edicionPedidoResultados" class="edicion-pedido-resultados" style="display:none;"></div>
     </div>
@@ -2614,20 +2617,12 @@ function _edicionPedidoActualizarResultados() {
     return;
   }
 
-  cont.innerHTML = coincidencias.map((p, idx) => {
-    const uds = Number(p.UNIDADES_POR_CAJA) || 0;
-    const pCaja = Number(p.PRECIO_CAJA) || 0;
-    const botonCaja = (uds > 0 && pCaja > 0)
-      ? `<button type="button" class="btn btn-outline-secondary btn-sm" style="white-space:nowrap; padding:1px 8px; font-size:12px;" title="Agregar 1 caja (${uds} uds) a $${pCaja.toLocaleString("es-AR")}" onclick="event.stopPropagation(); _edicionPedidoElegirResultado(${idx}, true)">📦 Caja x${uds} · $${pCaja.toLocaleString("es-AR")}</button>`
-      : "";
-    return `
+  cont.innerHTML = coincidencias.map((p, idx) => `
     <div class="edicion-pedido-resultado-item" onclick="_edicionPedidoElegirResultado(${idx})">
       <span class="epr-codigo">${escapeHtml(p.CODIGO)}</span>
       <span class="epr-nombre">${escapeHtml(p.PRODUCTO)}</span>
       <span class="epr-precio">$${Number(p.PRECIO || 0).toLocaleString("es-AR")}</span>
-      ${botonCaja}
-    </div>`;
-  }).join("");
+    </div>`).join("");
 
   // Se guardan las coincidencias actuales para que el clic (que solo
   // manda el índice) sepa a qué producto corresponde cada fila.
@@ -2638,13 +2633,15 @@ function _edicionPedidoActualizarResultados() {
 
 let _resultadosEdicionPedidoActuales = [];
 
-function _edicionPedidoElegirResultado(idx, comoCaja) {
+function _edicionPedidoElegirResultado(idx) {
   const producto = _resultadosEdicionPedidoActuales[idx];
   if (!producto) return;
 
-  // Se agrega sin limpiar la búsqueda: la lista queda abierta para poder
-  // tocar varias veces (más cajas / unidades) o pasar a otro producto.
-  _edicionPedidoAgregarDirecto(producto, comoCaja === true);
+  _productoElegidoEdicionPedido = producto;
+  document.getElementById("edicionPedidoBuscarProducto").value = `${producto.CODIGO} — ${producto.PRODUCTO}`;
+  document.getElementById("edicionPedidoResultados").style.display = "none";
+
+  _edicionPedidoAgregarProducto();
 }
 
 // Cierra la lista de resultados si se toca en cualquier otro lado del modal
@@ -2656,7 +2653,7 @@ document.addEventListener("click", (e) => {
   cont.style.display = "none";
 });
 
-function _edicionPedidoAgregarProducto(comoCaja) {
+function _edicionPedidoAgregarProducto() {
   const input = document.getElementById("edicionPedidoBuscarProducto");
   const texto = input.value.trim();
   if (!texto) return;
@@ -2670,63 +2667,11 @@ function _edicionPedidoAgregarProducto(comoCaja) {
     const fuente = (productosAdminGlobal && productosAdminGlobal.length ? productosAdminGlobal : productosPOS) || [];
     producto = fuente.find(p => String(p.CODIGO).toLowerCase() === codigoEscrito)
       || fuente.find(p => String(p.PRODUCTO).toLowerCase() === texto.toLowerCase());
-    if (!producto) {
-      // Código de barras / código de la caja escrito directamente
-      producto = fuente.find(p => p.CODIGO_CAJA && String(p.CODIGO_CAJA).toLowerCase() === codigoEscrito);
-      if (producto) comoCaja = true;
-    }
   }
 
   if (!producto) { toast("No se encontró ese producto — elegilo de la lista de resultados", "error"); return; }
 
-  if (_edicionPedidoAgregarDirecto(producto, comoCaja === true, true)) {
-    input.value = "";
-    _productoElegidoEdicionPedido = null;
-    renderEdicionItemsPedido();
-  }
-}
-
-// Agrega un producto (unidad o caja) al pedido en edición. Con
-// "limpiar" false conserva el texto buscado y la lista de resultados
-// para seguir agregando (el modal se vuelve a dibujar y hay que restaurarlos).
-function _edicionPedidoAgregarDirecto(producto, comoCaja, sinRender) {
-  const ok = _edicionPedidoAgregarLinea(producto, comoCaja);
-  if (!ok || sinRender) return ok;
-  const input0 = document.getElementById("edicionPedidoBuscarProducto");
-  const texto = input0 ? input0.value : "";
-  renderEdicionItemsPedido();
-  const input = document.getElementById("edicionPedidoBuscarProducto");
-  if (input && texto) {
-    input.value = texto;
-    _edicionPedidoActualizarResultados();
-    input.focus();
-  }
-  return ok;
-}
-
-function _edicionPedidoAgregarLinea(producto, comoCaja) {
-  const esLineaCaja = i => i._esCaja || /\(caja x\d+\)/i.test(String(i.PRODUCTO || ""));
-
-  if (comoCaja === true) {
-    const unidades = Number(producto.UNIDADES_POR_CAJA) || 0;
-    const precioCaja = Number(producto.PRECIO_CAJA) || 0;
-    if (unidades <= 0 || precioCaja <= 0) { toast("Este producto no tiene precio por caja configurado", "error"); return false; }
-    const existenteCaja = _carritoEdicionPedido.find(i => String(i.CODIGO) === String(producto.CODIGO) && esLineaCaja(i));
-    if (existenteCaja) {
-      existenteCaja.cantidad += unidades;
-    } else {
-      _carritoEdicionPedido.push({
-        CODIGO: producto.CODIGO,
-        PRODUCTO: `${producto.PRODUCTO} (caja x${unidades})`,
-        cantidad: unidades,
-        PRECIO: precioCaja / unidades,
-        _esCaja: true
-      });
-    }
-    return true;
-  }
-
-  const existente = _carritoEdicionPedido.find(i => String(i.CODIGO) === String(producto.CODIGO) && !esLineaCaja(i));
+  const existente = _carritoEdicionPedido.find(i => String(i.CODIGO) === String(producto.CODIGO));
   if (existente) {
     existente.cantidad++;
   } else {
@@ -2738,7 +2683,9 @@ function _edicionPedidoAgregarLinea(producto, comoCaja) {
     });
   }
 
-  return true;
+  input.value = "";
+  _productoElegidoEdicionPedido = null;
+  renderEdicionItemsPedido();
 }
 
 async function guardarEdicionItemsPedido() {
