@@ -155,7 +155,7 @@ function iniciarPollingSecciones() {
 
   setTimeout(() => {
     ejecutarPollingSecciones();
-    setInterval(ejecutarPollingSecciones, 30000); // 15 s — near real-time without hammering the API
+    setInterval(ejecutarPollingSecciones, 60000); // 60 s — menos carga sobre Apps Script
   }, offsetInicial);
 }
 
