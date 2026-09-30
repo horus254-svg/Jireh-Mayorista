@@ -2614,12 +2614,20 @@ function _edicionPedidoActualizarResultados() {
     return;
   }
 
-  cont.innerHTML = coincidencias.map((p, idx) => `
+  cont.innerHTML = coincidencias.map((p, idx) => {
+    const uds = Number(p.UNIDADES_POR_CAJA) || 0;
+    const pCaja = Number(p.PRECIO_CAJA) || 0;
+    const botonCaja = (uds > 0 && pCaja > 0)
+      ? `<button type="button" class="btn btn-outline-secondary btn-sm" style="white-space:nowrap; padding:1px 8px; font-size:12px;" title="Agregar 1 caja (${uds} uds) a $${pCaja.toLocaleString("es-AR")}" onclick="event.stopPropagation(); _edicionPedidoElegirResultado(${idx}, true)">📦 Caja x${uds} · $${pCaja.toLocaleString("es-AR")}</button>`
+      : "";
+    return `
     <div class="edicion-pedido-resultado-item" onclick="_edicionPedidoElegirResultado(${idx})">
       <span class="epr-codigo">${escapeHtml(p.CODIGO)}</span>
       <span class="epr-nombre">${escapeHtml(p.PRODUCTO)}</span>
       <span class="epr-precio">$${Number(p.PRECIO || 0).toLocaleString("es-AR")}</span>
-    </div>`).join("");
+      ${botonCaja}
+    </div>`;
+  }).join("");
 
   // Se guardan las coincidencias actuales para que el clic (que solo
   // manda el índice) sepa a qué producto corresponde cada fila.
@@ -2630,15 +2638,13 @@ function _edicionPedidoActualizarResultados() {
 
 let _resultadosEdicionPedidoActuales = [];
 
-function _edicionPedidoElegirResultado(idx) {
+function _edicionPedidoElegirResultado(idx, comoCaja) {
   const producto = _resultadosEdicionPedidoActuales[idx];
   if (!producto) return;
 
-  _productoElegidoEdicionPedido = producto;
-  document.getElementById("edicionPedidoBuscarProducto").value = `${producto.CODIGO} — ${producto.PRODUCTO}`;
-  document.getElementById("edicionPedidoResultados").style.display = "none";
-
-  _edicionPedidoAgregarProducto();
+  // Se agrega sin limpiar la búsqueda: la lista queda abierta para poder
+  // tocar varias veces (más cajas / unidades) o pasar a otro producto.
+  _edicionPedidoAgregarDirecto(producto, comoCaja === true);
 }
 
 // Cierra la lista de resultados si se toca en cualquier otro lado del modal
@@ -2673,12 +2679,38 @@ function _edicionPedidoAgregarProducto(comoCaja) {
 
   if (!producto) { toast("No se encontró ese producto — elegilo de la lista de resultados", "error"); return; }
 
+  if (_edicionPedidoAgregarDirecto(producto, comoCaja === true, true)) {
+    input.value = "";
+    _productoElegidoEdicionPedido = null;
+    renderEdicionItemsPedido();
+  }
+}
+
+// Agrega un producto (unidad o caja) al pedido en edición. Con
+// "limpiar" false conserva el texto buscado y la lista de resultados
+// para seguir agregando (el modal se vuelve a dibujar y hay que restaurarlos).
+function _edicionPedidoAgregarDirecto(producto, comoCaja, sinRender) {
+  const ok = _edicionPedidoAgregarLinea(producto, comoCaja);
+  if (!ok || sinRender) return ok;
+  const input0 = document.getElementById("edicionPedidoBuscarProducto");
+  const texto = input0 ? input0.value : "";
+  renderEdicionItemsPedido();
+  const input = document.getElementById("edicionPedidoBuscarProducto");
+  if (input && texto) {
+    input.value = texto;
+    _edicionPedidoActualizarResultados();
+    input.focus();
+  }
+  return ok;
+}
+
+function _edicionPedidoAgregarLinea(producto, comoCaja) {
   const esLineaCaja = i => i._esCaja || /\(caja x\d+\)/i.test(String(i.PRODUCTO || ""));
 
   if (comoCaja === true) {
     const unidades = Number(producto.UNIDADES_POR_CAJA) || 0;
     const precioCaja = Number(producto.PRECIO_CAJA) || 0;
-    if (unidades <= 0 || precioCaja <= 0) { toast("Este producto no tiene precio por caja configurado", "error"); return; }
+    if (unidades <= 0 || precioCaja <= 0) { toast("Este producto no tiene precio por caja configurado", "error"); return false; }
     const existenteCaja = _carritoEdicionPedido.find(i => String(i.CODIGO) === String(producto.CODIGO) && esLineaCaja(i));
     if (existenteCaja) {
       existenteCaja.cantidad += unidades;
@@ -2691,10 +2723,7 @@ function _edicionPedidoAgregarProducto(comoCaja) {
         _esCaja: true
       });
     }
-    input.value = "";
-    _productoElegidoEdicionPedido = null;
-    renderEdicionItemsPedido();
-    return;
+    return true;
   }
 
   const existente = _carritoEdicionPedido.find(i => String(i.CODIGO) === String(producto.CODIGO) && !esLineaCaja(i));
@@ -2709,9 +2738,7 @@ function _edicionPedidoAgregarProducto(comoCaja) {
     });
   }
 
-  input.value = "";
-  _productoElegidoEdicionPedido = null;
-  renderEdicionItemsPedido();
+  return true;
 }
 
 async function guardarEdicionItemsPedido() {
