@@ -394,6 +394,9 @@ resolverApiUrl().then(aplicarMarcaDesdeBackend);
  * vez que sí se validó con éxito, se deja entrar en "modo offline".
  */
 
+// Pasado este tiempo sin un login online, se exige validar contra el backend (por si se cambio la clave o se dio de baja al usuario).
+const VIGENCIA_LOGIN_LOCAL_MS = 7 * 24 * 60 * 60 * 1000;
+
 async function hashCredencial(usuario, password){
   const datos = new TextEncoder().encode("veekpos:" + usuario.toLowerCase() + ":" + password);
   const buffer = await crypto.subtle.digest("SHA-256", datos);
@@ -408,7 +411,8 @@ async function guardarLoginOfflineCache(usuario, password, data){
       hash,
       rol: data.rol || "admin",
       nombre: data.nombre || "",
-      usuario: data.usuario || usuario
+      usuario: data.usuario || usuario,
+      guardadoEn: Date.now()
     }));
   }catch(error){
     console.error("No se pudo guardar el login offline:", error);
@@ -455,6 +459,27 @@ document.getElementById("loginForm").addEventListener("submit", async function(e
 
   ocultarErrorLogin();
 
+  // Electron: primero se intenta el ingreso LOCAL (hash guardado en
+  // SQLite tras el ultimo login online exitoso) para entrar al instante.
+  // Si no coincide (contrasena cambiada, usuario nuevo, cache vencida),
+  // sigue el camino normal contra Apps Script, que ademas refresca el hash.
+  if(window.posOffline){
+    const u = document.getElementById("usuario").value.trim();
+    const p = document.getElementById("password").value;
+    if(u && p){
+      const local = await intentarLoginOffline(u, p);
+      const vigente = local && local.guardadoEn && (Date.now() - local.guardadoEn) < VIGENCIA_LOGIN_LOCAL_MS;
+      if(vigente){
+        sessionStorage.setItem("admin", "true");
+        sessionStorage.setItem("rol", local.rol || "admin");
+        sessionStorage.setItem("nombreUsuario", local.nombre || "");
+        sessionStorage.setItem("usuarioLogueado", local.usuario || u);
+        window.location.href = "index.html";
+        return;
+      }
+    }
+  }
+
   // Por si el click llegó antes de que resolverApiUrl() terminara
   // (lectura local, debería tardar milisegundos, pero por las dudas).
   await resolverApiUrl();
@@ -483,26 +508,15 @@ document.getElementById("loginForm").addEventListener("submit", async function(e
     // intentar el login offline de respaldo (ver más abajo, en el
     // catch). 12s es generoso para una red normal, pero corta a
     // tiempo cuando el backend está con problemas.
-    // Hasta 2 intentos de 30s cada uno (Apps Script puede tardar en arrancar en frío).
-    mostrarErrorLogin("Conectando con el servidor, puede tardar unos segundos...");
-    let r;
-    for (let intento = 1; intento <= 2; intento++) {
-      const controlador = new AbortController();
-      const timeoutId = setTimeout(() => controlador.abort(), 30000);
-      try {
-        r = await fetch(
-          `${API_URL}?action=login&usuario=${encodeURIComponent(usuario)}&password=${encodeURIComponent(password)}`,
-          { signal: controlador.signal }
-        );
-        clearTimeout(timeoutId);
-        break;
-      } catch (e) {
-        clearTimeout(timeoutId);
-        if (intento === 2) throw e;
-      }
-    }
+    const controlador = new AbortController();
+    const timeoutId = setTimeout(() => controlador.abort(), 12000);
 
-    ocultarErrorLogin();
+    const r = await fetch(
+      `${API_URL}?action=login&usuario=${encodeURIComponent(usuario)}&password=${encodeURIComponent(password)}`,
+      { signal: controlador.signal }
+    );
+    clearTimeout(timeoutId);
+
     const data = await r.json();
 
     if(data.success){
