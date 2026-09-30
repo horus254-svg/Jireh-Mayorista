@@ -2520,6 +2520,7 @@ function renderEdicionItemsPedido() {
         <input type="text" id="edicionPedidoBuscarProducto" class="form-control form-control-sm" placeholder="🔍 Código o nombre del producto a agregar..."
           autocomplete="off" oninput="_edicionPedidoActualizarResultados()" onkeydown="if(event.key==='Enter'){event.preventDefault(); _edicionPedidoAgregarProducto();}">
         <button type="button" class="btn btn-outline-primary btn-sm" style="white-space:nowrap;" onclick="_edicionPedidoAgregarProducto()">+ Agregar</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm" style="white-space:nowrap;" title="Agregar una caja cerrada al precio por caja" onclick="_edicionPedidoAgregarProducto(true)">📦 Caja</button>
       </div>
       <div id="edicionPedidoResultados" class="edicion-pedido-resultados" style="display:none;"></div>
     </div>
@@ -2649,7 +2650,7 @@ document.addEventListener("click", (e) => {
   cont.style.display = "none";
 });
 
-function _edicionPedidoAgregarProducto() {
+function _edicionPedidoAgregarProducto(comoCaja) {
   const input = document.getElementById("edicionPedidoBuscarProducto");
   const texto = input.value.trim();
   if (!texto) return;
@@ -2663,11 +2664,40 @@ function _edicionPedidoAgregarProducto() {
     const fuente = (productosAdminGlobal && productosAdminGlobal.length ? productosAdminGlobal : productosPOS) || [];
     producto = fuente.find(p => String(p.CODIGO).toLowerCase() === codigoEscrito)
       || fuente.find(p => String(p.PRODUCTO).toLowerCase() === texto.toLowerCase());
+    if (!producto) {
+      // Código de barras / código de la caja escrito directamente
+      producto = fuente.find(p => p.CODIGO_CAJA && String(p.CODIGO_CAJA).toLowerCase() === codigoEscrito);
+      if (producto) comoCaja = true;
+    }
   }
 
   if (!producto) { toast("No se encontró ese producto — elegilo de la lista de resultados", "error"); return; }
 
-  const existente = _carritoEdicionPedido.find(i => String(i.CODIGO) === String(producto.CODIGO));
+  const esLineaCaja = i => i._esCaja || /\(caja x\d+\)/i.test(String(i.PRODUCTO || ""));
+
+  if (comoCaja === true) {
+    const unidades = Number(producto.UNIDADES_POR_CAJA) || 0;
+    const precioCaja = Number(producto.PRECIO_CAJA) || 0;
+    if (unidades <= 0 || precioCaja <= 0) { toast("Este producto no tiene precio por caja configurado", "error"); return; }
+    const existenteCaja = _carritoEdicionPedido.find(i => String(i.CODIGO) === String(producto.CODIGO) && esLineaCaja(i));
+    if (existenteCaja) {
+      existenteCaja.cantidad += unidades;
+    } else {
+      _carritoEdicionPedido.push({
+        CODIGO: producto.CODIGO,
+        PRODUCTO: `${producto.PRODUCTO} (caja x${unidades})`,
+        cantidad: unidades,
+        PRECIO: precioCaja / unidades,
+        _esCaja: true
+      });
+    }
+    input.value = "";
+    _productoElegidoEdicionPedido = null;
+    renderEdicionItemsPedido();
+    return;
+  }
+
+  const existente = _carritoEdicionPedido.find(i => String(i.CODIGO) === String(producto.CODIGO) && !esLineaCaja(i));
   if (existente) {
     existente.cantidad++;
   } else {

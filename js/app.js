@@ -1284,7 +1284,7 @@ function agregarAlCarrito(producto, cantidad, color, imagenSeleccionada){
     // carrito aparte (mismo CODIGO, pero distinta característica) —
     // así el color elegido queda claro en el pedido.
     const existente = estado.carrito.find(p =>
-        String(p.CODIGO) === String(producto.CODIGO) && String(p.COLOR || "") === color
+        String(p.CODIGO) === String(producto.CODIGO) && String(p.COLOR || "") === color && !p._esCaja
     );
     const yaEnCarritoDeEsteCodigo = estado.carrito
         .filter(p => String(p.CODIGO) === String(producto.CODIGO))
@@ -1449,9 +1449,9 @@ function actualizarBarraMinimo(totalPrecio){
     });
 }
 
-function cambiarCantidad(codigo, cambio, color){
+function cambiarCantidad(codigo, cambio, color, caja){
 
-    const item = estado.carrito.find(p => String(p.CODIGO) === String(codigo) && String(p.COLOR || "") === String(color || ""));
+    const item = estado.carrito.find(p => String(p.CODIGO) === String(codigo) && String(p.COLOR || "") === String(color || "") && !!p._esCaja === !!caja);
     if(!item) return;
 
     const nuevaCantidad = item.cantidad + cambio;
@@ -1476,9 +1476,9 @@ function cambiarCantidad(codigo, cambio, color){
     abrirCarrito();
 }
 
-function actualizarCantidadManual(codigo, cantidad, color){
+function actualizarCantidadManual(codigo, cantidad, color, caja){
 
-    const item = estado.carrito.find(p => String(p.CODIGO) === String(codigo) && String(p.COLOR || "") === String(color || ""));
+    const item = estado.carrito.find(p => String(p.CODIGO) === String(codigo) && String(p.COLOR || "") === String(color || "") && !!p._esCaja === !!caja);
     if(!item) return;
 
     cantidad = parseInt(cantidad);
@@ -1500,10 +1500,10 @@ function actualizarCantidadManual(codigo, cantidad, color){
     abrirCarrito();
 }
 
-function eliminarProducto(codigo, color){
+function eliminarProducto(codigo, color, caja){
 
     estado.carrito = estado.carrito.filter(p =>
-        !(String(p.CODIGO) === String(codigo) && String(p.COLOR || "") === String(color || ""))
+        !(String(p.CODIGO) === String(codigo) && String(p.COLOR || "") === String(color || "") && !!p._esCaja === !!caja)
     );
 
     guardarCarrito();
@@ -1567,12 +1567,24 @@ function sincronizarCarritoConStockActual(){
         const precioAnterior = Number(item.PRECIO) || 0;
         const precioCajaAnterior = Number(item.PRECIO_CAJA) || 0;
 
-        item.PRECIO = actual.PRECIO;
-        item.STOCK = stockActual;
-        if(item._esCaja) item.PRECIO_CAJA = actual.PRECIO_CAJA;
-
-        const precioCambio = Number(actual.PRECIO) !== precioAnterior ||
-            (item._esCaja && Number(actual.PRECIO_CAJA) !== precioCajaAnterior);
+        let precioCambio;
+        if(item._esCaja){
+            const uds = Number(actual.UNIDADES_POR_CAJA) || 0;
+            const pCaja = Number(actual.PRECIO_CAJA) || 0;
+            if(uds <= 0 || pCaja <= 0){
+                huboAjustes = true;
+                avisos.push(`"${item.PRODUCTO}" ya no se vende por caja y se quitó del carrito`);
+                return;
+            }
+            item.PRECIO = pCaja / uds;
+            item.STOCK = stockActual;
+            item.PRECIO_CAJA = pCaja;
+            precioCambio = pCaja !== precioCajaAnterior;
+        }else{
+            item.PRECIO = actual.PRECIO;
+            item.STOCK = stockActual;
+            precioCambio = Number(actual.PRECIO) !== precioAnterior;
+        }
 
         if(precioCambio){
             huboAjustes = true;
@@ -1625,7 +1637,7 @@ function abrirCarrito(){
             total += subtotal;
 
             html += `
-            <div class="cart-item-row" data-code="${escapeHtml(item.CODIGO)}" data-color="${escapeHtml(item.COLOR || "")}">
+            <div class="cart-item-row" data-code="${escapeHtml(item.CODIGO)}" data-color="${escapeHtml(item.COLOR || "")}" data-caja="${item._esCaja ? "1" : ""}">
 
                 <div class="cart-item-main">
 
@@ -1713,10 +1725,11 @@ document.getElementById("cart-items").addEventListener("click", function(e){
 
     const codigo = row.dataset.code;
     const color = row.dataset.color;
+    const caja = row.dataset.caja === "1";
 
-    if(btn.dataset.action === "eliminar") eliminarProducto(codigo, color);
-    if(btn.dataset.action === "menos") cambiarCantidad(codigo, -1, color);
-    if(btn.dataset.action === "mas") cambiarCantidad(codigo, 1, color);
+    if(btn.dataset.action === "eliminar") eliminarProducto(codigo, color, caja);
+    if(btn.dataset.action === "menos") cambiarCantidad(codigo, -1, color, caja);
+    if(btn.dataset.action === "mas") cambiarCantidad(codigo, 1, color, caja);
 });
 
 document.getElementById("cart-items").addEventListener("change", function(e){
@@ -1724,7 +1737,7 @@ document.getElementById("cart-items").addEventListener("change", function(e){
     if(e.target.dataset.actionInput === "cantidad"){
 
         const row = e.target.closest(".cart-item-row");
-        actualizarCantidadManual(row.dataset.code, e.target.value, row.dataset.color);
+        actualizarCantidadManual(row.dataset.code, e.target.value, row.dataset.color, row.dataset.caja === "1");
     }
 });
 
