@@ -66,7 +66,7 @@ async function resolverApiUrlBase(){
     // "no-cache" revalida con el servidor (barato: 304) pero deja que el CDN
     // y el navegador lo sirvan sin golpear el origen en cada visita.
     // Antes se usaba ?_=Date.now(), que anulaba todo cache con mucho tráfico.
-    const res = await fetch("config.json", { cache: "no-cache" });
+    const res = await fetch(((typeof window!=="undefined" && window.CONFIG_BASE) || "") + "config.json", { cache: "no-cache" });
     if(res.ok){
       const cfg = await res.json();
       if(cfg.apiUrl) API_URL_BASE = cfg.apiUrl;
