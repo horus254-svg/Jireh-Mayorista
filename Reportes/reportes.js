@@ -11,7 +11,8 @@ let API_URL = "";
 
 /* ---- Sesión: requiere haber pasado por login.html ---- */
 if (sessionStorage.getItem("admin") !== "true") {
-  window.location.href = "login.html";
+  window.location.replace("login.html");
+  throw new Error("Sin sesión: redirigiendo a login.html");
 }
 
 function cerrarSesion() {
@@ -321,5 +322,9 @@ if ("serviceWorker" in navigator) {
 /* ---- Carga inicial: trae los 6 reportes del mes en curso ---- */
 cargarConfigNegocio().then(() => {
   API_URL = CONFIG_NEGOCIO.API_URL;
+  if (!API_URL) {
+    toast("No se pudo leer la API URL. Revisá que config.json esté en la carpeta raíz.", "error");
+    return;
+  }
   cargarTodosLosReportes();
 });
