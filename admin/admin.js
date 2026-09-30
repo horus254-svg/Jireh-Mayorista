@@ -264,7 +264,21 @@ function escapeHtml(text) {
  *  — si no, un apóstrofe en el dato (código, nombre, motivo, etc.) corta el
  *  string antes de tiempo y rompe el atributo con "missing ) after argument list". */
 function escapeJsAttr(text) {
-  return escapeHtml(text).replace(/'/g, "&#39;");
+  // Orden correcto: primero se escapa para el string JS (\ y '), y RECIÉN
+  // DESPUÉS para el atributo HTML. Antes solo se convertía ' en &#39;, que el
+  // navegador decodifica de nuevo a ' ANTES de ejecutar el JS, así que el
+  // apóstrofe seguía cortando el string. Sirve tanto para onclick="..." como
+  // para onclick='...'.
+  const js = String(text ?? "")
+    .replace(/\\/g, "\\\\")
+    .replace(/'/g, "\\'")
+    .replace(/\r?\n/g, " ");
+  return js
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 /**
@@ -1599,6 +1613,9 @@ function renderVentasPOSRecientes(lista) {
     const pago  = v.FORMA_PAGO || v.PAGO || "—";
     const total = Number(v.TOTAL || 0).toLocaleString("es-AR");
 
+    const _vidRec = String(v.VENTA_ID || v.ID || "");
+    _ventasMapPOS[_vidRec] = v;
+
     html += `
       <tr>
         <td class="mono">${escapeHtml(String(v.VENTA_ID || v.ID || "—"))}</td>
@@ -1608,7 +1625,7 @@ function renderVentasPOSRecientes(lista) {
         <td class="money">$${total}</td>
         <td>
           <button class="btn btn-sm btn-outline-secondary"
-            onclick='imprimirVentaDesdeData(${JSON.stringify(v)})'>🖨️</button>
+            onclick="imprimirVentaDesdeData(_ventasMapPOS['${escapeJsAttr(_vidRec)}'])">🖨️</button>
         </td>
       </tr>
     `;
@@ -1707,9 +1724,9 @@ function renderVentasPOSHistorial(lista) {
         <td class="money" style="${anulada ? 'text-decoration:line-through;' : ''}">$${total}</td>
         <td>
           <button class="btn btn-sm btn-outline-secondary"
-            onclick='imprimirVentaDesdeData(_ventasMapPOS[${JSON.stringify(_vid)}])' title="Reimprimir">🖨️ Reimprimir</button>
+            onclick="imprimirVentaDesdeData(_ventasMapPOS['${escapeJsAttr(_vid)}'])" title="Reimprimir">🖨️ Reimprimir</button>
           <button class="btn btn-sm btn-outline-danger ms-1"
-            onclick='eliminarVentaPOS(_ventasMapPOS[${JSON.stringify(_vid)}])'
+            onclick="eliminarVentaPOS(_ventasMapPOS['${escapeJsAttr(_vid)}'])"
             ${anulada ? 'disabled title="Ya anulada"' : 'title="Anular"'}>🗑️ Anular</button>
         </td>`;
       frag.appendChild(tr);
@@ -5943,7 +5960,7 @@ function _armarTileProductoHTML(p, dataIdxAttr, esPineado) {
         ${stockBadge}
       </div>
       ${obtenerRolActual() === "vendedor" ? "" : `<button type="button" class="tile-edit" title="Editar precio y stock" onclick="event.stopPropagation(); abrirEdicionRapidaPOS('${escapeJsAttr(p.CODIGO)}');">✏️</button>`}
-      ${Number(p.UNIDADES_POR_CAJA) > 0 ? `<button type="button" class="tile-caja" title="Agregar 1 caja (${p.UNIDADES_POR_CAJA} uds) a $${Number(p.PRECIO_CAJA || 0).toLocaleString("es-AR")}" onclick="event.stopPropagation(); agregarCajaAlTicket(productosPOS.find(x => String(x.CODIGO)==='${escapeHtml(p.CODIGO)}'));">📦x${p.UNIDADES_POR_CAJA}</button>` : ""}
+      ${Number(p.UNIDADES_POR_CAJA) > 0 ? `<button type="button" class="tile-caja" title="Agregar 1 caja (${p.UNIDADES_POR_CAJA} uds) a $${Number(p.PRECIO_CAJA || 0).toLocaleString("es-AR")}" onclick="event.stopPropagation(); agregarCajaAlTicket(productosPOS.find(x => String(x.CODIGO)==='${escapeJsAttr(p.CODIGO)}'));">📦x${p.UNIDADES_POR_CAJA}</button>` : ""}
       <span class="tile-add">+</span>
     </div>`;
 }
@@ -6371,10 +6388,10 @@ function renderTicketPOS() {
             inputmode="numeric"
             value="${item.cantidad}"
             onfocus="seleccionarCantidadPOS(this)"
-            onchange="actualizarCantidadManualPOS('${item.CODIGO}', this.value)">
+            onchange="actualizarCantidadManualPOS('${escapeJsAttr(item.CODIGO)}', this.value)">
         </div>
         <div class="ti-sub money">$${sub.toLocaleString("es-AR")}</div>
-        <button class="ti-remove" onclick="quitarProductoPOS('${item.CODIGO}')" title="Quitar">✕</button>
+        <button class="ti-remove" onclick="quitarProductoPOS('${escapeJsAttr(item.CODIGO)}')" title="Quitar">✕</button>
       </div>`;
   });
 
@@ -12182,9 +12199,13 @@ function quitarItemCarrito(idx) {
 }
 
 function vaciarCarritoBoleta() {
-  if (ipCarritoBoleta.length && !confirm("¿Vaciar todos los productos cargados en esta boleta?")) return;
-  ipCarritoBoleta = [];
-  renderCarritoBoleta();
+  if (!ipCarritoBoleta.length) return;
+  // confirmarAccion (modal propio) en vez de confirm() nativo, que en Electron deja el foco roto
+  confirmarAccion(
+    "¿Vaciar todos los productos cargados en esta boleta?",
+    () => { ipCarritoBoleta = []; renderCarritoBoleta(); },
+    "🗑️ Vaciar boleta"
+  );
 }
 
 /* =====================================================================
@@ -13649,7 +13670,7 @@ function renderTablaProveedores(lista) {
         </div>
       </div>
       <div class="pedido-card-controls">
-        <button class="btn btn-outline-secondary btn-sm" onclick="abrirModalBoletasProveedor('${escapeHtml(p.PROVEEDOR).replace(/'/g, "\\'")}')">Ver boletas</button>
+        <button class="btn btn-outline-secondary btn-sm" onclick="abrirModalBoletasProveedor('${escapeJsAttr(p.PROVEEDOR)}')">Ver boletas</button>
       </div>
     </div>`;
   }).join("");
@@ -13889,17 +13910,21 @@ async function guardarUsuarioForm() {
   }
 }
 
-async function eliminarUsuarioClick(usuarioId, nombre) {
-  if (!confirm(`¿Eliminar el usuario "${nombre}"? Esta acción no se puede deshacer.`)) return;
-
-  try {
-    const res = await fetchAPI(API_URL, { method: "POST", body: JSON.stringify({ action: "eliminarUsuario", usuarioId }) });
-    const data = await res.json();
-    if (!data.success) { toast(data.message || "No se pudo eliminar el usuario", "error"); return; }
-    toast("Usuario eliminado", "success");
-    cargarUsuarios();
-  } catch (error) {
-    console.error("Error al eliminar usuario:", error);
-    toast("Error de conexión al eliminar el usuario", "error");
-  }
+function eliminarUsuarioClick(usuarioId, nombre) {
+  confirmarAccion(
+    `¿Eliminar el usuario "${nombre}"? Esta acción no se puede deshacer.`,
+    async () => {
+      try {
+        const res = await fetchAPI(API_URL, { method: "POST", body: JSON.stringify({ action: "eliminarUsuario", usuarioId }) });
+        const data = await res.json();
+        if (!data.success) { toast(data.message || "No se pudo eliminar el usuario", "error"); return; }
+        toast("Usuario eliminado", "success");
+        cargarUsuarios();
+      } catch (error) {
+        console.error("Error al eliminar usuario:", error);
+        toast("Error de conexión al eliminar el usuario", "error");
+      }
+    },
+    "🗑️ Eliminar usuario"
+  );
 }
