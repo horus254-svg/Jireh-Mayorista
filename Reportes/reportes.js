@@ -7,7 +7,7 @@
    ya carga ese script antes de este archivo).
 =================================================================== */
 
-const API_URL = CONFIG_NEGOCIO.API_URL;
+let API_URL = "";
 
 /* ---- Sesión: requiere haber pasado por login.html ---- */
 if (sessionStorage.getItem("admin") !== "true") {
@@ -319,4 +319,7 @@ if ("serviceWorker" in navigator) {
 }
 
 /* ---- Carga inicial: trae los 6 reportes del mes en curso ---- */
-cargarTodosLosReportes();
+cargarConfigNegocio().then(() => {
+  API_URL = CONFIG_NEGOCIO.API_URL;
+  cargarTodosLosReportes();
+});

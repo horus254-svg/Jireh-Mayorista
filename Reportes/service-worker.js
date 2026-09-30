@@ -18,7 +18,7 @@
  * NUNCA se cachean — los reportes siempre se piden en vivo.
  */
 
-const CACHE_NAME = "reportes-jireh-v1";
+const CACHE_NAME = "reportes-jireh-v2";
 
 const ARCHIVOS_A_CACHEAR = [
   "login.html",
@@ -54,8 +54,15 @@ self.addEventListener("fetch", (event) => {
 
   // Nunca cachear las llamadas al backend (Apps Script) — los
   // reportes siempre deben pedirse en vivo, con datos actuales.
-  if (url.includes("script.google.com")) {
+  if (url.includes("script.google.com") || url.includes("workers.dev")) {
     return; // deja pasar la petición tal cual, sin intervenir
+  }
+
+  // Solo intervenir en archivos de esta carpeta (reportes/). La config
+  // compartida (../config.js y ../config.json) vive en la carpeta padre
+  // y siempre se pide directo a la red.
+  if (!url.startsWith(self.registration.scope)) {
+    return;
   }
 
   // Para los archivos propios de la app: red primero, caché como
