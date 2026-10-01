@@ -302,11 +302,19 @@
     <a href="#" data-target="usuarios"         onclick="mostrarSeccion('usuarios'); cargarUsuarios();"><span class="ic">🔐</span> Usuarios</a>
     <a href="#" data-target="instalador"       onclick="mostrarSeccion('instalador')" style="display:none;" title="Oculto — descomentar el style para volver a mostrarlo"><span class="ic">🛠️</span> Instalador</a>
   </nav>
+  <!-- Estado de sincronización con Sheets (siempre visible) — lo pinta admin.js / pos-offline.js -->
+  <button type="button" id="syncEstadoBtn" class="sync-estado-btn" data-estado="ok"
+          onclick="clickBotonEstadoSync()" title="Estado de sincronización">
+    <span class="sync-dot" aria-hidden="true"></span>
+    <span class="sync-txt" id="syncEstadoTexto">Sincronizado</span>
+    <span class="sync-count" id="syncEstadoCantidad"></span>
+  </button>
   <button class="logout-btn" onclick="logout()">⏻ Cerrar sesión</button>
 </div>
 
 <!-- =================== BOTTOM NAV (mobile) =================== -->
 <div class="bottom-nav">
+  <span id="syncEstadoDotMovil" class="sync-dot-movil" data-estado="ok" onclick="clickBotonEstadoSync()" title="Estado de sincronización"></span>
   <nav id="bottomNavLinks">
     <a href="#" data-target="dashboard" onclick="mostrarSeccion('dashboard')"><span class="ic">🏠</span>Inicio</a>
     <a href="#" data-target="pos"       onclick="mostrarSeccion('pos')"><span class="ic">🏪</span>Venta</a>

@@ -159,8 +159,21 @@ function iniciarPollingSecciones() {
   }, offsetInicial);
 }
 
+// Polling más liviano: sin interacción del usuario por más de 5 minutos
+// (caja abierta pero nadie mirando la pantalla) se consulta 1 de cada 4
+// ciclos (~2 min) en vez de cada 30s; y sin red no se consulta.
+let _ultimaInteraccionUsuario = Date.now();
+let _cicloPolling = 0;
+["pointerdown", "keydown", "wheel", "touchstart"].forEach(ev =>
+  document.addEventListener(ev, () => { _ultimaInteraccionUsuario = Date.now(); }, { passive: true, capture: true })
+);
+
 function ejecutarPollingSecciones() {
   if (document.hidden) return; // pestaña en segundo plano: no consultar
+  if (!navigator.onLine) return;
+  _cicloPolling++;
+  const inactivo = Date.now() - _ultimaInteraccionUsuario > 5 * 60 * 1000;
+  if (inactivo && _cicloPolling % 4 !== 0) return;
 
   const dashboardVisible = document.getElementById("dashboard").style.display === "block";
   const pedidosVisible   = document.getElementById("pedidos").style.display === "block";
@@ -2045,21 +2058,117 @@ function encolarVentaPendiente(venta) {
   _guardarColaVentasPendientes(cola);
 }
 
-/** Muestra/oculta un aviso discreto de cuántas ventas todavía no se subieron al servidor */
-function actualizarBadgeVentasPendientes(cantidad) {
-  let badge = document.getElementById("badgeVentasPendientes");
-  if (!badge) {
-    badge = document.createElement("div");
-    badge.id = "badgeVentasPendientes";
-    badge.style.cssText = "position:fixed;bottom:14px;right:14px;z-index:9999;background:var(--amber-500,#f59e0b);color:#fff;padding:8px 14px;border-radius:20px;font-size:13px;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,.25);cursor:pointer;display:none;";
-    badge.onclick = () => sincronizarVentasPendientes(true);
-    document.body.appendChild(badge);
+/* ---- Botón de estado de sincronización (barra lateral) ----
+   Reemplaza la banda azul de arriba y el aviso flotante de abajo a la
+   derecha. Siempre visible, con color según el estado:
+     verde  = todo sincronizado
+     azul   = hay pendientes / sincronizando
+     ámbar  = sin conexión (trabajando local)
+     rojo   = hay operaciones con error que no subieron
+   En la app de escritorio lo alimenta pos-offline.js (cola SQLite);
+   en la web, la cola de ventas de localStorage de acá abajo. */
+const _TEXTOS_ESTADO_SYNC = {
+  ok: "Sincronizado",
+  sincronizando: "Sincronizando…",
+  pendiente: "Pendiente de subir",
+  offline: "Sin conexión",
+  error: "Error al sincronizar"
+};
+
+function pintarEstadoSync(info) {
+  const estado = (info && info.estado) || "ok";
+  const cantidad = Number((info && info.cantidad) || 0);
+  const texto = (info && info.texto) || _TEXTOS_ESTADO_SYNC[estado] || "";
+  const detalle = (info && info.detalle) || "";
+
+  const btn = document.getElementById("syncEstadoBtn");
+  if (btn) {
+    btn.dataset.estado = estado;
+    btn.title = detalle || texto;
+    const t = document.getElementById("syncEstadoTexto");
+    const c = document.getElementById("syncEstadoCantidad");
+    if (t) t.textContent = texto;
+    if (c) c.textContent = cantidad > 0 ? String(cantidad) : "";
   }
+  const punto = document.getElementById("syncEstadoDotMovil");
+  if (punto) {
+    punto.dataset.estado = estado;
+    punto.title = (detalle || texto) + (cantidad > 0 ? ` (${cantidad})` : "");
+  }
+}
+window.pintarEstadoSync = pintarEstadoSync;
+
+/** Click en el botón: en escritorio fuerza la sync de la cola SQLite; en la web reintenta la cola local */
+function clickBotonEstadoSync() {
+  if (typeof window.clickEstadoSyncEscritorio === "function") return window.clickEstadoSyncEscritorio();
+  if (_leerColaVentasPendientes().length === 0) { toast("Todo está sincronizado ✓", "success"); return; }
+  sincronizarVentasPendientes(true);
+}
+
+function _esAppEscritorio() {
+  return typeof window.veekpos !== "undefined" || typeof window.posOffline !== "undefined";
+}
+
+/** Versión web del indicador (en escritorio lo maneja pos-offline.js) */
+function actualizarBadgeVentasPendientes(cantidad) {
+  if (_esAppEscritorio()) return;
   if (cantidad > 0) {
-    badge.textContent = `📴 ${cantidad} venta${cantidad === 1 ? "" : "s"} sin sincronizar — tocar para reintentar`;
-    badge.style.display = "block";
+    pintarEstadoSync({
+      estado: navigator.onLine ? "pendiente" : "offline",
+      cantidad,
+      detalle: `${cantidad} venta${cantidad === 1 ? "" : "s"} sin sincronizar — tocá para reintentar`
+    });
   } else {
-    badge.style.display = "none";
+    pintarEstadoSync({ estado: navigator.onLine ? "ok" : "offline" });
+  }
+}
+
+/**
+ * Registra una venta ya cobrada. En la app de escritorio va SIEMPRE por
+ * el camino local-primero de pos-offline.js (red multi-caja o SQLite +
+ * cola, sin esperar a Apps Script). En la web, POST directo y, si falla,
+ * a la cola de localStorage. Devuelve { ventaId } con el ID definitivo
+ * si se conoce, o null.
+ */
+async function registrarVentaCobrada(venta) {
+  if (typeof window.registrarVentaLocalPrimero === "function") {
+    try {
+      return await window.registrarVentaLocalPrimero(venta);
+    } catch (error) {
+      console.error("Falló el registro local de la venta, se usa la cola de respaldo:", error);
+    }
+  }
+
+  try {
+    const response = await fetchAPI(
+      API_URL,
+      {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({
+          action: "guardarVenta",
+          total: venta.total,
+          formaPago: venta.formaPago,
+          vendedor: venta.vendedor || "",
+          observaciones: venta.observaciones || "",
+          carrito: venta.carrito,
+          clienteVentaId: venta.clienteVentaId
+        })
+      },
+      { timeoutMs: 15000 } // mutación: sin reintento automático propio (lo maneja la cola)
+    );
+    const data = await response.json();
+    if (data.success) return { ventaId: data.ventaId || null };
+    toast("⚠️ La venta se mostró pero el servidor la rechazó: " + (data.message || "error desconocido"), "error");
+    encolarVentaPendiente(venta);
+    return null;
+  } catch (err) {
+    console.error("Error al guardar venta en backend:", err);
+    // Se guarda en la cola local con el mismo clienteVentaId: el
+    // backend lo reconoce y nunca la duplica al reintentar.
+    encolarVentaPendiente(venta);
+    toast("📴 Sin conexión — la venta se guardó localmente y se subirá sola al reconectar", "error");
+    return null;
   }
 }
 
@@ -2070,10 +2179,13 @@ let _sincronizandoVentasPendientes = false;
  *  automáticos de fondo (cada 30s, o al reconectar) no, para no repetir el mismo error cada rato mientras dure el corte. */
 async function sincronizarVentasPendientes(manual) {
   if (_sincronizandoVentasPendientes) return;
+  // En escritorio esta cola se migra a SQLite al arrancar (pos-offline.js)
+  if (_esAppEscritorio() && typeof window.registrarVentaLocalPrimero === "function") return;
   const cola = _leerColaVentasPendientes();
-  if (cola.length === 0) return;
+  if (cola.length === 0) { actualizarBadgeVentasPendientes(0); return; }
 
   _sincronizandoVentasPendientes = true;
+  if (!_esAppEscritorio()) pintarEstadoSync({ estado: "sincronizando", cantidad: cola.length });
   const pendientes = [];
 
   for (const venta of cola) {
@@ -2088,6 +2200,7 @@ async function sincronizarVentasPendientes(manual) {
             total: venta.total,
             formaPago: venta.formaPago,
             observaciones: venta.observaciones || "",
+            vendedor: venta.vendedor || "",
             carrito: venta.carrito,
             clienteVentaId: venta.clienteVentaId
           })
@@ -2124,8 +2237,10 @@ async function sincronizarVentasPendientes(manual) {
 // además cada 30s como red de respaldo (el evento "online" del
 // navegador no siempre es 100% confiable para saber si hay internet
 // real, solo que hay una interfaz de red activa).
-window.addEventListener("online", sincronizarVentasPendientes);
-setInterval(sincronizarVentasPendientes, 30000);
+window.addEventListener("online", () => sincronizarVentasPendientes());
+window.addEventListener("offline", () => actualizarBadgeVentasPendientes(_leerColaVentasPendientes().length));
+setInterval(() => sincronizarVentasPendientes(), 30000);
+document.addEventListener("DOMContentLoaded", () => actualizarBadgeVentasPendientes(_leerColaVentasPendientes().length));
 
 function cacheGet(clave) {
   try {
@@ -3390,7 +3505,8 @@ async function _actualizarProductosAdminEnBackground(cacheKey) {
     const data = await response.json();
     if (!data.productos) return;
     productosAdminGlobal = data.productos;
-    try { localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), data: data.productos })); } catch(e) {}
+    // En escritorio el catálogo vive en SQLite (pos-offline.js): no duplicarlo en localStorage
+    if (!_esAppEscritorio()) { try { localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), data: data.productos })); } catch(e) {} }
     poblarFiltroCategoriasProductos();
     filtrarProductos();
   } catch (error) {
@@ -5769,7 +5885,7 @@ async function _actualizarCacheProductosPOS(cacheKey) {
     const response = await fetchAPI(API_URL + "?action=productos");
     const data = await response.json();
     const productos = data.productos || [];
-    localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), productos }));
+    if (!_esAppEscritorio()) { try { localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), productos })); } catch(e) {} }
     if (JSON.stringify(productos.map(p => p.CODIGO + p.STOCK)) !==
         JSON.stringify(productosPOS.map(p => p.CODIGO + p.STOCK))) {
       productosPOS = productos;
@@ -6898,56 +7014,24 @@ async function confirmarFinalizarVenta() {
   const btn = document.getElementById("btnFinalizarVenta");
   if (btn) btn.disabled = false;
 
-  // ── GUARDAR en el backend en segundo plano ──
-  try {
-    // Por POST, con el carrito en el body — un carrito grande por GET
-    // (todo metido en la URL) puede superar lo que Google/Apps Script
-    // acepta, y la venta fallaba con "error de conexión" sin serlo
-    // realmente (el mismo problema que tenían los pedidos grandes).
-    const response = await fetchAPI(
-      API_URL,
-      {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({
-          action: "guardarVenta",
-          total: total,
-          formaPago: formaPagoPOS,
-          observaciones: etiquetaDescuento ? (ajusteModoPOS === "RECARGO" ? "Recargo: " : "Descuento: ") + etiquetaDescuento : "",
-          carrito: itemsSnapshot,
-          clienteVentaId: clienteVentaId
-        })
-      },
-      { timeoutMs: 15000 } // mutación: sin reintento automático propio (lo maneja la cola de abajo), con más margen que una lectura chica
-    );
-    const data = await response.json();
-
-    if (data.success && data.ventaId && data.ventaId !== ventaIdTemp) {
-      // Actualizar el ID real en el recibo imprimible
-      ultimaVentaImprimible.ventaId = data.ventaId;
-      // Actualizar el ID visible en el modal de recibo si sigue abierto
-      const idEl = document.getElementById("reciboVentaId");
-      if (idEl) idEl.textContent = data.ventaId;
-    } else if (!data.success) {
-      toast("⚠️ La venta se mostró pero no se guardó en el servidor. Reintentá.", "error");
-    }
-  } catch (err) {
-    console.error("Error al guardar venta en backend:", err);
-    // Antes acá la venta se perdía directamente — el cajero ya le
-    // había dado el ticket al cliente, pero la fila nunca llegaba a
-    // VENTAS_LOCAL ni se descontaba el stock del lado del servidor, y
-    // no había ninguna forma de recuperarla después. Ahora se guarda
-    // en una cola local (localStorage) con el mismo clienteVentaId, y
-    // se reintenta sola en cuanto vuelve la conexión — de forma
-    // segura: el backend reconoce ese ID y nunca la duplica, aunque el
-    // primer intento sí hubiera llegado a guardarse y solo se haya
-    // perdido la respuesta.
-    encolarVentaPendiente({
-      clienteVentaId, total, formaPago: formaPagoPOS,
-      observaciones: etiquetaDescuento ? (ajusteModoPOS === "RECARGO" ? "Recargo: " : "Descuento: ") + etiquetaDescuento : "",
-      carrito: itemsSnapshot
-    });
-    toast("📴 Sin conexión — la venta se guardó localmente y se subirá sola al reconectar", "error");
+  // ── GUARDAR: local-primero en escritorio, POST + cola en la web ──
+  // (Antes, en la app de escritorio esto iba DIRECTO a Apps Script y se
+  // salteaba la SQLite local, la red multi-caja y la cola unificada.)
+  const ventaParaGuardar = {
+    clienteVentaId,
+    ventaIdTemp,
+    total, subtotal,
+    descuento: montoDescuento,
+    formaPago: formaPagoPOS,
+    vendedor: sessionStorage.getItem("nombreUsuario") || sessionStorage.getItem("usuarioLogueado") || "",
+    observaciones: etiquetaDescuento ? (ajusteModoPOS === "RECARGO" ? "Recargo: " : "Descuento: ") + etiquetaDescuento : "",
+    carrito: itemsSnapshot
+  };
+  const resultadoGuardado = await registrarVentaCobrada(ventaParaGuardar);
+  if (resultadoGuardado && resultadoGuardado.ventaId && resultadoGuardado.ventaId !== ventaIdTemp) {
+    ultimaVentaImprimible.ventaId = resultadoGuardado.ventaId;
+    const idEl = document.getElementById("reciboVentaId");
+    if (idEl) idEl.textContent = resultadoGuardado.ventaId;
   }
 
   // Métricas en segundo plano
@@ -11532,35 +11616,23 @@ async function consultarCobroMercadoPagoPolling() {
         const { subtotal, total, itemsSnapshot, recibido } = mpVentaEnCurso;
         const etiquetaDescuento = obtenerEtiquetaDescuentoPOS(subtotal);
 
-        // Guardar en backend — recién ahora que el pago está confirmado
+        // Guardar — recién ahora que el pago está confirmado. Mismo
+        // camino que una venta normal (local-primero en escritorio; en la
+        // web POST + cola). Antes, si este POST fallaba, la venta cobrada
+        // por QR se perdía: no se encolaba en ningún lado.
         let ventaId = "VEN-" + Date.now().toString().slice(-6);
         const clienteVentaIdMP = "CVL-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
-        try {
-          // Por POST, con el carrito en el body — igual que el resto de
-          // las ventas, para no toparse con el límite de tamaño de URL
-          // en carritos grandes, y con timeout para no quedar colgado.
-          const res = await fetchAPI(
-            API_URL,
-            {
-              method: "POST",
-              headers: { "Content-Type": "text/plain;charset=utf-8" },
-              body: JSON.stringify({
-                action: "guardarVenta",
-                total: total,
-                formaPago: "TRANSFERENCIA",
-                observaciones: etiquetaDescuento ? (ajusteModoPOS === "RECARGO" ? "Recargo: " : "Descuento: ") + etiquetaDescuento : "",
-                carrito: itemsSnapshot,
-                clienteVentaId: clienteVentaIdMP
-              })
-            },
-            { timeoutMs: 15000 }
-          );
-          const data = await res.json();
-          if (data.success && data.ventaId) ventaId = data.ventaId;
-        } catch(e) {
-          console.error("Error guardando venta MP en backend:", e);
-          toast("⚠️ Pago confirmado pero no se pudo guardar en el servidor", "error");
-        }
+        const guardadoMP = await registrarVentaCobrada({
+          clienteVentaId: clienteVentaIdMP,
+          ventaIdTemp: ventaId,
+          total, subtotal,
+          descuento: subtotal - total,
+          formaPago: "TRANSFERENCIA",
+          vendedor: sessionStorage.getItem("nombreUsuario") || sessionStorage.getItem("usuarioLogueado") || "",
+          observaciones: etiquetaDescuento ? (ajusteModoPOS === "RECARGO" ? "Recargo: " : "Descuento: ") + etiquetaDescuento : "",
+          carrito: itemsSnapshot
+        });
+        if (guardadoMP && guardadoMP.ventaId) ventaId = guardadoMP.ventaId;
 
         // Mostrar recibo con el ID real
         ultimaVentaImprimible = {
