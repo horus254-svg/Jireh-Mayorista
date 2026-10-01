@@ -2257,7 +2257,15 @@ function cacheSet(clave, data) {
   } catch(e) {}
 }
 
-async function cargarPedidos() {
+let _cargandoPedidos = null; // evita que el polling y la apertura de la sección pidan la lista a la vez
+
+function cargarPedidos() {
+  if (_cargandoPedidos) return _cargandoPedidos;
+  _cargandoPedidos = _cargarPedidosImpl().finally(() => { _cargandoPedidos = null; });
+  return _cargandoPedidos;
+}
+
+async function _cargarPedidosImpl() {
   // Mostrar caché al instante si existe
   const cached = cacheGet("pedidos");
   if (cached) {
@@ -2266,7 +2274,10 @@ async function cargarPedidos() {
     if (!cached.stale) return; // fresco, no hace falta recargar
   }
   try {
-    const response = await fetchAPI(API_URL + "?action=pedidos");
+    // Un solo intento con más margen: antes eran 2 intentos de 25s, y si
+    // Apps Script estaba lento el segundo volvía a pedir la misma lectura
+    // pesada mientras la primera todavía corría del lado del servidor.
+    const response = await fetchAPI(API_URL + "?action=pedidos", {}, { timeoutMs: 45000, reintentos: 1 });
     const data = await response.json();
     if (!data.pedidos) return;
 
@@ -2282,9 +2293,13 @@ async function cargarPedidos() {
     pedidosGlobal = data.pedidos;
     cacheSet("pedidos", pedidosGlobal);
     _avisoPedidosCaido = false; // se pudo actualizar bien — resetea el aviso para el próximo corte
-    if (cambio) filtrarPedidos();
+    if (cambio && _pedidosEnProceso.size === 0) filtrarPedidos(); // no pisar el "Guardando…" de una acción en curso
   } catch (error) {
-    console.error("Error pedidos:", error);
+    if (error && error.name === "AbortError") {
+      console.warn("Pedidos: el servidor tardó demasiado en responder (se reintenta en el próximo ciclo).");
+    } else {
+      console.error("Error pedidos:", error);
+    }
     // Solo se avisa la primera vez que falla, no en cada intento del
     // polling de 15s — si la conexión está mal por un rato, un toast
     // nuevo cada 15s sería más molesto que informativo.
@@ -2356,7 +2371,104 @@ function recargarVentasPOSHistorial() {
   cargarVentasPOSHistorial();
 }
 
-async function cambiarEstado(pedidoId, estado) {
+/* ---- Feedback visual de acciones sobre pedidos ----
+   Antes, al cambiar el estado o marcar un pedido como cobrado no pasaba
+   nada visible hasta que respondía Apps Script (a veces varios
+   segundos), y no quedaba claro si el click se había registrado.
+   Ahora: el control muestra "Guardando…" con spinner apenas se toca,
+   la tarjeta queda atenuada, y al terminar se ve ✓ en verde (o el
+   error en rojo, volviendo al valor anterior). */
+function _tarjetaPedido(pedidoId) {
+  return document.querySelector(`[data-pedido-card="${CSS.escape(String(pedidoId))}"]`);
+}
+
+function _marcarPedidoProcesando(pedidoId, el, texto) {
+  const card = _tarjetaPedido(pedidoId);
+  if (card) {
+    card.classList.add("pedido-procesando");
+    card.querySelectorAll(".pedido-pago-btn, .pedido-card-controls select, .pedido-cobrado-controles button")
+      .forEach(b => { b.disabled = true; });
+  }
+  if (el) {
+    el.dataset.textoOriginal = el.tagName === "SELECT" ? "" : el.innerHTML;
+    el.classList.add("accion-pendiente");
+    if (el.tagName !== "SELECT") el.innerHTML = `<span class="spinner-accion"></span>${texto}`;
+    else {
+      const aviso = document.createElement("span");
+      aviso.className = "accion-aviso accion-aviso-pendiente";
+      aviso.innerHTML = `<span class="spinner-accion"></span>${texto}`;
+      el.insertAdjacentElement("afterend", aviso);
+    }
+  }
+}
+
+function _terminarPedidoProcesando(pedidoId, el, ok, textoResultado) {
+  const card = _tarjetaPedido(pedidoId);
+  if (card) {
+    card.classList.remove("pedido-procesando");
+    if (!ok) {
+      card.querySelectorAll(".pedido-pago-btn, .pedido-card-controls select, .pedido-cobrado-controles button")
+        .forEach(b => { b.disabled = false; });
+    }
+  }
+  if (!el) return;
+  el.classList.remove("accion-pendiente");
+  if (el.tagName === "SELECT") {
+    const aviso = el.parentElement && el.parentElement.querySelector(".accion-aviso");
+    if (aviso) {
+      aviso.className = "accion-aviso " + (ok ? "accion-aviso-ok" : "accion-aviso-error");
+      aviso.textContent = textoResultado;
+      if (!ok) setTimeout(() => aviso.remove(), 2500);
+    }
+    if (!ok) {
+      el.value = el.dataset.estadoPrevio || el.value; // vuelve al estado que tenía
+      el.classList.add("accion-error");
+      setTimeout(() => el.classList.remove("accion-error"), 600);
+    } else {
+      el.classList.add("accion-ok");
+    }
+  } else {
+    el.classList.add(ok ? "accion-ok" : "accion-error");
+    el.innerHTML = textoResultado;
+    if (!ok) {
+      setTimeout(() => {
+        el.classList.remove("accion-error");
+        if (el.dataset.textoOriginal) el.innerHTML = el.dataset.textoOriginal;
+      }, 1800);
+    }
+  }
+}
+
+/** Después de un cambio exitoso: deja ver el ✓ un momento, redibuja y resalta la tarjeta */
+function _refrescarPedidosConDestello(pedidoId) {
+  setTimeout(() => {
+    filtrarPedidos();
+    requestAnimationFrame(() => {
+      const card = _tarjetaPedido(pedidoId);
+      if (card) {
+        card.classList.add("pedido-recien-actualizado");
+        setTimeout(() => card.classList.remove("pedido-recien-actualizado"), 1600);
+      }
+    });
+  }, 900);
+}
+
+/** Lee la respuesta de Apps Script avisando claro si no vino JSON (ej. página de error 404 de Google) */
+async function _leerRespuestaJSON(response) {
+  const texto = await response.text();
+  try { return JSON.parse(texto); }
+  catch (e) {
+    throw new Error(response.ok
+      ? "El servidor devolvió una respuesta inválida"
+      : `El servidor respondió ${response.status} — revisá la implementación de Apps Script`);
+  }
+}
+
+async function cambiarEstado(pedidoId, estado, el) {
+  if (_pedidosEnProceso.has(pedidoId)) return;
+  _pedidosEnProceso.add(pedidoId);
+  _marcarPedidoProcesando(pedidoId, el, "Guardando…");
+  let ok = false, mensaje = "";
   try {
     const response = await fetchAPI(
       API_URL +
@@ -2366,22 +2478,28 @@ async function cambiarEstado(pedidoId, estado) {
       {},
       { timeoutMs: 30000 }
     );
-    let data;
-    try {
-      data = await response.json();
-    } catch (error) {
-      console.error("Respuesta no era JSON válido en cambiarEstado:", error);
-      toast("Error de conexión", "error");
-      return;
+    const data = await _leerRespuestaJSON(response);
+    if (!data.success) {
+      mensaje = data.message || "No se pudo actualizar el pedido";
+    } else {
+      ok = true;
+      const p = pedidosGlobal.find(x => x.PEDIDO_ID === pedidoId);
+      if (p) { p.ESTADO = estado; invalidarCache("pedidos"); }
     }
-    if (!data.success) { toast("No se pudo actualizar el pedido", "error"); return; }
-    // Actualizar en memoria sin recargar todo
-    const p = pedidosGlobal.find(x => x.PEDIDO_ID === pedidoId);
-    if (p) { p.ESTADO = estado; invalidarCache("pedidos"); filtrarPedidos(); }
-    toast("Estado actualizado", "success");
   } catch (error) {
-    console.error(error);
-    toast("Error de conexión", "error");
+    console.error("Error al cambiar el estado del pedido:", error);
+    mensaje = error && error.name === "AbortError" ? "El servidor no respondió a tiempo" : (error.message || "Error de conexión");
+  } finally {
+    _pedidosEnProceso.delete(pedidoId);
+  }
+
+  if (ok) {
+    _terminarPedidoProcesando(pedidoId, el, true, "✓ Guardado");
+    toast(`Pedido ${pedidoId}: estado cambiado a ${estado}`, "success");
+    _refrescarPedidosConDestello(pedidoId);
+  } else {
+    _terminarPedidoProcesando(pedidoId, el, false, "✕ No se guardó");
+    toast(`No se pudo cambiar el estado: ${mensaje}`, "error");
   }
 }
 
@@ -2425,47 +2543,54 @@ async function cambiarFormaPagoPedido(pedidoId, formaPago) {
 /** Llama al backend para marcar/desmarcar el pedido como cobrado en caja, y refresca la lista */
 const _pedidosEnProceso = new Set(); // evita doble cobro del mismo pedido
 
-async function aplicarCobroPedido(pedidoId, cobrado, formaPago) {
+async function aplicarCobroPedido(pedidoId, cobrado, formaPago, el) {
   if (_pedidosEnProceso.has(pedidoId)) return; // ya procesando
   _pedidosEnProceso.add(pedidoId);
+  _marcarPedidoProcesando(pedidoId, el, cobrado ? "Cobrando…" : "Desmarcando…");
 
-  // Deshabilitar los botones de ese pedido visualmente
-  document.querySelectorAll(`.pedido-pago-btns[data-pedido="${pedidoId}"] button`)
-    .forEach(b => b.disabled = true);
-
+  let ok = false, mensaje = "";
   try {
-    const response = await fetch(
+    // Con timeout (antes era un fetch sin límite: si Apps Script se
+    // colgaba, el botón quedaba bloqueado para siempre)
+    const response = await fetchAPI(
       API_URL +
       "?action=marcarPedidoCobrado" +
       "&pedidoId=" + encodeURIComponent(pedidoId) +
       "&cobrado=" + (cobrado ? "SI" : "NO") +
-      "&formaPago=" + encodeURIComponent(formaPago || "")
+      "&formaPago=" + encodeURIComponent(formaPago || ""),
+      {},
+      { timeoutMs: 30000 }
     );
-    const data = await response.json();
+    const data = await _leerRespuestaJSON(response);
 
     if (!data.success) {
-      toast(data.message || "No se pudo actualizar el cobro del pedido", "error");
-      return;
+      mensaje = data.message || "No se pudo actualizar el cobro del pedido";
+    } else {
+      ok = true;
+      const p = pedidosGlobal.find(x => x.PEDIDO_ID === pedidoId);
+      if (p) {
+        p.COBRADO = cobrado ? "SI" : "NO";
+        p.FORMA_PAGO_COBRO = formaPago || "";
+        invalidarCache("pedidos");
+      }
     }
-
-    // Actualizar en memoria para respuesta inmediata
-    const p = pedidosGlobal.find(x => x.PEDIDO_ID === pedidoId);
-    if (p) {
-      p.COBRADO = cobrado ? "SI" : "NO";
-      p.FORMA_PAGO_COBRO = formaPago || "";
-      invalidarCache("pedidos");
-      filtrarPedidos();
-    }
-
-    toast(cobrado
-      ? `Pedido cobrado con ${formaPago} — ya suma al cierre de caja`
-      : "Pedido desmarcado — ya no suma al cierre de caja", "success");
-
   } catch (error) {
     console.error("Error al marcar el pedido como cobrado:", error);
-    toast("Error de conexión al actualizar el pedido", "error");
+    mensaje = error && error.name === "AbortError" ? "El servidor no respondió a tiempo" : (error.message || "Error de conexión");
   } finally {
     _pedidosEnProceso.delete(pedidoId);
+  }
+
+  if (ok) {
+    _terminarPedidoProcesando(pedidoId, el, true, cobrado ? "✓ Cobrado" : "✓ Desmarcado");
+    toast(cobrado
+      ? `Pedido ${pedidoId} cobrado con ${formaPago} — ya suma al cierre de caja`
+      : `Pedido ${pedidoId} desmarcado — ya no suma al cierre de caja`, "success");
+    _refrescarPedidosConDestello(pedidoId);
+    invalidarCache("ventasPOS");
+  } else {
+    _terminarPedidoProcesando(pedidoId, el, false, "✕ Error");
+    toast(`No se pudo ${cobrado ? "marcar como cobrado" : "desmarcar"} el pedido: ${mensaje}`, "error");
   }
 }
 
@@ -3412,16 +3537,16 @@ function renderPedidos(listaOriginal) {
              <span class="pedido-cobrado-badge">✓ Cobrado</span>
              <span class="pedido-cobrado-forma">${formaPagoActual}</span>
              <button class="btn btn-outline-danger btn-sm" style="font-size:11px;padding:2px 8px;"
-               onclick="aplicarCobroPedido('${p.PEDIDO_ID}', false, '')">Desmarcar</button>
+               onclick="aplicarCobroPedido('${p.PEDIDO_ID}', false, '', this)">Desmarcar</button>
            </div>`
         : `<div class="pedido-pago-btns" data-pedido="${p.PEDIDO_ID}">
              <span style="font-size:11px;font-weight:600;color:var(--slate-500);">Cobrar con:</span>
-             <button class="pedido-pago-btn" onclick="aplicarCobroPedido('${p.PEDIDO_ID}', true, 'EFECTIVO')">💵 Efectivo</button>
-             <button class="pedido-pago-btn" onclick="aplicarCobroPedido('${p.PEDIDO_ID}', true, 'TRANSFERENCIA')">📲 Transfer.</button>
-             <button class="pedido-pago-btn" onclick="aplicarCobroPedido('${p.PEDIDO_ID}', true, 'TARJETA')">💳 Tarjeta</button>
+             <button class="pedido-pago-btn" onclick="aplicarCobroPedido('${p.PEDIDO_ID}', true, 'EFECTIVO', this)">💵 Efectivo</button>
+             <button class="pedido-pago-btn" onclick="aplicarCobroPedido('${p.PEDIDO_ID}', true, 'TRANSFERENCIA', this)">📲 Transfer.</button>
+             <button class="pedido-pago-btn" onclick="aplicarCobroPedido('${p.PEDIDO_ID}', true, 'TARJETA', this)">💳 Tarjeta</button>
            </div>`;
       const tmp = document.createElement("div");
-      tmp.innerHTML = `<div class="pedido-card estado-${claseEstado}">
+      tmp.innerHTML = `<div class="pedido-card estado-${claseEstado}${_pedidosEnProceso.has(p.PEDIDO_ID) ? " pedido-procesando" : ""}" data-pedido-card="${escapeHtml(p.PEDIDO_ID)}">
         <div class="pedido-card-top">
           <div>
             <div class="pedido-card-id">${escapeHtml(p.PEDIDO_ID)}</div>
@@ -3436,7 +3561,7 @@ function renderPedidos(listaOriginal) {
           </div>
         </div>
         <div class="pedido-card-controls">
-          <select class="form-select form-select-sm" style="max-width:160px;" onchange="cambiarEstado('${p.PEDIDO_ID}',this.value)">
+          <select class="form-select form-select-sm" style="max-width:160px;" data-estado-previo="${escapeHtml(p.ESTADO)}" onchange="cambiarEstado('${p.PEDIDO_ID}',this.value,this)">
             <option value="NUEVO"      ${p.ESTADO==="NUEVO"?"selected":""}>🆕 Nuevo</option>
             <option value="PREPARANDO" ${p.ESTADO==="PREPARANDO"?"selected":""}>⚙️ Preparando</option>
             <option value="ENVIADO"    ${p.ESTADO==="ENVIADO"?"selected":""}>📦 Enviado</option>
