@@ -2645,6 +2645,8 @@ async function abrirDetallePedido(pedidoId) {
     // complicaría tener que devolver/redescontar con más margen de error.
     const btnEditarItems = document.getElementById("btnEditarItemsPedido");
     if (btnEditarItems) btnEditarItems.style.display = pedido.ESTADO === "NUEVO" ? "inline-flex" : "none";
+    const btnEditarCliente = document.getElementById("btnEditarClientePedido");
+    if (btnEditarCliente) btnEditarCliente.style.display = "inline-flex";
 
     const simbolo = String(pedido.MONEDA || "ARS").toUpperCase() === "USD" ? "US$" : "$";
     const filas = detalle.map(item => `
@@ -2693,6 +2695,125 @@ function cerrarModalDetallePedido() {
   pedidoDetalleActual = null;
   _carritoEdicionPedido = null;
   _descuentoEdicionPedido = null;
+}
+
+/* ===================== EDITAR DATOS DEL CLIENTE DE UN PEDIDO =====================
+   Cualquier estado. El backend (editarDatosClientePedido, en
+   PapeleraYClientes.gs) actualiza el pedido, refleja los cambios en la
+   hoja CLIENTES (o crea el cliente si no existía) y regenera el PDF. */
+
+function activarEdicionClientePedido() {
+  if (!pedidoDetalleActual) return;
+  const p = pedidoDetalleActual.pedido;
+  const campo = (id, label, valor, col, extra) => `
+    <div class="${col}">
+      <label class="form-label" style="font-size:12px;">${label}</label>
+      <input type="text" class="form-control form-control-sm" id="${id}" value="${escapeHtml(valor || "")}" ${extra || ""}>
+    </div>`;
+
+  ["btnEditarItemsPedido", "btnEditarClientePedido"].forEach(id => {
+    const b = document.getElementById(id);
+    if (b) b.style.display = "none";
+  });
+
+  document.getElementById("pedidoDetalleBody").innerHTML = `
+    <div class="config-preview-hint mb-3">
+      <span class="ic">👤</span> Editando los datos del cliente del pedido <strong>${escapeHtml(p.PEDIDO_ID)}</strong>.
+      Los cambios también se guardan en <strong>Clientes</strong>.
+    </div>
+    <div class="row g-2 mb-2">
+      ${campo("edCliNombre", 'Nombre / razón social <span class="text-danger">*</span>', p.CLIENTE, "col-12")}
+    </div>
+    <div class="row g-2 mb-2">
+      ${campo("edCliDni", "DNI/CUIT", p.DNI, "col-6", 'inputmode="numeric"')}
+      ${campo("edCliTelefono", "Teléfono", p.TELEFONO, "col-6")}
+    </div>
+    <div class="row g-2 mb-2">
+      ${campo("edCliDireccion", "Dirección", p.DIRECCION, "col-12")}
+    </div>
+    <div class="row g-2 mb-2">
+      ${campo("edCliLocalidad", "Localidad", p.LOCALIDAD, "col-7")}
+      ${campo("edCliCP", "Código Postal", p.CODIGO_POSTAL || p.CODIGOPOSTAL, "col-5")}
+    </div>
+    <div class="row g-2 mb-2">
+      ${campo("edCliProvincia", "Provincia", p.PROVINCIA, "col-6")}
+      ${campo("edCliEmpresa", "Transporte / empresa", p.EMPRESA, "col-6")}
+    </div>
+    <div class="d-flex gap-2 justify-content-end mt-3">
+      <button type="button" class="btn btn-outline-secondary btn-sm" onclick="cancelarEdicionClientePedido()">Cancelar</button>
+      <button type="button" class="btn btn-primary btn-sm" id="btnGuardarClientePedido" onclick="guardarEdicionClientePedido()">💾 Guardar cambios</button>
+    </div>`;
+
+  setTimeout(() => document.getElementById("edCliNombre")?.focus(), 50);
+}
+
+function cancelarEdicionClientePedido() {
+  if (!pedidoDetalleActual) return;
+  abrirDetallePedido(pedidoDetalleActual.pedido.PEDIDO_ID);
+}
+
+async function guardarEdicionClientePedido() {
+  if (!pedidoDetalleActual) return;
+  const val = id => (document.getElementById(id)?.value || "").trim();
+  const nombre = val("edCliNombre");
+  if (!nombre) {
+    toast("El nombre del cliente es obligatorio", "error");
+    document.getElementById("edCliNombre")?.focus();
+    return;
+  }
+
+  const pedidoId = pedidoDetalleActual.pedido.PEDIDO_ID;
+  const cuerpo = {
+    action: "editarDatosClientePedido",
+    pedidoId,
+    nombre,
+    dni: val("edCliDni"),
+    telefono: val("edCliTelefono"),
+    direccion: val("edCliDireccion"),
+    localidad: val("edCliLocalidad"),
+    codigoPostal: val("edCliCP"),
+    provincia: val("edCliProvincia"),
+    empresa: val("edCliEmpresa")
+  };
+
+  const btn = document.getElementById("btnGuardarClientePedido");
+  if (btn) { btn.disabled = true; btn.textContent = "Guardando..."; }
+
+  try {
+    const response = await fetchAPI(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(cuerpo)
+    });
+    const data = await _leerRespuestaJSON(response);
+
+    if (!data || !data.success) {
+      let msg = (data && data.message) || "No se pudieron guardar los cambios";
+      if (/no v[aá]lida|desconocida|no reconocida|invalid/i.test(msg)) {
+        msg = "El backend todavía no tiene esta función: agregá PapeleraYClientes.gs en Apps Script y publicá una nueva versión (ver LEEME).";
+      }
+      toast(msg, "error");
+      if (btn) { btn.disabled = false; btn.textContent = "💾 Guardar cambios"; }
+      return;
+    }
+
+    const accion = data.cliente && data.cliente.accion === "creado" ? "y se creó el cliente en Clientes" : "y en Clientes";
+    toast(`Datos del cliente actualizados en el pedido ${accion}`, "success");
+    if (data.pdfError) toast("Ojo: no se pudo regenerar el PDF del pedido", "error");
+
+    // Que Clientes, el selector de clientes y la lista de pedidos vean los datos nuevos
+    _clientesPedidoCache = [];
+    invalidarCache("clientes", "pedidos");
+    try { if (typeof cargarClientesDesdeBackend === "function") cargarClientesDesdeBackend(); } catch (e) {}
+    try { recargarPedidos(); } catch (e) {}
+
+    abrirDetallePedido(pedidoId);
+
+  } catch (error) {
+    console.error("Error al editar cliente del pedido:", error);
+    toast("Error de conexión — revisá tu internet e intentá de nuevo", "error");
+    if (btn) { btn.disabled = false; btn.textContent = "💾 Guardar cambios"; }
+  }
 }
 
 /* ===================== EDITAR ÍTEMS DE UN PEDIDO (solo estado NUEVO) ===================== */
@@ -3004,22 +3125,223 @@ async function guardarEdicionItemsPedido() {
  * WhatsApp). No crea ningún registro en Pedidos ni toca stock — es
  * pura utilidad de impresión, todo queda en el navegador.
  */
+let _etqManualClienteSeleccionado = null; // cliente elegido de la lista (null = destinatario nuevo/escrito a mano)
+let _etqManualClientes = [];
+
 function abrirModalEtiquetaManual() {
   ["etqManualCliente", "etqManualDni", "etqManualTelefono", "etqManualDireccion",
    "etqManualLocalidad", "etqManualCP", "etqManualProvincia", "etqManualTransporte",
-   "etqManualReferencia"].forEach(id => {
+   "etqManualReferencia", "etqManualBuscarCliente"].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = "";
   });
+  _etqManualClienteSeleccionado = null;
+  const chk = document.getElementById("etqManualGuardarCliente");
+  if (chk) chk.checked = true;
+  const res = document.getElementById("etqManualResultadosClientes");
+  if (res) { res.style.display = "none"; res.innerHTML = ""; }
+  etqManualActualizarGuardar();
+
   document.getElementById("etiquetaManualModalBackdrop").classList.add("show");
-  setTimeout(() => document.getElementById("etqManualCliente")?.focus(), 50);
+  setTimeout(() => (document.getElementById("etqManualBuscarCliente") || document.getElementById("etqManualCliente"))?.focus(), 50);
+  etqManualCargarClientes();
 }
 
 function cerrarModalEtiquetaManual() {
   document.getElementById("etiquetaManualModalBackdrop").classList.remove("show");
 }
 
-function generarEtiquetaManual() {
+/** Trae los clientes (con localidad/provincia/CP) — usa el mismo cache que el selector de pedidos */
+async function etqManualCargarClientes() {
+  let lista = [];
+  try { lista = await cargarClientesParaPedido(); } catch (e) { lista = []; }
+  // Sin internet en la app de escritorio: se usa la copia local de clientes
+  if ((!lista || lista.length === 0) && window.posOffline && typeof window.posOffline.obtenerClientesConCredito === "function") {
+    try { lista = await window.posOffline.obtenerClientesConCredito(); } catch (e) { lista = []; }
+  }
+  if ((!lista || lista.length === 0) && Array.isArray(clientesGlobal)) lista = clientesGlobal;
+  _etqManualClientes = lista || [];
+  const buscador = document.getElementById("etqManualBuscarCliente");
+  if (buscador && buscador.value.trim()) etqManualFiltrarClientes();
+}
+
+function etqManualFiltrarClientes() {
+  const input = document.getElementById("etqManualBuscarCliente");
+  const res = document.getElementById("etqManualResultadosClientes");
+  if (!input || !res) return;
+  const q = normalizarBusquedaPOS(input.value);
+  if (!q) { res.style.display = "none"; res.innerHTML = ""; return; }
+
+  const qDigitos = q.replace(/\D/g, "");
+  const coincidencias = _etqManualClientes.filter(c => {
+    const texto = normalizarBusquedaPOS([c.NOMBRE, c.ALIAS, c.DNI, c.TELEFONO, c.LOCALIDAD].join(" "));
+    if (texto.includes(q)) return true;
+    return qDigitos.length >= 3 && String(c.DNI || "").replace(/\D/g, "").includes(qDigitos);
+  }).slice(0, 12);
+
+  if (coincidencias.length === 0) {
+    res.innerHTML = `<div style="padding:8px 10px; font-size:12.5px; color:var(--slate-500);">
+      No hay clientes con "${escapeHtml(input.value.trim())}".
+      <a href="#" onclick="event.preventDefault(); etqManualUsarComoNuevo();">Cargarlo como cliente nuevo</a>
+    </div>`;
+  } else {
+    res.innerHTML = coincidencias.map(c => `
+      <div class="etq-cli-opcion" style="padding:7px 10px; cursor:pointer; border-bottom:1px solid var(--slate-100);"
+           onmousedown="event.preventDefault(); etqManualSeleccionarCliente('${escapeJsAttr(c.CLIENTE_ID)}')"
+           onmouseover="this.style.background='var(--slate-100)'" onmouseout="this.style.background=''">
+        <div style="font-weight:600; font-size:13px;">${escapeHtml(c.NOMBRE)}${c.ALIAS ? ` <span style="color:var(--slate-500); font-weight:400;">(${escapeHtml(c.ALIAS)})</span>` : ""}</div>
+        <div style="font-size:11.5px; color:var(--slate-500);">${[c.DNI ? "DNI " + escapeHtml(c.DNI) : "", escapeHtml(c.LOCALIDAD || ""), escapeHtml(c.TELEFONO || "")].filter(Boolean).join(" · ")}</div>
+      </div>`).join("");
+  }
+  res.style.display = "block";
+}
+
+function etqManualTeclaBuscar(event) {
+  if (event.key === "Escape") {
+    const res = document.getElementById("etqManualResultadosClientes");
+    if (res) res.style.display = "none";
+  } else if (event.key === "Enter") {
+    event.preventDefault();
+    const primera = document.querySelector("#etqManualResultadosClientes .etq-cli-opcion");
+    if (primera) primera.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+  }
+}
+
+function etqManualOcultarResultados() {
+  setTimeout(() => {
+    const res = document.getElementById("etqManualResultadosClientes");
+    if (res) res.style.display = "none";
+  }, 150);
+}
+
+function etqManualSeleccionarCliente(clienteId) {
+  const c = _etqManualClientes.find(x => String(x.CLIENTE_ID) === String(clienteId));
+  if (!c) return;
+  _etqManualClienteSeleccionado = c;
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ""; };
+  set("etqManualCliente", c.NOMBRE);
+  set("etqManualDni", c.DNI);
+  set("etqManualTelefono", c.TELEFONO);
+  set("etqManualDireccion", c.DIRECCION);
+  set("etqManualLocalidad", c.LOCALIDAD);
+  set("etqManualCP", c.CODIGO_POSTAL || c.CODIGOPOSTAL);
+  set("etqManualProvincia", c.PROVINCIA);
+  set("etqManualTransporte", c.EMPRESA);
+  set("etqManualBuscarCliente", c.NOMBRE);
+  const res = document.getElementById("etqManualResultadosClientes");
+  if (res) res.style.display = "none";
+  etqManualActualizarGuardar();
+}
+
+/** Pasa lo escrito en el buscador al nombre del destinatario, como cliente nuevo */
+function etqManualUsarComoNuevo() {
+  const texto = (document.getElementById("etqManualBuscarCliente")?.value || "").trim();
+  etqManualLimpiarCliente();
+  const nombre = document.getElementById("etqManualCliente");
+  if (nombre) { if (texto && !/^\d+$/.test(texto)) nombre.value = texto; nombre.focus(); }
+  const dni = document.getElementById("etqManualDni");
+  if (dni && /^\d{7,11}$/.test(texto)) dni.value = texto;
+}
+
+/** "✕ Nuevo": deja el formulario vacío para cargar un destinatario que no está en la lista */
+function etqManualLimpiarCliente() {
+  _etqManualClienteSeleccionado = null;
+  ["etqManualCliente", "etqManualDni", "etqManualTelefono", "etqManualDireccion",
+   "etqManualLocalidad", "etqManualCP", "etqManualProvincia", "etqManualTransporte",
+   "etqManualBuscarCliente"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = "";
+  });
+  const res = document.getElementById("etqManualResultadosClientes");
+  if (res) res.style.display = "none";
+  etqManualActualizarGuardar();
+  document.getElementById("etqManualCliente")?.focus();
+}
+
+/**
+ * Muestra el tilde "Guardar como cliente nuevo" solo cuando el
+ * destinatario NO es un cliente existente. Si se elige uno de la lista
+ * pero después se cambia el nombre o el DNI a mano, se lo toma como
+ * otro destinatario (nuevo).
+ */
+function etqManualActualizarGuardar() {
+  const c = _etqManualClienteSeleccionado;
+  if (c) {
+    const nombre = (document.getElementById("etqManualCliente")?.value || "").trim().toLowerCase();
+    const dni = (document.getElementById("etqManualDni")?.value || "").replace(/\D/g, "");
+    const mismoNombre = nombre === String(c.NOMBRE || "").trim().toLowerCase();
+    const mismoDni = dni === String(c.DNI || "").replace(/\D/g, "");
+    if (!mismoNombre || !mismoDni) _etqManualClienteSeleccionado = null;
+  }
+
+  const fila = document.getElementById("etqManualGuardarClienteFila");
+  const aviso = document.getElementById("etqManualClienteSeleccionadoAviso");
+  if (fila) fila.style.display = _etqManualClienteSeleccionado ? "none" : "block";
+  if (aviso) {
+    aviso.style.display = _etqManualClienteSeleccionado ? "block" : "none";
+    if (_etqManualClienteSeleccionado) aviso.textContent = "✓ Cliente de la lista: " + _etqManualClienteSeleccionado.NOMBRE;
+  }
+}
+
+/** Busca si el destinatario ya existe en la lista local (por DNI o nombre exacto) */
+function _etqManualBuscarExistente(nombre, dni) {
+  const dniNum = String(dni || "").replace(/\D/g, "");
+  if (dniNum) return _etqManualClientes.find(c => String(c.DNI || "").replace(/\D/g, "") === dniNum) || null;
+  const n = String(nombre || "").trim().toLowerCase();
+  return _etqManualClientes.find(c => String(c.NOMBRE || "").trim().toLowerCase() === n) || null;
+}
+
+/**
+ * Guarda el destinatario como cliente nuevo. Usa guardarClienteDesdeRotulo
+ * (guarda también localidad/provincia/CP y no duplica por DNI); si el
+ * backend todavía no tiene ese archivo, cae a crearCliente; y en la app
+ * de escritorio sin internet, lo guarda local y lo encola para Sheets.
+ */
+async function etqManualGuardarCliente(datos) {
+  const existente = _etqManualBuscarExistente(datos.nombre, datos.dni);
+  if (existente) return { ok: true, existente: true, nombre: existente.NOMBRE };
+
+  const post = async (cuerpo) => {
+    const response = await fetchAPI(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(cuerpo)
+    });
+    return _leerRespuestaJSON(response);
+  };
+
+  try {
+    let data = await post({ action: "guardarClienteDesdeRotulo", ...datos });
+    if (!data || (!data.success && /no v[aá]lida|desconocida|no reconocida|invalid/i.test(String(data.message || "")))) {
+      data = await post({ action: "crearCliente", nombre: datos.nombre, alias: "", dni: datos.dni, telefono: datos.telefono,
+                          empresa: datos.empresa, direccion: datos.direccion, aCredito: "NO" });
+    }
+    if (!data || !data.success) return { ok: false, message: (data && data.message) || "No se pudo guardar el cliente" };
+
+    _clientesPedidoCache = [];
+    invalidarCache("clientes");
+    try { if (typeof cargarClientesDesdeBackend === "function") cargarClientesDesdeBackend(); } catch (e) {}
+    return { ok: true, existente: !!data.existente, nombre: data.nombre || datos.nombre };
+
+  } catch (error) {
+    // App de escritorio sin conexión: guardar local + encolar para Sheets
+    if (window.posOffline && typeof window.posOffline.crearCliente === "function" && typeof window.posOffline.encolarAccion === "function") {
+      try {
+        const local = { nombre: datos.nombre, alias: "", dni: datos.dni, telefono: datos.telefono,
+                        direccion: datos.direccion, empresa: datos.empresa, aCredito: "NO" };
+        await window.posOffline.crearCliente(local);
+        await window.posOffline.encolarAccion("cliente_upsert", { editando: false, ...local });
+        return { ok: true, offline: true, nombre: datos.nombre };
+      } catch (e2) {
+        console.error("No se pudo guardar el cliente offline:", e2);
+      }
+    }
+    console.error("Error al guardar cliente desde el rótulo:", error);
+    return { ok: false, message: "Error de conexión al guardar el cliente" };
+  }
+}
+
+async function generarEtiquetaManual() {
   const val = id => (document.getElementById(id)?.value || "").trim();
 
   const cliente = val("etqManualCliente");
@@ -3031,11 +3353,10 @@ function generarEtiquetaManual() {
 
   // Si no se cargó una referencia a mano, se genera una localmente
   // (timestamp) solo para tener algo que mostrar en el código de
-  // barras — no es un ID de pedido real, no queda guardado en
-  // ningún lado más que en esta etiqueta impresa.
+  // barras — no es un ID de pedido real.
   const referencia = val("etqManualReferencia") || ("MANUAL-" + Date.now());
 
-  imprimirEtiquetaEnvio({
+  const datos = {
     pedidoId: referencia,
     cliente,
     telefono: val("etqManualTelefono"),
@@ -3045,9 +3366,27 @@ function generarEtiquetaManual() {
     codigoPostal: val("etqManualCP"),
     dni: val("etqManualDni"),
     transporte: val("etqManualTransporte")
-  });
+  };
 
+  etqManualActualizarGuardar();
+  const quiereGuardar = !_etqManualClienteSeleccionado && !!document.getElementById("etqManualGuardarCliente")?.checked;
+
+  // Primero se imprime (window.open tiene que salir del click directo,
+  // si no el navegador lo puede bloquear); el guardado va después.
+  imprimirEtiquetaEnvio(datos);
   cerrarModalEtiquetaManual();
+
+  if (quiereGuardar) {
+    const r = await etqManualGuardarCliente({
+      nombre: cliente, dni: datos.dni, telefono: datos.telefono, direccion: datos.direccion,
+      localidad: datos.localidad, provincia: datos.provincia, codigoPostal: datos.codigoPostal,
+      empresa: datos.transporte
+    });
+    if (!r.ok) toast("El rótulo se generó, pero no se pudo guardar el cliente: " + r.message, "error");
+    else if (r.existente) toast(`"${r.nombre}" ya estaba en Clientes — no se duplicó`, "success");
+    else if (r.offline) toast("Cliente guardado offline — se sincroniza con Sheets cuando vuelva la conexión", "success");
+    else toast(`Cliente "${r.nombre}" guardado en Clientes`, "success");
+  }
 }
 
 function imprimirEtiquetaDesdeDetalle() {
@@ -4990,7 +5329,7 @@ function eliminarProducto(codigo) {
 
   const backdrop = document.getElementById("modalEliminarProdBackdrop");
   const texto = document.getElementById("modalEliminarProdTexto");
-  if (texto) texto.textContent = `¿Eliminar el producto "${codigo}"? Esta acción no se puede deshacer.`;
+  if (texto) texto.textContent = `¿Mover el producto "${codigo}" a la papelera? Lo vas a poder restaurar desde Productos → 🗑️ Papelera.`;
   if (backdrop) backdrop.classList.add("show");
 }
 
@@ -5006,7 +5345,8 @@ async function eliminarProductoForm() {
   if (!codigo) return;
 
   try {
-    const params = new URLSearchParams({ action: "eliminarProducto", codigo });
+    const usuario = sessionStorage.getItem("nombreUsuario") || sessionStorage.getItem("usuarioLogueado") || "";
+    const params = new URLSearchParams({ action: "eliminarProducto", codigo, usuario });
     const response = await fetchAPI(API_URL + "?" + params.toString());
     const data = await response.json();
 
@@ -5015,7 +5355,7 @@ async function eliminarProductoForm() {
       return;
     }
 
-    toast("Producto eliminado", "success");
+    toast("Producto enviado a la papelera", "success");
     cargarProductos();
     productosPOS = [];
 
@@ -5023,6 +5363,174 @@ async function eliminarProductoForm() {
     console.error("Error al eliminar producto:", error);
     toast("Error de conexión al eliminar el producto", "error");
   }
+}
+
+/* ===================== PAPELERA DE PRODUCTOS =====================
+   Los productos borrados no se pierden: el backend (PapeleraYClientes.gs)
+   los mueve a la hoja PAPELERA_PRODUCTOS con todos sus datos. Desde acá
+   se pueden restaurar, borrar definitivo o vaciar la papelera.
+   En la app de escritorio, un borrado hecho SIN internet aparece en la
+   papelera recién cuando se sincroniza con Sheets. */
+
+let _papeleraProductos = [];
+
+async function _postPapelera(cuerpo) {
+  const response = await fetchAPI(API_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify(cuerpo)
+  });
+  const data = await _leerRespuestaJSON(response);
+  if (data && data.success === false && /no v[aá]lida|desconocida|no reconocida|invalid/i.test(String(data.message || ""))) {
+    data.message = "El backend todavía no tiene la papelera: agregá el archivo PapeleraYClientes.gs en Apps Script y publicá una nueva versión (ver LEEME).";
+  }
+  return data;
+}
+
+function abrirPapeleraProductos() {
+  const backdrop = document.getElementById("papeleraProductosModalBackdrop");
+  if (!backdrop) return;
+  const buscador = document.getElementById("papeleraBuscar");
+  if (buscador) buscador.value = "";
+  backdrop.classList.add("show");
+  cargarPapeleraProductos();
+}
+
+function cerrarPapeleraProductos() {
+  const backdrop = document.getElementById("papeleraProductosModalBackdrop");
+  if (backdrop) backdrop.classList.remove("show");
+}
+
+async function cargarPapeleraProductos() {
+  const cont = document.getElementById("papeleraProductosLista");
+  if (!cont) return;
+  cont.innerHTML = `<div class="text-center text-muted py-4">Cargando papelera...</div>`;
+
+  try {
+    const data = await _postPapelera({ action: "papeleraProductos" });
+    if (!data || !data.success) {
+      cont.innerHTML = `<div class="text-center text-danger py-4" style="font-size:13px;">${escapeHtml((data && data.message) || "No se pudo cargar la papelera")}</div>`;
+      return;
+    }
+    _papeleraProductos = data.productos || [];
+    renderPapeleraProductos();
+  } catch (error) {
+    console.error("Error al cargar la papelera:", error);
+    cont.innerHTML = `<div class="text-center text-danger py-4" style="font-size:13px;">Error de conexión al cargar la papelera. Revisá tu internet.</div>`;
+  }
+}
+
+function renderPapeleraProductos() {
+  const cont = document.getElementById("papeleraProductosLista");
+  const contador = document.getElementById("papeleraContador");
+  const btnVaciar = document.getElementById("btnVaciarPapelera");
+  if (!cont) return;
+
+  const esVendedor = obtenerRolActual() === "vendedor";
+  if (btnVaciar) btnVaciar.style.display = (_papeleraProductos.length > 0 && !esVendedor) ? "inline-flex" : "none";
+  if (contador) contador.textContent = _papeleraProductos.length === 1 ? "1 producto" : `${_papeleraProductos.length} productos`;
+
+  const filtro = normalizarBusquedaPOS((document.getElementById("papeleraBuscar") || {}).value || "");
+  const lista = filtro
+    ? _papeleraProductos.filter(p => normalizarBusquedaPOS(p.PRODUCTO + " " + p.CODIGO + " " + p.CATEGORIA).includes(filtro))
+    : _papeleraProductos;
+
+  if (_papeleraProductos.length === 0) {
+    cont.innerHTML = `<div class="text-center text-muted py-5" style="font-size:13.5px;">🗑️ La papelera está vacía</div>`;
+    return;
+  }
+  if (lista.length === 0) {
+    cont.innerHTML = `<div class="text-center text-muted py-4" style="font-size:13px;">Ningún producto coincide con la búsqueda</div>`;
+    return;
+  }
+
+  cont.innerHTML = lista.map(p => `
+    <div class="d-flex align-items-center gap-2" style="padding:9px 4px; border-bottom:1px solid var(--slate-200);">
+      ${p.IMAGEN && !String(p.IMAGEN).startsWith("data:") ? `<img src="${escapeHtml(p.IMAGEN)}" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:6px;flex-shrink:0;" onerror="this.style.display='none'">` : `<div style="width:40px;height:40px;border-radius:6px;background:var(--slate-100);display:flex;align-items:center;justify-content:center;flex-shrink:0;">📦</div>`}
+      <div style="flex:1; min-width:0;">
+        <div style="font-weight:600; font-size:13.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(p.PRODUCTO || "(sin nombre)")}</div>
+        <div style="font-size:11.5px; color:var(--slate-500);">
+          <span style="font-family:var(--font-mono);">${escapeHtml(p.CODIGO)}</span>
+          ${p.CATEGORIA ? " · " + escapeHtml(p.CATEGORIA) : ""}
+          · $${Number(p.PRECIO || 0).toLocaleString("es-AR")} · stock ${Number(p.STOCK || 0)}
+        </div>
+        <div style="font-size:11px; color:var(--slate-400);">Eliminado ${escapeHtml(p.FECHA_ELIMINADO || "")}${p.USUARIO ? " por " + escapeHtml(p.USUARIO) : ""}</div>
+      </div>
+      <button type="button" class="btn btn-outline-success btn-sm" style="white-space:nowrap;" onclick="restaurarProductoPapelera('${escapeJsAttr(p.PAPELERA_ID)}', this)">↩️ Restaurar</button>
+      ${esVendedor ? "" : `<button type="button" class="btn btn-outline-danger btn-sm" title="Borrar definitivamente" onclick="eliminarDefinitivoPapelera('${escapeJsAttr(p.PAPELERA_ID)}', '${escapeJsAttr(p.PRODUCTO || p.CODIGO)}')">✕</button>`}
+    </div>`).join("");
+}
+
+async function restaurarProductoPapelera(papeleraId, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = "Restaurando..."; }
+  try {
+    const data = await _postPapelera({ action: "restaurarProductoPapelera", papeleraId });
+    if (!data || !data.success) {
+      toast((data && data.message) || "No se pudo restaurar el producto", "error");
+      if (btn) { btn.disabled = false; btn.textContent = "↩️ Restaurar"; }
+      return;
+    }
+    toast(`Producto "${data.producto || data.codigo}" restaurado`, "success");
+    _papeleraProductos = _papeleraProductos.filter(p => p.PAPELERA_ID !== papeleraId);
+    renderPapeleraProductos();
+    await _refrescarCatalogoTrasPapelera();
+  } catch (error) {
+    console.error("Error al restaurar producto:", error);
+    toast("Error de conexión al restaurar el producto", "error");
+    if (btn) { btn.disabled = false; btn.textContent = "↩️ Restaurar"; }
+  }
+}
+
+/** Después de restaurar: que Productos y el POS vuelvan a ver el producto */
+async function _refrescarCatalogoTrasPapelera() {
+  try { invalidarCache("productosAdmin", "productos"); } catch (e) {}
+  productosPOS = [];
+  try {
+    if (typeof window.olvidarVersionCatalogoLocal === "function") await window.olvidarVersionCatalogoLocal();
+    if (typeof actualizarCatalogoProductosManual === "function") await actualizarCatalogoProductosManual();
+    else if (typeof cargarProductos === "function") await cargarProductos();
+  } catch (e) {
+    console.warn("No se pudo refrescar el catálogo después de restaurar:", e);
+  }
+}
+
+function eliminarDefinitivoPapelera(papeleraId, nombre) {
+  confirmarAccion(
+    `¿Borrar "${nombre}" DEFINITIVAMENTE? Ya no se va a poder recuperar.`,
+    async () => {
+      try {
+        const data = await _postPapelera({ action: "eliminarDefinitivoPapelera", papeleraId, rol: obtenerRolActual() });
+        if (!data || !data.success) { toast((data && data.message) || "No se pudo borrar", "error"); return; }
+        _papeleraProductos = _papeleraProductos.filter(p => p.PAPELERA_ID !== papeleraId);
+        renderPapeleraProductos();
+        toast("Producto borrado definitivamente", "success");
+      } catch (error) {
+        console.error("Error al borrar de la papelera:", error);
+        toast("Error de conexión", "error");
+      }
+    },
+    "🗑️ Borrar definitivamente"
+  );
+}
+
+function vaciarPapeleraProductos() {
+  if (_papeleraProductos.length === 0) return;
+  confirmarAccion(
+    `¿Vaciar la papelera? Se van a borrar DEFINITIVAMENTE ${_papeleraProductos.length} producto(s) y no se van a poder recuperar.`,
+    async () => {
+      try {
+        const data = await _postPapelera({ action: "vaciarPapeleraProductos", rol: obtenerRolActual() });
+        if (!data || !data.success) { toast((data && data.message) || "No se pudo vaciar la papelera", "error"); return; }
+        _papeleraProductos = [];
+        renderPapeleraProductos();
+        toast("Papelera vaciada", "success");
+      } catch (error) {
+        console.error("Error al vaciar la papelera:", error);
+        toast("Error de conexión", "error");
+      }
+    },
+    "🗑️ Vaciar papelera"
+  );
 }
 
 /* ===================== CLIENTES ===================== */

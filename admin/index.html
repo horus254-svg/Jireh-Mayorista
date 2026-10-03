@@ -549,6 +549,7 @@
       <div><h1>Productos</h1><div class="sub">Catálogo e inventario</div></div>
       <div class="d-flex gap-2">
         <button class="btn btn-outline-secondary btn-sm" onclick="actualizarCatalogoProductosManual()">↻ Actualizar</button>
+        <button class="btn btn-outline-secondary btn-sm" onclick="abrirPapeleraProductos()" title="Productos eliminados — se pueden restaurar">🗑️ Papelera</button>
         <button class="btn btn-success" onclick="nuevoProducto()">+ Nuevo Producto</button>
       </div>
     </div>
@@ -2715,12 +2716,38 @@
     </div>
     <div class="product-modal-body">
       <p id="modalEliminarProdTexto" style="font-size:13.5px; color:var(--slate-700);">
-        ¿Eliminar este producto? Esta acción no se puede deshacer.
+        ¿Mover este producto a la papelera? Lo vas a poder restaurar desde Productos → 🗑️ Papelera.
       </p>
     </div>
     <div class="product-modal-actions">
       <button class="btn btn-outline-secondary" onclick="cerrarModalEliminarProd()">Cancelar</button>
-      <button class="btn btn-danger" onclick="eliminarProductoForm()">Eliminar</button>
+      <button class="btn btn-danger" onclick="eliminarProductoForm()">Mover a la papelera</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL PAPELERA DE PRODUCTOS =====
+     Va ANTES del modal de confirmación genérico para que ese quede por
+     encima cuando se confirma un borrado definitivo / vaciar. -->
+<div class="product-modal-backdrop" id="papeleraProductosModalBackdrop">
+  <div class="product-modal" style="width:min(640px, 94vw);">
+    <div class="product-modal-header">
+      <h6>🗑️ Papelera de productos <span id="papeleraContador" style="font-size:12px; color:var(--slate-500); font-weight:400;"></span></h6>
+      <button onclick="cerrarPapeleraProductos()">✕</button>
+    </div>
+    <div class="product-modal-body">
+      <div class="d-flex gap-2 mb-2">
+        <input type="text" class="form-control form-control-sm" id="papeleraBuscar" placeholder="🔍 Buscar por nombre, código o categoría..." oninput="renderPapeleraProductos()" autocomplete="off">
+        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="cargarPapeleraProductos()" title="Recargar">↻</button>
+      </div>
+      <div style="font-size:11.5px; color:var(--slate-500); margin-bottom:6px;">
+        Los productos eliminados quedan acá con todos sus datos (precio, stock, imagen, etc.) hasta que los restaures o los borres definitivamente.
+      </div>
+      <div id="papeleraProductosLista" style="max-height:58vh; overflow-y:auto;"></div>
+    </div>
+    <div class="product-modal-actions">
+      <button class="btn btn-outline-danger" id="btnVaciarPapelera" style="display:none; margin-right:auto;" onclick="vaciarPapeleraProductos()">Vaciar papelera</button>
+      <button class="btn btn-outline-secondary" onclick="cerrarPapeleraProductos()">Cerrar</button>
     </div>
   </div>
 </div>
@@ -3492,6 +3519,7 @@
       <button class="btn btn-outline-secondary" onclick="cerrarModalDetallePedido()">Cerrar</button>
       <button class="btn btn-outline-secondary" id="btnImprimirEtiquetaDetalle" onclick="imprimirEtiquetaDesdeDetalle()">Imprimir Rotulo</button>
       <button class="btn btn-outline-secondary" id="btnImprimirRemitoDetalle" onclick="abrirRemitoDesdeDetalle()">Imprimir remito</button>
+      <button class="btn btn-outline-primary" id="btnEditarClientePedido" style="display:none;" onclick="activarEdicionClientePedido()">👤 Editar cliente</button>
       <button class="btn btn-outline-primary" id="btnEditarItemsPedido" style="display:none;" onclick="activarEdicionItemsPedido()">✏️ Editar ítems</button>
       <button class="btn btn-success" onclick="imprimirNotaPedidoA4()">Imprimir pedido (A4)</button>
     </div>
@@ -3514,14 +3542,24 @@
       <button onclick="cerrarModalEtiquetaManual()">✕</button>
     </div>
     <div class="product-modal-body">
+      <div class="mb-2" style="position:relative;">
+        <label class="form-label">Buscar cliente <span class="text-muted" style="font-size:11px;">(o cargá uno nuevo abajo)</span></label>
+        <div class="d-flex gap-2">
+          <input type="text" class="form-control" id="etqManualBuscarCliente" placeholder="🔍 Nombre, DNI/CUIT o teléfono..." autocomplete="off"
+            oninput="etqManualFiltrarClientes()" onfocus="etqManualFiltrarClientes()" onblur="etqManualOcultarResultados()" onkeydown="etqManualTeclaBuscar(event)">
+          <button type="button" class="btn btn-outline-secondary" style="white-space:nowrap;" title="Limpiar y cargar un destinatario nuevo" onclick="etqManualLimpiarCliente()">✕ Nuevo</button>
+        </div>
+        <div id="etqManualResultadosClientes" style="display:none; position:absolute; left:0; right:0; top:100%; z-index:50; max-height:240px; overflow-y:auto; background:var(--white, #fff); border:1px solid var(--slate-200); border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,.12);"></div>
+        <div id="etqManualClienteSeleccionadoAviso" style="display:none; font-size:12px; color:var(--green-600, #16a34a); margin-top:4px;"></div>
+      </div>
       <div class="mb-2">
         <label class="form-label">Nombre del destinatario <span class="text-danger">*</span></label>
-        <input type="text" class="form-control" id="etqManualCliente" placeholder="Nombre y apellido, o razón social">
+        <input type="text" class="form-control" id="etqManualCliente" placeholder="Nombre y apellido, o razón social" oninput="etqManualActualizarGuardar()">
       </div>
       <div class="row g-2 mb-2">
         <div class="col-6">
           <label class="form-label">DNI/CUIT</label>
-          <input type="text" class="form-control" id="etqManualDni" placeholder="20123456789">
+          <input type="text" class="form-control" id="etqManualDni" placeholder="20123456789" oninput="etqManualActualizarGuardar()">
         </div>
         <div class="col-6">
           <label class="form-label">Teléfono</label>
@@ -3553,6 +3591,12 @@
       <div class="mb-2">
         <label class="form-label">Referencia <span class="text-muted" style="font-size:11px;">(opcional — se muestra en el código de barras; si se deja vacío se genera una automática)</span></label>
         <input type="text" class="form-control" id="etqManualReferencia" placeholder="Ej: número de pedido, de WhatsApp, etc.">
+      </div>
+      <div class="mb-1" id="etqManualGuardarClienteFila">
+        <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;">
+          <input type="checkbox" id="etqManualGuardarCliente" checked>
+          Guardar como cliente nuevo en <strong>Clientes</strong> <span class="text-muted" style="font-size:11px;">(si ya existe por DNI, no se duplica)</span>
+        </label>
       </div>
     </div>
     <div class="product-modal-actions">
