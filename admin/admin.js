@@ -9754,7 +9754,7 @@ function cambiarLimiteReporte(key, valor) {
   _repLimites[key] = valor;
   switch (key) {
     case "ventasPeriodo": renderReporteVentasPeriodo(); break;
-    case "productos": renderReporteProductos(_repProductosDatosActuales, (document.getElementById("repProductosBuscador") || {}).value || ""); break;
+    case "productos": renderReporteProductos(); break;
     case "categorias": renderReporteCategorias(); break;
     case "formasPago": renderReporteFormasPago(); break;
     case "cierres": renderReporteCierres(); break;
@@ -9821,78 +9821,611 @@ function renderReporteVentasPeriodo() {
   }).join("");
 }
 
-/* ---- Reporte 2: Productos más vendidos ---- */
-let _repProductosDatosActuales = []; // último set de productos cargado, para filtrar sin re-pedir al backend
+/* ---- Reporte 2: Productos más vendidos ----
+   Carga: una sola llamada (el backend ya trae período anterior, stock y
+   categoría, y cachea el resultado). Mientras carga se muestra un
+   esqueleto; si el usuario cambia de rango a mitad de una carga, la
+   respuesta vieja se descarta (contador _repProductosGen). Buscador,
+   categoría, orden y Top N filtran en memoria, sin volver a pedir nada. */
+let _repProductosDatosActuales = []; // ranking completo del último período cargado
+let _repProductosMeta = null;        // { desde, hasta, anterior, totales, totalesAnterior, generado }
+let _repProductosGen = 0;
 
-async function cargarReporteProductos() {
-  const _ck_repProductos = "reporteProductosVendidos" + obtenerRangoReportes();
-  const _cd_repProductos = _getCacheReporte(_ck_repProductos);
-  if (_cd_repProductos) { _aplicar_cargarReporteProductos(_cd_repProductos); return; }
+const _fmtNum = n => Number(n || 0).toLocaleString("es-AR");
+const _fmtPlata = n => "$" + Math.round(Number(n || 0)).toLocaleString("es-AR");
+const _fmtFechaCorta = s => {
+  const m = String(s || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? `${Number(m[3])}/${Number(m[2])}/${m[1].slice(2)}` : String(s || "");
+};
+
+/** Variación porcentual con texto y flecha (nunca solo color) */
+function _repVariacion(actual, anterior) {
+  actual = Number(actual || 0); anterior = Number(anterior || 0);
+  if (!anterior && !actual) return { clase: "na", texto: "—", valor: 0 };
+  if (!anterior) return { clase: "nuevo", texto: "● nuevo", valor: Infinity };
+  const pct = (actual - anterior) / anterior * 100;
+  if (Math.abs(pct) < 0.5) return { clase: "flat", texto: "= 0%", valor: 0 };
+  const r = Math.abs(pct) >= 10 ? Math.round(pct) : Math.round(pct * 10) / 10;
+  return pct > 0
+    ? { clase: "up", texto: `▲ ${r.toLocaleString("es-AR")}%`, valor: pct }
+    : { clase: "down", texto: `▼ ${Math.abs(r).toLocaleString("es-AR")}%`, valor: pct };
+}
+
+function _repProductosEsqueleto() {
   const tbody = document.getElementById("repProductosTabla");
+  if (!tbody) return;
+  const fila = w => `<span class="rep-skel" style="width:${w}px;"></span>`;
+  tbody.innerHTML = Array.from({ length: 6 }, (_, i) => `
+    <tr>
+      <td>${fila(14)}</td>
+      <td>${fila(160 - i * 12)}<br>${fila(80)}</td>
+      <td class="num">${fila(90)}</td>
+      <td class="num">${fila(60)}</td>
+      <td class="num d-none d-md-table-cell">${fila(34)}</td>
+      <td class="num">${fila(44)}</td>
+      <td class="num d-none d-md-table-cell">${fila(26)}</td>
+    </tr>`).join("");
+  const kpis = document.getElementById("repProductosKpis");
+  if (kpis && !_repProductosMeta) {
+    kpis.innerHTML = Array.from({ length: 4 }, () =>
+      `<div class="rep-prod-kpi"><div class="lbl">${fila(70)}</div><div class="val">${fila(90)}</div></div>`).join("");
+  }
+}
+
+async function cargarReporteProductos(forzar) {
+  const rango = obtenerRangoReportes();
+  const clave = "reporteProductosVendidos" + rango;
+  const estado = document.getElementById("repProductosEstado");
+  const gen = ++_repProductosGen;
+
+  if (!forzar) {
+    const enCache = _getCacheReporte(clave);
+    if (enCache) { _aplicar_cargarReporteProductos(enCache); return; }
+  }
+
+  // Si ya hay datos de este mismo rango, se dejan a la vista mientras se
+  // actualiza; si es un rango nuevo, esqueleto.
+  const mismoRango = _repProductosMeta && _repProductosMeta._rango === rango;
+  if (!mismoRango) _repProductosEsqueleto();
+  if (estado) estado.textContent = "Cargando…";
 
   try {
-    const response = await fetchAPI(API_URL + "?action=reporteProductosVendidos" + obtenerRangoReportes());
-    const data = await response.json();
-    if (!data.success) return;
+    const response = await fetchAPI(API_URL + "?action=reporteProductosVendidos" + rango + (forzar ? "&sinCache=1&_=" + Date.now() : ""));
+    const data = await _leerRespuestaJSON(response);
+    if (gen !== _repProductosGen) return; // llegó tarde: ya se pidió otro rango
 
-    _cacheReporte(_ck_repProductos, data);
+    if (!data || !data.success) {
+      _repProductosError((data && data.message) || "El servidor no devolvió el reporte");
+      return;
+    }
+    // Se guarda con la clave del rango real que resolvió el backend (la
+    // primera carga va sin fechas, y después los inputs quedan completos)
+    const rangoReal = "&desde=" + encodeURIComponent(data.desde) + "&hasta=" + encodeURIComponent(data.hasta);
+    data._rango = rangoReal;
+    _cacheReporte(clave, data);
+    _cacheReporte("reporteProductosVendidos" + rangoReal, data);
     _aplicar_cargarReporteProductos(data);
 
   } catch (error) {
+    if (gen !== _repProductosGen) return;
     console.error("Error al cargar reporte de productos vendidos:", error);
-    tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-3">Error al cargar el reporte</td></tr>`;
+    _repProductosError("Error de conexión al cargar el reporte");
   }
 }
 
-/** Aplica los datos del reporte (desde backend o caché) a la tabla, y guarda la lista
- *  completa en _repProductosDatosActuales para que el buscador pueda filtrar localmente
- *  sin tener que volver a pedirle nada al servidor. */
+function _repProductosError(mensaje) {
+  const tbody = document.getElementById("repProductosTabla");
+  const estado = document.getElementById("repProductosEstado");
+  if (estado) estado.textContent = "";
+  if (!tbody) return;
+  if (_repProductosDatosActuales.length && _repProductosMeta) {
+    // Se mantienen los datos anteriores en pantalla, solo se avisa
+    toast(mensaje + " — se siguen mostrando los datos anteriores", "error");
+    return;
+  }
+  tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4">
+    <div class="text-muted mb-2">⚠️ ${escapeHtml(mensaje)}</div>
+    <button class="btn btn-outline-primary btn-sm" onclick="cargarReporteProductos(true)">Reintentar</button>
+  </td></tr>`;
+}
+
+/** Aplica los datos (del backend o de la caché de sesión) y arma los filtros */
 function _aplicar_cargarReporteProductos(data) {
   sincronizarRangoReportes(data.desde, data.hasta);
-  _repProductosDatosActuales = data.productos || [];
+  _repProductosDatosActuales = (data.productos || []).map(p => ({
+    ...p,
+    CODIGO: String(p.CODIGO ?? ""),
+    CATEGORIA: p.CATEGORIA || "Sin categoría",
+    VENDIDOS: Number(p.VENDIDOS || 0),
+    INGRESOS: Number(p.INGRESOS || 0),
+    _busqueda: normalizarBusquedaPOS((p.PRODUCTO || "") + " " + (p.CODIGO ?? "") + " " + (p.CATEGORIA || ""))
+  }));
 
-  // Si había algo tipeado en el buscador, se respeta al recargar/cambiar de rango
-  const buscador = document.getElementById("repProductosBuscador");
-  const filtro = buscador ? buscador.value : "";
-  renderReporteProductos(_repProductosDatosActuales, filtro);
+  // Totales: los manda el backend nuevo; con uno viejo se calculan acá
+  const totales = data.totales || {
+    unidades: _repProductosDatosActuales.reduce((s, p) => s + p.VENDIDOS, 0),
+    ingresos: _repProductosDatosActuales.reduce((s, p) => s + p.INGRESOS, 0),
+    productos: _repProductosDatosActuales.length
+  };
+  _repProductosMeta = {
+    _rango: data._rango, desde: data.desde, hasta: data.hasta,
+    anterior: data.anterior || null, totales, totalesAnterior: data.totalesAnterior || null,
+    generado: data.generado || null, conComparacion: !!data.anterior,
+    porDia: data.porDia || null
+  };
+  if (_repProductoSel && !_repProductosDatosActuales.some(p => p.CODIGO === _repProductoSel)) _repProductoSel = null;
+
+  // Categorías presentes en el período (respeta la elegida si sigue existiendo)
+  const selCat = document.getElementById("repProductosCategoria");
+  if (selCat) {
+    const actual = selCat.value;
+    const cats = [...new Set(_repProductosDatosActuales.map(p => p.CATEGORIA))].sort((a, b) => a.localeCompare(b, "es"));
+    selCat.innerHTML = `<option value="">Todas las categorías</option>` +
+      cats.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
+    selCat.value = cats.includes(actual) ? actual : "";
+  }
+
+  const periodo = document.getElementById("repProductosPeriodo");
+  if (periodo) {
+    periodo.textContent = `${_fmtFechaCorta(data.desde)} al ${_fmtFechaCorta(data.hasta)}` +
+      (data.anterior ? ` · comparado con ${_fmtFechaCorta(data.anterior.desde)} al ${_fmtFechaCorta(data.anterior.hasta)}` : "");
+  }
+  const estado = document.getElementById("repProductosEstado");
+  if (estado) {
+    const hora = data.generado ? new Date(data.generado) : new Date();
+    estado.textContent = "Datos de las " + hora.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+  }
+
+  _renderKpisReporteProductos();
+  renderReporteProductos();
 }
 
-/** Renderiza la tabla de productos más vendidos, opcionalmente filtrada por texto
- *  (coincidencia parcial, sin distinguir mayúsculas/minúsculas, contra código o nombre). */
-function renderReporteProductos(productos, filtro = "") {
+function _renderKpisReporteProductos() {
+  const cont = document.getElementById("repProductosKpis");
+  const m = _repProductosMeta;
+  if (!cont || !m) return;
+  const t = m.totales, a = m.totalesAnterior;
+  const comp = (act, ant) => {
+    if (!a) return "";
+    const v = _repVariacion(act, ant);
+    return `<div class="sub"><span class="rep-tend ${v.clase}">${v.texto}</span> vs. período anterior</div>`;
+  };
+  // Concentración: cuánto de los ingresos explican los 10 primeros
+  const top10 = [..._repProductosDatosActuales].sort((x, y) => y.INGRESOS - x.INGRESOS).slice(0, 10)
+    .reduce((s, p) => s + p.INGRESOS, 0);
+  const pctTop10 = t.ingresos ? Math.round(top10 / t.ingresos * 100) : 0;
+
+  cont.innerHTML = `
+    <div class="rep-prod-kpi"><div class="lbl">Unidades vendidas</div><div class="val">${_fmtNum(t.unidades)}</div>${comp(t.unidades, a && a.unidades)}</div>
+    <div class="rep-prod-kpi"><div class="lbl">Ingresos por productos</div><div class="val">${_fmtPlata(t.ingresos)}</div>${comp(t.ingresos, a && a.ingresos)}</div>
+    <div class="rep-prod-kpi"><div class="lbl">Productos distintos vendidos</div><div class="val">${_fmtNum(t.productos)}</div>${comp(t.productos, a && a.productos)}</div>
+    <div class="rep-prod-kpi"><div class="lbl">Peso del Top 10</div><div class="val">${pctTop10}%</div><div class="sub">de los ingresos del período</div></div>`;
+}
+
+/** Lista filtrada y ordenada según buscador, categoría y orden (sin el Top N) */
+function _repProductosFiltrados() {
+  const texto = normalizarBusquedaPOS((document.getElementById("repProductosBuscador") || {}).value || "");
+  const categoria = (document.getElementById("repProductosCategoria") || {}).value || "";
+  const orden = (document.getElementById("repProductosOrden") || {}).value || "unidades";
+
+  let lista = _repProductosDatosActuales.filter(p =>
+    (!categoria || p.CATEGORIA === categoria) && (!texto || p._busqueda.includes(texto)));
+
+  const varUnid = p => _repVariacion(p.VENDIDOS, p.VENDIDOS_ANTERIOR).valor;
+  const stockNum = p => (p.STOCK === null || p.STOCK === undefined || p.STOCK === "") ? Infinity : Number(p.STOCK);
+  const comparadores = {
+    unidades: (x, y) => (y.VENDIDOS - x.VENDIDOS) || (y.INGRESOS - x.INGRESOS),
+    ingresos: (x, y) => (y.INGRESOS - x.INGRESOS) || (y.VENDIDOS - x.VENDIDOS),
+    suba: (x, y) => (varUnid(y) - varUnid(x)) || (y.VENDIDOS - x.VENDIDOS),
+    baja: (x, y) => (varUnid(x) - varUnid(y)) || (y.VENDIDOS - x.VENDIDOS),
+    stock: (x, y) => (stockNum(x) - stockNum(y)) || (y.VENDIDOS - x.VENDIDOS)
+  };
+  return lista.sort(comparadores[orden] || comparadores.unidades);
+}
+
+/** Renderiza la tabla (los parámetros viejos se ignoran: todo sale de los controles) */
+function renderReporteProductos() {
   const tbody = document.getElementById("repProductosTabla");
+  const pie = document.getElementById("repProductosPie");
   if (!tbody) return;
 
-  const texto = filtro.trim().toLowerCase();
-  const lista = texto
-    ? productos.filter(p =>
-        String(p.PRODUCTO || "").toLowerCase().includes(texto) ||
-        String(p.CODIGO || "").toLowerCase().includes(texto))
-    : productos;
-
-  if (!productos || productos.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-3">Sin ventas para el rango elegido</td></tr>`;
+  if (!_repProductosDatosActuales.length) {
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4">Sin ventas de productos en el período elegido</td></tr>`;
+    if (pie) pie.textContent = "";
+    const g = document.getElementById("repProdGraficos");
+    if (g) g.style.display = "none";
     return;
   }
 
-  if (lista.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-3">Ningún producto coincide con "${escapeHtml(filtro)}"</td></tr>`;
+  const filtrados = _repProductosFiltrados();
+  if (!filtrados.length) {
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4">Ningún producto coincide con los filtros</td></tr>`;
+    if (pie) pie.textContent = "";
+    _repDibujarGraficos(filtrados);
     return;
   }
 
-  const listaLimitada = _limitarReporte(lista, "productos");
-  tbody.innerHTML = listaLimitada.map(p => `
-    <tr>
-      <td class="mono">${escapeHtml(p.CODIGO)}</td>
-      <td>${escapeHtml(p.PRODUCTO)}</td>
-      <td class="money">${Number(p.VENDIDOS || 0).toLocaleString("es-AR")}</td>
-      <td class="money">$${Number(p.INGRESOS || 0).toLocaleString("es-AR")}</td>
-    </tr>`).join("");
+  const lista = _limitarReporte(filtrados, "productos");
+  const maxUnid = Math.max(...lista.map(p => p.VENDIDOS), 1);
+  const totalIngresos = (_repProductosMeta && _repProductosMeta.totales.ingresos) || 0;
+  const conComparacion = _repProductosMeta && _repProductosMeta.conComparacion;
+
+  tbody.innerHTML = lista.map((p, i) => {
+    const anchoBarra = Math.max(2, Math.round(p.VENDIDOS / maxUnid * 100));
+    const pct = totalIngresos ? (p.INGRESOS / totalIngresos * 100) : 0;
+    const v = conComparacion ? _repVariacion(p.VENDIDOS, p.VENDIDOS_ANTERIOR) : { clase: "na", texto: "—" };
+    const tituloVar = conComparacion ? `Período anterior: ${_fmtNum(p.VENDIDOS_ANTERIOR)} u.` : "";
+
+    let stockHtml = `<span class="text-muted">—</span>`;
+    if (p.EN_CATALOGO === false) stockHtml = `<span class="text-muted" title="El producto ya no está en el catálogo">eliminado</span>`;
+    else if (p.STOCK !== null && p.STOCK !== undefined && p.STOCK !== "") {
+      const st = Number(p.STOCK);
+      // Stock bajo: no alcanza para repetir las ventas de este período
+      stockHtml = st < p.VENDIDOS
+        ? `<span class="rep-stock-bajo" title="Quedan menos unidades que las vendidas en el período">⚠ ${_fmtNum(st)}</span>`
+        : _fmtNum(st);
+    }
+
+    const sel = p.CODIGO === _repProductoSel;
+    return `
+      <tr class="rep-fila${sel ? " rep-sel" : ""}" onclick="repSeleccionarProducto('${escapeJsAttr(p.CODIGO)}')" title="Ver la evolución de este producto">
+        <td class="rep-prod-rank">${i + 1}</td>
+        <td>
+          <div class="rep-prod-nombre">${escapeHtml(p.PRODUCTO || "(sin nombre)")}</div>
+          <div class="rep-prod-meta"><span class="mono">${escapeHtml(p.CODIGO)}</span> · ${escapeHtml(p.CATEGORIA)}${p.OPERACIONES ? ` · en ${_fmtNum(p.OPERACIONES)} venta${p.OPERACIONES === 1 ? "" : "s"}` : ""}</div>
+        </td>
+        <td class="num">
+          <div class="rep-prod-barra" title="${_fmtNum(p.VENDIDOS)} unidades">
+            <div class="track"><div class="fill" style="width:${anchoBarra}%;"></div></div>
+            <span>${_fmtNum(p.VENDIDOS)}</span>
+          </div>
+        </td>
+        <td class="num">${_fmtPlata(p.INGRESOS)}</td>
+        <td class="num d-none d-md-table-cell">${pct >= 0.1 ? pct.toLocaleString("es-AR", { maximumFractionDigits: 1 }) + "%" : "<0,1%"}</td>
+        <td class="num"><span class="rep-tend ${v.clase}" title="${escapeHtml(tituloVar)}">${v.texto}</span></td>
+        <td class="num d-none d-md-table-cell">${stockHtml}</td>
+      </tr>`;
+  }).join("");
+
+  if (pie) {
+    const partes = [`Mostrando ${_fmtNum(lista.length)} de ${_fmtNum(filtrados.length)} productos`];
+    if (filtrados.length !== _repProductosDatosActuales.length) partes.push(`(${_fmtNum(_repProductosDatosActuales.length)} en total)`);
+    if (!conComparacion) partes.push("· la comparación con el período anterior aparece al actualizar el Code.gs");
+    pie.textContent = partes.join(" ");
+  }
+  _repDibujarGraficos(filtrados);
 }
 
-/** Llamado por el input del buscador (oninput) en la tabla de productos más vendidos. */
-function filtrarReporteProductos(texto) {
-  renderReporteProductos(_repProductosDatosActuales, texto);
+
+/* ---- Gráficos del reporte de productos (Chart.js, ya cargado en index.html) ----
+   Siguen los mismos filtros que la tabla. Un solo tono (azul) para el
+   período actual y gris para el anterior; la categoría o el producto
+   elegido se resalta y el resto queda más claro. */
+const _REP_AZUL = "#2563eb";
+const _REP_AZUL_CLARO = "rgba(37,99,235,.28)";
+const _REP_GRIS = "#b8c1cf";
+const _REP_GRILLA = "#eef1f6";
+const _REP_TEXTO = "#6b7585";
+let _repCharts = {};
+let _repProductoSel = null; // código del producto elegido para el gráfico diario
+
+const _fmtCompacto = n => {
+  const v = Math.abs(Number(n || 0));
+  if (v >= 1e6) return (n / 1e6).toLocaleString("es-AR", { maximumFractionDigits: 1 }) + " M";
+  if (v >= 1e3) return (n / 1e3).toLocaleString("es-AR", { maximumFractionDigits: 1 }) + " mil";
+  return Number(n || 0).toLocaleString("es-AR");
+};
+const _recortar = (t, n) => { t = String(t || ""); return t.length > n ? t.slice(0, n - 1) + "…" : t; };
+
+function _repOpcionesBase() {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: { duration: 250 },
+    plugins: {
+      legend: { display: false },
+      tooltip: { backgroundColor: "#0b1633", padding: 10, cornerRadius: 8, titleFont: { weight: "600" }, displayColors: true, boxPadding: 4 }
+    }
+  };
+}
+
+function _repDibujarGraficos(filtrados) {
+  const cont = document.getElementById("repProdGraficos");
+  if (!cont) return;
+  if (typeof Chart === "undefined") { cont.style.display = "none"; return; } // sin internet la 1ª vez no carga la librería
+  cont.style.display = "";
+  _repDibujarGraficoTop(filtrados);
+  _repDibujarGraficoCategorias();
+  _repDibujarGraficoDias();
+}
+
+/* -- 1. Top 10: barras horizontales, período actual vs. anterior -- */
+function _repDibujarGraficoTop(filtrados) {
+  const canvas = document.getElementById("repGrafTop");
+  if (!canvas) return;
+  if (_repCharts.top) _repCharts.top.destroy();
+
+  const orden = (document.getElementById("repProductosOrden") || {}).value || "unidades";
+  const porIngresos = orden === "ingresos";
+  const valor = p => porIngresos ? p.INGRESOS : p.VENDIDOS;
+  const valorAnt = p => porIngresos ? Number(p.INGRESOS_ANTERIOR || 0) : Number(p.VENDIDOS_ANTERIOR || 0);
+  const top = [...filtrados].sort((a, b) => valor(b) - valor(a)).slice(0, 10);
+  const conComparacion = _repProductosMeta && _repProductosMeta.conComparacion;
+  const fmt = porIngresos ? _fmtPlata : (n => _fmtNum(n) + " u.");
+
+  const titulo = document.getElementById("repGrafTopTitulo");
+  if (titulo) titulo.textContent = `Top ${top.length} por ${porIngresos ? "ingresos" : "unidades"}` + (conComparacion ? " — este período vs. el anterior" : "");
+
+  const resaltar = p => !_repProductoSel || p.CODIGO === _repProductoSel;
+  const datasets = [{
+    label: "Este período",
+    data: top.map(valor),
+    backgroundColor: top.map(p => resaltar(p) ? _REP_AZUL : _REP_AZUL_CLARO),
+    borderRadius: 4, borderSkipped: "start", barPercentage: .85, categoryPercentage: .75
+  }];
+  if (conComparacion) datasets.push({
+    label: "Período anterior",
+    data: top.map(valorAnt),
+    backgroundColor: _REP_GRIS,
+    borderRadius: 4, borderSkipped: "start", barPercentage: .85, categoryPercentage: .75
+  });
+
+  const op = _repOpcionesBase();
+  op.indexAxis = "y";
+  op.plugins.legend = { display: conComparacion, position: "bottom", labels: {
+    boxWidth: 10, boxHeight: 10, font: { size: 11 }, color: _REP_TEXTO,
+    // La leyenda usa siempre el azul pleno (las barras pueden estar aclaradas por la selección)
+    generateLabels: ch => ch.data.datasets.map((ds, i) => ({
+      text: ds.label, datasetIndex: i, hidden: !ch.isDatasetVisible(i),
+      fillStyle: i === 0 ? _REP_AZUL : _REP_GRIS, strokeStyle: i === 0 ? _REP_AZUL : _REP_GRIS, lineWidth: 0
+    }))
+  } };
+  op.plugins.tooltip.callbacks = {
+    title: items => top[items[0].dataIndex].PRODUCTO,
+    label: ctx => ` ${ctx.dataset.label}: ${fmt(ctx.raw)}`
+  };
+  op.scales = {
+    x: { beginAtZero: true, grid: { color: _REP_GRILLA }, border: { display: false }, ticks: { color: _REP_TEXTO, font: { size: 11 }, callback: v => porIngresos ? "$" + _fmtCompacto(v) : _fmtCompacto(v) } },
+    y: { grid: { display: false }, border: { display: false }, ticks: { color: "#334155", font: { size: 11.5 }, callback: (v, i) => _recortar(top[i] && top[i].PRODUCTO, 26) } }
+  };
+  op.onClick = (evt, elementos) => { if (elementos.length) repSeleccionarProducto(top[elementos[0].index].CODIGO); };
+  op.onHover = (evt, elementos) => { evt.native.target.style.cursor = elementos.length ? "pointer" : "default"; };
+
+  _repCharts.top = new Chart(canvas, { type: "bar", data: { labels: top.map(p => p.CODIGO), datasets }, options: op });
+}
+
+/* -- 2. Ingresos por categoría: barras horizontales ordenadas (8 + "Otras") -- */
+function _repDibujarGraficoCategorias() {
+  const canvas = document.getElementById("repGrafCategorias");
+  if (!canvas) return;
+  if (_repCharts.cat) _repCharts.cat.destroy();
+
+  // Respeta el buscador pero NO la categoría (si no, siempre habría una sola barra)
+  const texto = normalizarBusquedaPOS((document.getElementById("repProductosBuscador") || {}).value || "");
+  const catSel = (document.getElementById("repProductosCategoria") || {}).value || "";
+  const sumas = {};
+  _repProductosDatosActuales.forEach(p => {
+    if (texto && !p._busqueda.includes(texto)) return;
+    sumas[p.CATEGORIA] = (sumas[p.CATEGORIA] || 0) + p.INGRESOS;
+  });
+  let filas = Object.entries(sumas).sort((a, b) => b[1] - a[1]);
+  if (filas.length > 9) {
+    const otras = filas.slice(8).reduce((s, f) => s + f[1], 0);
+    filas = filas.slice(0, 8).concat([["Otras", otras]]);
+  }
+  const total = filas.reduce((s, f) => s + f[1], 0);
+
+  const op = _repOpcionesBase();
+  op.indexAxis = "y";
+  op.plugins.tooltip.callbacks = {
+    label: ctx => ` ${_fmtPlata(ctx.raw)} (${total ? (ctx.raw / total * 100).toLocaleString("es-AR", { maximumFractionDigits: 1 }) : 0}%)`
+  };
+  op.scales = {
+    x: { beginAtZero: true, grid: { color: _REP_GRILLA }, border: { display: false }, ticks: { color: _REP_TEXTO, font: { size: 11 }, callback: v => "$" + _fmtCompacto(v) } },
+    y: { grid: { display: false }, border: { display: false }, ticks: { color: "#334155", font: { size: 11.5 }, callback: (v, i) => _recortar(filas[i] && filas[i][0], 20) } }
+  };
+  op.onClick = (evt, elementos) => {
+    if (!elementos.length) return;
+    const cat = filas[elementos[0].index][0];
+    if (cat === "Otras") return;
+    const sel = document.getElementById("repProductosCategoria");
+    if (sel) { sel.value = sel.value === cat ? "" : cat; renderReporteProductos(); }
+  };
+  op.onHover = (evt, elementos) => {
+    const ok = elementos.length && filas[elementos[0].index][0] !== "Otras";
+    evt.native.target.style.cursor = ok ? "pointer" : "default";
+  };
+
+  _repCharts.cat = new Chart(canvas, {
+    type: "bar",
+    data: {
+      labels: filas.map(f => f[0]),
+      datasets: [{
+        label: "Ingresos",
+        data: filas.map(f => f[1]),
+        backgroundColor: filas.map(f => (!catSel || f[0] === catSel) ? _REP_AZUL : _REP_AZUL_CLARO),
+        borderRadius: 4, borderSkipped: "start", barPercentage: .8
+      }]
+    },
+    options: op
+  });
+}
+
+/* -- 3. Evolución por día (o por semana si el período es largo) -- */
+function _repDibujarGraficoDias() {
+  const canvas = document.getElementById("repGrafDias");
+  const aviso = document.getElementById("repGrafDiasAviso");
+  const chip = document.getElementById("repGrafDiasChip");
+  const titulo = document.getElementById("repGrafDiasTitulo");
+  if (!canvas) return;
+  if (_repCharts.dias) { _repCharts.dias.destroy(); _repCharts.dias = null; }
+
+  const meta = _repProductosMeta;
+  const serieBase = meta && meta.porDia;
+  if (!serieBase || !serieBase.length) {
+    canvas.parentElement.style.display = "none";
+    if (aviso) { aviso.style.display = "block"; aviso.textContent = "Este gráfico aparece al publicar el Code.gs nuevo (necesita las ventas día por día)."; }
+    return;
+  }
+  canvas.parentElement.style.display = "";
+  if (aviso) aviso.style.display = "none";
+
+  const metrica = (document.getElementById("repGrafDiasMetrica") || {}).value || "unidades";
+  const idx = metrica === "ingresos" ? 1 : 0;
+  const catSel = (document.getElementById("repProductosCategoria") || {}).value || "";
+  const prod = _repProductoSel ? _repProductosDatosActuales.find(p => p.CODIGO === _repProductoSel) : null;
+
+  // Qué se grafica: un producto, una categoría o el total
+  let valores, etiqueta;
+  if (prod) {
+    valores = serieBase.map(d => { const par = (prod.DIAS || {})[d.fecha]; return par ? Number(Array.isArray(par) ? par[idx] : (idx ? 0 : par)) : 0; });
+    etiqueta = prod.PRODUCTO;
+  } else if (catSel) {
+    const enCat = _repProductosDatosActuales.filter(p => p.CATEGORIA === catSel);
+    valores = serieBase.map(d => enCat.reduce((s, p) => { const par = (p.DIAS || {})[d.fecha]; return s + (par ? Number(Array.isArray(par) ? par[idx] : (idx ? 0 : par)) : 0); }, 0));
+    etiqueta = catSel;
+  } else {
+    valores = serieBase.map(d => Number(idx ? d.ingresos : d.unidades) || 0);
+    etiqueta = "Todos los productos";
+  }
+
+  if (chip) {
+    if (prod) {
+      chip.style.display = "inline-flex";
+      chip.innerHTML = `<span>${escapeHtml(prod.PRODUCTO)}</span><button type="button" title="Ver todos" onclick="repSeleccionarProducto(null)">✕</button>`;
+    } else chip.style.display = "none";
+  }
+
+  // Más de 2 meses: por semana (lunes a domingo), si no se vuelve ilegible
+  let etiquetas = serieBase.map(d => d.fecha);
+  let porSemana = false;
+  if (serieBase.length > 62) {
+    porSemana = true;
+    const semanas = [];
+    serieBase.forEach((d, i) => {
+      const f = new Date(d.fecha + "T12:00:00");
+      const lunes = new Date(f); lunes.setDate(f.getDate() - ((f.getDay() + 6) % 7));
+      const clave = lunes.toISOString().slice(0, 10);
+      const ult = semanas[semanas.length - 1];
+      if (ult && ult.clave === clave) ult.valor += valores[i];
+      else semanas.push({ clave, valor: valores[i] });
+    });
+    etiquetas = semanas.map(s => s.clave);
+    valores = semanas.map(s => s.valor);
+  }
+
+  if (titulo) titulo.textContent = `${metrica === "ingresos" ? "Ingresos" : "Unidades vendidas"} por ${porSemana ? "semana" : "día"} — ${etiqueta}`;
+
+  const fmt = metrica === "ingresos" ? _fmtPlata : (n => _fmtNum(n) + " u.");
+  const fmtEje = f => _fmtFechaCorta(f).replace(/\/\d{2}$/, ""); // "3/10"
+  const ctx = canvas.getContext("2d");
+  const grad = ctx.createLinearGradient(0, 0, 0, 220);
+  grad.addColorStop(0, "rgba(37,99,235,.18)");
+  grad.addColorStop(1, "rgba(37,99,235,0)");
+
+  const op = _repOpcionesBase();
+  op.interaction = { mode: "index", intersect: false };
+  op.plugins.tooltip.callbacks = {
+    title: items => (porSemana ? "Semana del " : "") + _fmtFechaCorta(etiquetas[items[0].dataIndex]),
+    label: c => ` ${fmt(c.raw)}`
+  };
+  op.scales = {
+    x: { grid: { display: false }, border: { color: _REP_GRILLA }, ticks: { color: _REP_TEXTO, font: { size: 11 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12, callback: (v, i) => fmtEje(etiquetas[i]) } },
+    y: { beginAtZero: true, grid: { color: _REP_GRILLA }, border: { display: false }, ticks: { color: _REP_TEXTO, font: { size: 11 }, maxTicksLimit: 5, precision: 0, callback: v => metrica === "ingresos" ? "$" + _fmtCompacto(v) : _fmtCompacto(v) } }
+  };
+
+  _repCharts.dias = new Chart(canvas, {
+    type: "line",
+    data: {
+      labels: etiquetas,
+      datasets: [{
+        label: etiqueta, data: valores,
+        borderColor: _REP_AZUL, borderWidth: 2, backgroundColor: grad, fill: true,
+        tension: .3, cubicInterpolationMode: "monotone", pointRadius: valores.length <= 31 ? 2.5 : 0, pointHoverRadius: 5,
+        pointBackgroundColor: _REP_AZUL, pointBorderColor: "#fff", pointBorderWidth: 1.5
+      }]
+    },
+    options: op
+  });
+}
+
+/** Elige (o suelta) un producto: se resalta en la tabla y en el Top 10, y el gráfico diario muestra solo ese */
+function repSeleccionarProducto(codigo) {
+  _repProductoSel = (codigo === null || codigo === undefined || String(codigo) === _repProductoSel) ? null : String(codigo);
+  renderReporteProductos();
+  if (_repProductoSel) document.getElementById("repGrafDias")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+/** Llamado por el buscador (oninput) */
+function filtrarReporteProductos() {
+  renderReporteProductos();
+}
+
+/** Filas para exportar: TODO lo filtrado (no solo el Top N visible) */
+function _repProductosFilasExport() {
+  const total = (_repProductosMeta && _repProductosMeta.totales.ingresos) || 0;
+  return _repProductosFiltrados().map((p, i) => ({
+    "#": i + 1,
+    "Código": p.CODIGO,
+    "Producto": p.PRODUCTO,
+    "Categoría": p.CATEGORIA,
+    "Unidades": p.VENDIDOS,
+    "Ingresos": Math.round(p.INGRESOS),
+    "% ingresos": total ? Math.round(p.INGRESOS / total * 1000) / 10 : 0,
+    "Unidades período anterior": p.VENDIDOS_ANTERIOR ?? "",
+    "Variación": _repVariacion(p.VENDIDOS, p.VENDIDOS_ANTERIOR).texto.replace(/[▲▼●=]\s?/g, "").trim(),
+    "Stock actual": (p.STOCK === null || p.STOCK === undefined) ? "" : p.STOCK
+  }));
+}
+
+function exportarReporteProductosCSV() {
+  const filas = _repProductosFilasExport();
+  if (!filas.length) { toast("No hay datos para exportar", "error"); return; }
+  const cols = Object.keys(filas[0]);
+  const celda = v => {
+    const t = typeof v === "number" ? String(v).replace(".", ",") : String(v ?? "");
+    return /[";\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
+  };
+  // ";" y BOM: Excel en español lo abre directo en columnas y con acentos
+  const csv = "﻿" + [cols.join(";"), ...filas.map(f => cols.map(c => celda(f[c])).join(";"))].join("\r\n");
+  const m = _repProductosMeta || {};
+  descargarArchivo(`Productos_mas_vendidos_${m.desde || ""}_a_${m.hasta || ""}.csv`, csv, "text/csv;charset=utf-8");
+}
+
+function exportarReporteProductosPDF() {
+  try {
+    const filas = _repProductosFilasExport();
+    if (!filas.length) { toast("No hay datos para exportar", "error"); return; }
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+    const m = _repProductosMeta || {};
+    const t = m.totales || {};
+    const nombreLocal = (obtenerConfigNegocio().nombre || "Reporte").toString();
+
+    doc.setFontSize(14);
+    doc.text(`${nombreLocal} — Productos más vendidos`, 30, 30);
+    doc.setFontSize(10);
+    doc.setTextColor(110, 110, 110);
+    doc.text(`Período: ${_fmtFechaCorta(m.desde)} al ${_fmtFechaCorta(m.hasta)}  ·  ${_fmtNum(t.unidades)} unidades  ·  ${_fmtPlata(t.ingresos)}  ·  Generado: ${new Date().toLocaleString("es-AR")}`, 30, 46);
+
+    const cols = ["#", "Código", "Producto", "Categoría", "Unidades", "Ingresos", "% ingresos", "Variación", "Stock actual"];
+    doc.autoTable({
+      head: [cols],
+      body: filas.map(f => cols.map(c =>
+        c === "Ingresos" ? _fmtPlata(f[c]) :
+        c === "% ingresos" ? String(f[c]).replace(".", ",") + "%" :
+        c === "Unidades" ? _fmtNum(f[c]) : String(f[c] ?? ""))),
+      startY: 58,
+      theme: "grid",
+      styles: { fontSize: 8.5, cellPadding: 4 },
+      headStyles: { fillColor: [18, 32, 71], textColor: [255, 255, 255] },
+      columnStyles: { 0: { halign: "right" }, 4: { halign: "right" }, 5: { halign: "right" }, 6: { halign: "right" }, 7: { halign: "right" }, 8: { halign: "right" } }
+    });
+    doc.save(`Productos_mas_vendidos_${m.desde || ""}_a_${m.hasta || ""}.pdf`);
+  } catch (error) {
+    console.error("Error al exportar productos a PDF:", error);
+    toast("No se pudo generar el PDF", "error");
+  }
 }
 
 /* ---- Reporte 3: Ventas por categoría ---- */
