@@ -11427,6 +11427,11 @@ function imprimirQROffline() {
 
 let estadoLicenciaActual = { activada: false, modoLimitado: true };
 
+// Servidor de licencias de VeekPOS — fijo: el usuario solo carga correo y clave.
+// (main.js tiene la misma URL; se manda también desde acá por si la app
+// todavía tiene un main.js viejo que lee la URL guardada en la PC.)
+const URL_SERVIDOR_LICENCIAS = "https://script.google.com/macros/s/AKfycbygrGvC481UoNPEfCGgY29TW-CU9L0n4lNO0qKLA5IBVI8eSTkjKZyghIlyLbnB4xRi/exec";
+
 async function aplicarEstadoLicencia() {
   if (typeof window.veekpos === "undefined" || !window.veekpos.obtenerEstadoLicencia) return;
   try {
@@ -11440,9 +11445,6 @@ async function aplicarEstadoLicencia() {
   if (!estadoLicenciaActual.activada) {
     if (pantallaActivacion) pantallaActivacion.classList.add("show");
     if (banner) banner.style.display = "none";
-    const urlGuardada = await window.veekpos.obtenerUrlServidorLicencia?.() || "";
-    const inputUrl = document.getElementById("licenseScreenUrlServidor");
-    if (inputUrl && urlGuardada && !inputUrl.value) inputUrl.value = urlGuardada;
     return;
   }
 
@@ -11469,61 +11471,175 @@ function actualizarBloqueosPorLicencia() {
 }
 
 async function activarLicenciaForm() {
-  const urlServidor = document.getElementById("licenseScreenUrlServidor").value.trim();
   const email = document.getElementById("licenseScreenEmail").value.trim();
   const pin = document.getElementById("licenseScreenPin").value.trim();
   const errorBox = document.getElementById("licenseScreenError");
   if (errorBox) errorBox.style.display = "none";
-  if (!urlServidor || !email || !pin) {
-    if (errorBox) { errorBox.style.display = "block"; errorBox.textContent = "Completá la URL, el email y el PIN."; }
+  if (!email || !pin) {
+    if (errorBox) { errorBox.style.display = "block"; errorBox.textContent = "Completá el correo y la clave."; }
     return;
   }
   const btn = document.getElementById("licenseScreenBtn");
   const textoOriginal = btn.innerHTML;
   btn.disabled = true; btn.innerHTML = "Activando...";
   try {
-    await window.veekpos.fijarUrlServidorLicencia(urlServidor);
+    await window.veekpos.fijarUrlServidorLicencia?.(URL_SERVIDOR_LICENCIAS);
     const resultado = await window.veekpos.activarLicencia(email, pin);
     if (!resultado.success) {
       if (errorBox) { errorBox.style.display = "block"; errorBox.textContent = resultado.message || "No se pudo activar la licencia"; }
       return;
     }
     toast("Licencia activada correctamente", "success");
+    const cancelar = document.getElementById("licenseScreenCancelar");
+    if (cancelar) cancelar.style.display = "none";
     await aplicarEstadoLicencia();
+    mostrarEstadoLicenciaEnConfig();
   } catch (error) {
     if (errorBox) { errorBox.style.display = "block"; errorBox.textContent = "Error: " + String(error.message || error); }
   } finally { btn.disabled = false; btn.innerHTML = textoOriginal; }
 }
 
-async function guardarUrlServidorLicencia() {
-  const url = (document.getElementById("cfgLicenciaUrlServidor")?.value || "").trim();
-  if (!url) { toast("Ingresá la URL del servidor", "error"); return; }
-  try { await window.veekpos?.fijarUrlServidorLicencia?.(url); toast("URL guardada", "success"); }
-  catch (e) { toast("Error al guardar", "error"); }
-}
-
 async function validarLicenciaAhoraBtn() {
-  const btn = event?.target;
+  const btn = document.getElementById("btnVerificarLicencia");
   const orig = btn ? btn.innerHTML : "";
-  if (btn) { btn.disabled = true; btn.innerHTML = "Validando..."; }
+  if (btn) { btn.disabled = true; btn.innerHTML = "Verificando..."; }
   try {
+    await window.veekpos?.fijarUrlServidorLicencia?.(URL_SERVIDOR_LICENCIAS);
     estadoLicenciaActual = await window.veekpos?.validarLicenciaAhora?.() || estadoLicenciaActual;
     await aplicarEstadoLicencia();
+    mostrarEstadoLicenciaEnConfig();
     toast(estadoLicenciaActual.modoLimitado ? "No vigente: " + (estadoLicenciaActual.motivo||"") : "Licencia válida", estadoLicenciaActual.modoLimitado ? "error" : "success");
-  } catch(e) { toast("Error al validar", "error"); }
+  } catch(e) { toast("Error al verificar la licencia", "error"); }
   finally { if (btn) { btn.disabled = false; btn.innerHTML = orig; } }
+}
+
+/** Fecha "2027-07-24" (o ISO completa) → Date local, sin correrse un día por zona horaria */
+function _fechaLicencia(valor) {
+  if (!valor) return null;
+  const m = String(valor).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const d = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(valor);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+/** "24 de julio de 2027 (295 días)" */
+function _textoVencimientoLicencia(valor) {
+  const d = _fechaLicencia(valor);
+  if (!d) return valor ? escapeHtml(String(valor)) : "—";
+  // Mismo criterio que VeekIQ: días que quedan contando el día del vencimiento
+  const finDelDia = new Date(d); finDelDia.setHours(23, 59, 59, 999);
+  const dias = Math.ceil((finDelDia - Date.now()) / 86400000);
+  const fecha = d.toLocaleDateString("es-AR", { day: "numeric", month: "long", year: "numeric" });
+  const vencidaHace = 1 - dias;
+  const resto = dias > 1 ? `${dias} días` : dias === 1 ? "último día" : `vencida hace ${vencidaHace} día${vencidaHace === 1 ? "" : "s"}`;
+  const color = dias <= 0 ? "var(--red-500)" : dias <= 15 ? "#b45309" : "inherit";
+  return `${escapeHtml(fecha)} <span style="color:${color};">(${resto})</span>`;
+}
+
+/** "3/10/26, 10:11 a. m." */
+function _textoUltimaVerificacionLicencia(valor) {
+  const d = _fechaLicencia(valor);
+  if (!d) return "—";
+  return escapeHtml(d.toLocaleString("es-AR", { day: "numeric", month: "numeric", year: "2-digit", hour: "numeric", minute: "2-digit", hour12: true }));
 }
 
 async function mostrarEstadoLicenciaEnConfig() {
   const box = document.getElementById("licenciaEstadoBox");
-  const inputUrl = document.getElementById("cfgLicenciaUrlServidor");
-  if (inputUrl && !inputUrl.value) inputUrl.value = await window.veekpos?.obtenerUrlServidorLicencia?.() || "";
+  const badge = document.getElementById("licenciaBadge");
+  const idBox = document.getElementById("licenciaIdInstalacion");
+  const acciones = document.getElementById("licenciaAcciones");
   if (!box) return;
-  const e = estadoLicenciaActual;
-  if (!e.activada) { box.innerHTML = `<span style="color:var(--red-500)">⚠️ Sin licencia activada.</span>`; return; }
-  if (e.modoLimitado) { box.innerHTML = `<div style="color:var(--red-500);font-weight:600">⚠️ Modo limitado — ${escapeHtml(e.motivo||"")}</div>`; return; }
-  box.innerHTML = `<div style="color:var(--green-600);font-weight:600">✓ Licencia activa</div>
-    <div class="text-muted" style="font-size:12.5px">Email: ${escapeHtml(e.email||"—")} · Vence: ${escapeHtml(e.fechaVencimiento||"—")}</div>`;
+
+  // Datos frescos (la última verificación pudo cambiar en segundo plano)
+  try { if (window.veekpos?.obtenerEstadoLicencia) estadoLicenciaActual = await window.veekpos.obtenerEstadoLicencia(); } catch (e) {}
+  const e = estadoLicenciaActual || {};
+
+  const fijarBadge = (texto, clase) => { if (badge) { badge.textContent = texto; badge.className = "licencia-badge " + clase; } };
+
+  if (typeof window.veekpos === "undefined") {
+    fijarBadge("web", "");
+    box.innerHTML = `<div class="text-muted" style="font-size:12.5px;">La licencia se administra desde la app de escritorio.</div>`;
+    if (acciones) acciones.style.display = "none";
+    if (idBox) idBox.textContent = "";
+    return;
+  }
+  if (acciones) acciones.style.display = "flex";
+
+  // Caja cliente de la red local: no tiene licencia propia
+  if (e.activada && !e.email && e.fechaVencimiento === undefined) {
+    fijarBadge(e.modoLimitado ? "sin conexión" : "activa", e.modoLimitado ? "bad" : "ok");
+    box.innerHTML = `<div style="font-size:13px;">Esta caja usa la licencia de la <strong>caja servidor</strong>.</div>
+      ${e.modoLimitado ? `<div style="font-size:12.5px; color:var(--red-500); margin-top:4px;">⚠️ ${escapeHtml(e.motivo || "")}</div>` : ""}`;
+    if (acciones) acciones.style.display = "none";
+    if (idBox) idBox.textContent = "";
+    return;
+  }
+
+  if (!e.activada) {
+    fijarBadge("sin activar", "bad");
+    box.innerHTML = `<div style="font-size:13px; color:var(--red-500);">⚠️ Esta PC no tiene una licencia activada.</div>`;
+  } else {
+    if (!e.modoLimitado) fijarBadge("activa", "ok");
+    else if (e.rechazada) fijarBadge(/venc/i.test(e.motivo || "") ? "vencida" : "suspendida", "bad");
+    else fijarBadge("sin verificar", "warn");
+
+    box.innerHTML = `
+      <div class="licencia-datos">
+        <span class="lbl">Correo</span><span>${escapeHtml(e.email || "—")}</span>
+        <span class="lbl">Vence</span><span>${_textoVencimientoLicencia(e.fechaVencimiento)}</span>
+        <span class="lbl">Última verificación</span><span>${_textoUltimaVerificacionLicencia(e.ultimaValidacionOk)}</span>
+      </div>
+      ${e.modoLimitado ? `<div style="font-size:12.5px; color:var(--red-500); margin-top:8px;">⚠️ ${escapeHtml(e.motivo || "Licencia no vigente")}</div>` : ""}`;
+  }
+
+  const btnQuitar = document.getElementById("btnQuitarLicencia");
+  // Con un main.js/preload.js viejos no existe quitarLicenciaDeEstaPC: no se muestra el botón
+  if (btnQuitar) btnQuitar.style.display = (e.activada && typeof window.veekpos.quitarLicenciaDeEstaPC === "function") ? "inline-flex" : "none";
+  const btnCambiar = document.getElementById("btnCambiarLicencia");
+  if (btnCambiar) btnCambiar.textContent = e.activada ? "Cambiar licencia…" : "Activar licencia…";
+  if (idBox) idBox.textContent = e.idInstalacion ? "ID de instalación: VEEKPOS-" + String(e.idInstalacion).toUpperCase() : "";
+}
+
+/** Abre la pantalla de activación para cargar otro correo y clave, con opción de cancelar */
+async function cambiarLicencia() {
+  const pantalla = document.getElementById("licenseScreenBackdrop");
+  if (!pantalla) return;
+  const email = document.getElementById("licenseScreenEmail");
+  if (email) email.value = "";
+  const pin = document.getElementById("licenseScreenPin");
+  if (pin) pin.value = "";
+  const err = document.getElementById("licenseScreenError");
+  if (err) err.style.display = "none";
+  const cancelar = document.getElementById("licenseScreenCancelar");
+  if (cancelar) cancelar.style.display = estadoLicenciaActual.activada ? "block" : "none";
+  pantalla.classList.add("show");
+  setTimeout(() => email?.focus(), 50);
+}
+
+function cancelarCambioLicencia() {
+  if (!estadoLicenciaActual.activada) return; // sin licencia no se puede salir de la pantalla
+  document.getElementById("licenseScreenBackdrop")?.classList.remove("show");
+  const cancelar = document.getElementById("licenseScreenCancelar");
+  if (cancelar) cancelar.style.display = "none";
+}
+
+function quitarLicenciaDeEstaPC() {
+  confirmarAccion(
+    "¿Quitar la licencia de esta PC? VeekPOS va a pedir de nuevo el correo y la clave para seguir usándose acá. Tus datos (ventas, productos, clientes) no se tocan.",
+    async () => {
+      try {
+        const r = await window.veekpos?.quitarLicenciaDeEstaPC?.();
+        if (!r || !r.success) { toast((r && r.message) || "No se pudo quitar la licencia (actualizá main.js y preload.js)", "error"); return; }
+        toast("Licencia quitada de esta PC", "success");
+        const cancelar = document.getElementById("licenseScreenCancelar");
+        if (cancelar) cancelar.style.display = "none";
+        await aplicarEstadoLicencia();
+        mostrarEstadoLicenciaEnConfig();
+      } catch (e) {
+        toast("No se pudo quitar la licencia", "error");
+      }
+    },
+    "🔑 Quitar licencia de esta PC"
+  );
 }
 
 /* =========================================================

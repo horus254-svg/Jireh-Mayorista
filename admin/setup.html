@@ -177,9 +177,8 @@ body{
         <div class="step-block">
           <div class="field">
             <div class="field-title"><span class="step-num">2</span> Activar tu licencia</div>
-            <input type="text" id="licenciaUrl" placeholder="URL del servidor de licencias — https://script.google.com/macros/s/AKfycbw.../exec" required style="margin-bottom:10px;">
             <input type="email" id="licenciaEmail" placeholder="Correo de la licencia" autocomplete="username" required style="margin-bottom:10px; font-family:var(--font-ui);">
-            <input type="password" id="licenciaPassword" placeholder="Contraseña / PIN de la licencia" autocomplete="current-password" required style="font-family:var(--font-ui);">
+            <input type="password" id="licenciaPassword" placeholder="Clave de la licencia" autocomplete="current-password" required style="font-family:var(--font-ui);">
             <div class="hint">Estos datos te los pasa quien te vendió VeekPOS. Se usan para activar la licencia de esta caja — no hace falta volver a ingresarlos después.</div>
           </div>
         </div>
@@ -207,6 +206,9 @@ body{
 // Mismo patrón de validación que usa el migrador: cualquier URL de
 // Apps Script válida, no una en particular.
 const PATRON_URL_APPS_SCRIPT = /^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec\/?$/;
+
+// Servidor de licencias de VeekPOS — fijo, ya no se le pide al usuario.
+const URL_SERVIDOR_LICENCIAS = "https://script.google.com/macros/s/AKfycbygrGvC481UoNPEfCGgY29TW-CU9L0n4lNO0qKLA5IBVI8eSTkjKZyghIlyLbnB4xRi/exec";
 
 function normalizarUrl(url){
   url = url.trim();
@@ -294,7 +296,6 @@ document.getElementById("setupForm").addEventListener("submit", async function(e
   ocultarError();
 
   const apiUrl     = normalizarUrl(document.getElementById("apiUrl").value);
-  const licenciaUrl        = normalizarUrl(document.getElementById("licenciaUrl").value);
   const licenciaEmail      = document.getElementById("licenciaEmail").value.trim();
   const licenciaPassword   = document.getElementById("licenciaPassword").value;
 
@@ -303,13 +304,8 @@ document.getElementById("setupForm").addEventListener("submit", async function(e
     return;
   }
 
-  if(!PATRON_URL_APPS_SCRIPT.test(licenciaUrl)){
-    mostrarError("La URL del servidor de licencias no parece válida. Tiene que empezar con https://script.google.com/macros/s/ y terminar en /exec");
-    return;
-  }
-
   if(!licenciaEmail || !licenciaPassword){
-    mostrarError("Completá el correo y la contraseña (PIN) de tu licencia.");
+    mostrarError("Completá el correo y la clave de tu licencia.");
     return;
   }
 
@@ -338,13 +334,13 @@ document.getElementById("setupForm").addEventListener("submit", async function(e
     // si el correo/contraseña están mal, preferimos que la persona
     // los corrija ahora mismo en vez de dejar la caja a mitad de
     // configurar con una licencia inválida.
-    if(bridge.fijarUrlServidorLicencia) await bridge.fijarUrlServidorLicencia(licenciaUrl);
+    if(bridge.fijarUrlServidorLicencia) await bridge.fijarUrlServidorLicencia(URL_SERVIDOR_LICENCIAS);
     if(!bridge.activarLicencia){
       throw new Error("Esta versión de la app no puede activar licencias. Actualizá VeekPOS e intentá de nuevo.");
     }
     const resultadoLicencia = await bridge.activarLicencia(licenciaEmail, licenciaPassword);
     if(!resultadoLicencia || !resultadoLicencia.success){
-      throw new Error((resultadoLicencia && resultadoLicencia.message) || "No se pudo activar la licencia con ese correo y esa contraseña.");
+      throw new Error((resultadoLicencia && resultadoLicencia.message) || "No se pudo activar la licencia con ese correo y esa clave.");
     }
 
     // Recién ahora que la API respondió bien y la licencia quedó
