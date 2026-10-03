@@ -2,7 +2,7 @@
   "id": "./?app=reportes",
   "name": "Reportes — Jireh Mayorista",
   "short_name": "Reportes",
-  "description": "Ver y exportar los reportes de ventas, productos, categorías, formas de pago, cierres de caja y clientes.",
+  "description": "Ver y exportar los reportes de ventas, productos, categorías, formas de pago, cierres de caja, clientes y qué reponer.",
   "start_url": "./login.html",
   "scope": "./",
   "display": "standalone",

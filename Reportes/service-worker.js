@@ -18,7 +18,7 @@
  * NUNCA se cachean — los reportes siempre se piden en vivo.
  */
 
-const CACHE_NAME = "reportes-jireh-v2";
+const CACHE_NAME = "reportes-jireh-v3"; // v3: Reportes unificado (ventas, productos, compras)
 
 const ARCHIVOS_A_CACHEAR = [
   "login.html",
