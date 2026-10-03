@@ -1892,6 +1892,8 @@ function mostrarConfigTab(tabId, btnEl) {
 }
 
 function mostrarSeccion(id) {
+  // "Reportes de Compras" ahora es la pestaña "Compras y reposición" de Reportes
+  if (id === "reportesCompras") { _repTabActiva = "compras"; id = "reportes"; }
   if (!seccionPermitidaParaRol(id)) {
     toast("No tenés permiso para acceder a esta sección", "error");
     id = "dashboard";
@@ -2004,8 +2006,11 @@ function mostrarSeccion(id) {
     cargarResumenCierreCaja(selector ? selector.value : null);
   }
   if (id === "movimientosCaja") cargarMovimientosCajaHoy();
-  if (id === "reportes")   cargarSiVencido("reportes", cargarTodosLosReportes);
-  if (id === "reportesCompras") cargarReporteCompras();
+  if (id === "reportes") {
+    // Pasado el tiempo de caché de secciones, se vuelve a pedir todo al entrar
+    cargarSiVencido("reportes", () => { Object.keys(_repTabRangoCargado).forEach(k => _repTabRangoCargado[k] = null); });
+    mostrarTabReportes(_repTabActiva || _repTabPorDefecto());
+  }
 }
 
 /* ===================== PEDIDOS ===================== */
@@ -9714,14 +9719,74 @@ function obtenerRangoReportes() {
   return qs;
 }
 
-/** Dispara los 6 reportes a la vez con el rango de fecha actual. */
-function cargarTodosLosReportes() {
-  cargarReporteVentasPeriodo();
-  cargarReporteProductos();
-  cargarReporteCategorias();
-  cargarReporteFormasPago();
-  cargarReporteCierres();
-  cargarReporteClientes();
+/* ---- Pestañas de Reportes: cada una carga recién cuando se abre, y
+   solo si el período cambió desde la última vez (no se piden los 3
+   grupos de datos de golpe al entrar a la sección). ---- */
+let _repTabActiva = null;
+const _repTabRangoCargado = { ventas: null, productos: null, compras: null };
+
+function _repTabPorDefecto() {
+  return obtenerRolActual() === "deposito" ? "compras" : "ventas";
+}
+
+function mostrarTabReportes(tab, forzar) {
+  if (obtenerRolActual() === "deposito") tab = "compras";
+  _repTabActiva = tab;
+  _repCompletarRangoPorDefecto();
+  document.querySelectorAll("#repTabs .rep-tab").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+  document.querySelectorAll("#reportes .rep-pane").forEach(p => p.classList.toggle("active", p.id === "repPane-" + tab));
+
+  const rango = obtenerRangoReportes();
+  if (!forzar && _repTabRangoCargado[tab] !== null && _repTabRangoCargado[tab] === rango) {
+    // Ya cargada con este período: si es la de productos, redibujar los
+    // gráficos (estaban ocultos y Chart.js necesita el ancho real)
+    if (tab === "productos" && _repProductosDatosActuales.length) renderReporteProductos();
+    return;
+  }
+  _repTabRangoCargado[tab] = rango;
+
+  if (tab === "ventas") {
+    cargarReporteVentasPeriodo();
+    cargarReporteCategorias();
+    cargarReporteFormasPago();
+    cargarReporteCierres();
+    cargarReporteClientes();
+  } else if (tab === "productos") {
+    cargarReporteProductos(forzar);
+  } else if (tab === "compras") {
+    cargarReporteCompras(forzar);
+  }
+}
+
+/** Sin fechas elegidas: mes en curso (lo mismo que haría el backend), para que todas las pestañas usen el mismo período */
+function _repCompletarRangoPorDefecto() {
+  const d = document.getElementById("repDesde"), h = document.getElementById("repHasta");
+  if (!d || !h) return;
+  const hoy = new Date();
+  const iso = x => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
+  if (!d.value && !h.value) { d.value = iso(new Date(hoy.getFullYear(), hoy.getMonth(), 1)); h.value = iso(hoy); }
+  else if (!h.value) h.value = iso(hoy);
+  else if (!d.value) d.value = h.value;
+}
+
+/** Botón "Aplicar" (y la carga al entrar): recarga la pestaña visible; las otras se recargan al abrirlas */
+function cargarTodosLosReportes(forzar) {
+  _repTabRangoCargado.ventas = _repTabRangoCargado.productos = _repTabRangoCargado.compras = null;
+  mostrarTabReportes(_repTabActiva || _repTabPorDefecto(), !!forzar);
+}
+
+/** Atajos de período: Hoy / 7 días / 30 días / Este mes / Mes anterior */
+function repRangoRapido(tipo) {
+  const hoy = new Date();
+  const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  let desde = new Date(hoy), hasta = new Date(hoy);
+  if (tipo === "7") desde.setDate(hoy.getDate() - 6);
+  else if (tipo === "30") desde.setDate(hoy.getDate() - 29);
+  else if (tipo === "mes") desde = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+  else if (tipo === "mesAnterior") { desde = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1); hasta = new Date(hoy.getFullYear(), hoy.getMonth(), 0); }
+  document.getElementById("repDesde").value = iso(desde);
+  document.getElementById("repHasta").value = iso(hasta);
+  cargarTodosLosReportes();
 }
 
 /** Sincroniza los inputs de fecha "Desde"/"Hasta" con el rango que devolvió el backend (cuando no se eligió nada, para que el usuario vea qué período se está mostrando). */
@@ -9830,6 +9895,27 @@ function renderReporteVentasPeriodo() {
 let _repProductosDatosActuales = []; // ranking completo del último período cargado
 let _repProductosMeta = null;        // { desde, hasta, anterior, totales, totalesAnterior, generado }
 let _repProductosGen = 0;
+let _repProductosSinVentas = [];     // catálogo sin ventas en el período (solo para el buscador)
+
+/**
+ * Búsqueda de Reportes: sin acentos ni mayúsculas, por PALABRAS en
+ * cualquier orden ("1kg yerba" encuentra "Yerba Playadito 1kg"), y
+ * también por código, código de caja, alias o categoría. Un código
+ * escrito con o sin ceros adelante ("0123" / "123") también coincide.
+ */
+function coincideBusquedaReportes(textoNormalizado, consulta) {
+  const q = normalizarBusquedaPOS(consulta);
+  if (!q) return true;
+  const palabras = q.split(/\s+/).filter(Boolean);
+  return palabras.every(w => {
+    if (textoNormalizado.includes(w)) return true;
+    if (/^\d+$/.test(w)) {
+      const sinCeros = w.replace(/^0+/, "");
+      return sinCeros.length >= 2 && textoNormalizado.split(/\s+/).some(t => t.replace(/^0+/, "") === sinCeros);
+    }
+    return false;
+  });
+}
 
 const _fmtNum = n => Number(n || 0).toLocaleString("es-AR");
 const _fmtPlata = n => "$" + Math.round(Number(n || 0)).toLocaleString("es-AR");
@@ -9872,14 +9958,43 @@ function _repProductosEsqueleto() {
   }
 }
 
-async function cargarReporteProductos(forzar) {
+/**
+ * Pide reporteProductosVendidos para el período elegido, UNA sola vez:
+ * Productos y Compras usan la misma respuesta (caché de sesión de 90 s +
+ * la promesa en curso, así dos pestañas que la piden juntas no duplican
+ * el pedido). forzar=true saltea ambas cachés (también la del servidor).
+ */
+const _repProdPedidosEnCurso = {};
+async function _obtenerReporteProductosVendidos(forzar) {
   const rango = obtenerRangoReportes();
   const clave = "reporteProductosVendidos" + rango;
+  if (!forzar) {
+    const enCache = _getCacheReporte(clave);
+    if (enCache) return enCache;
+    if (_repProdPedidosEnCurso[clave]) return _repProdPedidosEnCurso[clave];
+  }
+  const promesa = (async () => {
+    const response = await fetchAPI(API_URL + "?action=reporteProductosVendidos" + rango + (forzar ? "&sinCache=1&_=" + Date.now() : ""));
+    const data = await _leerRespuestaJSON(response);
+    if (data && data.success) {
+      data._rango = "&desde=" + encodeURIComponent(data.desde) + "&hasta=" + encodeURIComponent(data.hasta);
+      _cacheReporte(clave, data);
+      _cacheReporte("reporteProductosVendidos" + data._rango, data);
+    }
+    return data;
+  })();
+  _repProdPedidosEnCurso[clave] = promesa;
+  try { return await promesa; }
+  finally { delete _repProdPedidosEnCurso[clave]; }
+}
+
+async function cargarReporteProductos(forzar) {
+  const rango = obtenerRangoReportes();
   const estado = document.getElementById("repProductosEstado");
   const gen = ++_repProductosGen;
 
   if (!forzar) {
-    const enCache = _getCacheReporte(clave);
+    const enCache = _getCacheReporte("reporteProductosVendidos" + rango);
     if (enCache) { _aplicar_cargarReporteProductos(enCache); return; }
   }
 
@@ -9890,22 +10005,13 @@ async function cargarReporteProductos(forzar) {
   if (estado) estado.textContent = "Cargando…";
 
   try {
-    const response = await fetchAPI(API_URL + "?action=reporteProductosVendidos" + rango + (forzar ? "&sinCache=1&_=" + Date.now() : ""));
-    const data = await _leerRespuestaJSON(response);
+    const data = await _obtenerReporteProductosVendidos(forzar);
     if (gen !== _repProductosGen) return; // llegó tarde: ya se pidió otro rango
-
     if (!data || !data.success) {
       _repProductosError((data && data.message) || "El servidor no devolvió el reporte");
       return;
     }
-    // Se guarda con la clave del rango real que resolvió el backend (la
-    // primera carga va sin fechas, y después los inputs quedan completos)
-    const rangoReal = "&desde=" + encodeURIComponent(data.desde) + "&hasta=" + encodeURIComponent(data.hasta);
-    data._rango = rangoReal;
-    _cacheReporte(clave, data);
-    _cacheReporte("reporteProductosVendidos" + rangoReal, data);
     _aplicar_cargarReporteProductos(data);
-
   } catch (error) {
     if (gen !== _repProductosGen) return;
     console.error("Error al cargar reporte de productos vendidos:", error);
@@ -9938,8 +10044,27 @@ function _aplicar_cargarReporteProductos(data) {
     CATEGORIA: p.CATEGORIA || "Sin categoría",
     VENDIDOS: Number(p.VENDIDOS || 0),
     INGRESOS: Number(p.INGRESOS || 0),
-    _busqueda: normalizarBusquedaPOS((p.PRODUCTO || "") + " " + (p.CODIGO ?? "") + " " + (p.CATEGORIA || ""))
+    _busqueda: normalizarBusquedaPOS([p.PRODUCTO, p.CODIGO, p.CATEGORIA, p.ALIAS, p.CODIGO_CAJA].join(" "))
   }));
+
+  // Productos del catálogo que NO se vendieron en el período: no van en el
+  // ranking, pero el buscador los encuentra igual (antes "no aparecían").
+  // El backend nuevo los manda en data.sinVentas; con uno viejo se usa el
+  // catálogo que ya esté cargado en el panel.
+  const vendidos = new Set(_repProductosDatosActuales.map(p => p.CODIGO));
+  let sinVentas = [];
+  if (Array.isArray(data.sinVentas)) {
+    sinVentas = data.sinVentas.map(r => ({ CODIGO: String(r[0] ?? ""), PRODUCTO: r[1] || "", CATEGORIA: r[2] || "Sin categoría", STOCK: r[3], ALIAS: r[4] || "", CODIGO_CAJA: r[5] || "" }));
+  } else if (typeof productosAdminGlobal !== "undefined" && Array.isArray(productosAdminGlobal)) {
+    sinVentas = productosAdminGlobal.map(p => ({ CODIGO: String(p.CODIGO ?? ""), PRODUCTO: p.PRODUCTO || "", CATEGORIA: p.CATEGORIA || "Sin categoría", STOCK: p.STOCK, ALIAS: p.ALIAS || "", CODIGO_CAJA: p.CODIGO_CAJA || "" }));
+  }
+  _repProductosSinVentas = sinVentas
+    .filter(p => p.CODIGO && !vendidos.has(p.CODIGO))
+    .map(p => ({
+      ...p, VENDIDOS: 0, INGRESOS: 0, VENDIDOS_ANTERIOR: 0, INGRESOS_ANTERIOR: 0, OPERACIONES: 0,
+      EN_CATALOGO: true, SIN_VENTAS: true, DIAS: {},
+      _busqueda: normalizarBusquedaPOS([p.PRODUCTO, p.CODIGO, p.CATEGORIA, p.ALIAS, p.CODIGO_CAJA].join(" "))
+    }));
 
   // Totales: los manda el backend nuevo; con uno viejo se calculan acá
   const totales = data.totales || {
@@ -10008,8 +10133,10 @@ function _repProductosFiltrados() {
   const categoria = (document.getElementById("repProductosCategoria") || {}).value || "";
   const orden = (document.getElementById("repProductosOrden") || {}).value || "unidades";
 
-  let lista = _repProductosDatosActuales.filter(p =>
-    (!categoria || p.CATEGORIA === categoria) && (!texto || p._busqueda.includes(texto)));
+  const consulta = (document.getElementById("repProductosBuscador") || {}).value || "";
+  const base = texto ? _repProductosDatosActuales.concat(_repProductosSinVentas) : _repProductosDatosActuales;
+  let lista = base.filter(p =>
+    (!categoria || p.CATEGORIA === categoria) && (!texto || coincideBusquedaReportes(p._busqueda, consulta)));
 
   const varUnid = p => _repVariacion(p.VENDIDOS, p.VENDIDOS_ANTERIOR).valor;
   const stockNum = p => (p.STOCK === null || p.STOCK === undefined || p.STOCK === "") ? Infinity : Number(p.STOCK);
@@ -10029,7 +10156,8 @@ function renderReporteProductos() {
   const pie = document.getElementById("repProductosPie");
   if (!tbody) return;
 
-  if (!_repProductosDatosActuales.length) {
+  const buscando = !!normalizarBusquedaPOS((document.getElementById("repProductosBuscador") || {}).value || "");
+  if (!_repProductosDatosActuales.length && !buscando) {
     tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4">Sin ventas de productos en el período elegido</td></tr>`;
     if (pie) pie.textContent = "";
     const g = document.getElementById("repProdGraficos");
@@ -10039,13 +10167,16 @@ function renderReporteProductos() {
 
   const filtrados = _repProductosFiltrados();
   if (!filtrados.length) {
-    tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4">Ningún producto coincide con los filtros</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4">${buscando
+      ? "Ningún producto del catálogo coincide con la búsqueda" + ((document.getElementById("repProductosCategoria") || {}).value ? " en esa categoría" : "")
+      : "Ningún producto coincide con los filtros"}</td></tr>`;
     if (pie) pie.textContent = "";
     _repDibujarGraficos(filtrados);
     return;
   }
 
-  const lista = _limitarReporte(filtrados, "productos");
+  // Buscando se muestran TODAS las coincidencias (con Top 10 quedaban productos afuera)
+  const lista = buscando ? filtrados : _limitarReporte(filtrados, "productos");
   const maxUnid = Math.max(...lista.map(p => p.VENDIDOS), 1);
   const totalIngresos = (_repProductosMeta && _repProductosMeta.totales.ingresos) || 0;
   const conComparacion = _repProductosMeta && _repProductosMeta.conComparacion;
@@ -10066,6 +10197,18 @@ function renderReporteProductos() {
         : _fmtNum(st);
     }
 
+    if (p.SIN_VENTAS) {
+      return `
+      <tr class="rep-sin-ventas">
+        <td class="rep-prod-rank">—</td>
+        <td>
+          <div class="rep-prod-nombre">${escapeHtml(p.PRODUCTO || "(sin nombre)")}</div>
+          <div class="rep-prod-meta"><span class="mono">${escapeHtml(p.CODIGO)}</span> · ${escapeHtml(p.CATEGORIA)}</div>
+        </td>
+        <td class="num" colspan="4"><span class="text-muted" style="font-size:12px;">Sin ventas en este período</span></td>
+        <td class="num d-none d-md-table-cell">${stockHtml}</td>
+      </tr>`;
+    }
     const sel = p.CODIGO === _repProductoSel;
     return `
       <tr class="rep-fila${sel ? " rep-sel" : ""}" onclick="repSeleccionarProducto('${escapeJsAttr(p.CODIGO)}')" title="Ver la evolución de este producto">
@@ -10088,12 +10231,15 @@ function renderReporteProductos() {
   }).join("");
 
   if (pie) {
-    const partes = [`Mostrando ${_fmtNum(lista.length)} de ${_fmtNum(filtrados.length)} productos`];
-    if (filtrados.length !== _repProductosDatosActuales.length) partes.push(`(${_fmtNum(_repProductosDatosActuales.length)} en total)`);
+    const conVentas = filtrados.filter(p => !p.SIN_VENTAS).length;
+    const partes = buscando
+      ? [`${_fmtNum(filtrados.length)} coincidencia${filtrados.length === 1 ? "" : "s"}: ${_fmtNum(conVentas)} con ventas y ${_fmtNum(filtrados.length - conVentas)} sin ventas en el período`]
+      : [`Mostrando ${_fmtNum(lista.length)} de ${_fmtNum(filtrados.length)} productos vendidos`];
+    if (!buscando && filtrados.length !== _repProductosDatosActuales.length) partes.push(`(${_fmtNum(_repProductosDatosActuales.length)} en total)`);
     if (!conComparacion) partes.push("· la comparación con el período anterior aparece al actualizar el Code.gs");
     pie.textContent = partes.join(" ");
   }
-  _repDibujarGraficos(filtrados);
+  _repDibujarGraficos(filtrados.filter(p => !p.SIN_VENTAS));
 }
 
 
@@ -10660,13 +10806,9 @@ let _rcCharts = {}; // instancias de Chart.js activas, para poder destruirlas an
  *  con qué venta diaria promedio se calcula, no para cuántos días se compra. */
 let _rcDiasCobertura = 30;
 
+/** Compras usa el mismo período que el resto de Reportes */
 function _rcRangoFechas() {
-  const desde = document.getElementById("rcDesde").value;
-  const hasta = document.getElementById("rcHasta").value;
-  let qs = "";
-  if (desde) qs += "&desde=" + encodeURIComponent(desde);
-  if (hasta) qs += "&hasta=" + encodeURIComponent(hasta);
-  return qs;
+  return obtenerRangoReportes();
 }
 
 function _rcDiasDelRango(desdeStr, hastaStr) {
@@ -10676,37 +10818,39 @@ function _rcDiasDelRango(desdeStr, hastaStr) {
   return dias > 0 ? dias : 30;
 }
 
-async function cargarReporteCompras() {
+async function cargarReporteCompras(forzar) {
   const tbody = document.getElementById("rcSemaforoTabla");
+  if (tbody && !_rcProductosActuales.length) tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-3">Cargando...</td></tr>`;
   try {
-    // 1) Asegurar que tenemos el catálogo completo (con STOCK y CATEGORIA) en memoria
-    if (!productosAdminGlobal || productosAdminGlobal.length === 0) {
-      await cargarProductos(); // función existente que llena productosAdminGlobal
-    }
+    // 1) Productos vendidos del período — la MISMA respuesta que usa la
+    //    pestaña Productos (se pide una sola vez y queda en caché)
+    const data = await _obtenerReporteProductosVendidos(forzar);
+    if (!data || !data.success) { toast((data && data.message) || "No se pudo cargar el reporte de compras", "error"); return; }
 
-    // 2) Pedir productos vendidos del rango elegido
-    const qs = _rcRangoFechas();
-    const response = await fetchAPI(API_URL + "?action=reporteProductosVendidos" + qs);
-    const data = await response.json();
-    if (!data.success) { toast("No se pudo cargar el reporte de compras", "error"); return; }
-
-    sincronizarRangoReportesCompras(data.desde, data.hasta);
+    sincronizarRangoReportes(data.desde, data.hasta);
     const dias = _rcDiasDelRango(data.desde, data.hasta);
 
-    // 3) Cruzar cada producto vendido con su stock/categoría actual
+    // 2) Stock y categoría: el backend nuevo ya los manda en cada producto.
+    //    Con un backend viejo se cruzan con el catálogo (que hay que cargar).
+    const backendTraeStock = (data.productos || []).some(v => v.STOCK !== undefined);
     const stockPorCodigo = {};
-    productosAdminGlobal.forEach(p => { stockPorCodigo[String(p.CODIGO)] = p; });
+    if (!backendTraeStock) {
+      if (!productosAdminGlobal || productosAdminGlobal.length === 0) await cargarProductos();
+      (productosAdminGlobal || []).forEach(p => { stockPorCodigo[String(p.CODIGO)] = p; });
+    }
 
     const productos = (data.productos || []).map(v => {
-      const info = stockPorCodigo[String(v.CODIGO)] || {};
-      return {
-        codigo:    v.CODIGO,
+      const info = backendTraeStock ? { STOCK: v.STOCK, CATEGORIA: v.CATEGORIA, ALIAS: v.ALIAS, CODIGO_CAJA: v.CODIGO_CAJA } : (stockPorCodigo[String(v.CODIGO)] || {});
+      const p = {
+        codigo:    String(v.CODIGO ?? ""),
         nombre:    v.PRODUCTO,
         categoria: info.CATEGORIA || "Sin categoría",
         vendidos:  Number(v.VENDIDOS || 0),
         ingresos:  Number(v.INGRESOS || 0),
-        stock:     info.STOCK !== undefined ? Number(info.STOCK) : 0,
+        stock:     (info.STOCK !== undefined && info.STOCK !== null && info.STOCK !== "") ? Number(info.STOCK) : 0,
       };
+      p._busqueda = normalizarBusquedaPOS([p.nombre, p.codigo, p.categoria, info.ALIAS, info.CODIGO_CAJA].join(" "));
+      return p;
     });
 
     // 4) Pedir la tendencia diaria por categoría (endpoint nuevo — ver nota al final
@@ -10767,10 +10911,7 @@ async function _rcCargarVentasDelRango(desde, hasta) {
 }
 
 function sincronizarRangoReportesCompras(desde, hasta) {
-  const inputDesde = document.getElementById("rcDesde");
-  const inputHasta = document.getElementById("rcHasta");
-  if (inputDesde && !inputDesde.value) inputDesde.value = desde;
-  if (inputHasta && !inputHasta.value) inputHasta.value = hasta;
+  sincronizarRangoReportes(desde, hasta);
 }
 
 function _rcVentaDiaria(p, dias) { return p.vendidos / dias; }
@@ -11041,7 +11182,7 @@ function _rcRedibujarTendencia() {
       aviso.style.display = "block";
       aviso.textContent = "⚠️ Tu backend todavía no tiene el desglose diario por categoría — mostrando el total general. Pedime el código de Apps Script para agregarlo.";
     }
-    _rcCargarVentasDelRango(document.getElementById("rcDesde").value, document.getElementById("rcHasta").value)
+    _rcCargarVentasDelRango(document.getElementById("repDesde").value, document.getElementById("repHasta").value)
       .then(ventasDelRango => {
         const porDia = {};
         (ventasDelRango || []).forEach(v => {
@@ -11108,7 +11249,7 @@ function _rcAplicarFiltrosTabla() {
 
   const filtroEstado = document.getElementById("rcFiltroEstado")?.value || "todos";
   const filtroCantidad = document.getElementById("rcFiltroCantidad")?.value || "10";
-  const busqueda = (document.getElementById("rcBuscarProducto")?.value || "").trim().toLowerCase();
+  const busqueda = document.getElementById("rcBuscarProducto")?.value || "";
 
   // Sin stock se marca oscuro para distinguirlo de un rojo "crítico" pero
   // todavía con algo de stock — son dos urgencias distintas de un vistazo.
@@ -11120,13 +11261,12 @@ function _rcAplicarFiltrosTabla() {
   };
 
   let filtrados = productos.filter(p => filtroEstado === "todos" || _rcEstado(p, dias) === filtroEstado);
-  if (busqueda) {
-    filtrados = filtrados.filter(p =>
-      String(p.nombre || "").toLowerCase().includes(busqueda) ||
-      String(p.codigo || "").toLowerCase().includes(busqueda));
+  if (busqueda.trim()) {
+    filtrados = filtrados.filter(p => coincideBusquedaReportes(p._busqueda || normalizarBusquedaPOS(p.nombre + " " + p.codigo), busqueda));
   }
   let ordenados = filtrados.sort((a,b)=> _rcCobertura(a, dias) - _rcCobertura(b, dias));
-  if (filtroCantidad !== "todos") ordenados = ordenados.slice(0, Number(filtroCantidad));
+  // Buscando, se muestran TODAS las coincidencias (el Top 10/20 escondía resultados)
+  if (filtroCantidad !== "todos" && !busqueda.trim()) ordenados = ordenados.slice(0, Number(filtroCantidad));
 
   if (ordenados.length === 0) {
     tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-3">Ningún producto en ese estado</td></tr>`;
@@ -15111,7 +15251,7 @@ function cerrarModalBoletasProveedor() {
 const PERMISOS_POR_ROL = {
   admin: null, // null = acceso a todas las secciones
   vendedor: ["dashboard", "pos", "ventasPOS", "cierreCaja", "movimientosCaja", "pedidos", "clientes"],
-  deposito: ["dashboard", "productos", "ingresoProductos", "proveedores", "reportesCompras"]
+  deposito: ["dashboard", "productos", "ingresoProductos", "proveedores", "reportes"] // en Reportes solo ve "Compras y reposición"
 };
 
 function obtenerRolActual() {
@@ -15133,6 +15273,11 @@ function aplicarPermisosPorRol() {
   if (nombre) {
     const label = document.getElementById("sidebarLabelSub");
     if (label) label.textContent = nombre + (rol !== "admin" ? " · " + rol : "");
+  }
+
+  // Depósito: dentro de Reportes solo la pestaña de compras/reposición
+  if (rol === "deposito") {
+    document.querySelectorAll('#repTabs .rep-tab[data-tab="ventas"], #repTabs .rep-tab[data-tab="productos"]').forEach(b => b.style.display = "none");
   }
 
   if (!permitidas) return; // admin: ve todo, no se toca el menú
