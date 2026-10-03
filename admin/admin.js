@@ -9746,15 +9746,75 @@ function mostrarTabReportes(tab, forzar) {
   _repTabRangoCargado[tab] = rango;
 
   if (tab === "ventas") {
-    cargarReporteVentasPeriodo();
-    cargarReporteCategorias();
-    cargarReporteFormasPago();
-    cargarReporteCierres();
-    cargarReporteClientes();
+    cargarReportesVentas(forzar);
   } else if (tab === "productos") {
     cargarReporteProductos(forzar);
   } else if (tab === "compras") {
     cargarReporteCompras(forzar);
+  }
+}
+
+/* Los reportes leen hojas enteras en Apps Script: con planillas grandes
+   pueden tardar bastante más que una lectura común. Más margen de espera
+   y UN solo intento (reintentar al vencer el tiempo solo duplicaba la
+   carga sobre el servidor y volvía a fallar). */
+const _REP_OPC_FETCH = { timeoutMs: 90000, reintentos: 1 };
+
+function _repMensajeError(error) {
+  if (error && error.name === "AbortError") return "Google tardó demasiado en responder. Probá de nuevo en un momento o con un período más corto.";
+  if (error && /Failed to fetch|NetworkError/i.test(String(error.message))) return "Sin conexión con el servidor. Revisá internet.";
+  return (error && error.message) || "Error al cargar el reporte";
+}
+
+/** Pestaña Ventas: los 5 reportes en UNA sola llamada (reportesVentas). Con un Code.gs viejo, cae a los 5 pedidos de antes. */
+let _repVentasGen = 0;
+async function cargarReportesVentas(forzar) {
+  const gen = ++_repVentasGen;
+  const cuerpos = { repVentasPeriodoTabla: 4, repCategoriasTabla: 3, repFormasPagoTabla: 3, repCierresTabla: 5, repClientesTabla: 4 };
+  Object.entries(cuerpos).forEach(([id, cols]) => {
+    const tb = document.getElementById(id);
+    if (tb) tb.innerHTML = `<tr><td colspan="${cols}" class="text-center text-muted py-3">Cargando…</td></tr>`;
+  });
+  const btn = document.getElementById("btnAplicarReportes");
+  if (btn) btn.disabled = true;
+
+  try {
+    const url = API_URL + "?action=reportesVentas" + obtenerRangoReportes() + (forzar ? "&sinCache=1&_=" + Date.now() : "");
+    const data = await _leerRespuestaJSON(await fetchAPI(url, {}, _REP_OPC_FETCH));
+    if (gen !== _repVentasGen) return;
+
+    if (!data || !data.success) {
+      if (/no v[aá]lida/i.test(String((data && data.message) || ""))) {
+        // Code.gs viejo: sin el endpoint combinado
+        await Promise.all([cargarReporteVentasPeriodo(), cargarReporteCategorias(), cargarReporteFormasPago(), cargarReporteCierres(), cargarReporteClientes()]);
+        return;
+      }
+      throw new Error((data && data.message) || "El servidor no devolvió los reportes");
+    }
+    const ok = d => (d && d.success) ? d : { success: false };
+    await Promise.all([
+      cargarReporteVentasPeriodo(ok(data.ventasPeriodo)),
+      cargarReporteCategorias(ok(data.categorias)),
+      cargarReporteFormasPago(ok(data.formasPago)),
+      cargarReporteCierres(ok(data.cierres)),
+      cargarReporteClientes(ok(data.clientes))
+    ]);
+    // Si alguno vino con error del servidor, que no quede "Cargando…"
+    Object.entries(cuerpos).forEach(([id, cols]) => {
+      const tb = document.getElementById(id);
+      if (tb && /Cargando…/.test(tb.textContent)) tb.innerHTML = `<tr><td colspan="${cols}" class="text-center text-muted py-3">No se pudo calcular este reporte</td></tr>`;
+    });
+  } catch (error) {
+    if (gen !== _repVentasGen) return;
+    console.error("Error al cargar los reportes de ventas:", error);
+    const msg = escapeHtml(_repMensajeError(error));
+    Object.entries(cuerpos).forEach(([id, cols]) => {
+      const tb = document.getElementById(id);
+      if (tb) tb.innerHTML = `<tr><td colspan="${cols}" class="text-center text-muted py-3">${msg} <button class="btn btn-outline-primary btn-sm ms-2" onclick="cargarTodosLosReportes(true)">Reintentar</button></td></tr>`;
+    });
+    _repTabRangoCargado.ventas = null; // que vuelva a intentar al reabrir la pestaña
+  } finally {
+    if (btn) btn.disabled = false;
   }
 }
 
@@ -9828,22 +9888,21 @@ function cambiarLimiteReporte(key, valor) {
 }
 
 /* ---- Reporte 1: Ventas por período ---- */
-async function cargarReporteVentasPeriodo() {
+async function cargarReporteVentasPeriodo(datosPrevios) {
   const tbody = document.getElementById("repVentasPeriodoTabla");
   const resumenWrap = document.getElementById("repVentasPeriodoResumen");
   const cacheKey = "ventasPeriodo" + obtenerRangoReportes();
-  const cached = _getCacheReporte(cacheKey);
+  const cached = datosPrevios ? null : _getCacheReporte(cacheKey);
   if (cached) { _aplicarReporteVentas(cached, tbody, resumenWrap); return; }
 
   try {
-    const response = await fetchAPI(API_URL + "?action=reporteVentasPeriodo" + obtenerRangoReportes());
-    const data = await response.json();
+    const data = datosPrevios || await _leerRespuestaJSON(await fetchAPI(API_URL + "?action=reporteVentasPeriodo" + obtenerRangoReportes(), {}, _REP_OPC_FETCH));
     if (!data.success) return;
     _cacheReporte(cacheKey, data);
     _aplicarReporteVentas(data, tbody, resumenWrap);
   } catch (error) {
     console.error("Error reporte ventas:", error);
-    tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-3">Error al cargar el reporte</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-3">${escapeHtml(_repMensajeError(error))}</td></tr>`;
   }
 }
 
@@ -9974,7 +10033,7 @@ async function _obtenerReporteProductosVendidos(forzar) {
     if (_repProdPedidosEnCurso[clave]) return _repProdPedidosEnCurso[clave];
   }
   const promesa = (async () => {
-    const response = await fetchAPI(API_URL + "?action=reporteProductosVendidos" + rango + (forzar ? "&sinCache=1&_=" + Date.now() : ""));
+    const response = await fetchAPI(API_URL + "?action=reporteProductosVendidos" + rango + (forzar ? "&sinCache=1&_=" + Date.now() : ""), {}, _REP_OPC_FETCH);
     const data = await _leerRespuestaJSON(response);
     if (data && data.success) {
       data._rango = "&desde=" + encodeURIComponent(data.desde) + "&hasta=" + encodeURIComponent(data.hasta);
@@ -10015,11 +10074,12 @@ async function cargarReporteProductos(forzar) {
   } catch (error) {
     if (gen !== _repProductosGen) return;
     console.error("Error al cargar reporte de productos vendidos:", error);
-    _repProductosError("Error de conexión al cargar el reporte");
+    _repProductosError(_repMensajeError(error));
   }
 }
 
 function _repProductosError(mensaje) {
+  if (typeof _repTabRangoCargado !== "undefined") _repTabRangoCargado.productos = null; // reintenta al reabrir la pestaña
   const tbody = document.getElementById("repProductosTabla");
   const estado = document.getElementById("repProductosEstado");
   if (estado) estado.textContent = "";
@@ -10575,15 +10635,14 @@ function exportarReporteProductosPDF() {
 }
 
 /* ---- Reporte 3: Ventas por categoría ---- */
-async function cargarReporteCategorias() {
+async function cargarReporteCategorias(datosPrevios) {
   const _ck_repCategorias = "reporteVentasPorCategoria" + obtenerRangoReportes();
-  const _cd_repCategorias = _getCacheReporte(_ck_repCategorias);
+  const _cd_repCategorias = null; // (estos reportes no se cachean por separado: vienen todos juntos de reportesVentas)
   if (_cd_repCategorias) { _aplicar_cargarReporteCategorias(_cd_repCategorias); return; }
   const tbody = document.getElementById("repCategoriasTabla");
 
   try {
-    const response = await fetchAPI(API_URL + "?action=reporteVentasPorCategoria" + obtenerRangoReportes());
-    const data = await response.json();
+    const data = datosPrevios || await _leerRespuestaJSON(await fetchAPI(API_URL + "?action=reporteVentasPorCategoria" + obtenerRangoReportes(), {}, _REP_OPC_FETCH));
     if (!data.success) return;
 
     sincronizarRangoReportes(data.desde, data.hasta);
@@ -10592,7 +10651,7 @@ async function cargarReporteCategorias() {
 
   } catch (error) {
     console.error("Error al cargar reporte de ventas por categoría:", error);
-    tbody.innerHTML = `<tr><td colspan="3" class="text-center text-muted py-3">Error al cargar el reporte</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="3" class="text-center text-muted py-3">${escapeHtml(_repMensajeError(error))}</td></tr>`;
   }
 }
 
@@ -10616,12 +10675,11 @@ function renderReporteCategorias() {
 }
 
 /* ---- Reporte 4: Formas de pago ---- */
-async function cargarReporteFormasPago() {
+async function cargarReporteFormasPago(datosPrevios) {
   const tbody = document.getElementById("repFormasPagoTabla");
 
   try {
-    const response = await fetchAPI(API_URL + "?action=reporteFormasPago" + obtenerRangoReportes());
-    const data = await response.json();
+    const data = datosPrevios || await _leerRespuestaJSON(await fetchAPI(API_URL + "?action=reporteFormasPago" + obtenerRangoReportes(), {}, _REP_OPC_FETCH));
     if (!data.success) return;
 
     sincronizarRangoReportes(data.desde, data.hasta);
@@ -10630,7 +10688,7 @@ async function cargarReporteFormasPago() {
 
   } catch (error) {
     console.error("Error al cargar reporte de formas de pago:", error);
-    tbody.innerHTML = `<tr><td colspan="3" class="text-center text-muted py-3">Error al cargar el reporte</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="3" class="text-center text-muted py-3">${escapeHtml(_repMensajeError(error))}</td></tr>`;
   }
 }
 
@@ -10654,15 +10712,14 @@ function renderReporteFormasPago() {
 }
 
 /* ---- Reporte 5: Historial de cierres de caja ---- */
-async function cargarReporteCierres() {
+async function cargarReporteCierres(datosPrevios) {
   const _ck_repCierres = "reporteCierres" + obtenerRangoReportes();
-  const _cd_repCierres = _getCacheReporte(_ck_repCierres);
+  const _cd_repCierres = null; // (estos reportes no se cachean por separado: vienen todos juntos de reportesVentas)
   if (_cd_repCierres) { _aplicar_cargarReporteCierres(_cd_repCierres); return; }
   const tbody = document.getElementById("repCierresTabla");
 
   try {
-    const response = await fetchAPI(API_URL + "?action=reporteCierresCaja" + obtenerRangoReportes());
-    const data = await response.json();
+    const data = datosPrevios || await _leerRespuestaJSON(await fetchAPI(API_URL + "?action=reporteCierresCaja" + obtenerRangoReportes(), {}, _REP_OPC_FETCH));
     if (!data.success) return;
 
     sincronizarRangoReportes(data.desde, data.hasta);
@@ -10671,7 +10728,7 @@ async function cargarReporteCierres() {
 
   } catch (error) {
     console.error("Error al cargar reporte de cierres de caja:", error);
-    tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-3">Error al cargar el reporte</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-3">${escapeHtml(_repMensajeError(error))}</td></tr>`;
   }
 }
 
@@ -10703,15 +10760,14 @@ function renderReporteCierres() {
 }
 
 /* ---- Reporte 6: Clientes que más compran ---- */
-async function cargarReporteClientes() {
+async function cargarReporteClientes(datosPrevios) {
   const _ck_repClientes = "reporteClientes" + obtenerRangoReportes();
-  const _cd_repClientes = _getCacheReporte(_ck_repClientes);
+  const _cd_repClientes = null; // (estos reportes no se cachean por separado: vienen todos juntos de reportesVentas)
   if (_cd_repClientes) { _aplicar_cargarReporteClientes(_cd_repClientes); return; }
   const tbody = document.getElementById("repClientesTabla");
 
   try {
-    const response = await fetchAPI(API_URL + "?action=reporteClientes" + obtenerRangoReportes());
-    const data = await response.json();
+    const data = datosPrevios || await _leerRespuestaJSON(await fetchAPI(API_URL + "?action=reporteClientes" + obtenerRangoReportes(), {}, _REP_OPC_FETCH));
     if (!data.success) return;
 
     sincronizarRangoReportes(data.desde, data.hasta);
@@ -10720,7 +10776,7 @@ async function cargarReporteClientes() {
 
   } catch (error) {
     console.error("Error al cargar reporte de clientes:", error);
-    tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-3">Error al cargar el reporte</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-3">${escapeHtml(_repMensajeError(error))}</td></tr>`;
   }
 }
 
@@ -10862,8 +10918,9 @@ async function cargarReporteCompras(forzar) {
 
   } catch (error) {
     console.error("Error al cargar reporte de compras:", error);
-    if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-3">Error al cargar el reporte</td></tr>`;
-    toast("Error de conexión al cargar el reporte de compras", "error");
+    if (tbody) tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-3">${escapeHtml(_repMensajeError(error))} <button class="btn btn-outline-primary btn-sm ms-2" onclick="cargarReporteCompras(true)">Reintentar</button></td></tr>`;
+    toast(_repMensajeError(error), "error");
+    _repTabRangoCargado.compras = null;
   }
 }
 
@@ -10884,7 +10941,7 @@ async function _rcCargarTendenciaPorCategoria(desde, hasta) {
     const params = new URLSearchParams({ action: "reporteVentasDiariasPorCategoria" });
     if (desde) params.set("desde", desde);
     if (hasta) params.set("hasta", hasta);
-    const response = await fetchAPI(API_URL + "?" + params.toString());
+    const response = await fetchAPI(API_URL + "?" + params.toString(), {}, _REP_OPC_FETCH);
     const data = await response.json();
     if (data && data.success && data.dias) return data;
     return null;
