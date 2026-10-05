@@ -13289,7 +13289,7 @@ async function tcActualizarAutomatico(silencioso) {
   const ctrl = new AbortController();
   const corte = setTimeout(() => ctrl.abort(), 8000);
   try {
-    const res = await fetch(TC_API + encodeURIComponent(tipo), { signal: ctrl.signal });
+    const res = await fetch(TC_API + encodeURIComponent(tipo), { signal: ctrl.signal, cache: "no-store" });
     if (!res.ok) throw new Error("HTTP " + res.status);
     const d = await res.json();
     const venta = Number(d.venta);
@@ -13342,37 +13342,76 @@ function tcIrAConfiguracion() {
 async function dolarMostrarValoresHoy() {
   const el = document.getElementById("cfgDolarHoy");
   if (!el) return;
+  const ctrl = new AbortController();
+  const corte = setTimeout(() => ctrl.abort(), 8000);
   try {
-    const res = await fetch(TC_API.replace(/\/$/, ""));
+    const res = await fetch(TC_API.replace(/\/$/, ""), { signal: ctrl.signal, cache: "no-store" });
     if (!res.ok) throw new Error("HTTP " + res.status);
     const lista = await res.json();
+    clearTimeout(corte);
     const partes = Object.keys(TC_TIPOS).map(casa => {
       const d = (Array.isArray(lista) ? lista : []).find(x => x.casa === casa);
       return d && Number(d.venta) > 0 ? `${TC_TIPOS[casa]} $${Number(d.venta).toLocaleString("es-AR")}` : null;
     }).filter(Boolean);
     el.textContent = partes.length ? "Valor de venta hoy: " + partes.join(" · ") : "";
   } catch (e) {
+    clearTimeout(corte);
     el.textContent = "";      // sin conexión: el selector funciona igual
   }
 }
 
-/* ---------- Burbuja con los 4 dólares principales (solo en POS y Dashboard, y solo con internet) ---------- */
+/* ---------- Burbuja con los 4 dólares principales (solo en POS y Dashboard) ----------
+   Se actualiza al entrar a POS/Dashboard si pasaron más de 10 minutos, cada
+   10 minutos mientras estás ahí, y al volver internet. Muestra la hora de la
+   COTIZACIÓN (no la de la consulta): fines de semana y feriados el oficial no
+   se mueve, y antes decía "Dólar hoy · 00:57" con el valor del viernes.
+   Si una actualización falla, se siguen mostrando los últimos valores marcados
+   como "sin actualizar" (antes la burbuja desaparecía). */
 const DB_TIPOS = ["oficial", "blue", "bolsa", "tarjeta"];
 const DB_LS_MIN = "vpos_dolar_burbuja_min";
-let dbDatos = null;            // { oficial: 1535, ... } o null si no hay datos
+const DB_REFRESCO_MS = 10 * 60 * 1000;
+let dbDatos = null;            // { valores:{oficial:1540,...}, fechas:{oficial:Date,...}, consultado:ms, desactualizado:bool }
 let dbSeccion = "";
 let dbTimer = null;
+let dbPidiendo = false;
+
+/** "hoy 15:56" / "ayer 18:55" / "vie 18:55" / "02/10 18:55" */
+function _dbFechaCorta(f) {
+  if (!(f instanceof Date) || isNaN(f)) return "";
+  const hora = f.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false });
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  const dia = new Date(f); dia.setHours(0, 0, 0, 0);
+  const dif = Math.round((hoy - dia) / 86400000);
+  if (dif === 0) return "hoy " + hora;
+  if (dif === 1) return "ayer " + hora;
+  if (dif > 1 && dif < 7) return f.toLocaleDateString("es-AR", { weekday: "short" }).replace(".", "") + " " + hora;
+  return f.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" }) + " " + hora;
+}
 
 function dolarBurbujaRender() {
   const el = document.getElementById("dolarBurbuja");
   if (!el) return;
-  const visible = (dbSeccion === "pos" || dbSeccion === "dashboard") && navigator.onLine !== false && !!dbDatos;
+  const visible = (dbSeccion === "pos" || dbSeccion === "dashboard") && !!dbDatos;
   el.classList.toggle("visible", visible);
   if (!visible) return;
-  document.getElementById("dbFilas").innerHTML = DB_TIPOS.filter(t => dbDatos[t] > 0).map(t =>
-    `<div class="db-fila"><span>${TC_TIPOS[t]}</span><b>$${Number(dbDatos[t]).toLocaleString("es-AR")}</b></div>`).join("");
+
+  const fechas = DB_TIPOS.map(t => dbDatos.fechas[t]).filter(f => f instanceof Date && !isNaN(f));
+  const masNueva = fechas.length ? new Date(Math.max(...fechas)) : null;
+  document.getElementById("dbFilas").innerHTML = DB_TIPOS.filter(t => dbDatos.valores[t] > 0).map(t => {
+    const f = dbDatos.fechas[t];
+    const tit = f ? `Venta · cotización de ${f.toLocaleString("es-AR", { weekday: "long", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}` : "Venta";
+    return `<div class="db-fila" title="${escapeHtml(tit)}"><span>${TC_TIPOS[t]}</span><b>$${Number(dbDatos.valores[t]).toLocaleString("es-AR", { maximumFractionDigits: 2 })}</b></div>`;
+  }).join("");
+
   const h = document.getElementById("dbHora");
-  if (h && dbDatos._hora) h.textContent = dbDatos._hora;
+  if (h) {
+    const sinRed = navigator.onLine === false || dbDatos.desactualizado;
+    h.textContent = sinRed ? "sin actualizar" : (masNueva ? _dbFechaCorta(masNueva) : "");
+    h.style.color = sinRed ? "var(--amber-600, #b45309)" : "";
+  }
+  el.title = "Cotización del dólar (valor de venta, DolarApi). Consultado a las " +
+    new Date(dbDatos.consultado).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }) + ". Tocá para minimizar";
+
   let min = false;
   try { min = localStorage.getItem(DB_LS_MIN) === "1"; } catch (e) {}
   el.classList.toggle("min", min);
@@ -13387,26 +13426,32 @@ function dolarBurbujaAlternar() {
 }
 
 async function dolarBurbujaActualizar() {
+  if (dbPidiendo) return;
   if (navigator.onLine === false) { dolarBurbujaRender(); return; }
+  dbPidiendo = true;
   const ctrl = new AbortController();
   const corte = setTimeout(() => ctrl.abort(), 8000);
   try {
-    const res = await fetch(TC_API.replace(/\/$/, ""), { signal: ctrl.signal });
+    const res = await fetch(TC_API.replace(/\/$/, ""), { signal: ctrl.signal, cache: "no-store" });
     if (!res.ok) throw new Error("HTTP " + res.status);
     const lista = await res.json();
-    const datos = {};
+    const valores = {}, fechas = {};
     DB_TIPOS.forEach(t => {
       const d = (Array.isArray(lista) ? lista : []).find(x => x.casa === t);
-      if (d && Number(d.venta) > 0) datos[t] = Number(d.venta);
+      if (d && Number(d.venta) > 0) {
+        valores[t] = Number(d.venta);
+        const f = d.fechaActualizacion ? new Date(d.fechaActualizacion) : null;
+        fechas[t] = f && !isNaN(f) ? f : null;
+      }
     });
-    if (Object.keys(datos).length) {
-      datos._hora = new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
-      dbDatos = datos;
-    }
+    if (!Object.keys(valores).length) throw new Error("respuesta sin cotizaciones");
+    dbDatos = { valores, fechas, consultado: Date.now(), desactualizado: false };
   } catch (e) {
-    dbDatos = null;            // sin datos confiables: la burbuja se esconde
+    console.warn("Cotización del dólar:", e);
+    if (dbDatos) dbDatos.desactualizado = true;   // se quedan los últimos valores, marcados como viejos
   } finally {
     clearTimeout(corte);
+    dbPidiendo = false;
     dolarBurbujaRender();
   }
 }
@@ -13415,12 +13460,14 @@ async function dolarBurbujaActualizar() {
 function dolarBurbujaAlCambiarSeccion(id) {
   dbSeccion = id;
   if (!dbTimer) {
-    dbTimer = setInterval(() => { if (dbSeccion === "pos" || dbSeccion === "dashboard") dolarBurbujaActualizar(); }, 10 * 60 * 1000);
-    window.addEventListener("online", dolarBurbujaActualizar);
+    dbTimer = setInterval(() => { if (dbSeccion === "pos" || dbSeccion === "dashboard") dolarBurbujaActualizar(); }, DB_REFRESCO_MS);
+    window.addEventListener("online", () => { if (dbSeccion === "pos" || dbSeccion === "dashboard") dolarBurbujaActualizar(); });
     window.addEventListener("offline", dolarBurbujaRender);
   }
   if (id === "pos" || id === "dashboard") {
-    if (!dbDatos) dolarBurbujaActualizar(); else dolarBurbujaRender();
+    const vencido = !dbDatos || dbDatos.desactualizado || (Date.now() - dbDatos.consultado) > DB_REFRESCO_MS;
+    dolarBurbujaRender();
+    if (vencido) dolarBurbujaActualizar();
   } else dolarBurbujaRender();
 }
 
