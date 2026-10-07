@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Configuración inicial · VeekPOS</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="vendor/fonts/fonts.css" rel="stylesheet">
 <style>
 
 :root{
@@ -315,6 +315,13 @@ document.getElementById("setupForm").addEventListener("submit", async function(e
     return;
   }
 
+  // La configuración inicial necesita internet (se verifica la URL y se
+  // activa la licencia). Mejor decirlo claro que mostrar un error genérico.
+  if(navigator.onLine === false){
+    mostrarError("Esta computadora no tiene internet ahora. La configuración inicial se hace una sola vez y necesita conexión; después, el punto de venta funciona sin internet.");
+    return;
+  }
+
   const btn = document.getElementById("btnGuardar");
   btn.disabled = true;
   btn.classList.add("loading");
@@ -322,7 +329,12 @@ document.getElementById("setupForm").addEventListener("submit", async function(e
   try{
     // Confirmamos que la API URL realmente responde antes de guardar
     // nada, para no dejar la caja "configurada" con datos que no sirven.
-    const respuesta = await fetch(apiUrl + "?action=productos");
+    let respuesta;
+    try{
+      respuesta = await fetch(apiUrl + "?action=productos", { signal: AbortSignal.timeout(30000) });
+    }catch(errRed){
+      throw new Error("No se pudo conectar con esa URL. Revisá que tengas internet y que la URL sea la de \"Aplicación web\" (termina en /exec).");
+    }
     if(!respuesta.ok){
       throw new Error("La URL no respondió correctamente (código " + respuesta.status + ")");
     }

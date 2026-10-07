@@ -1,5 +1,5 @@
 /* ===================================================================
-   JIREH ADMIN — app logic v2
+   VeekPOS — panel admin (app logic v2)
    • All original Apps Script API calls preserved
    • Thermal print (POS80 80mm) added
    • Dashboard POS summary added
@@ -228,7 +228,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
+  // En el navegador hace falta un token del backend (sesiones de antes de
+  // esta versión no lo tienen: se pide login de nuevo). En la app de
+  // escritorio se puede entrar sin token (login offline): el POS funciona
+  // y la cola espera a que haya sesión para subir.
+  if (window.VeekAuth && !VeekAuth.tieneSesion() && !(window.posOffline || window.veekpos)) {
+    sessionStorage.removeItem("admin");
+    window.location.href = "login.html";
+    return;
+  }
+
   aplicarPermisosPorRol();
+  mostrarAvisoPasswordDeFabrica();
 
   // Verificar licencia (solo en Electron con window.veekpos disponible)
   aplicarEstadoLicencia();
@@ -756,8 +767,8 @@ async function guardarCredencialesForm() {
     return;
   }
 
-  if (nuevaPassword.length < 4) {
-    toast("La nueva contraseña debe tener al menos 4 caracteres", "error");
+  if (nuevaPassword.length < 6) {
+    toast("La nueva contraseña debe tener al menos 6 caracteres", "error");
     return;
   }
 
@@ -770,7 +781,8 @@ async function guardarCredencialesForm() {
       action: "guardarCredencialesAdmin",
       passwordActual,
       nuevoUsuario,
-      nuevaPassword
+      nuevaPassword,
+      dispositivo: (window.posOffline || window.veekpos) ? "1" : ""
     });
     const response = await fetchAPI(API_URL + "?" + params.toString());
     const data = await response.json();
@@ -779,6 +791,12 @@ async function guardarCredencialesForm() {
       toast(data.message || "No se pudo cambiar el acceso", "error");
       return;
     }
+
+    // Cambiar la contraseña cierra las demás sesiones; esta sigue con el token nuevo.
+    if (data.token && window.VeekAuth) VeekAuth.guardarSesion(data, !!(window.posOffline || window.veekpos));
+    try { sessionStorage.removeItem("debeCambiarPassword"); } catch (e) {}
+    const avisoFabrica = document.getElementById("avisoPasswordFabrica");
+    if (avisoFabrica) avisoFabrica.remove();
 
     document.getElementById("credPasswordActual").value = "";
     document.getElementById("credNuevoUsuario").value = "";
@@ -1273,7 +1291,7 @@ async function guardarAparienciaForm() {
 /* ===================== BENEFICIOS DEL CATÁLOGO WEB (chips bajo el banner) ===================== */
 
 const BENEFICIOS_DEFAULT = {
-  beneficioWhatsappNumero: "5491140975795",
+  beneficioWhatsappNumero: "",
   beneficioInstagramUrl:   "",
   beneficioTelefono1:      "",
   beneficioTelefono2:      "",
@@ -3490,7 +3508,7 @@ function imprimirNotaPedidoA4() {
 }
 
 /* ====================================================================
- * REMITO sobre formulario preimpreso (Jireh, 168x204mm, cod. 091)
+ * REMITO sobre formulario preimpreso (168x204mm, cod. 091)
  * Imprime SOLO los datos variables en la posición exacta del formulario.
  * Coordenadas en mm medidas desde la esquina superior izquierda de la hoja
  * A4 (la hoja del remito se carga como si fuera A4, pegada a la esquina).
@@ -5224,7 +5242,7 @@ function actualizarPreviewBanner() {
 
   const tituloEl = document.getElementById("cfgBannerTitulo");
   const subtituloEl = document.getElementById("cfgBannerSubtitulo");
-  const titulo    = (tituloEl && tituloEl.value.trim())    || "Mayorista Jireh";
+  const titulo    = (tituloEl && tituloEl.value.trim())    || "Tu negocio";
   const subtitulo = (subtituloEl && subtituloEl.value.trim()) || "Catálogo Mayorista Online";
   ["bannerMockTituloD", "bannerMockTituloM"].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = titulo; });
   ["bannerMockSubtituloD", "bannerMockSubtituloM"].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = subtitulo; });
@@ -9104,6 +9122,27 @@ function setupScannerListener() {
       return;
     }
 
+    // F6/F7/F8: forma de pago, funcionan también con el foco en el buscador
+    // (los números 1/2/3 solo sirven cuando no se está escribiendo).
+    if (e.key === "F6" || e.key === "F7" || e.key === "F8") {
+      const mapaF = { F6: "EFECTIVO", F7: "TRANSFERENCIA", F8: "TARJETA" };
+      const btnF = document.querySelector(`.pay-method-btn[data-val="${mapaF[e.key]}"]`);
+      if (btnF) { e.preventDefault(); elegirFormaPago(btnF, mapaF[e.key]); toast("Forma de pago: " + mapaF[e.key].toLowerCase(), "success"); }
+      return;
+    }
+
+    // F1: ayuda con todos los atajos
+    if (e.key === "F1") {
+      e.preventDefault();
+      mostrarAyudaAtajosPOS();
+      return;
+    }
+    // Esc con la ayuda abierta: solo la cierra (no vacía el ticket)
+    if (e.key === "Escape" && cerrarAyudaAtajosPOS()) {
+      e.preventDefault();
+      return;
+    }
+
     if (!isOurInput && (activeTag === "INPUT" || activeTag === "SELECT" || activeTag === "TEXTAREA")) return;
 
     // ---- Atajos que solo aplican cuando NO se está escribiendo en el buscador ----
@@ -9130,6 +9169,11 @@ function setupScannerListener() {
         const mapa = { "1": "EFECTIVO", "2": "TRANSFERENCIA", "3": "TARJETA" };
         const btn = document.querySelector(`.pay-method-btn[data-val="${mapa[e.key]}"]`);
         if (btn) { e.preventDefault(); elegirFormaPago(btn, mapa[e.key]); }
+        return;
+      }
+      if (e.key === "?") {
+        e.preventDefault();
+        mostrarAyudaAtajosPOS();
         return;
       }
       if (e.key === "Escape") {
@@ -12450,24 +12494,44 @@ async function generarCodeGs() {
   }
 }
 
+/**
+ * Arma el config.json del cliente — el ÚNICO archivo con datos propios
+ * de cada negocio en el sitio (ver config.json y scripts/aplicar-cliente.js).
+ */
+function instArmarConfigCliente(d) {
+  let sitioUrl = "";
+  try {
+    if (/^https?:/.test(location.protocol)) sitioUrl = location.href.replace(/admin\/[^]*$/, "");
+  } catch (e) {}
+  return {
+    _LEEME: "Único archivo con los datos de este cliente. Editalo y subilo: el resto del sitio se adapta solo (scripts/aplicar-cliente.js). Nombre, colores, banner y teléfonos visibles se cambian desde el panel → Configuración.",
+    empresa:       d.empresa,
+    nombreCorto:   d.empresa.split(/\s+/)[0] || d.empresa,
+    descripcion:   "Catálogo online de " + d.empresa + " con envíos a todo el país.",
+    sitioUrl:      sitioUrl,
+    apiUrl:        d.apiUrl || "PEGAR_URL_API_AQUI",
+    apiUrlLectura: "",
+    whatsapp:      d.whatsapp,
+    direccion:     d.direccion,
+    moneda:        d.moneda,
+    pais:          "Argentina",
+    colorTema:     "#0b1633",
+    googleVerificacion: "",
+    version:       d.version,
+    generadoEn:    d.fecha
+  };
+}
+
 /** Paso 3a: Genera y descarga config.json */
 function generarConfigJson() {
   const d = instValidar();
   if (!d) return;
 
-  const config = {
-    empresa:    d.empresa,
-    apiUrl:     d.apiUrl || "PEGAR_URL_API_AQUI",
-    moneda:     d.moneda,
-    whatsapp:   d.whatsapp,
-    direccion:  d.direccion,
-    version:    d.version,
-    generadoEn: d.fecha
-  };
+  const config = instArmarConfigCliente(d);
 
   const json = JSON.stringify(config, null, 2);
   descargarArchivo("config.json", json, "application/json");
-  toast("config.json descargado — colocalo en la raíz del catálogo y del panel admin", "success");
+  toast("config.json descargado — colocalo en la raíz del sitio (al lado de index.html)", "success");
 }
 
 /** Paso 3b: Genera ZIP del catálogo web completo con config del cliente */
@@ -12493,15 +12557,7 @@ async function generarCatalogoZip() {
     const zip = new JSZip();
 
     // Insertar config.json del cliente en el ZIP
-    const config = {
-      empresa:    d.empresa,
-      apiUrl:     d.apiUrl,
-      moneda:     d.moneda,
-      whatsapp:   d.whatsapp,
-      direccion:  d.direccion,
-      version:    d.version,
-      generadoEn: d.fecha
-    };
+    const config = instArmarConfigCliente(d);
     zip.file("config.json", JSON.stringify(config, null, 2));
 
     // Lista de archivos del catálogo (viven en veekPOS/catalogo/)
@@ -12518,7 +12574,7 @@ async function generarCatalogoZip() {
     ];
     const archivosBinarios = ["icon-192.png", "icon-512.png", "favicon.ico"];
 
-    const base = "../catalogo/";
+    const base = "../"; // el catálogo vive en la raíz del sitio (admin/ está adentro)
     let cargados = 0;
 
     // Cargar archivos de texto
@@ -15352,6 +15408,53 @@ function cerrarModalBoletasProveedor() {
    guardado, se asume "admin" (acceso total), igual que siempre.
 =================================================================== */
 
+/* ===================== AYUDA DE ATAJOS DEL POS =====================
+   F1 o "?" abren el mismo panel que el botón "⌨️ Atajos" del POS. */
+
+function mostrarAyudaAtajosPOS() {
+  const fondo = document.getElementById("shortcutsHelpBackdrop");
+  if (!fondo) return;
+  if (fondo.classList.contains("show")) { cerrarAyudaAtajosPOS(); return; }
+  fondo.classList.add("show");
+}
+
+/** Cierra la ayuda si estaba abierta. Devuelve true si la cerró. */
+function cerrarAyudaAtajosPOS() {
+  const fondo = document.getElementById("shortcutsHelpBackdrop");
+  if (!fondo || !fondo.classList.contains("show")) return false;
+  fondo.classList.remove("show");
+  const input = document.getElementById("posBusqueda");
+  if (input) input.focus();
+  return true;
+}
+
+/**
+ * Si el admin entró con la contraseña que viene de fábrica, se le avisa
+ * arriba de todo hasta que la cambie (cualquiera que conozca VeekPOS la
+ * conoce). Lo marca login.html con "debeCambiarPassword".
+ */
+function mostrarAvisoPasswordDeFabrica() {
+  let debe = false;
+  try { debe = sessionStorage.getItem("debeCambiarPassword") === "1"; } catch (e) {}
+  if (!debe || document.getElementById("avisoPasswordFabrica")) return;
+  const div = document.createElement("div");
+  div.id = "avisoPasswordFabrica";
+  div.setAttribute("role", "alert");
+  div.style.cssText = "position:sticky;top:0;z-index:1040;background:#b91c1c;color:#fff;padding:10px 16px;margin:-4px 0 16px;" +
+    "border-radius:10px;display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap;font-weight:600";
+  div.innerHTML = '<span>⚠️ Estás usando la contraseña de fábrica. Cualquiera que la conozca puede entrar a tu panel.</span>' +
+    '<button type="button" class="btn btn-sm btn-light fw-bold">Cambiarla ahora</button>';
+  div.querySelector("button").onclick = () => {
+    mostrarSeccion("configuracion");
+    setTimeout(() => {
+      const campo = document.getElementById("credPasswordActual");
+      if (campo) { campo.scrollIntoView({ behavior: "smooth", block: "center" }); campo.focus(); }
+    }, 200);
+  };
+  // Dentro del área de contenido (no tapa la barra lateral)
+  (document.querySelector(".content") || document.body).prepend(div);
+}
+
 const PERMISOS_POR_ROL = {
   admin: null, // null = acceso a todas las secciones
   vendedor: ["dashboard", "pos", "ventasPOS", "cierreCaja", "movimientosCaja", "pedidos", "clientes"],
@@ -15493,8 +15596,8 @@ async function guardarUsuarioForm() {
 
   try {
     const body = usuarioId
-      ? { action: "editarUsuario", usuarioId, nombre, username, password, rol, activo }
-      : { action: "crearUsuario", nombre, username, password, rol };
+      ? { action: "editarUsuario", usuarioId, nombre, username, password, rolNuevo: rol, activo }
+      : { action: "crearUsuario", nombre, username, password, rolNuevo: rol };
 
     const res = await fetchAPI(API_URL, { method: "POST", body: JSON.stringify(body) });
     const data = await res.json();

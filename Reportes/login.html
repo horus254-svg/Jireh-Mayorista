@@ -12,6 +12,15 @@
 
 <script>window.CONFIG_BASE = "../";</script>
 <script src="../config.js"></script>
+<script src="../admin/veek-auth.js"></script>
+<script>
+// App instalada en el celular: si este equipo ya tiene una sesión vigente, se entra directo.
+if (window.VeekAuth && VeekAuth.tieneSesion()) {
+  sessionStorage.setItem("admin", "true");
+  try { const rol = localStorage.getItem("veekRolReportes"); if (rol) sessionStorage.setItem("rol", rol); } catch (e) {}
+  location.replace("index.html");
+}
+</script>
 
 <style>
 
@@ -275,17 +284,24 @@ document.getElementById("loginForm").addEventListener("submit", async function(e
 
   try{
 
-    const r = await fetch(
-      `${API_URL}?action=login&usuario=${encodeURIComponent(usuario)}&password=${encodeURIComponent(password)}`
-    );
+    // Por POST (la contraseña no viaja en la URL). dispositivo=1: la app
+    // del celular queda con sesión por 30 días.
+    const r = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action: "login", usuario, password, dispositivo: "1" })
+    });
 
     const data = await r.json();
 
     if(data.success){
+      VeekAuth.guardarSesion(data, true);
       sessionStorage.setItem("admin", "true");
+      sessionStorage.setItem("rol", data.rol || "admin");
+      try { localStorage.setItem("veekRolReportes", data.rol || "admin"); } catch (e) {}
       window.location.href = "index.html";
     }else{
-      mostrarErrorLogin("Usuario o contraseña incorrectos.");
+      mostrarErrorLogin(data.bloqueado ? (data.message || "Demasiados intentos. Esperá 15 minutos.") : "Usuario o contraseña incorrectos.");
       btn.disabled = false;
       btn.classList.remove("loading");
     }

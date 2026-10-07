@@ -16,7 +16,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <!-- Chart.js, para los gráficos de Productos y de Compras -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<script>if(sessionStorage.getItem("admin")!=="true"){document.documentElement.style.display="none";location.replace("login.html");}</script>
+<script src="../admin/veek-auth.js"></script>
+<script>VeekAuth.configurar({ urlLogin: "login.html" });
+if(sessionStorage.getItem("admin")!=="true" || !VeekAuth.tieneSesion()){document.documentElement.style.display="none";location.replace("login.html");}</script>
 <script>window.CONFIG_BASE = "../";</script>
 <script src="../config.js"></script>
 
@@ -122,7 +124,7 @@ details[open] .rc-summary-caret{ transform:rotate(90deg); }
     <div class="mark">📊</div>
     <div class="label">
       <strong>Reportes</strong>
-      <small id="topbarNombreNegocio">JIREH MAYORISTA</small>
+      <small id="topbarNombreNegocio"></small>
     </div>
   </div>
   <button class="btn-salir" onclick="cerrarSesion()">Salir</button>

@@ -1,0 +1,9 @@
+Copias locales de librerías de código abierto (para que el panel funcione sin internet):
+- Bootstrap 5.3.3 (MIT) — https://getbootstrap.com
+- JsBarcode 3.11.6 (MIT) — https://github.com/lindell/JsBarcode
+- QRCode.js 1.0.0 (MIT) — https://github.com/davidshimjs/qrcodejs
+- @zxing/library 0.20.0 (Apache-2.0) — https://github.com/zxing-js/library
+- jsPDF 2.5.1 (MIT) — https://github.com/parallax/jsPDF
+- jsPDF-AutoTable 5.0.2 (MIT) — https://github.com/simonbengtsson/jsPDF-AutoTable
+- Chart.js 4.4.1 (MIT) — https://www.chartjs.org
+- Inter y JetBrains Mono (SIL Open Font License 1.1) — vía Fontsource

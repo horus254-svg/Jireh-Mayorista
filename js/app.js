@@ -136,7 +136,8 @@ const estado = {
 // Número de WhatsApp usado por el botón flotante y por el checkout.
 // Se sobreescribe con el valor de Sheets en aplicarApariencia(); este
 // es solo el valor por defecto mientras carga o si falla la conexión.
-let whatsappNumero = "5491140975795";
+// (El respaldo sale de config.json → "whatsapp", el archivo del cliente.)
+let whatsappNumero = "";
 
 // Promesa de la carga de configuración (se asigna más abajo, al llamar
 // aplicarApariencia()). checkoutWhatsapp() la espera antes de armar el
@@ -1978,7 +1979,9 @@ Subtotal: $${formatearPrecio(subtotal)}
         desactivarCargaCheckout();
 
         setTimeout(()=>{
-            window.location.href = `https://api.whatsapp.com/send?phone=${whatsappNumero}&text=${encodeURIComponent(mensaje)}`;
+            const numeroDestino = whatsappNumero ||
+                String((typeof CONFIG_NEGOCIO_RESPALDO !== "undefined" && CONFIG_NEGOCIO_RESPALDO.WHATSAPP_NUMERO) || "");
+            window.location.href = `https://api.whatsapp.com/send?phone=${numeroDestino}&text=${encodeURIComponent(mensaje)}`;
         }, 300);
 
     }catch(error){
@@ -2192,7 +2195,8 @@ function configurarChipBeneficio(wrapId, visible){
 function aplicarBeneficios(cfg){
 
     // --- WhatsApp: actualiza el botón flotante y la variable de checkout ---
-    const numeroWa = limpiarTelefonoParaLink(cfg.beneficioWhatsappNumero) || whatsappNumero;
+    const numeroWa = limpiarTelefonoParaLink(cfg.beneficioWhatsappNumero) || whatsappNumero ||
+        String((typeof CONFIG_NEGOCIO_RESPALDO !== "undefined" && CONFIG_NEGOCIO_RESPALDO.WHATSAPP_NUMERO) || "");
     whatsappNumero = numeroWa;
 
     const btnFlotanteWa = document.getElementById("whatsapp-float-btn");

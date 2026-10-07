@@ -4,7 +4,7 @@
    Responsive: desktop sidebar + mobile bottom-nav
 =================================================================== */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap');
+@import url('vendor/fonts/fonts.css'); /* fuentes locales: se ven igual sin internet */
 
 :root{
   --navy-950: #070d1f;

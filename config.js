@@ -71,6 +71,17 @@ async function resolverApiUrlBase(){
       const cfg = await res.json();
       if(cfg.apiUrl) API_URL_BASE = cfg.apiUrl;
       if(cfg.apiUrlLectura) API_URL_LECTURA_BASE = cfg.apiUrlLectura;
+      // config.json es el archivo de datos del cliente: sus valores pasan
+      // a ser el respaldo si Sheets no responde (nombre, WhatsApp, URL...).
+      if(cfg.empresa){ CONFIG_NEGOCIO_RESPALDO.NOMBRE_NEGOCIO = cfg.empresa; CONFIG_NEGOCIO_RESPALDO.SEO_TITULO = cfg.empresa; }
+      if(cfg.nombreCorto) CONFIG_NEGOCIO_RESPALDO.NOMBRE_CORTO = cfg.nombreCorto;
+      if(cfg.descripcion) CONFIG_NEGOCIO_RESPALDO.SEO_DESCRIPCION = cfg.descripcion;
+      if(cfg.whatsapp) CONFIG_NEGOCIO_RESPALDO.WHATSAPP_NUMERO = String(cfg.whatsapp).replace(/[^\d]/g, "");
+      if(cfg.sitioUrl) CONFIG_NEGOCIO_RESPALDO.URL_SITIO = normalizarUrlConBarraFinal(cfg.sitioUrl);
+      CONFIG_NEGOCIO = { ...CONFIG_NEGOCIO_RESPALDO, ...CONFIG_NEGOCIO, NOMBRE_NEGOCIO: CONFIG_NEGOCIO_RESPALDO.NOMBRE_NEGOCIO,
+        NOMBRE_CORTO: CONFIG_NEGOCIO_RESPALDO.NOMBRE_CORTO, WHATSAPP_NUMERO: CONFIG_NEGOCIO_RESPALDO.WHATSAPP_NUMERO,
+        URL_SITIO: CONFIG_NEGOCIO_RESPALDO.URL_SITIO, SEO_TITULO: CONFIG_NEGOCIO_RESPALDO.SEO_TITULO,
+        SEO_DESCRIPCION: CONFIG_NEGOCIO_RESPALDO.SEO_DESCRIPCION };
     }
   }catch(error){
     console.error("No se pudo leer config.json para obtener la API URL:", error);

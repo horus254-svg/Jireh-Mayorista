@@ -1,10 +1,22 @@
 {
+  "_LEEME": "ÚNICO archivo con los datos de este cliente. Editalo y subilo: el resto del sitio se adapta solo (lo aplica scripts/aplicar-cliente.js, que GitHub Actions corre en cada cambio). Nombre visible, colores, banner, teléfonos y textos del catálogo se cambian desde el panel → Configuración.",
+
   "empresa": "Jireh Mayorista",
+  "nombreCorto": "Jireh",
+  "descripcion": "Catálogo mayorista de juguetes y artículos al por mayor con envíos a todo el país.",
+
+  "sitioUrl": "https://horus254-svg.github.io/Jireh-Mayorista/",
   "apiUrl": "https://script.google.com/macros/s/AKfycbw1eY_mXImG503rU0Cqddx1WBuGIOhxaW_SXGoIMsug_CjsSC-HLsb2XzYwrovaGBU/exec",
-  "moneda": "ARS",
-  "whatsapp": "",
+  "apiUrlLectura": "https://veek-api.veek254.workers.dev/",
+
+  "whatsapp": "5491140975795",
   "direccion": "",
-  "version": "1.0",
-  "generadoEn": "2026-07-09",
-  "apiUrlLectura": "https://veek-api.veek254.workers.dev/"
+  "moneda": "ARS",
+  "pais": "Argentina",
+  "colorTema": "#241536",
+
+  "googleVerificacion": "google1a690aa2baf89ec2.html",
+
+  "version": "1.1",
+  "generadoEn": "2026-10-07"
 }

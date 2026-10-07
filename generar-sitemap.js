@@ -25,7 +25,7 @@
  *   API_URL   -> la URL del backend (la misma que usa config.js / CONFIG_NEGOCIO.API_URL)
  *
  * Ejemplo:
- *   BASE_URL="https://horus254-svg.github.io/Jireh-Mayorista/" API_URL="https://script.google.com/macros/s/XXXX/exec" node generar-sitemap.js
+ *   node generar-sitemap.js   (toma sitioUrl y apiUrl de config.json)
  *
  * Requiere Node 18+ (trae fetch nativo). Pensado para correrse a mano antes
  * de cada deploy, o automático con GitHub Actions (ver workflow sugerido
@@ -34,8 +34,13 @@
 
 const fs = require("fs");
 
-const BASE_URL = (process.env.BASE_URL || "https://horus254-svg.github.io/Jireh-Mayorista/").trim();
-const API_URL = (process.env.API_URL || "").trim();
+// Datos del cliente: config.json (sitioUrl / apiUrl). Las variables de
+// entorno, si están, tienen prioridad.
+let CLIENTE = {};
+try { CLIENTE = JSON.parse(fs.readFileSync(require("path").join(__dirname, "config.json"), "utf8")); } catch (e) {}
+
+const BASE_URL = String(process.env.BASE_URL || CLIENTE.sitioUrl || "").trim().replace(/\/*$/, "/");
+const API_URL = String(process.env.API_URL || CLIENTE.apiUrlLectura || CLIENTE.apiUrl || "").trim();
 
 function generarSlug(texto) {
   return String(texto || "")
@@ -53,6 +58,10 @@ function escapeXml(str) {
 }
 
 async function main() {
+  if (BASE_URL === "/") {
+    console.error("Falta sitioUrl en config.json (o la variable BASE_URL).");
+    process.exit(1);
+  }
   if (!API_URL) {
     console.error("Falta API_URL. Pasala como variable de entorno, ej:\n  API_URL=\"https://script.google.com/macros/s/XXXX/exec\" node generar-sitemap.js");
     process.exit(1);

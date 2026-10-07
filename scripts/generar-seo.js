@@ -33,7 +33,8 @@
  *
  * Variables de entorno esperadas:
  *   SITE_URL   → ej: https://tuusuario.github.io/tu-repo   (sin / al final)
- *   API_URL    → si no se pasa, se intenta leer de config.js
+ *   API_URL    → si no se pasa, se lee de config.json (apiUrlLectura o apiUrl)
+ *   (SITE_URL también se lee de config.json → sitioUrl)
  * =================================================================
  */
 
@@ -46,24 +47,20 @@ const ROOT = path.resolve(__dirname, "..");
 // 1) Resolver SITE_URL y API_URL
 // ---------------------------------------------------------------
 
-let SITE_URL = process.env.SITE_URL || "";
-let API_URL = process.env.API_URL || "";
+// Datos del cliente: config.json (el único archivo editable por cliente).
+// Las variables de entorno, si están, tienen prioridad.
+let CLIENTE = {};
+try { CLIENTE = JSON.parse(fs.readFileSync(path.join(ROOT, "config.json"), "utf8")); } catch (e) {}
 
-if (!API_URL) {
-    const configPath = path.join(ROOT, "config.js");
-    if (fs.existsSync(configPath)) {
-        const contenido = fs.readFileSync(configPath, "utf8");
-        const match = contenido.match(/API_URL\s*:\s*["'`]([^"'`]+)["'`]/);
-        if (match) API_URL = match[1];
-    }
-}
+let SITE_URL = process.env.SITE_URL || CLIENTE.sitioUrl || "";
+let API_URL = process.env.API_URL || CLIENTE.apiUrlLectura || CLIENTE.apiUrl || "";
 
 if (!SITE_URL) {
-    console.error("❌ Falta la variable de entorno SITE_URL (ej: https://tuusuario.github.io/tu-repo). Abortando.");
+    console.error("❌ Falta sitioUrl en config.json (o la variable SITE_URL). Abortando.");
     process.exit(1);
 }
 if (!API_URL) {
-    console.error("❌ No se encontró API_URL (ni en env ni en config.js). Abortando.");
+    console.error("❌ Falta apiUrl en config.json (o la variable API_URL). Abortando.");
     process.exit(1);
 }
 

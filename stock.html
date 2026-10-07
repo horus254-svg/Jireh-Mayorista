@@ -10,6 +10,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="config.js"></script>
+<script src="admin/veek-auth.js"></script>
+<script>VeekAuth.configurar({ tipo: "stock", urlLogin: "stock.html" });</script>
 
 <style>
 
@@ -462,8 +464,11 @@ main{
 
 <script>
 
-const API_URL = CONFIG_NEGOCIO.API_URL;
-cargarConfigNegocio().then(() => {
+// La URL del backend llega de config.json de forma asíncrona: antes se
+// leía acá mismo (todavía vacía) y las llamadas salían sin dirección.
+let API_URL = CONFIG_NEGOCIO.API_URL || "";
+const configLista = cargarConfigNegocio().then(() => {
+  API_URL = CONFIG_NEGOCIO.API_URL || API_URL;
   document.title = "Gestión de Stock · " + CONFIG_NEGOCIO.NOMBRE_NEGOCIO;
 });
 
@@ -473,7 +478,7 @@ let guardadoPendiente = {}; // codigo -> timeoutId, para debounce por tarjeta
 /* ---------- login (contraseña propia, distinta de la del panel admin) ---------- */
 
 function verificarSesion(){
-    if(sessionStorage.getItem("stock_auth") === "true"){
+    if(sessionStorage.getItem("stock_auth") === "true" && VeekAuth.tieneSesion()){
         mostrarContenidoPrincipal();
     }else{
         document.getElementById("loginPassword").focus();
@@ -501,10 +506,11 @@ async function intentarLogin(){
         const data = await r.json();
 
         if(data.success){
+            VeekAuth.guardarSesion(data, false);
             sessionStorage.setItem("stock_auth", "true");
             mostrarContenidoPrincipal();
         }else{
-            errorEl.textContent = "Contraseña incorrecta.";
+            errorEl.textContent = data.bloqueado ? (data.message || "Demasiados intentos.") : "Contraseña incorrecta.";
         }
     }catch(error){
         console.error(error);
@@ -553,6 +559,11 @@ function mostrarToast(mensaje, tipo){
 // Reintentos simples con timeout — conexiones de depósito/celular
 // suelen ser más inestables que las de una PC de local.
 async function fetchConTimeout(url, timeoutMs){
+    // Si la llamada se armó antes de tener la URL del backend ("?action=..."), se completa ahora.
+    if(String(url).charAt(0) === "?"){
+        await configLista.catch(() => {});
+        url = API_URL + url;
+    }
     const controlador = new AbortController();
     const timer = setTimeout(() => controlador.abort(), timeoutMs || 12000);
     try{

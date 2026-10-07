@@ -18,7 +18,7 @@
  * NUNCA se cachean — los reportes siempre se piden en vivo.
  */
 
-const CACHE_NAME = "reportes-jireh-v3"; // v3: Reportes unificado (ventas, productos, compras)
+const CACHE_NAME = "reportes-veek-v4"; // v4: sesión con token (VeekAuth)
 
 const ARCHIVOS_A_CACHEAR = [
   "login.html",

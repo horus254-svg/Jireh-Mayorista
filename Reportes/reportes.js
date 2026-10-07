@@ -11,13 +11,15 @@
 let API_URL = "";
 
 /* ---- Sesión: requiere haber pasado por login.html ---- */
-if (sessionStorage.getItem("admin") !== "true") {
+if (sessionStorage.getItem("admin") !== "true" || (window.VeekAuth && !VeekAuth.tieneSesion())) {
   window.location.replace("login.html");
   throw new Error("Sin sesión: redirigiendo a login.html");
 }
 
 function cerrarSesion() {
   sessionStorage.removeItem("admin");
+  try { localStorage.removeItem("veekRolReportes"); } catch (e) {}
+  if (window.VeekAuth) VeekAuth.cerrarSesion();
   window.location.href = "login.html";
 }
 
