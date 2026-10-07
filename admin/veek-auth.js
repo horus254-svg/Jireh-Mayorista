@@ -162,8 +162,10 @@
         "font:500 14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif";
       div.innerHTML =
         '<span style="font-size:20px" aria-hidden="true">🔒</span>' +
-        '<span style="flex:1">Tu sesión venció. Lo que hagas en el POS se sigue guardando; ' +
-        'para enviar cambios al servidor, volvé a iniciar sesión.</span>' +
+        '<span style="flex:1">' + (ss("veekEntroSinServidor") === "1"
+          ? 'Entraste sin poder validar con el servidor (no había conexión o tardó demasiado). Lo que hagas en el POS se guarda; ' +
+            'cuando tengas internet, volvé a iniciar sesión para subirlo.'
+          : 'Tu sesión venció. Lo que hagas en el POS se sigue guardando; para enviar cambios al servidor, volvé a iniciar sesión.') + '</span>' +
         '<button type="button" id="veekAvisoSesionBtn" style="background:#fff;color:#111;border:0;border-radius:8px;' +
         'padding:8px 12px;font-weight:700;cursor:pointer;white-space:nowrap">Iniciar sesión</button>' +
         '<button type="button" id="veekAvisoSesionX" aria-label="Cerrar aviso" style="background:transparent;color:#fff;' +

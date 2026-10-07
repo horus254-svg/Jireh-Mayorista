@@ -533,27 +533,40 @@ document.getElementById("loginForm").addEventListener("submit", async function(e
 
   try{
 
-    // Timeout explícito — sin esto, un Apps Script lento podía dejar
-    // este fetch colgado mucho más de lo razonable antes de si quiera
-    // intentar el login offline de respaldo (ver más abajo, en el
-    // catch). 12s es generoso para una red normal, pero corta a
-    // tiempo cuando el backend está con problemas.
-    const controlador = new AbortController();
-    const timeoutId = setTimeout(() => controlador.abort(), 12000);
+    // Login contra el backend. Apps Script puede tardar bastante en la
+    // primera llamada después de publicar una versión nueva (o tras un
+    // rato sin uso): antes se cortaba a los 12s y la app entraba en modo
+    // offline SIN sesión del servidor (y después no podía subir nada).
+    // Ahora: hasta 30s, y si hay red, un segundo intento antes de rendirse.
+    const cuerpoLogin = JSON.stringify({ action: "login", usuario, password, dispositivo: (window.posOffline || window.veekpos) ? "1" : "" });
+    const intentarLoginOnline = async (ms) => {
+      const controlador = new AbortController();
+      const timeoutId = setTimeout(() => controlador.abort(), ms);
+      try{
+        // Por POST: usuario y contraseña nunca viajan en la URL.
+        return await fetch(API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: cuerpoLogin,
+          signal: controlador.signal
+        });
+      }finally{
+        clearTimeout(timeoutId);
+      }
+    };
 
-    // Por POST: usuario y contraseña nunca viajan en la URL (que queda
-    // guardada en historiales y registros).
-    const r = await fetch(API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ action: "login", usuario, password, dispositivo: (window.posOffline || window.veekpos) ? "1" : "" }),
-      signal: controlador.signal
-    });
-    clearTimeout(timeoutId);
+    let r;
+    try{
+      r = await intentarLoginOnline(30000);
+    }catch(primerError){
+      if(navigator.onLine === false) throw primerError;
+      r = await intentarLoginOnline(30000);
+    }
 
     const data = await r.json();
 
     if(data.success){
+      sessionStorage.removeItem("veekEntroSinServidor");
       if(window.VeekAuth) VeekAuth.guardarSesion(data, !!(window.posOffline || window.veekpos));
       if(data.debeCambiarPassword) sessionStorage.setItem("debeCambiarPassword", "1");
       else sessionStorage.removeItem("debeCambiarPassword");
@@ -577,6 +590,9 @@ document.getElementById("loginForm").addEventListener("submit", async function(e
     // el último login que sí validó bien estando online.
     const cache = await intentarLoginOffline(usuario, password);
     if(cache){
+      // Entró sin validar con el servidor: el aviso del panel lo explica así
+      // (y no como "sesión vencida").
+      sessionStorage.setItem("veekEntroSinServidor", "1");
       sessionStorage.setItem("admin", "true");
       sessionStorage.setItem("rol", cache.rol || "admin");
       sessionStorage.setItem("nombreUsuario", cache.nombre || "");
