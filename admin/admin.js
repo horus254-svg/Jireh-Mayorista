@@ -4702,7 +4702,9 @@ async function subirImagenProductoRecortada(blob, inputEl, destino) {
 
     const urlInput = document.getElementById(destino.urlInputId);
     if (urlInput) urlInput.value = data.url;
-    if (statusEl) { statusEl.className = "pm-image-status success"; statusEl.textContent = `✓ Imagen subida (${pesoFinalKB}KB)`; }
+    // Ojo: esto solo confirma que la foto quedó en Drive. El producto
+    // recién la usa cuando se toca "Guardar" — se aclara en el mensaje.
+    if (statusEl) { statusEl.className = "pm-image-status success"; statusEl.textContent = `✓ Imagen subida (${pesoFinalKB}KB) — tocá Guardar para aplicarla al producto`; }
 
   } catch (error) {
     console.error("Error al subir imagen de producto:", error);
