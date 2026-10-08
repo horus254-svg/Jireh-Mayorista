@@ -120,15 +120,36 @@ function normalizarUrlConBarraFinal(url){
 // las siguientes reciben la misma Promise ya en vuelo (o resuelta).
 let _configuracionNegocioPromise = null;
 
+/* "inicio": productos + configuración en UN solo pedido al Worker (la mitad
+   de pedidos por visita — el plan gratis de Cloudflare cuenta pedidos).
+   Solo lo usa la página del catálogo (app.js pone VEEK_PEDIR_INICIO = true):
+   las demás páginas no necesitan bajar todos los productos. Si no hay Worker,
+   o es una versión vieja sin "inicio", devuelve null y todo sigue como antes. */
+let _inicioCatalogoPromise = null;
+function obtenerInicioCatalogo(){
+  if(typeof window === "undefined" || !window.VEEK_PEDIR_INICIO || !API_URL_LECTURA_BASE) return Promise.resolve(null);
+  if(!_inicioCatalogoPromise){
+    _inicioCatalogoPromise = fetch(API_URL_LECTURA_BASE + "?action=inicio")
+      .then(res => res.ok ? res.json() : null)
+      .then(d => (d && d.success && d.productos && d.configuracionNegocio) ? d : null)
+      .catch(() => null);
+  }
+  return _inicioCatalogoPromise;
+}
+
 async function obtenerConfiguracionNegocioCruda(apiUrl){
   if(!_configuracionNegocioPromise){
     const lectura = API_URL_LECTURA_BASE || apiUrl;
-    _configuracionNegocioPromise = fetch(lectura + "?action=configuracionNegocio")
+    _configuracionNegocioPromise = obtenerInicioCatalogo()
+      .then(ini => {
+        if(ini) return ini.configuracionNegocio;
+        return fetch(lectura + "?action=configuracionNegocio")
       .then(res => { if(!res.ok) throw new Error("HTTP " + res.status); return res.json(); })
       .catch(err => {
         // Si el Worker falla, se reintenta directo contra Apps Script.
         if(lectura === apiUrl) throw err;
         return fetch(apiUrl + "?action=configuracionNegocio").then(res => res.json());
+      });
       })
       .catch(err => {
         // No dejar una promesa fallida cacheada para siempre: el próximo

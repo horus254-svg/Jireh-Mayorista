@@ -75,6 +75,10 @@ async function fetchAPI(url, opciones = {}, config = {}) {
   throw ultimoError;
 }
 
+// Esta página sí necesita productos + configuración: se piden juntos al
+// Worker en un solo pedido (ver obtenerInicioCatalogo en config.js).
+if (typeof window !== "undefined") window.VEEK_PEDIR_INICIO = true;
+
 async function cargarConfigCliente() {
   if (typeof cargarConfigNegocio === "function") {
     await cargarConfigNegocio(); // de config.js — resuelve config.json y trae el resto de Sheets
@@ -297,8 +301,13 @@ async function cargarProductos(){
 
         // Apps Script en frío puede tardar más de 10 s; cortar antes solo
         // descartaba una respuesta que estaba por llegar. 30 s y 1 reintento.
-        const res = await fetchAPI(API_URL_LECTURA + "?action=productos", {}, { timeoutMs: 30000, reintentos: 2 });
-        const data = await res.json();
+        // Primero, lo que ya trajo el pedido combinado "inicio" (si hay Worker).
+        const inicio = typeof obtenerInicioCatalogo === "function" ? await obtenerInicioCatalogo() : null;
+        let data = inicio && inicio.productos && Array.isArray(inicio.productos.productos) ? inicio.productos : null;
+        if(!data){
+            const res = await fetchAPI(API_URL_LECTURA + "?action=productos", {}, { timeoutMs: 30000, reintentos: 2 });
+            data = await res.json();
+        }
 
         if(!data || data.success === false || !Array.isArray(data.productos)){
             throw new Error("Respuesta inválida del catálogo");
