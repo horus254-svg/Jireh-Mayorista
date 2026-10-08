@@ -287,6 +287,20 @@ async function iniciar(){
   // Instalación nueva: recién ahora mostramos el formulario.
   overlay.style.display = "none";
   contenido.style.display = "block";
+
+  // Si quedó un config.json de una instalación vieja, se usa solo para
+  // completar la URL (después queda guardada en la base local de esta PC
+  // y ya no hace falta ese archivo, ni copiarlo al reinstalar).
+  for(const ruta of ["../config.json", "config.json"]){
+    try{
+      const r = await fetch(ruta + "?_=" + Date.now(), { cache: "no-store" });
+      if(!r.ok) continue;
+      const cfg = await r.json();
+      const campo = document.getElementById("apiUrl");
+      if(cfg && cfg.apiUrl && campo && !campo.value) campo.value = cfg.apiUrl;
+      break;
+    }catch(e){ /* no hay config.json: es lo normal */ }
+  }
 }
 
 iniciar();

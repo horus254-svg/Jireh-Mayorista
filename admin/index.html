@@ -2972,7 +2972,7 @@
       <div class="row g-2">
         <div class="col-6">
           <label class="form-label">Código <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
-          <input type="text" class="form-control" id="pmCodigo" placeholder="Se genera automático si lo dejás vacío">
+          <input type="text" class="form-control" id="pmCodigo" placeholder="Se genera automático si lo dejás vacío" onchange="avisarCodigoDuplicadoFormulario()">
         </div>
         <div class="col-6">
           <label class="form-label">Categoría</label>
@@ -3036,7 +3036,7 @@
         <div id="pmCajaWrap" class="row g-2 mt-1" style="display:none;">
           <div class="col-12">
             <label class="form-label">Código de barras de la caja</label>
-            <input type="text" class="form-control form-control-sm" id="pmCodigoCaja" placeholder="Distinto del código del producto suelto">
+            <input type="text" class="form-control form-control-sm" id="pmCodigoCaja" placeholder="Distinto del código del producto suelto" onchange="avisarCodigoDuplicadoFormulario()">
           </div>
           <div class="col-6">
             <label class="form-label">Unidades por caja</label>

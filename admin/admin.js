@@ -5261,6 +5261,77 @@ function poblarCategoriasDatalist() {
 }
 
 /** Saves the product form — creates a new product or updates an existing one */
+/* ===================== CÓDIGOS ÚNICOS DE PRODUCTO =====================
+   Mismas reglas que el backend (conflictoCodigoProducto en code.gs): un
+   código —de producto o de caja— identifica a UN solo producto; se compara
+   sin espacios y sin distinguir mayúsculas. Esto avisa al instante (y sin
+   internet en la app de escritorio); el backend lo vuelve a validar igual. */
+
+function normalizarCodigoProducto(c) {
+  return String(c === undefined || c === null ? "" : c).trim().toUpperCase();
+}
+
+/**
+ * Devuelve el mensaje de error si `codigo` o `codigoCaja` ya los usa OTRO
+ * producto, o null si están libres. `codigoOriginal` = producto que se
+ * está editando (vacío si es nuevo). Solo se revisa lo que cambió, igual
+ * que el backend. `listaExtra`: productos de otra fuente (caché local).
+ */
+function conflictoCodigoProductoLocal(codigo, codigoCaja, codigoOriginal, listaExtra) {
+  const listas = [
+    typeof productosAdminGlobal !== "undefined" ? productosAdminGlobal : [],
+    typeof productosPOS !== "undefined" ? productosPOS : [],
+    listaExtra || []
+  ];
+  const propio = normalizarCodigoProducto(codigoOriginal);
+  const otros = new Map();
+  let actual = null;
+  listas.forEach(lista => (lista || []).forEach(p => {
+    const c = normalizarCodigoProducto(p && p.CODIGO);
+    if (!c) return;
+    if (propio && c === propio) { if (!actual) actual = p; return; }
+    if (!otros.has(c)) otros.set(c, p);
+  }));
+
+  const n = normalizarCodigoProducto(codigo);
+  const nCaja = normalizarCodigoProducto(codigoCaja);
+  const revisar = (valor, esCaja) => {
+    const v = normalizarCodigoProducto(valor);
+    for (const p of otros.values()) {
+      const nombre = p.PRODUCTO ? `"${p.PRODUCTO}"` : "otro producto";
+      if (normalizarCodigoProducto(p.CODIGO) === v) return `${esCaja ? "El código de caja" : "El código"} "${String(valor).trim()}" ya pertenece a ${nombre}.`;
+      if (normalizarCodigoProducto(p.CODIGO_CAJA) === v) return `${esCaja ? "El código de caja" : "El código"} "${String(valor).trim()}" ya es el código de caja de ${nombre}.`;
+    }
+    return null;
+  };
+
+  if (n && n !== propio) { const m = revisar(codigo, false); if (m) return m; }
+  const cajaActual = normalizarCodigoProducto(actual && actual.CODIGO_CAJA);
+  if (nCaja && nCaja !== cajaActual) { const m = revisar(codigoCaja, true); if (m) return m; }
+  if (nCaja && nCaja === (n || propio)) return "El código de caja tiene que ser distinto del código del producto.";
+  return null;
+}
+window.conflictoCodigoProductoLocal = conflictoCodigoProductoLocal;
+
+/** Aviso al salir del campo código / código de caja del formulario de producto. */
+function avisarCodigoDuplicadoFormulario() {
+  const campoCodigo = document.getElementById("pmCodigo");
+  const campoCaja = document.getElementById("pmCodigoCaja");
+  const ventaPorCaja = document.getElementById("pmVentaPorCaja");
+  const msg = conflictoCodigoProductoLocal(
+    campoCodigo ? campoCodigo.value : "",
+    ventaPorCaja && ventaPorCaja.checked && campoCaja ? campoCaja.value : "",
+    (document.getElementById("pmCodigoOriginal") || {}).value || ""
+  );
+  [campoCodigo, campoCaja].forEach(c => c && c.classList.remove("is-invalid"));
+  if (msg) {
+    toast(msg, "error");
+    const culpable = /de caja/.test(msg.split(" ya ")[0]) || /distinto/.test(msg) ? campoCaja : campoCodigo;
+    if (culpable) culpable.classList.add("is-invalid");
+  }
+  return msg;
+}
+
 async function guardarProductoForm() {
   const codigoOriginal = document.getElementById("pmCodigoOriginal").value.trim();
   const codigo   = document.getElementById("pmCodigo").value.trim();
@@ -5287,6 +5358,9 @@ async function guardarProductoForm() {
     toast("Completá código, unidades y precio de la caja (o desactivá la venta por caja)", "error");
     return;
   }
+
+  // Códigos únicos (aviso inmediato; el backend lo vuelve a validar)
+  if (avisarCodigoDuplicadoFormulario()) return;
 
   const esEdicion = !!codigoOriginal;
   const btn = document.getElementById("btnGuardarProducto");
@@ -6929,8 +7003,9 @@ async function guardarEdicionRapidaPOS() {
   // Si cambiaron el código, chequeo local rápido para avisar antes de
   // mandarlo — el backend igual lo vuelve a validar (por si otra
   // persona creó ese código justo en el medio).
-  if (codigoNuevo !== codigoOriginal && productosPOS.some(p => String(p.CODIGO).trim() === codigoNuevo)) {
-    toast(`Ya existe otro producto con el código "${codigoNuevo}"`, "error");
+  const conflictoErp = conflictoCodigoProductoLocal(codigoNuevo, "", codigoOriginal);
+  if (conflictoErp) {
+    toast(conflictoErp, "error");
     return;
   }
 

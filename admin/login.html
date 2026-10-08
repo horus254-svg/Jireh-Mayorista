@@ -274,9 +274,30 @@ body{
 // contra el backend de otro cliente por error.
 let API_URL = "";
 
+// Puente con la app de escritorio. window.veekpos lo expone preload.js
+// ANTES de que cargue esta página; window.posOffline (el alias que arma
+// pos-offline.js) recién aparece un rato después. Antes se miraba solo
+// posOffline: al abrir el login todavía no existía, la página se creía
+// "navegador" y buscaba config.json en la carpeta de instalación — que
+// se borra en cada reinstalación de la app.
+function puenteEscritorio(){
+  return window.posOffline || window.veekpos || null;
+}
+
+async function leerApiUrlEscritorio(puente){
+  try{
+    if(typeof puente.obtenerApiUrl === "function") return (await puente.obtenerApiUrl()) || "";
+    if(typeof puente.obtenerConfigLocal === "function") return (await puente.obtenerConfigLocal("api_url", "")) || "";
+  }catch(e){
+    console.error("No se pudo leer la URL guardada en esta PC:", e);
+  }
+  return "";
+}
+
 async function resolverApiUrl(){
-  if(window.posOffline && typeof window.posOffline.obtenerApiUrl === "function"){
-    const guardada = await window.posOffline.obtenerApiUrl();
+  const puente = puenteEscritorio();
+  if(puente){
+    const guardada = await leerApiUrlEscritorio(puente);
     if(guardada){
       API_URL = guardada;
       return;
@@ -347,11 +368,11 @@ function aplicarMarcaAlDom(config){
  * HTML, así que nunca se queda en blanco por esto.
  */
 async function aplicarMarcaDesdeBackend(){
-  const enElectron = window.posOffline && typeof window.posOffline.obtenerConfigNegocioCache === "function";
+  const enElectron = !!puenteEscritorio() && typeof puenteEscritorio().obtenerConfigNegocioCache === "function";
 
   if(enElectron){
     try{
-      const cacheado = await window.posOffline.obtenerConfigNegocioCache();
+      const cacheado = await puenteEscritorio().obtenerConfigNegocioCache();
       if(cacheado) aplicarMarcaAlDom(cacheado);
     }catch(error){
       console.error("No se pudo leer la marca cacheada:", error);
@@ -366,7 +387,7 @@ async function aplicarMarcaDesdeBackend(){
     aplicarMarcaAlDom(data.config);
 
     if(enElectron){
-      try{ await window.posOffline.guardarConfigNegocioCache(data.config); }
+      try{ await puenteEscritorio().guardarConfigNegocioCache(data.config); }
       catch(error){ console.error("No se pudo guardar la marca en caché:", error); }
     }
 
@@ -431,10 +452,10 @@ async function coincideHashCredencial(usuario, password, guardado){
 }
 
 async function guardarLoginOfflineCache(usuario, password, data){
-  if(!window.posOffline) return; // solo tiene sentido en la app de escritorio
+  if(!puenteEscritorio()) return; // solo tiene sentido en la app de escritorio
   try{
     const hash = await hashCredencial(usuario, password);
-    await window.posOffline.fijarConfigLocal("login_offline_" + usuario.toLowerCase(), JSON.stringify({
+    await puenteEscritorio().fijarConfigLocal("login_offline_" + usuario.toLowerCase(), JSON.stringify({
       hash,
       rol: data.rol || "admin",
       nombre: data.nombre || "",
@@ -448,9 +469,9 @@ async function guardarLoginOfflineCache(usuario, password, data){
 
 /** Devuelve los datos de sesión si usuario/contraseña coinciden con el último login válido guardado, o null. */
 async function intentarLoginOffline(usuario, password){
-  if(!window.posOffline) return null;
+  if(!puenteEscritorio()) return null;
   try{
-    const guardado = await window.posOffline.obtenerConfigLocal("login_offline_" + usuario.toLowerCase(), null);
+    const guardado = await puenteEscritorio().obtenerConfigLocal("login_offline_" + usuario.toLowerCase(), null);
     if(!guardado) return null;
     const cache = JSON.parse(guardado);
     if(!(await coincideHashCredencial(usuario, password, cache.hash))) return null;
@@ -489,7 +510,7 @@ document.getElementById("loginForm").addEventListener("submit", async function(e
   // SQLite tras el ultimo login online exitoso) para entrar al instante.
   // Si no coincide (contrasena cambiada, usuario nuevo, cache vencida),
   // sigue el camino normal contra Apps Script, que ademas refresca el hash.
-  if(window.posOffline){
+  if(puenteEscritorio()){
     const u = document.getElementById("usuario").value.trim();
     const p = document.getElementById("password").value;
     if(u && p){
@@ -602,7 +623,7 @@ document.getElementById("loginForm").addEventListener("submit", async function(e
     }
 
     mostrarErrorLogin(
-      window.posOffline
+      puenteEscritorio()
         ? "No se pudo conectar y no hay un ingreso offline guardado para este usuario. Conectate a internet al menos una vez con este usuario y contraseña para habilitar el acceso sin conexión."
         : "No se pudo conectar. Revisá tu conexión e intentá de nuevo."
     );
