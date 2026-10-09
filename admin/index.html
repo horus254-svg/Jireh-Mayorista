@@ -5,7 +5,22 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>VeekPOS · Punto de Venta</title>
 <link href="vendor/bootstrap.min.css" rel="stylesheet">
+<script>
+/* Estilo del panel elegido en ESTA computadora (Configuración → General).
+   Se aplica antes de pintar para que no se vea un instante el estilo clásico. */
+(function(){
+  try{
+    var e = localStorage.getItem("veekEstiloPanel") || "clasico";
+    var oscuros = { turno:1, pizarron:1, degrade:1 };
+    var r = document.documentElement;
+    r.setAttribute("data-estilo", e);
+    if(oscuros[e]){ r.setAttribute("data-oscuro", ""); r.setAttribute("data-bs-theme", "dark"); }
+  }catch(err){}
+})();
+</script>
 <link rel="stylesheet" href="admin.css?v=9">
+<link rel="stylesheet" href="estilos/capa-oscura.css">
+<link rel="stylesheet" href="estilos/estilos.css">
 </head>
 <!-- ===== POPUP PROMOCIONAL ===== -->
 <div id="popupPromo" style="
@@ -1883,6 +1898,12 @@
     <!-- TAB 1: GENERAL — lo que se configura al arrancar y se revisa seguido -->
     <!-- =================================================================== -->
     <div class="cfg-tab-pane active" id="cfgTab-general">
+
+      <div class="card p-3 mb-3">
+        <h6 style="margin-bottom:4px;">🖥️ Estilo del panel en esta computadora</h6>
+        <p class="text-muted" style="font-size:13px;margin-bottom:14px;">Cambia cómo se ve el panel solo en esta caja (cada una puede elegir el suyo). El color del negocio se sigue eligiendo en Catálogo Web → Color del sitio.</p>
+        <div class="estilos-grid" id="selectorEstilosPanel" role="group" aria-label="Estilo del panel"></div>
+      </div>
 
       <div class="card p-3 mb-3">
         <h6 style="margin-bottom:14px;">🧾 Encabezado del ticket (impresora térmica)</h6>

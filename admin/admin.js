@@ -15505,6 +15505,58 @@ function cerrarAyudaAtajosPOS() {
   return true;
 }
 
+/* ===================== ESTILO DEL PANEL (por computadora) =====================
+   Se guarda en el navegador / app de ESTA caja (localStorage), no en la
+   planilla: cada caja elige el suyo. El color del negocio (Catálogo Web →
+   Color del sitio) se sigue aplicando encima. Ver estilos/estilos.css. */
+
+const ESTILOS_PANEL = [
+  { id: "clasico",   nombre: "Clásico",            desc: "El de siempre." },
+  { id: "mostrador", nombre: "Mostrador claro",    desc: "Claro y amplio, con botones y buscador grandes." },
+  { id: "turno",     nombre: "Turno largo",        desc: "Oscuro, cansa menos la vista. El total se ve como el visor de una caja." },
+  { id: "recibo",    nombre: "Escáner y recibo",   desc: "Productos en lista, para escanear rápido. El ticket parece un recibo impreso." },
+  { id: "centro",    nombre: "Ticket al centro",   desc: "El ticket ocupa la parte principal; los productos quedan al costado." },
+  { id: "pizarron",  nombre: "Pizarrón de almacén",desc: "Pizarra verde con precios a tiza y el ticket en papel madera." },
+  { id: "minimal",   nombre: "Minimalista",        desc: "Blanco y gris, mucho aire y un solo color para lo importante." },
+  { id: "contraste", nombre: "Alto contraste",     desc: "Letras grandes, bordes marcados y foco amarillo. Colores fijos." },
+  { id: "celeste",   nombre: "Celeste y blanco",   desc: "Colores fijos celeste y dorado. El ticket va en una barra abajo." },
+  { id: "degrade",   nombre: "Degradé",            desc: "Oscuro con degradé en los colores del negocio." }
+];
+const ESTILOS_OSCUROS = { turno: true, pizarron: true, degrade: true };
+
+function obtenerEstiloPanel() {
+  try { return localStorage.getItem("veekEstiloPanel") || "clasico"; } catch (e) { return "clasico"; }
+}
+
+function aplicarEstiloPanel(id) {
+  if (!ESTILOS_PANEL.some(e => e.id === id)) id = "clasico";
+  const r = document.documentElement;
+  r.setAttribute("data-estilo", id);
+  if (ESTILOS_OSCUROS[id]) { r.setAttribute("data-oscuro", ""); r.setAttribute("data-bs-theme", "dark"); }
+  else { r.removeAttribute("data-oscuro"); r.removeAttribute("data-bs-theme"); }
+}
+
+function elegirEstiloPanel(id) {
+  aplicarEstiloPanel(id);
+  try { localStorage.setItem("veekEstiloPanel", id); } catch (e) {}
+  renderSelectorEstilosPanel();
+  const nombre = (ESTILOS_PANEL.find(e => e.id === id) || {}).nombre || id;
+  toast(`Estilo "${nombre}" aplicado en esta computadora`, "success");
+}
+
+function renderSelectorEstilosPanel() {
+  const cont = document.getElementById("selectorEstilosPanel");
+  if (!cont) return;
+  const actual = obtenerEstiloPanel();
+  cont.innerHTML = ESTILOS_PANEL.map(e => `
+    <button type="button" class="estilo-opcion" aria-pressed="${e.id === actual}" onclick="elegirEstiloPanel('${e.id}')">
+      <img src="estilos/vista-${e.id}.jpg" alt="" loading="lazy">
+      <b>${escapeHtml(e.nombre)}${e.id === actual ? " ✓" : ""}</b>
+      <small>${escapeHtml(e.desc)}</small>
+    </button>`).join("");
+}
+document.addEventListener("DOMContentLoaded", renderSelectorEstilosPanel);
+
 /**
  * Si el admin entró con la contraseña que viene de fábrica, se le avisa
  * arriba de todo hasta que la cambie (cualquiera que conozca VeekPOS la
