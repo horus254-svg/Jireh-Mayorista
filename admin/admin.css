@@ -1409,7 +1409,7 @@ tr.fila-arrastrable{ cursor:default; }
   font-weight:800; font-size:18px; padding:14px 22px;
   border-top:1.5px dashed var(--slate-300);
 }
-.receipt-actions{ display:flex; gap:10px; padding:16px 22px 20px; }
+.receipt-actions{ display:flex; flex-wrap:wrap; gap:10px; padding:16px 22px 20px; }
 .receipt-actions .btn{ flex:1; }
 
 /* ===================== THERMAL PRINT STYLES ===================== */
@@ -1791,10 +1791,13 @@ tr.fila-arrastrable{ cursor:default; }
 }
 
 .product-modal-actions{
-  display:flex; gap:10px; justify-content:flex-end;
+  display:flex; flex-wrap:wrap; gap:10px; justify-content:flex-end;
   padding:14px 22px 20px; border-top:1px solid var(--slate-200);
 }
-.product-modal-actions .btn{ min-width:120px; }
+/* Con muchos botones bajan a otra fila en vez de salirse del modal */
+.product-modal-actions .btn{ min-width:min(120px, 100%); max-width:100%; }
+/* Detalle del pedido: "Cerrar" a la izquierda, las acciones a la derecha */
+#pedidoDetalleModalBackdrop .product-modal-actions > .btn:first-child{ margin-right:auto; }
 
 @media(max-width:480px){
   .product-modal-actions{ flex-direction:column-reverse; }
