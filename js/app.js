@@ -1937,7 +1937,7 @@ async function checkoutWhatsapp(){
                     method: "POST",
                     headers: { "Content-Type": "text/plain;charset=utf-8" }, // evita preflight CORS contra Apps Script
                     body: cuerpoPedido
-                }, { timeoutMs: 45000, reintentos: 0 });
+                }, { timeoutMs: 90000, reintentos: 0 }); // margen amplio: cortar antes y reintentar podía abrir una segunda ejecución en paralelo
                 resultado = await response.json();
             }catch(errIntento){
                 ultimoError = errIntento;

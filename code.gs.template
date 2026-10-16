@@ -5876,6 +5876,7 @@ function textoSeguroHoja(valor, max){
  */
 function guardarPedidoPublico(entrada){
 
+  const _t0Pedido = Date.now();
   const d = entrada || {};
 
   // --- Campos del cliente: obligatorios, con largo máximo ---
@@ -5908,15 +5909,18 @@ function guardarPedidoPublico(entrada){
     return jsonResponse({ success:false, message:"El pedido tiene demasiados renglones. Dividilo en dos pedidos." });
   }
 
-  // --- Catálogo REAL (caché del catálogo público o, si no hay, la hoja) ---
-  let catalogo;
+  // --- Precio y stock REALES, solo de los códigos del carrito ---
+  // Antes se rearmaba el catálogo entero (getProductos) cuando no estaba
+  // en caché — y casi nunca lo está, porque el sitio lee el catálogo por
+  // el Worker. Eso podía tardar más de 30-45 s y el pedido "no respondía".
+  let porCodigo;
   try{
-    catalogo = JSON.parse(getProductos().getContent()).productos || [];
+    porCodigo = leerProductosParaPedido(carritoCliente.map(it => String((it || {}).CODIGO === undefined ? "" : it.CODIGO).trim()));
   }catch(err){
+    console.error("guardarPedido: no se pudieron leer precios: " + err);
     return jsonResponse({ success:false, message:"No pudimos verificar los precios. Probá de nuevo en unos segundos." });
   }
-  const porCodigo = {};
-  catalogo.forEach(p => { porCodigo[String(p.CODIGO).trim()] = p; });
+  console.log("guardarPedido: precios y stock leídos en " + (Date.now() - _t0Pedido) + " ms");
 
   const carritoReal = [];
   const cantidadPorCodigo = {};
@@ -5988,7 +5992,7 @@ function guardarPedidoPublico(entrada){
   }
 
   // --- A guardarPedido: solo campos permitidos, con origen SIEMPRE catálogo web ---
-  return guardarPedido({
+  const _respuestaPedido = guardarPedido({
     idOperacion: d.idOperacion,
     nombre: nombre,
     empresa: textoSeguroHoja(d.empresa, 120),
@@ -6003,6 +6007,51 @@ function guardarPedidoPublico(entrada){
     _stockValidado: true
     // origenPOS, moneda, descuento, subtotal: a propósito NO se aceptan desde el público
   });
+  // Visible en Apps Script → Ejecuciones: cuánto tardó cada pedido.
+  console.log("guardarPedido: pedido completo en " + (Date.now() - _t0Pedido) + " ms");
+  return _respuestaPedido;
+}
+
+/**
+ * CODIGO -> { CODIGO, PRODUCTO, PRECIO, STOCK, UNIDADES_POR_CAJA, PRECIO_CAJA }
+ * de los productos PUBLICADOS pedidos. Usa la caché del catálogo si está;
+ * si no, lee de la hoja SOLO las columnas necesarias en una sola lectura
+ * (en vez de toda la hoja + ordenar + armar el JSON del catálogo).
+ */
+function leerProductosParaPedido(codigos){
+  const buscados = new Set(codigos.filter(Boolean));
+  const mapa = {};
+
+  const texto = cacheLeerTexto("catalogo_publico");
+  if(texto){
+    (JSON.parse(texto).productos || []).forEach(p => {
+      const c = String(p.CODIGO || "").trim();
+      if(buscados.has(c)) mapa[c] = p;
+    });
+    return mapa;
+  }
+
+  const sheet = getSheet();
+  const ultimaFila = sheet.getLastRow();
+  const ultimaCol = sheet.getLastColumn();
+  if(ultimaFila < 2) return mapa;
+  const enc = sheet.getRange(1, 1, 1, ultimaCol).getValues()[0].map(h => String(h || "").trim());
+  const campos = ["CODIGO", "PRODUCTO", "PRECIO", "STOCK", "PUBLICADO", "UNIDADES_POR_CAJA", "PRECIO_CAJA"];
+  const idx = {};
+  campos.forEach(k => { idx[k] = enc.indexOf(k); });
+  if(idx.CODIGO === -1 || idx.PRECIO === -1) throw new Error("Faltan columnas CODIGO/PRECIO en PRODUCTOS");
+  const hasta = Math.max.apply(null, campos.map(k => idx[k])) + 1;
+  const filas = sheet.getRange(2, 1, ultimaFila - 1, hasta).getValues();
+  for(let i = 0; i < filas.length; i++){
+    const f = filas[i];
+    const c = String(f[idx.CODIGO] || "").trim();
+    if(!buscados.has(c)) continue;
+    if(idx.PUBLICADO !== -1 && String(f[idx.PUBLICADO]).toUpperCase() !== "SI") continue;
+    const p = { CODIGO: f[idx.CODIGO] };
+    campos.forEach(k => { if(k !== "PUBLICADO" && idx[k] !== -1) p[k] = f[idx[k]]; });
+    mapa[c] = p;
+  }
+  return mapa;
 }
 
 function guardarPedido(data){
@@ -6091,13 +6140,17 @@ function guardarPedido(data){
   // y IDs repetidos cuando entran varios pedidos a la vez).
   let lock = null;
   if(!_dentroDeLockIdempotencia){
+    const _t0Lock = Date.now();
     lock = LockService.getScriptLock();
     if(!lock.tryLock(25000)){
+      console.warn("guardarPedido: no se obtuvo el lock en 25 s");
       return jsonResponse({
         success:false,
         message:"El sistema está ocupado, probá de nuevo en unos segundos."
       });
     }
+    const _espera = Date.now() - _t0Lock;
+    if(_espera > 1000) console.warn("guardarPedido: esperó " + _espera + " ms el lock (otra operación lo tenía)");
   }
 
   let pedidoId;
@@ -6244,14 +6297,12 @@ function guardarPedido(data){
 /**
  * El catálogo la llama cuando el cliente abre el carrito para completar
  * sus datos: despierta el servidor y deja en caché todo lo que el pedido
- * va a necesitar (catálogo, mínimo, transportes, DNIs conocidos), así el
+ * va a necesitar (mínimo, transportes, DNIs conocidos), así el
  * "Enviar pedido" no paga esas lecturas. Si ya está todo en caché, solo
  * hace lecturas de caché (no toca la planilla).
  */
 function prepararPedido(){
-  try{
-    if(!cacheLeerTexto("catalogo_publico")) getProductos();
-  }catch(e){}
+  // (No se toca el catálogo: rearmarlo es lo más pesado y el pedido ya no lo necesita.)
   try{ leerReglasPedido(); }catch(e){}
   try{
     const cache = CacheService.getScriptCache();
