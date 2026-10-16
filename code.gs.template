@@ -447,12 +447,13 @@ function invalidarCachePollingVentas(){
 /** Se llama después de cualquier cambio en PEDIDOS o VENTAS_LOCAL (crear/editar/cobrar/anular pedido o venta) — invalida la caché de los endpoints de polling (dashboard, pedidos, ventasPOS) y el índice de búsqueda de pedidos. */
 function invalidarCachePolling(){
   try{
-    const cache = CacheService.getScriptCache();
+    // Una sola llamada a la caché (antes eran cinco).
+    const claves = [];
     ["dashboard", "pedidos", "ventas_pos_hoy", "pedidos_indice", "metricas"].forEach(base => {
-      const claves = ["n"];
-      for(let i = 0; i < 20; i++) claves.push(String(i));
-      cache.removeAll(claves.map(c => base + ":" + c));
+      claves.push(base + ":n");
+      for(let i = 0; i < 20; i++) claves.push(base + ":" + i);
     });
+    CacheService.getScriptCache().removeAll(claves);
   } catch(e){
     console.error("No se pudo invalidar la caché de polling: " + e.message);
   }
@@ -564,7 +565,7 @@ const ACCIONES_PUBLICAS = {
   productos: true, categorias: true, destacados: true, ofertas: true,
   producto: true, configLanding: true, configuracionNegocio: true,
   catalogoVersion: true, catalogoPDFInfo: true, imagenProxy: true,
-  guardarPedido: true, consultarPedido: true,
+  guardarPedido: true, consultarPedido: true, prepararPedido: true,
   login: true, loginStock: true, inicializarHojas: true,
   qrEstado: true, qrPantalla: true
 };
@@ -602,10 +603,27 @@ function _propScript(clave, generar){
   const p = _props();
   if(p[clave]) return p[clave];
   if(!generar) return "";
-  const valor = generar();
-  PropertiesService.getScriptProperties().setProperty(clave, valor);
-  p[clave] = valor;
-  return valor;
+  // Primera vez: si dos cajas llegan al mismo tiempo, cada una generaría
+  // un secreto distinto y uno pisaría al otro (tokens o contraseñas que
+  // dejan de validar). Se escribe, se espera un instante y se usa lo que
+  // quedó guardado: todas las ejecuciones terminan con el mismo valor.
+  const servicio = PropertiesService.getScriptProperties();
+  const yaGuardado = servicio.getProperty(clave);
+  if(yaGuardado){ p[clave] = yaGuardado; return yaGuardado; }
+  servicio.setProperty(clave, generar());
+  Utilities.sleep(700);
+  const final = servicio.getProperty(clave);
+  p[clave] = final;
+  return final;
+}
+
+/** Crea de antemano los secretos de seguridad (lo llama instalarTriggersVeekPOS). */
+function prepararSeguridad(){
+  _propScript("VEEK_SECRETO_SESIONES", _secretoAleatorio);
+  _propScript("VEEK_PIMIENTA", _secretoAleatorio);
+  _epochSesiones("panel");
+  _epochSesiones("stock");
+  return "Seguridad lista.";
 }
 
 function _secretoAleatorio(){
@@ -1061,6 +1079,9 @@ case "reportesVentas":
 
     case "catalogoVersion":
       return getCatalogoVersion();
+
+    case "prepararPedido":
+      return prepararPedido();
 
     case "stockTodos":
       return getStockTodos();
@@ -1689,6 +1710,7 @@ function instalarTriggersVeekPOS(){
   ScriptApp.getProjectTriggers().forEach(t => {
     if(handlers.indexOf(t.getHandlerFunction()) !== -1) ScriptApp.deleteTrigger(t);
   });
+  prepararSeguridad();
   ScriptApp.newTrigger("calentarCacheCatalogoProgramado").timeBased().everyMinutes(30).create();
   ScriptApp.newTrigger("limpiarLedgerIdempotencia").timeBased().everyDays(1).atHour(3).create();
   ScriptApp.newTrigger("actualizarResumenMetricas").timeBased().everyDays(1).atHour(4).create();
@@ -2482,6 +2504,69 @@ function asegurarColumnasGaleriaProducto(sheet){
   }
 }
 
+/* =====================================================================
+   CÓDIGOS ÚNICOS DE PRODUCTO
+   Un código (de producto o de caja) identifica UNA sola cosa: el escáner
+   del POS busca en los dos. Se compara sin espacios y sin distinguir
+   mayúsculas ("abc " y "ABC" son el mismo código).
+===================================================================== */
+function normalizarCodigo(c){
+  return String(c === undefined || c === null ? "" : c).trim().toUpperCase();
+}
+
+/**
+ * Revisa si `codigo` ya está usado en `filas` (con encabezado) como
+ * CODIGO o como CODIGO_CAJA de otro producto. `filaPropia` (índice en
+ * `filas`) se ignora — es el producto que se está editando.
+ * Devuelve el mensaje de error, o null si está libre.
+ */
+function conflictoCodigoProducto(filas, codigo, filaPropia, esCodigoCaja){
+  const n = normalizarCodigo(codigo);
+  if(!n || !filas || !filas.length) return null;
+  const enc = filas[0].map(h => String(h || "").trim());
+  const iCod = enc.indexOf("CODIGO") === -1 ? 0 : enc.indexOf("CODIGO");
+  const iCaja = enc.indexOf("CODIGO_CAJA");
+  const iNom = enc.indexOf("PRODUCTO");
+  const queEs = esCodigoCaja ? "El código de caja" : "El código";
+  for(let i = 1; i < filas.length; i++){
+    if(i === filaPropia) continue;
+    const nombre = iNom !== -1 ? String(filas[i][iNom] || "").trim() : "";
+    if(normalizarCodigo(filas[i][iCod]) === n){
+      return queEs + " '" + String(codigo).trim() + "' ya pertenece al producto " + (nombre ? "\"" + nombre + "\"" : "existente") + ".";
+    }
+    if(iCaja !== -1 && normalizarCodigo(filas[i][iCaja]) === n){
+      return queEs + " '" + String(codigo).trim() + "' ya es el código de caja del producto " + (nombre ? "\"" + nombre + "\"" : "existente") + ".";
+    }
+  }
+  return null;
+}
+
+/**
+ * Ejecutar a mano desde el editor: lista los códigos repetidos que YA
+ * existan en la hoja PRODUCTOS (de antes de este control), para
+ * corregirlos. No modifica nada.
+ */
+function revisarCodigosDuplicados(){
+  const filas = getSheet().getDataRange().getValues();
+  const enc = filas[0].map(h => String(h || "").trim());
+  const iCod = enc.indexOf("CODIGO") === -1 ? 0 : enc.indexOf("CODIGO");
+  const iCaja = enc.indexOf("CODIGO_CAJA");
+  const iNom = enc.indexOf("PRODUCTO");
+  const usos = {};
+  for(let i = 1; i < filas.length; i++){
+    [[iCod, "código"], [iCaja, "código de caja"]].forEach(([idx, tipo]) => {
+      if(idx === -1) return;
+      const n = normalizarCodigo(filas[i][idx]);
+      if(!n) return;
+      (usos[n] = usos[n] || []).push("fila " + (i + 1) + " (" + tipo + ", " + String(filas[i][iNom] || "") + ")");
+    });
+  }
+  const repetidos = Object.keys(usos).filter(k => usos[k].length > 1).map(k => k + ": " + usos[k].join(" / "));
+  const texto = repetidos.length ? "Códigos repetidos:\n" + repetidos.join("\n") : "No hay códigos repetidos.";
+  Logger.log(texto);
+  return texto;
+}
+
 function guardarProducto(e){
 
   const params = (e && e.parameter) || {};
@@ -2548,16 +2633,18 @@ function guardarProducto(e){
     let codigo = (params.CODIGO || params.codigo || "").toString().trim();
     if(!codigo){
       codigo = "PRD-" + new Date().getTime();
-    } else {
-      // Evitar códigos duplicados
+    }
+
+    // Códigos únicos: ni el código ni el de caja pueden estar usados por
+    // otro producto (ni como código ni como código de caja).
+    {
       const existentes = sheet.getDataRange().getValues();
-      existentes.shift();
-      const yaExiste = existentes.some(row => String(row[0]).trim() === codigo);
-      if(yaExiste){
-        return jsonResponse({
-          success:false,
-          message:"Ya existe un producto con el código '" + codigo + "'."
-        });
+      const codigoCajaNuevo = (params.CODIGO_CAJA || "").toString().trim();
+      const conflicto = conflictoCodigoProducto(existentes, codigo, -1, false) ||
+        (codigoCajaNuevo ? conflictoCodigoProducto(existentes, codigoCajaNuevo, -1, true) : null);
+      if(conflicto) return jsonResponse({ success:false, codigoDuplicado:true, message: conflicto });
+      if(codigoCajaNuevo && normalizarCodigo(codigoCajaNuevo) === normalizarCodigo(codigo)){
+        return jsonResponse({ success:false, codigoDuplicado:true, message:"El código de caja tiene que ser distinto del código del producto." });
       }
     }
 
@@ -2709,16 +2796,23 @@ function actualizarProducto(e){
     let nuevoCodigo = (params.CODIGO || params.codigo || codigoOriginal).toString().trim();
     if(!nuevoCodigo) nuevoCodigo = codigoOriginal;
 
-    // Si cambiaron el código, verificar que no choque con otro producto existente
-    if(nuevoCodigo !== codigoOriginal){
-      for(let i = 1; i < data.length; i++){
-        if(i !== filaIndex && String(data[i][0]).trim() === nuevoCodigo){
-          return jsonResponse({
-            success:false,
-            message:"Ya existe otro producto con el código '" + nuevoCodigo + "'."
-          });
-        }
+    // Códigos únicos: el código (si cambió) y el de caja (si cambió) no
+    // pueden estar usados por OTRO producto, ni como código ni como caja.
+    {
+      const idxCajaActual = headerRow.map(h => String(h || "").trim()).indexOf("CODIGO_CAJA");
+      const cajaActual = idxCajaActual !== -1 ? String(data[filaIndex][idxCajaActual] || "").trim() : "";
+      const cajaNueva = params.CODIGO_CAJA !== undefined ? String(params.CODIGO_CAJA || "").trim() : cajaActual;
+      let conflicto = null;
+      if(normalizarCodigo(nuevoCodigo) !== normalizarCodigo(codigoOriginal)){
+        conflicto = conflictoCodigoProducto(data, nuevoCodigo, filaIndex, false);
       }
+      if(!conflicto && cajaNueva && normalizarCodigo(cajaNueva) !== normalizarCodigo(cajaActual)){
+        conflicto = conflictoCodigoProducto(data, cajaNueva, filaIndex, true);
+      }
+      if(!conflicto && cajaNueva && normalizarCodigo(cajaNueva) === normalizarCodigo(nuevoCodigo)){
+        conflicto = "El código de caja tiene que ser distinto del código del producto.";
+      }
+      if(conflicto) return jsonResponse({ success:false, codigoDuplicado:true, message: conflicto });
     }
 
     const valoresPorColumna = {
@@ -3180,7 +3274,7 @@ function _aplicarItemIngresoProducto(sheet, filas, headerRow, item){
   let filaIndex = -1;
   if(codigo){
     for(let i = 1; i < filas.length; i++){
-      if(String(filas[i][idxCodigo]).trim() === codigo){
+      if(normalizarCodigo(filas[i][idxCodigo]) === normalizarCodigo(codigo)){
         filaIndex = i;
         break;
       }
@@ -3224,9 +3318,9 @@ function _aplicarItemIngresoProducto(sheet, filas, headerRow, item){
     if(!codigo){
       codigo = generarCodigoProductoNuevo();
     } else {
-      const yaExiste = filas.slice(1).some(row => String(row[idxCodigo]).trim() === codigo);
-      if(yaExiste){
-        return { error: "Ya existe un producto con el código '" + codigo + "'." };
+      const conflicto = conflictoCodigoProducto(filas, codigo, -1, false);
+      if(conflicto){
+        return { error: conflicto };
       }
     }
 
@@ -5374,6 +5468,7 @@ function guardarConfiguracionNegocio(e){
   // se invalida acá para que un cambio del admin (ej. pedido mínimo)
   // se vea al instante y no recién a los 5 minutos.
   try{ CacheService.getScriptCache().removeAll(["config_negocio:n","config_negocio:0","config_negocio:1"]); }catch(errCache){}
+  invalidarCacheReglasPedido();
 
   return jsonResponse({
     success:true
@@ -5386,7 +5481,7 @@ function guardarConfiguracionNegocio(e){
  * verificando que no choque con ningún ID ya existente en la columna
  * indicada de la hoja (por defecto la columna 1 / A).
  */
-function generarIdCorto(prefijo, sheet, columnaId){
+function generarIdCorto(prefijo, sheet, columnaId, ultimaFilaConocida){
 
   columnaId = columnaId || 1;
 
@@ -5394,7 +5489,7 @@ function generarIdCorto(prefijo, sheet, columnaId){
   // getDataRange en CADA venta, solo para evitar un choque de IDs).
   let existentes = new Set();
   if(sheet){
-    const ultima = sheet.getLastRow();
+    const ultima = ultimaFilaConocida !== undefined ? ultimaFilaConocida : sheet.getLastRow();
     if(ultima >= 1){
       sheet.getRange(1, columnaId, ultima, 1).getValues().forEach(row => existentes.add(String(row[0] || "")));
     }
@@ -5584,21 +5679,51 @@ function normalizarTextoTransporte(texto){
     .replace(/\s+/g, " ");
 }
 
-/** Lista de nombres de transporte bloqueados, ya normalizados, leída desde la configuración */
-function obtenerTransportesNoDisponibles(){
-  const sheet = getOrCrearHojaConfiguracion();
-  const data = sheet.getDataRange().getValues();
-  data.shift();
-
-  let valor = "";
-  for(const row of data){
-    if(String(row[0] || "").trim().toUpperCase() === "TRANSPORTES_NO_DISPONIBLES"){
-      valor = String(row[1] || "");
-      break;
+/**
+ * Reglas que se validan en cada pedido del catálogo: pedido mínimo y
+ * transportes no disponibles. Antes se leía la hoja CONFIGURACION entera
+ * DOS veces por pedido; ahora una sola lectura, guardada 2 minutos en la
+ * caché. Guardar la configuración desde el panel borra esta caché, así
+ * que un cambio del admin se aplica en el pedido siguiente.
+ */
+const CLAVE_CACHE_REGLAS_PEDIDO = "reglas_pedido_v1";
+let _reglasPedidoMemo = null;
+function leerReglasPedido(){
+  if(_reglasPedidoMemo) return _reglasPedidoMemo;
+  try{
+    const t = CacheService.getScriptCache().get(CLAVE_CACHE_REGLAS_PEDIDO);
+    if(t){ _reglasPedidoMemo = JSON.parse(t); return _reglasPedidoMemo; }
+  }catch(e){}
+  const reglas = { minimo: null, transportes: "" };
+  try{
+    const filas = getOrCrearHojaConfiguracion().getDataRange().getValues();
+    for(let i = 1; i < filas.length; i++){
+      const clave = String(filas[i][0] || "").trim().toUpperCase();
+      if(clave === "PEDIDO_MINIMO"){
+        const raw = filas[i][1];
+        const n = Number(raw);
+        reglas.minimo = (raw === "" || raw === null || raw === undefined || isNaN(n) || n < 0) ? 100000 : n;
+      } else if(clave === "TRANSPORTES_NO_DISPONIBLES"){
+        reglas.transportes = String(filas[i][1] || "");
+      }
     }
+    try{ CacheService.getScriptCache().put(CLAVE_CACHE_REGLAS_PEDIDO, JSON.stringify(reglas), 120); }catch(e){}
+  }catch(err){
+    Logger.log("leerReglasPedido: " + err);
+    // reglas.minimo queda en null → no se bloquea el pedido por no poder leerlo
   }
+  _reglasPedidoMemo = reglas;
+  return reglas;
+}
 
-  return valor
+function invalidarCacheReglasPedido(){
+  _reglasPedidoMemo = null;
+  try{ CacheService.getScriptCache().remove(CLAVE_CACHE_REGLAS_PEDIDO); }catch(e){}
+}
+
+/** Lista de nombres de transporte bloqueados, ya normalizados */
+function obtenerTransportesNoDisponibles(){
+  return String(leerReglasPedido().transportes || "")
     .split("\n")
     .map(normalizarTextoTransporte)
     .filter(Boolean);
@@ -5655,26 +5780,9 @@ function obtenerStockActualPorCodigo(codigos){
   return mapa;
 }
 
-/**
- * Lee el pedido mínimo VIGENTE directo de la hoja de configuración
- * (sin caché), para validarlo del lado del servidor.
- */
+/** Pedido mínimo vigente (null si no se pudo determinar → no se bloquea). */
 function leerPedidoMinimoActual(){
-  try{
-    const sheet = getOrCrearHojaConfiguracion();
-    const filas = sheet.getDataRange().getValues();
-    for(let i = 1; i < filas.length; i++){
-      if(String(filas[i][0] || "").trim().toUpperCase() === "PEDIDO_MINIMO"){
-        const raw = filas[i][1];
-        const n = Number(raw);
-        if(raw === "" || raw === null || raw === undefined || isNaN(n) || n < 0) return 100000;
-        return n;
-      }
-    }
-  }catch(err){
-    Logger.log("leerPedidoMinimoActual: " + err);
-  }
-  return null; // no se pudo determinar → no se bloquea el pedido
+  return leerReglasPedido().minimo;
 }
 
 /**
@@ -5684,6 +5792,13 @@ function leerPedidoMinimoActual(){
  * agrega al final — sin tocar ninguna columna ni fila existente.
  * Mismo patrón que asegurarColumnaAlias.
  */
+/** Igual que asegurarColumnaColorDetalle, pero recuerda (6 h) que ya existe. */
+function asegurarColumnaColorDetalleRapido(sheet){
+  try{ if(CacheService.getScriptCache().get("detalle_color_ok")) return; }catch(e){}
+  asegurarColumnaColorDetalle(sheet);
+  try{ CacheService.getScriptCache().put("detalle_color_ok", "1", 21600); }catch(e){}
+}
+
 function asegurarColumnaColorDetalle(sheet){
   if(!sheet) return;
   const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
@@ -5707,6 +5822,32 @@ function asegurarColumnaColorDetalle(sheet){
  * (No es atómico al 100% entre ejecuciones simultáneas, pero alcanza
  * para frenar fuerza bruta y abuso automatizado.)
  */
+/**
+ * Igual que permitirIntento pero para varios límites a la vez, con una
+ * lectura y una escritura de caché (en vez de una de cada por límite).
+ * Cada entrada: [clave, maximo, ventanaSegundos]. Si alguno está en el
+ * tope, no se cuenta ninguno y devuelve false.
+ */
+function permitirIntentosJuntos(limites){
+  try{
+    const cache = CacheService.getScriptCache();
+    const claves = limites.map(l => "rl:" + l[0]);
+    const actuales = cache.getAll(claves) || {};
+    for(let i = 0; i < limites.length; i++){
+      if(Number(actuales[claves[i]] || 0) >= limites[i][1]) return false;
+    }
+    // Se escribe agrupado por ventana, así cada límite conserva su vencimiento.
+    const porVentana = {};
+    limites.forEach((l, i) => {
+      (porVentana[l[2]] = porVentana[l[2]] || {})[claves[i]] = String(Number(actuales[claves[i]] || 0) + 1);
+    });
+    Object.keys(porVentana).forEach(v => cache.putAll(porVentana[v], Number(v)));
+    return true;
+  }catch(e){
+    return true; // si la caché falla, no se bloquea a nadie por error
+  }
+}
+
 function permitirIntento(clave, maximo, ventanaSegundos){
   try{
     const cache = CacheService.getScriptCache();
@@ -5751,7 +5892,7 @@ function guardarPedidoPublico(entrada){
 
   // --- Frenos contra abuso automatizado ---
   const dniNorm = normalizarDni(dni) || dni;
-  if(!permitirIntento("pedido_dni:" + dniNorm, 10, 3600) || !permitirIntento("pedido_global", 200, 600)){
+  if(!permitirIntentosJuntos([["pedido_dni:" + dniNorm, 10, 3600], ["pedido_global", 200, 600]])){
     return jsonResponse({ success:false, message:"Recibimos muchos pedidos seguidos. Probá de nuevo en unos minutos." });
   }
 
@@ -5858,7 +5999,8 @@ function guardarPedidoPublico(entrada){
     localidad: localidad,
     provincia: provincia,
     total: totalReal,
-    carrito: carritoReal
+    carrito: carritoReal,
+    _stockValidado: true
     // origenPOS, moneda, descuento, subtotal: a propósito NO se aceptan desde el público
   });
 }
@@ -5873,7 +6015,7 @@ function guardarPedido(data){
   // Idempotencia rápida (sin lock): si el cliente reintenta un pedido cuya
   // respuesta se perdió, se devuelve el pedido ya guardado.
   if(idOperacion){
-    const previo = buscarPedidoPorIdOperacion(pedidosSheet, idOperacion);
+    const previo = buscarPedidoPorIdOperacionRapido(pedidosSheet, idOperacion);
     if(previo){
       return jsonResponse({ success:true, pedidoId: previo, repetido:true });
     }
@@ -5905,7 +6047,8 @@ function guardarPedido(data){
     }
 
     // Stock real (solo catálogo web; el POS puede vender sin stock).
-    if(data.carrito && data.carrito.length > 0){
+    // Si guardarPedidoPublico ya lo validó contra el catálogo, no se repite.
+    if(!data._stockValidado && data.carrito && data.carrito.length > 0){
       const codigosCarrito = data.carrito.map(item => item.CODIGO);
       const alcanza = (mapa) => mapa && data.carrito.every(item => {
         const st = mapa[String(item.CODIGO).trim()];
@@ -5961,13 +6104,14 @@ function guardarPedido(data){
   try{
 
     if(idOperacion){
-      const previo = buscarPedidoPorIdOperacion(pedidosSheet, idOperacion);
+      const previo = buscarPedidoPorIdOperacionRapido(pedidosSheet, idOperacion);
       if(previo){
         return jsonResponse({ success:true, pedidoId: previo, repetido:true });
       }
     }
 
-    pedidoId = generarIdCorto("PED", pedidosSheet);
+    const ultimaFilaPedidos = pedidosSheet.getLastRow();
+    pedidoId = generarIdCorto("PED", pedidosSheet, 1, ultimaFilaPedidos);
     const fecha = new Date();
 
     const valores = {
@@ -6009,12 +6153,12 @@ function guardarPedido(data){
     }
 
     const fila = encabezados.map(h => valores.hasOwnProperty(h) ? valores[h] : "");
-    const filaDestino = pedidosSheet.getLastRow() + 1;
+    const filaDestino = ultimaFilaPedidos + 1;
     pedidosSheet.getRange(filaDestino, 1, 1, fila.length).setValues([fila]);
 
     if(data.carrito && data.carrito.length > 0){
 
-      asegurarColumnaColorDetalle(detalleSheet);
+      asegurarColumnaColorDetalleRapido(detalleSheet);
 
       const filas = data.carrito.map(item => [
         pedidoId,
@@ -6030,6 +6174,9 @@ function guardarPedido(data){
         .getRange(detalleSheet.getLastRow() + 1, 1, filas.length, filas[0].length)
         .setValues(filas);
     }
+
+    // Un reintento del mismo pedido (respuesta perdida) se resuelve con la caché.
+    recordarPedidoPorIdOperacion(idOperacion, pedidoId);
 
   } finally {
     if(lock) lock.releaseLock();
@@ -6047,7 +6194,11 @@ function guardarPedido(data){
         if(t) dnisCache = JSON.parse(t);
       }catch(e){}
       let yaExiste = !!(dnisCache && dnisCache.indexOf(dniNormalizado) !== -1);
-      if(!yaExiste){
+      if(!yaExiste && dnisCache){
+        // La caché tiene la lista completa: no hace falta releer la hoja.
+        dnisCache.push(dniNormalizado);
+        try{ CacheService.getScriptCache().put("clientes_dnis", JSON.stringify(dnisCache), 600); }catch(e){}
+      } else if(!yaExiste){
         const clientesSheet = getOrCrearHojaClientes();
         const ultima = clientesSheet.getLastRow();
         const lista = ultima >= 2
@@ -6090,6 +6241,57 @@ function guardarPedido(data){
  * Busca un pedido reciente (últimas 300 filas) por su ID_OPERACION.
  * Devuelve el PEDIDO_ID o null.
  */
+/**
+ * El catálogo la llama cuando el cliente abre el carrito para completar
+ * sus datos: despierta el servidor y deja en caché todo lo que el pedido
+ * va a necesitar (catálogo, mínimo, transportes, DNIs conocidos), así el
+ * "Enviar pedido" no paga esas lecturas. Si ya está todo en caché, solo
+ * hace lecturas de caché (no toca la planilla).
+ */
+function prepararPedido(){
+  try{
+    if(!cacheLeerTexto("catalogo_publico")) getProductos();
+  }catch(e){}
+  try{ leerReglasPedido(); }catch(e){}
+  try{
+    const cache = CacheService.getScriptCache();
+    if(!cache.get("clientes_dnis")){
+      const hoja = getOrCrearHojaClientes();
+      const ultima = hoja.getLastRow();
+      const lista = ultima >= 2 ? hoja.getRange(2, 4, ultima - 1, 1).getValues().map(f => normalizarDni(f[0])).filter(Boolean) : [];
+      cache.put("clientes_dnis", JSON.stringify(lista), 600);
+    }
+  }catch(e){}
+  return jsonResponse({ success:true });
+}
+
+/** Borra la lista de DNIs conocidos (la usa el alta automática de clientes en los pedidos web). */
+function invalidarCacheDnisClientes(){
+  try{ CacheService.getScriptCache().remove("clientes_dnis"); }catch(e){}
+}
+
+const PREFIJO_CACHE_OP_PEDIDO = "pedido_op:";
+
+/** Recuerda (6 h) qué pedido se creó con este idOperacion. */
+function recordarPedidoPorIdOperacion(idOperacion, pedidoId){
+  if(!idOperacion) return;
+  try{ CacheService.getScriptCache().put(PREFIJO_CACHE_OP_PEDIDO + idOperacion, String(pedidoId), 21600); }catch(e){}
+}
+
+/**
+ * Busca el pedido de un idOperacion: primero en la caché (una sola
+ * llamada, lo normal) y solo si la caché no responde, en la hoja.
+ * Devuelve el PEDIDO_ID o null.
+ */
+function buscarPedidoPorIdOperacionRapido(pedidosSheet, idOperacion){
+  try{
+    const enCache = CacheService.getScriptCache().get(PREFIJO_CACHE_OP_PEDIDO + idOperacion);
+    return enCache ? String(enCache) : null;
+  }catch(e){
+    return buscarPedidoPorIdOperacion(pedidosSheet, idOperacion);
+  }
+}
+
 function buscarPedidoPorIdOperacion(pedidosSheet, idOperacion){
   const ultimaFila = pedidosSheet.getLastRow();
   const ultimaCol = pedidosSheet.getLastColumn();
@@ -8083,6 +8285,7 @@ function getClientesConCredito(){
  * ("SI"/"NO", default "NO")
  */
 function crearCliente(data){
+  invalidarCacheDnisClientes(); // la lista de DNIs que usan los pedidos web se rearma sola
 
   const nombre = String(data.nombre || "").trim();
   if(!nombre){
@@ -8117,6 +8320,7 @@ function crearCliente(data){
  * cualquier llamador viejo que no lo incluya)
  */
 function editarCliente(data){
+  invalidarCacheDnisClientes(); // la lista de DNIs que usan los pedidos web se rearma sola
 
   const clienteId = String(data.clienteId || "").trim();
   const nombre = String(data.nombre || "").trim();
@@ -8216,6 +8420,7 @@ function eliminarPedidosCancelados(data){
 }
 
 function eliminarCliente(data){
+  invalidarCacheDnisClientes(); // la lista de DNIs que usan los pedidos web se rearma sola
 
   const clienteId = String(data.clienteId || "").trim();
   if(!clienteId){
@@ -8272,6 +8477,7 @@ function actualizarCreditoCliente(data){
  * Parámetros esperados: dni
  */
 function crearClienteDesdeHistorialYMarcarCredito(data){
+  invalidarCacheDnisClientes(); // la lista de DNIs que usan los pedidos web se rearma sola
 
   const dniBuscado = normalizarDni(data.dni);
   if(!dniBuscado){
@@ -10848,6 +11054,7 @@ function testAutorizacionUrlFetch(){
  *   3. Listo. No hace falta volver a ejecutarla.
  */
 function migrarClientesDesdePedidos() {
+  invalidarCacheDnisClientes(); // la lista de DNIs que usan los pedidos web se rearma sola
 
   const ss = getSS();
   const pedidosSheet = getHoja("PEDIDOS");
@@ -11181,11 +11388,13 @@ function restaurarProductoPapelera(data) {
     let headers = valores[0].map(h => String(h || "").trim());
     const idxCodigo = headers.indexOf("CODIGO") === -1 ? 0 : headers.indexOf("CODIGO");
 
-    const yaExiste = valores.slice(1).some(r => String(r[idxCodigo]).trim() === codigo);
-    if (yaExiste) {
+    const conflictoCod = conflictoCodigoProducto(valores, codigo, -1, false) ||
+      (producto.CODIGO_CAJA ? conflictoCodigoProducto(valores, producto.CODIGO_CAJA, -1, true) : null);
+    if (conflictoCod) {
       return jsonResponse({
         success: false,
-        message: "Ya existe un producto activo con el código '" + codigo + "'. Cambiá o eliminá ese producto antes de restaurar este."
+        codigoDuplicado: true,
+        message: conflictoCod + " Cambiá o eliminá ese producto antes de restaurar este."
       });
     }
 

@@ -1722,7 +1722,31 @@ function abrirCarrito(){
     const modal = bootstrap.Modal.getOrCreateInstance(modalElement);
 
     modal.show();
+
+    if(estado.carrito.length > 0) prepararServidorParaPedido();
 }
+
+/**
+ * Mientras el cliente completa sus datos, despierta el servidor y le pide
+ * que deje listo en caché lo que el pedido necesita. Así "Enviar pedido"
+ * responde más rápido. No espera respuesta ni muestra nada; como mucho
+ * una vez cada 4 minutos. Va directo a Apps Script (no usa el Worker).
+ */
+let _ultimoPreparePedido = 0;
+function prepararServidorParaPedido(){
+    const ahora = Date.now();
+    if(!API_URL || ahora - _ultimoPreparePedido < 4 * 60 * 1000) return;
+    _ultimoPreparePedido = ahora;
+    try{
+        fetch(API_URL + (API_URL.indexOf("?") === -1 ? "?" : "&") + "action=prepararPedido", { cache: "no-store" })
+            .catch(()=>{ /* es solo un adelanto: si falla, el pedido funciona igual */ });
+    }catch(e){}
+}
+
+// Al empezar a completar los datos (si el carrito quedó abierto un rato)
+document.getElementById("cartModal")?.addEventListener("focusin", function(){
+    if(estado.carrito.length > 0) prepararServidorParaPedido();
+});
 
 /* Delegación de eventos dentro del carrito */
 document.getElementById("cart-items").addEventListener("click", function(e){
@@ -1818,13 +1842,9 @@ async function checkoutWhatsapp(){
     if(enviandoPedido) return;
     activarCargaCheckout();
 
-    // Espera a que termine de cargar la configuración del negocio (de donde
-    // sale whatsappNumero), por si el cliente hizo clic muy rápido y esa
-    // carga todavía estaba en curso. Si ya terminó, esto no demora nada.
-    // Si falla, igual sigue: whatsappNumero ya tiene el valor de respaldo.
-    if(apariencaCargadaPromise){
-        try{ await apariencaCargadaPromise; }catch(e){ /* whatsappNumero ya tiene el valor de respaldo */ }
-    }
+    // La configuración del negocio (de donde sale whatsappNumero) ya NO se
+    // espera acá: el pedido se manda en paralelo y recién antes de abrir
+    // WhatsApp se espera esa carga (normalmente ya terminó para entonces).
 
     const nombre = document.getElementById("clienteNombre").value.trim();
     const empresa = document.getElementById("clienteEmpresa").value.trim();
@@ -1984,6 +2004,12 @@ Subtotal: $${formatearPrecio(subtotal)}
         const modalElement = document.getElementById("cartModal");
         const modal = bootstrap.Modal.getInstance(modalElement);
         if(modal) modal.hide();
+
+        // Recién ahora hace falta el número de WhatsApp: si la configuración
+        // todavía estaba cargando, se espera acá (en paralelo con el envío).
+        if(apariencaCargadaPromise){
+            try{ await apariencaCargadaPromise; }catch(e){ /* whatsappNumero ya tiene el valor de respaldo */ }
+        }
 
         desactivarCargaCheckout();
 
