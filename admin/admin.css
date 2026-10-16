@@ -137,9 +137,9 @@ html,body{
 
 .sidebar-brand{
   display:flex; align-items:center; gap:10px;
-  padding:6px 10px 26px 10px;
+  padding:6px 10px 18px 10px;
   border-bottom:1px solid rgba(255,255,255,.08);
-  margin-bottom:18px;
+  margin-bottom:8px;
 }
 
 .sidebar-brand .mark{
@@ -156,12 +156,20 @@ html,body{
   letter-spacing:.12em; color:var(--slate-400); margin-top:2px;
 }
 
-.sidebar nav{ display:flex; flex-direction:column; gap:3px; flex:1; }
+.sidebar nav{ display:flex; flex-direction:column; gap:1px; flex:1; }
+/* Títulos de grupo del menú (Vender, Caja, Mercadería…) */
+.sidebar .nav-grupo{
+  font-size:10.5px; font-weight:700; letter-spacing:.11em; text-transform:uppercase;
+  color:var(--e-lateral-suave, var(--slate-400)); opacity:.6;
+  padding:10px 12px 3px;
+}
+
+.sidebar .nav-grupo.vacio{ display:none; }
 
 .sidebar a{
   display:flex; align-items:center; gap:11px;
   color:var(--slate-300); text-decoration:none;
-  padding:10px 12px; border-radius:10px;
+  padding:7px 12px; border-radius:10px;
   font-size:14px; font-weight:500;
   transition:background .15s, color .15s;
 }
@@ -2481,4 +2489,92 @@ kbd{
 @media (max-width:820px){
   .oc-body{ grid-template-columns:1fr; overflow-y:auto; }
   .oc-cat-lista{ max-height:200px; }
+}
+
+/* Separa las acciones que borran de las comunes (ej. "Eliminar cancelados") */
+.separador-acciones{ width:1px; align-self:stretch; background:var(--slate-200); margin:2px 6px; }
+
+/* =====================================================================
+   ANIMACIONES — menús, botones, pestañas, modales y secciones.
+   Cortas (0,15–0,35 s) y solo de opacidad/posición. Se desactivan si
+   la computadora tiene pedido "reducir movimiento". No afectan lo impreso.
+===================================================================== */
+@media screen and (prefers-reduced-motion: no-preference){
+
+  /* --- Al cambiar de sección: el contenido aparece suave y sube un poco --- */
+  .seccion{ animation:anEntrarFade .25s ease-out; }
+  .seccion > .page-header{ animation:anSubir .32s cubic-bezier(.2,.8,.2,1) both; }
+  .seccion > .card, .seccion > .row, .seccion > .alert{ animation:anSubir .36s cubic-bezier(.2,.8,.2,1) both; animation-delay:.04s; }
+  .seccion > .card ~ .card, .seccion > .row ~ .row{ animation-delay:.08s; }
+  .cfg-tab-pane.active > *{ animation:anSubir .3s cubic-bezier(.2,.8,.2,1) both; }
+  .cfg-tab-pane.active > :nth-child(2){ animation-delay:.04s; }
+  .cfg-tab-pane.active > :nth-child(3){ animation-delay:.08s; }
+  .cfg-tab-pane.active > :nth-child(n+4){ animation-delay:.12s; }
+
+  /* --- Menú lateral --- */
+  .sidebar a{ position:relative; transition:background .18s, color .18s, padding-left .18s; }
+  .sidebar a .ic{ transition:transform .22s cubic-bezier(.3,1.6,.5,1); }
+  .sidebar a:hover .ic{ transform:scale(1.18) rotate(-6deg); }
+  .sidebar a:hover{ padding-left:15px; }
+  .sidebar a::before{
+    content:""; position:absolute; left:0; top:22%; bottom:22%; width:3px; border-radius:3px;
+    background:var(--blue-500); transform:scaleY(0); transition:transform .25s cubic-bezier(.2,.8,.2,1);
+  }
+  .sidebar a.active::before{ transform:scaleY(1); }
+  .sidebar a.active .ic{ animation:anRebote .45s cubic-bezier(.3,1.6,.5,1); }
+  .bottom-nav a .ic{ display:inline-block; transition:transform .2s; }
+  .bottom-nav a.active .ic{ animation:anRebote .45s cubic-bezier(.3,1.6,.5,1); }
+
+  /* --- Botones: se levantan al pasar el mouse y se hunden al hacer clic --- */
+  .btn{ transition:background-color .16s, border-color .16s, color .16s, box-shadow .2s, transform .16s cubic-bezier(.2,.8,.2,1); }
+  .btn:not(:disabled):not(.disabled):hover{ transform:translateY(-1px); box-shadow:0 6px 14px -6px rgba(15,23,42,.35); }
+  .btn:not(:disabled):not(.disabled):active{ transform:translateY(0) scale(.97); box-shadow:none; transition-duration:.06s; }
+  .pos-action-btn:not(:disabled):active, .btn-shortcuts-help:active{ transform:scale(.96); }
+
+  /* --- Pestañas (Configuración y Reportes) --- */
+  .cfg-tab-btn, .rep-tab{ transition:background .18s, color .18s, transform .16s; }
+  .cfg-tab-btn:hover, .rep-tab:hover{ transform:translateY(-1px); }
+  .cfg-tab-btn.active, .rep-tab.active{ animation:anPop .3s cubic-bezier(.3,1.6,.5,1); }
+  .cfg-tab-btn .ic{ display:inline-block; transition:transform .22s cubic-bezier(.3,1.6,.5,1); }
+  .cfg-tab-btn:hover .ic{ transform:scale(1.2); }
+
+  /* --- Tarjetas del Inicio y chips de categorías --- */
+  .metric-card{ transition:transform .2s cubic-bezier(.2,.8,.2,1), box-shadow .2s; }
+  .metric-card:hover{ transform:translateY(-3px); box-shadow:0 12px 24px -12px rgba(15,23,42,.35); }
+  .metric-card:hover .metric-icon{ animation:anRebote .45s cubic-bezier(.3,1.6,.5,1); }
+  .cat-chip{ transition:background .16s, color .16s, transform .16s; }
+  .cat-chip:hover{ transform:translateY(-1px); }
+  .cat-chip:active{ transform:scale(.95); }
+
+  /* --- Modales: fondo que aparece y ventana que "salta" suave --- */
+  .product-modal-backdrop.show, .receipt-backdrop.show, .scan-modal-backdrop.show, .shortcuts-help-backdrop.show{ animation:anEntrarFade .2s ease-out; }
+  .product-modal-backdrop.show .product-modal,
+  .receipt-backdrop.show .receipt-modal,
+  .scan-modal-backdrop.show .scan-modal,
+  .shortcuts-help-backdrop.show .shortcuts-help-modal{ animation:anModal .28s cubic-bezier(.2,.9,.25,1.05); }
+
+  /* --- Onda al hacer clic (la agrega admin.js) --- */
+  .onda-capa{ position:fixed; overflow:hidden; pointer-events:none; z-index:3000; }
+  .onda-clic{
+    position:absolute; border-radius:50%; pointer-events:none;
+    background:currentColor; opacity:.22; transform:scale(0);
+    animation:anOnda .55s ease-out forwards;
+  }
+}
+
+@keyframes anEntrarFade{ from{ opacity:0; } to{ opacity:1; } }
+@keyframes anSubir{ from{ opacity:0; transform:translateY(10px); } to{ opacity:1; transform:none; } }
+@keyframes anRebote{ 0%{ transform:scale(1); } 40%{ transform:scale(1.28); } 70%{ transform:scale(.94); } 100%{ transform:scale(1); } }
+@keyframes anPop{ 0%{ transform:scale(.94); } 60%{ transform:scale(1.04); } 100%{ transform:scale(1); } }
+@keyframes anModal{ from{ opacity:0; transform:translateY(14px) scale(.97); } to{ opacity:1; transform:none; } }
+@keyframes anOnda{ to{ transform:scale(2.6); opacity:0; } }
+
+/* Pantallas bajas (notebooks 1366×768 con barra de tareas): menú más compacto */
+@media (max-height:800px){
+  .sidebar{ padding-top:14px; padding-bottom:14px; }
+  .sidebar-brand{ padding-bottom:12px; }
+  .sidebar a{ padding-top:5px; padding-bottom:5px; font-size:13.5px; }
+  .sidebar .nav-grupo{ padding:7px 12px 2px; }
+  .sidebar .sync-estado-btn{ padding-top:6px; padding-bottom:6px; }
+  .sidebar .logout-btn{ padding-top:7px; padding-bottom:7px; }
 }

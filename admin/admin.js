@@ -1909,6 +1909,43 @@ function mostrarConfigTab(tabId, btnEl) {
   try { localStorage.setItem("veekpos_cfg_tab", tabId); } catch (e) {}
 }
 
+/**
+ * Oculta las pestañas de Configuración que no tienen ninguna tarjeta
+ * visible (ej.: en la versión web no hay Mercado Pago ni impresora, que
+ * son solo de la app de escritorio). Si la pestaña activa quedó oculta,
+ * se pasa a "Negocio".
+ */
+function actualizarPestanasConfigVisibles() {
+  document.querySelectorAll(".cfg-tab-pane").forEach(pane => {
+    const tab = pane.id.replace("cfgTab-", "");
+    const btn = document.querySelector(`.cfg-tab-btn[data-cfg-tab="${tab}"]`);
+    if (!btn) return;
+    const hayVisible = [...pane.children].some(c => getComputedStyle(c).display !== "none");
+    btn.style.display = hayVisible ? "" : "none";
+  });
+  const activo = document.querySelector(".cfg-tab-btn.active");
+  if (activo && activo.style.display === "none") mostrarConfigTab("negocio");
+}
+
+/** Atajos del Inicio: abre Productos ya filtrado (stock bajo, sin stock…) */
+function irAProductosFiltrados(estado) {
+  const sel = document.getElementById("filtroEstadoProducto");
+  const buscar = document.getElementById("buscarProducto");
+  const cat = document.getElementById("filtroCategoriaProductos");
+  if (buscar) buscar.value = "";
+  if (cat) cat.value = "";
+  if (sel) sel.value = estado;
+  mostrarSeccion("productos");
+  if (productosAdminGlobal && productosAdminGlobal.length) filtrarProductos();
+}
+
+/** Atajo del Inicio: ranking de más vendidos (Reportes → Productos) */
+function irAMasVendidos() {
+  if (obtenerRolActual() === "deposito") { toast("Tu usuario no tiene acceso a los reportes de ventas", "error"); return; }
+  _repTabActiva = "productos";
+  mostrarSeccion("reportes");
+}
+
 function mostrarSeccion(id) {
   // "Reportes de Compras" ahora es la pestaña "Compras y reposición" de Reportes
   if (id === "reportesCompras") { _repTabActiva = "compras"; id = "reportes"; }
@@ -1946,9 +1983,11 @@ function mostrarSeccion(id) {
   }
   if (id === "ventasPOS") cargarSiVencido("ventasPOS", cargarVentasPOSHistorial);
   if (id === "configuracion") {
-    let tabInicial = "general";
-    try { tabInicial = localStorage.getItem("veekpos_cfg_tab") || "general"; } catch (e) {}
-    if (!document.getElementById("cfgTab-" + tabInicial)) tabInicial = "general";
+    let tabInicial = "negocio";
+    try { tabInicial = localStorage.getItem("veekpos_cfg_tab") || "negocio"; } catch (e) {}
+    // Nombres de pestañas anteriores a la reorganización
+    tabInicial = ({ general: "negocio", productos: "pedidos", pagos: "sistema", hardware: "equipo", avanzado: "sistema" })[tabInicial] || tabInicial;
+    if (!document.getElementById("cfgTab-" + tabInicial)) tabInicial = "negocio";
     mostrarConfigTab(tabInicial);
 
     cargarConfigNegocioForm();
@@ -2004,6 +2043,8 @@ function mostrarSeccion(id) {
         if (typeof mostrarEstadoMercadoPagoEnConfig === "function") mostrarEstadoMercadoPagoEnConfig();
       }
     }
+    actualizarPestanasConfigVisibles();
+    setTimeout(actualizarPestanasConfigVisibles, 600); // la tarjeta de licencia se muestra async
   }
 
   if (id === "pos") {
@@ -4446,6 +4487,8 @@ function filtrarProductos() {
 
   if (estado === "sin_imagen") {
     filtrados = filtrados.filter(p => !String(p.IMAGEN || "").trim());
+  } else if (estado === "stock_bajo") {
+    filtrados = filtrados.filter(p => { const st = Number(p.STOCK ?? 0); return st > 0 && st <= 5; });
   } else if (estado === "sin_stock") {
     filtrados = filtrados.filter(p => Number(p.STOCK ?? 0) <= 0);
   } else if (estado === "stock_negativo") {
@@ -13677,12 +13720,12 @@ function tcTipoConfigurado() {
   return TC_TIPOS[t] ? t : "oficial";
 }
 
-/** Atajo desde la barra: abre Configuración > Productos y Pedidos, donde se elige el tipo de dólar */
+/** Atajo desde la barra: abre Configuración > Negocio, donde se elige el tipo de dólar */
 function tcIrAConfiguracion() {
   mostrarSeccion("configuracion");
   setTimeout(() => {
-    const btn = document.querySelector('.cfg-tab-btn[data-cfg-tab="productos"]');
-    if (btn) mostrarConfigTab("productos", btn);
+    const btn = document.querySelector('.cfg-tab-btn[data-cfg-tab="negocio"]');
+    if (btn) mostrarConfigTab("negocio", btn);
   }, 60);
 }
 
@@ -15789,7 +15832,8 @@ function mostrarAvisoPasswordDeFabrica() {
   div.innerHTML = '<span>⚠️ Estás usando la contraseña de fábrica. Cualquiera que la conozca puede entrar a tu panel.</span>' +
     '<button type="button" class="btn btn-sm btn-light fw-bold">Cambiarla ahora</button>';
   div.querySelector("button").onclick = () => {
-    mostrarSeccion("configuracion");
+    mostrarSeccion("usuarios");
+    if (typeof cargarUsuarios === "function") cargarUsuarios();
     setTimeout(() => {
       const campo = document.getElementById("credPasswordActual");
       if (campo) { campo.scrollIntoView({ behavior: "smooth", block: "center" }); campo.focus(); }
@@ -15836,6 +15880,15 @@ function aplicarPermisosPorRol() {
   document.querySelectorAll("#navLinks a[data-target], #bottomNavLinks a[data-target]").forEach(a => {
     const target = a.getAttribute("data-target");
     if (!permitidas.includes(target)) a.style.display = "none";
+  });
+
+  // Títulos de grupo del menú que quedaron sin ninguna opción visible: se ocultan
+  document.querySelectorAll("#navLinks .nav-grupo").forEach(g => {
+    let hayVisible = false;
+    for (let el = g.nextElementSibling; el && !el.classList.contains("nav-grupo"); el = el.nextElementSibling) {
+      if (el.tagName === "A" && el.style.display !== "none") { hayVisible = true; break; }
+    }
+    g.classList.toggle("vacio", !hayVisible);
   });
 
   // El rol vendedor ve la sección Pedidos y Movimientos de Caja, pero
@@ -15982,3 +16035,36 @@ function eliminarUsuarioClick(usuarioId, nombre) {
     "🗑️ Eliminar usuario"
   );
 }
+
+
+/* =====================================================================
+   ONDA AL HACER CLIC — en botones, menú y pestañas. Solo visual; si la
+   computadora pide "reducir movimiento", no se agrega.
+===================================================================== */
+(function () {
+  if (typeof window === "undefined" || !window.matchMedia) return;
+  const reducir = window.matchMedia("(prefers-reduced-motion: reduce)");
+  const SELECTOR = ".btn, .sidebar a, .bottom-nav a, .cfg-tab-btn, .rep-tab, .pos-action-btn, .cat-chip";
+  document.addEventListener("pointerdown", ev => {
+    if (reducir.matches || ev.button !== 0) return;
+    const el = ev.target.closest(SELECTOR);
+    if (!el || el.disabled || el.classList.contains("disabled")) return;
+    // La onda se dibuja en una capa aparte encima del elemento (no dentro
+    // de él), así no se mezcla con el contenido de botones que guardan y
+    // restauran su texto (ej. "Guardando..." → "Guardar").
+    const r = el.getBoundingClientRect();
+    const cs = getComputedStyle(el);
+    const capa = document.createElement("div");
+    capa.className = "onda-capa";
+    capa.style.cssText = `left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;border-radius:${cs.borderRadius};color:${cs.color}`;
+    const tam = Math.max(r.width, r.height);
+    const onda = document.createElement("span");
+    onda.className = "onda-clic";
+    onda.style.width = onda.style.height = tam + "px";
+    onda.style.left = (ev.clientX - r.left - tam / 2) + "px";
+    onda.style.top = (ev.clientY - r.top - tam / 2) + "px";
+    capa.appendChild(onda);
+    document.body.appendChild(capa);
+    setTimeout(() => capa.remove(), 600);
+  }, { passive: true });
+})();

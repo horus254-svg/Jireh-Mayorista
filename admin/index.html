@@ -6,7 +6,7 @@
 <title>VeekPOS · Punto de Venta</title>
 <link href="vendor/bootstrap.min.css" rel="stylesheet">
 <script>
-/* Estilo del panel elegido en ESTA computadora (Configuración → General).
+/* Estilo del panel elegido en ESTA computadora (Configuración → Esta computadora).
    Se aplica antes de pintar para que no se vea un instante el estilo clásico. */
 (function(){
   try{
@@ -299,19 +299,29 @@
     <div class="label"><span id="sidebarLabelTexto"></span><small id="sidebarLabelSub">PANEL ADMIN</small></div>
   </div>
   <nav id="navLinks">
-    <a href="#" data-target="dashboard"        onclick="mostrarSeccion('dashboard')"><span class="ic">🏠</span> Dashboard</a>
+    <a href="#" data-target="dashboard"        onclick="mostrarSeccion('dashboard')"><span class="ic">🏠</span> Inicio</a>
+
+    <div class="nav-grupo">Vender</div>
     <a href="#" data-target="pos"              onclick="mostrarSeccion('pos')"><span class="ic">🏪</span> Punto de Venta</a>
-    <a href="#" data-target="ventasPOS"        onclick="mostrarSeccion('ventasPOS')"><span class="ic">🧾</span> Ventas POS</a>
-    <a href="#" data-target="cierreCaja"        onclick="mostrarSeccion('cierreCaja')"><span class="ic">🧮</span> Cierre de Caja</a>
-    <a href="#" data-target="movimientosCaja"   onclick="mostrarSeccion('movimientosCaja')"><span class="ic">💸</span> Movimientos de Caja</a>
-    <a href="#" data-target="pedidos"          onclick="mostrarSeccion('pedidos')"><span class="ic">📦</span> Pedidos</a>
+    <a href="#" data-target="pedidos"          onclick="mostrarSeccion('pedidos')"><span class="ic">📦</span> Pedidos web</a>
+
+    <div class="nav-grupo">Caja</div>
+    <a href="#" data-target="ventasPOS"        onclick="mostrarSeccion('ventasPOS')"><span class="ic">🧾</span> Historial de ventas</a>
+    <a href="#" data-target="movimientosCaja"  onclick="mostrarSeccion('movimientosCaja')"><span class="ic">💸</span> Movimientos</a>
+    <a href="#" data-target="cierreCaja"       onclick="mostrarSeccion('cierreCaja')"><span class="ic">🧮</span> Cierre de caja</a>
+
+    <div class="nav-grupo">Mercadería</div>
     <a href="#" data-target="productos"        onclick="mostrarSeccion('productos')"><span class="ic">🛒</span> Productos</a>
-    <a href="#" data-target="ingresoProductos" onclick="mostrarSeccion('ingresoProductos')"><span class="ic">📥</span> Ingreso de Productos</a>
-    <a href="#" data-target="proveedores" onclick="mostrarSeccion('proveedores'); cargarProveedores();"><span class="ic">🚚</span> Proveedores</a>
+    <a href="#" data-target="ingresoProductos" onclick="mostrarSeccion('ingresoProductos')"><span class="ic">📥</span> Ingreso de mercadería</a>
+    <a href="#" data-target="proveedores"      onclick="mostrarSeccion('proveedores'); cargarProveedores();"><span class="ic">🚚</span> Proveedores</a>
+
+    <div class="nav-grupo">Clientes y números</div>
     <a href="#" data-target="clientes"         onclick="mostrarSeccion('clientes'); cargarClientes();"><span class="ic">👥</span> Clientes</a>
     <a href="#" data-target="reportes"         onclick="mostrarSeccion('reportes')"><span class="ic">📈</span> Reportes</a>
+
+    <div class="nav-grupo">Ajustes</div>
     <a href="#" data-target="configuracion"    onclick="mostrarSeccion('configuracion')"><span class="ic">⚙️</span> Configuración</a>
-    <a href="#" data-target="usuarios"         onclick="mostrarSeccion('usuarios'); cargarUsuarios();"><span class="ic">🔐</span> Usuarios</a>
+    <a href="#" data-target="usuarios"         onclick="mostrarSeccion('usuarios'); cargarUsuarios();"><span class="ic">🔐</span> Usuarios y accesos</a>
     <a href="#" data-target="instalador"       onclick="mostrarSeccion('instalador')" style="display:none;" title="Oculto — descomentar el style para volver a mostrarlo"><span class="ic">🛠️</span> Instalador</a>
   </nav>
   <!-- Estado de sincronización con Sheets (siempre visible) — lo pinta admin.js / pos-offline.js -->
@@ -332,7 +342,7 @@
     <a href="#" data-target="pos"       onclick="mostrarSeccion('pos')"><span class="ic">🏪</span>Venta</a>
     <a href="#" data-target="cierreCaja" onclick="mostrarSeccion('cierreCaja')"><span class="ic">🧮</span>Caja</a>
     <a href="#" data-target="pedidos"   onclick="mostrarSeccion('pedidos')"><span class="ic">📦</span>Pedidos</a>
-    <a href="#" data-target="productos" onclick="mostrarSeccion('productos')"><span class="ic">🛒</span>Stock</a>
+    <a href="#" data-target="productos" onclick="mostrarSeccion('productos')"><span class="ic">🛒</span>Productos</a>
     <a href="#" data-target="reportes"  onclick="mostrarSeccion('reportes')"><span class="ic">📈</span>Reportes</a>
   </nav>
 </div>
@@ -343,7 +353,7 @@
   <!-- ===== DASHBOARD ===== -->
   <div id="dashboard" class="seccion">
     <div class="page-header">
-      <div><h1>Dashboard</h1><div class="sub">Resumen general del negocio</div></div>
+      <div><h1>Inicio</h1><div class="sub">Resumen general del negocio</div></div>
     </div>
 
     <!-- POS daily summary banner -->
@@ -374,7 +384,7 @@
 
     <div class="row g-3">
       <div class="col-6 col-md-3">
-        <div class="card p-3 dashboard-card metric-card" onclick="mostrarSeccion('masVendidos'); cargarMasVendidos();">
+        <div class="card p-3 dashboard-card metric-card" onclick="irAMasVendidos()">
           <div class="metric-icon bg-tint-amber">🏆</div>
           <h6>Más Vendido</h6>
           <h2 id="cantidadMasVendidos" style="font-size:18px;">Ver ranking →</h2>
@@ -388,14 +398,14 @@
         </div>
       </div>
       <div class="col-6 col-md-3">
-        <div class="card p-3 dashboard-card metric-card" onclick="mostrarSeccion('stockBajoProductos'); cargarStockBajo();">
+        <div class="card p-3 dashboard-card metric-card" onclick="irAProductosFiltrados('stock_bajo')">
           <div class="metric-icon bg-tint-amber">⚠️</div>
           <h6>Stock Bajo</h6>
           <h2 id="stockBajo">0</h2>
         </div>
       </div>
       <div class="col-6 col-md-3">
-        <div class="card p-3 dashboard-card metric-card" onclick="mostrarSeccion('productosAgotados'); cargarAgotados();">
+        <div class="card p-3 dashboard-card metric-card" onclick="irAProductosFiltrados('sin_stock')">
           <div class="metric-icon bg-tint-red">❌</div>
           <h6>Stock 0</h6>
           <h2 id="agotados">0</h2>
@@ -468,7 +478,7 @@
     <div class="page-header">
       <div><h1>Clientes</h1><div class="sub">Historial de compra y cuentas a crédito</div></div>
       <div class="d-flex gap-2">
-        <button class="btn btn-outline-secondary" id="btnActualizarClientes" onclick="actualizarClientesForm()">🔄 Actualizar</button>
+        <button class="btn btn-outline-secondary" id="btnActualizarClientes" onclick="actualizarClientesForm()">↻ Actualizar</button>
         <button class="btn btn-success" onclick="abrirModalNuevoCliente()">+ Nuevo Cliente</button>
       </div>
     </div>
@@ -517,7 +527,7 @@
 
   <!-- ===== MAS VENDIDOS ===== -->
   <div id="masVendidos" class="seccion">
-    <div class="page-header"><div><h1>🏆 Más Vendidos</h1><div class="sub">Ranking de productos por unidades vendidas</div></div></div>
+    <div class="page-header"><div><h1>Más vendidos</h1><div class="sub">Ranking de productos por unidades vendidas</div></div></div>
     <div class="card p-3">
       <div class="table-responsive">
         <table class="table table-striped">
@@ -531,11 +541,12 @@
   <!-- ===== PEDIDOS ===== -->
   <div id="pedidos" class="seccion">
     <div class="page-header">
-      <div><h1>Pedidos</h1><div class="sub">Seguimiento y estado de pedidos del catálogo web</div></div>
+      <div><h1>Pedidos web</h1><div class="sub">Seguimiento y estado de los pedidos del catálogo web</div></div>
       <div class="d-flex gap-2">
-        <button class="btn btn-outline-primary btn-sm" onclick="abrirModalEtiquetaManual()">🏷️ Rotulo Manual</button>
-        <button class="btn btn-outline-danger btn-sm" id="btnEliminarPedidosCancelados" onclick="eliminarPedidosCancelados()">🗑️ Eliminar cancelados</button>
         <button class="btn btn-outline-secondary btn-sm" onclick="recargarPedidos()">↻ Actualizar</button>
+        <button class="btn btn-outline-primary btn-sm" onclick="abrirModalEtiquetaManual()">🏷️ Rótulo manual</button>
+        <span class="separador-acciones" aria-hidden="true"></span>
+        <button class="btn btn-outline-danger btn-sm" id="btnEliminarPedidosCancelados" onclick="eliminarPedidosCancelados()" title="Borra de la lista todos los pedidos en estado Cancelado">🗑️ Eliminar cancelados</button>
       </div>
     </div>
     <div class="card p-3">
@@ -582,6 +593,7 @@
           <select id="filtroEstadoProducto" class="form-select form-select-sm" style="max-width:170px" onchange="filtrarProductos()">
             <option value="">Todos los productos</option>
             <option value="sin_imagen">Sin imagen</option>
+            <option value="stock_bajo">Stock bajo (1 a 5)</option>
             <option value="sin_stock">Sin stock (0)</option>
             <option value="stock_negativo">Stock negativo</option>
             <option value="sin_imagen_y_stock">Sin imagen y sin stock</option>
@@ -637,7 +649,7 @@
   <!-- ===== INGRESO DE PRODUCTOS (recepción de mercadería) ===== -->
   <div id="ingresoProductos" class="seccion">
     <div class="page-header">
-      <div><h1>Ingreso de Productos</h1><div class="sub">Recepción de mercadería con proveedor — un documento por boleta</div></div>
+      <div><h1>Ingreso de mercadería</h1><div class="sub">Recepción de mercadería con proveedor — un documento por boleta</div></div>
       <div class="d-flex gap-2">
         <button class="btn btn-outline-secondary btn-sm" onclick="cargarHistorialIngresos()">↻ Actualizar</button>
         <button class="btn btn-outline-dark" onclick="exportarIngresosPDF()">📄 Informe PDF</button>
@@ -948,7 +960,7 @@
     <div class="page-header">
       <div><h1>Proveedores</h1><div class="sub">Boletas cargadas y saldos pendientes de pago, por proveedor</div></div>
       <div class="d-flex gap-2">
-        <button class="btn btn-outline-secondary" onclick="cargarProveedores()">🔄 Actualizar</button>
+        <button class="btn btn-outline-secondary" onclick="cargarProveedores()">↻ Actualizar</button>
       </div>
     </div>
 
@@ -1017,7 +1029,7 @@
     <div class="page-header">
       <div><h1>Punto de Venta</h1><div class="sub">Escaneá, buscá o tocá un producto para agregarlo al ticket</div></div>
       <div class="d-flex gap-2">
-        <button class="btn-shortcuts-help" id="btnActualizarCatalogo" onclick="actualizarCatalogoPOSManual()" title="Volver a pedir el catálogo">🔄 Actualizar catálogo</button>
+        <button class="btn-shortcuts-help" id="btnActualizarCatalogo" onclick="actualizarCatalogoPOSManual()" title="Volver a pedir el catálogo">↻ Actualizar catálogo</button>
         <button class="btn-shortcuts-help" id="btnShortcutsHelp" onclick="toggleShortcutsHelp()" title="Atajos de teclado (F1)">⌨️ Atajos</button>
       </div>
     </div>
@@ -1118,7 +1130,7 @@
   <!-- ===== VENTAS POS (historial + reimpresión) ===== -->
   <div id="ventasPOS" class="seccion">
     <div class="page-header">
-      <div><h1>🧾 Ventas POS</h1><div class="sub">Historial de ventas de mostrador — reimprimí cualquier ticket</div></div>
+      <div><h1>Historial de ventas</h1><div class="sub">Ventas de mostrador — reimprimí cualquier ticket</div></div>
       <button class="btn btn-outline-secondary btn-sm" onclick="recargarVentasPOSHistorial()">↻ Actualizar</button>
     </div>
 
@@ -1171,7 +1183,7 @@
   <!-- ===== CIERRE DE CAJA ===== -->
   <div id="cierreCaja" class="seccion">
     <div class="page-header">
-      <div><h1>🧮 Cierre de Caja</h1><div class="sub">Reconciliación diaria — compará lo esperado contra lo contado</div></div>
+      <div><h1>Cierre de caja</h1><div class="sub">Reconciliación diaria — compará lo esperado contra lo contado</div></div>
       <div style="display:flex; gap:8px;">
         <button class="btn btn-outline-secondary btn-sm" onclick="cargarResumenCierreCaja(document.getElementById('ccFechaSelector')?.value, true)">↻ Recalcular</button>
         <button class="btn btn-outline-primary btn-sm" onclick="imprimirCierreCaja()">🖨️ Imprimir Cierre</button>
@@ -1311,7 +1323,7 @@
   <!-- ===== MOVIMIENTOS DE CAJA (ingresos / egresos manuales) ===== -->
   <div id="movimientosCaja" class="seccion">
     <div class="page-header">
-      <div><h1>💸 Movimientos de Caja</h1><div class="sub">Ingresos y egresos manuales — retiros, gastos chicos, aportes</div></div>
+      <div><h1>Movimientos de caja</h1><div class="sub">Ingresos y egresos manuales — retiros, gastos chicos, aportes</div></div>
       <div class="d-flex align-items-center gap-2">
         <input type="date" id="mcFechaSelector" class="form-control form-control-sm" style="max-width:160px;" onchange="cargarMovimientosCajaHoy()">
         <button class="btn btn-outline-secondary btn-sm" onclick="cargarMovimientosCajaHoy()">↻ Actualizar</button>
@@ -1813,15 +1825,15 @@
   <!-- ===== USUARIOS Y ROLES ===== -->
   <div id="usuarios" class="seccion">
     <div class="page-header">
-      <div><h1>Usuarios</h1><div class="sub">Accesos al panel y sus permisos</div></div>
+      <div><h1>Usuarios y accesos</h1><div class="sub">Quién entra al panel, con qué permisos, y las contraseñas</div></div>
       <button class="btn btn-success" onclick="nuevoUsuario()">+ Nuevo Usuario</button>
     </div>
 
     <div class="card p-3 mb-3">
       <div class="d-flex flex-wrap gap-3" style="font-size:13px;">
         <div><strong>👑 Admin:</strong> acceso a todo el panel, incluida esta pantalla.</div>
-        <div><strong>🏪 Vendedor:</strong> Punto de Venta, Ventas, Cierre de Caja, Pedidos y Clientes.</div>
-        <div><strong>📦 Depósito:</strong> Productos, Ingreso de Productos y Reportes de Compras.</div>
+        <div><strong>🏪 Vendedor:</strong> Punto de Venta, Pedidos web, Caja (historial, movimientos y cierre) y Clientes.</div>
+        <div><strong>📦 Depósito:</strong> Productos, Ingreso de mercadería, Proveedores y Reportes de compras.</div>
       </div>
     </div>
 
@@ -1833,6 +1845,55 @@
         </table>
       </div>
     </div>
+
+    <div class="mt-3"></div>
+    <div class="card p-3 mt-3">
+        <h6 style="margin-bottom:14px;">🔑 Acceso al panel</h6>
+        <p class="text-muted" style="font-size:12.5px; margin-top:-8px; margin-bottom:14px;">
+          Usuario y contraseña para entrar al panel admin. Por seguridad, necesitás escribir la contraseña actual para poder cambiarlos.
+        </p>
+
+        <div class="mb-3">
+          <label class="form-label">Contraseña actual *</label>
+          <input type="password" class="form-control" id="credPasswordActual" placeholder="Tu contraseña actual" autocomplete="current-password">
+        </div>
+
+        <div class="row g-2 mb-3">
+          <div class="col-6">
+            <label class="form-label">Nuevo usuario</label>
+            <input type="text" class="form-control" id="credNuevoUsuario" placeholder="Ej: admin" autocomplete="username">
+          </div>
+          <div class="col-6">
+            <label class="form-label">Nueva contraseña</label>
+            <input type="password" class="form-control" id="credNuevaPassword" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+          </div>
+        </div>
+
+        <div class="d-flex justify-content-end mt-3">
+          <button class="btn btn-success" id="btnGuardarCredenciales" onclick="guardarCredencialesForm()">💾 Cambiar acceso</button>
+        </div>
+      </div>
+
+    <div class="card p-3 mt-3">
+        <h6 style="margin-bottom:14px;">📦 Acceso a Gestión de Stock</h6>
+        <p class="text-muted" style="font-size:12.5px; margin-top:-8px; margin-bottom:14px;">
+          Contraseña propia para <code>stock.html</code> — a propósito distinta de la del panel completo, para poder dársela a alguien de depósito sin darle acceso a ventas, clientes ni el resto de la configuración. Para cambiarla necesitás tu contraseña del panel admin (no la de stock vieja).
+        </p>
+
+        <div class="mb-3">
+          <label class="form-label">Tu contraseña del panel admin *</label>
+          <input type="password" class="form-control" id="stockPasswordAdminActual" placeholder="Para confirmar el cambio" autocomplete="current-password">
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Nueva contraseña de stock</label>
+          <input type="password" class="form-control" id="stockPasswordNueva" placeholder="Mínimo 4 caracteres" autocomplete="new-password">
+        </div>
+
+        <div class="d-flex justify-content-end mt-3">
+          <button class="btn btn-success" id="btnGuardarPasswordStock" onclick="guardarPasswordStockForm()">💾 Cambiar contraseña de stock</button>
+        </div>
+      </div>
   </div>
 
   <!-- ===== MODAL USUARIO ===== -->
@@ -1883,27 +1944,66 @@
   <!-- ===== CONFIGURACION ===== -->
   <div id="configuracion" class="seccion">
     <div class="page-header">
-      <div><h1>⚙️ Configuración</h1><div class="sub">Todo lo que podés personalizar de tu VeekPOS, agrupado por tema</div></div>
+      <div><h1>Configuración</h1><div class="sub">Todo lo que podés personalizar de tu VeekPOS, agrupado por tema</div></div>
     </div>
 
     <div class="cfg-tabs" id="cfgTabsNav">
-      <button type="button" class="cfg-tab-btn active" data-cfg-tab="general" onclick="mostrarConfigTab('general', this)"><span class="ic">🏪</span> General</button>
-      <button type="button" class="cfg-tab-btn" data-cfg-tab="catalogo" onclick="mostrarConfigTab('catalogo', this)"><span class="ic">🌐</span> Catálogo Web</button>
-      <button type="button" class="cfg-tab-btn" data-cfg-tab="productos" onclick="mostrarConfigTab('productos', this)"><span class="ic">🖼️</span> Productos y Pedidos</button>
-      <button type="button" class="cfg-tab-btn" data-cfg-tab="pagos" onclick="mostrarConfigTab('pagos', this)"><span class="ic">💳</span> Pagos y Conexión</button>
-      <button type="button" class="cfg-tab-btn" data-cfg-tab="hardware" onclick="mostrarConfigTab('hardware', this)"><span class="ic">🖨️</span> Hardware</button>
-      <button type="button" class="cfg-tab-btn" data-cfg-tab="avanzado" onclick="mostrarConfigTab('avanzado', this)"><span class="ic">🔧</span> Avanzado</button>
+      <button type="button" class="cfg-tab-btn active" data-cfg-tab="negocio" onclick="mostrarConfigTab('negocio', this)" title="Datos del negocio, ticket y moneda"><span class="ic">🏪</span> Negocio</button>
+      <button type="button" class="cfg-tab-btn" data-cfg-tab="catalogo" onclick="mostrarConfigTab('catalogo', this)" title="Cómo se ve la página pública"><span class="ic">🌐</span> Catálogo web</button>
+      <button type="button" class="cfg-tab-btn" data-cfg-tab="pedidos" onclick="mostrarConfigTab('pedidos', this)" title="Reglas y datos de los pedidos del catálogo"><span class="ic">📦</span> Pedidos</button>
+      <button type="button" class="cfg-tab-btn" data-cfg-tab="cobros" onclick="mostrarConfigTab('cobros', this)" title="Medios de cobro"><span class="ic">💳</span> Cobros</button>
+      <button type="button" class="cfg-tab-btn" data-cfg-tab="equipo" onclick="mostrarConfigTab('equipo', this)" title="Solo afecta a esta caja"><span class="ic">🖥️</span> Esta computadora</button>
+      <button type="button" class="cfg-tab-btn" data-cfg-tab="sistema" onclick="mostrarConfigTab('sistema', this)" title="Licencia, conexión y mantenimiento"><span class="ic">🔧</span> Sistema</button>
     </div>
 
-    <!-- =================================================================== -->
-    <!-- TAB 1: GENERAL — lo que se configura al arrancar y se revisa seguido -->
-    <!-- =================================================================== -->
-    <div class="cfg-tab-pane active" id="cfgTab-general">
+    <!-- ===== PESTAÑA: NEGOCIO — Datos del negocio, ticket y moneda ===== -->
+    <div class="cfg-tab-pane active" id="cfgTab-negocio">
 
-      <div class="card p-3 mb-3">
-        <h6 style="margin-bottom:4px;">🖥️ Estilo del panel en esta computadora</h6>
-        <p class="text-muted" style="font-size:13px;margin-bottom:14px;">Cambia cómo se ve el panel solo en esta caja (cada una puede elegir el suyo). El color del negocio se sigue eligiendo en Catálogo Web → Color del sitio.</p>
-        <div class="estilos-grid" id="selectorEstilosPanel" role="group" aria-label="Estilo del panel"></div>
+      <div class="card p-3 mt-3">
+        <h6 style="margin-bottom:6px;">🌐 Datos generales, ícono y SEO</h6>
+        <p class="text-muted" style="font-size:13px;">Se usan al compartir el link del catálogo (WhatsApp, Facebook, X) y para buscadores como Google.</p>
+
+        <div class="mb-3">
+          <span class="form-label d-block">URL del catálogo online</span>
+          <div class="form-text" style="font-size:11.5px;">
+            Ese dato se edita en la pestaña <strong>Catálogo web → "📱 Catálogo online (para los QR de precio)"</strong> — se usa tanto para los QR como para el SEO/redes, no hace falta repetirlo acá.
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Nombre corto <span class="text-muted" style="font-size:11px;">(pantalla de acceso a Reportes)</span></label>
+          <input type="text" class="form-control" id="cfgNombreCorto" placeholder="Ej: MI NEGOCIO">
+        </div>
+
+        <div class="row g-2 mb-3">
+          <div class="col-md-6">
+            <label class="form-label">Ícono del catálogo <span class="text-muted" style="font-size:11px;">(archivo icon-512.png o URL)</span></label>
+            <input type="text" class="form-control" id="cfgIconoUrl" placeholder="icon-512.png">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Ícono del botón flotante de WhatsApp</label>
+            <input type="url" class="form-control" id="cfgWhatsappIconoUrl" placeholder="https://...">
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Título SEO <span class="text-muted" style="font-size:11px;">(pestaña del navegador y buscadores)</span></label>
+          <input type="text" class="form-control" id="cfgSeoTitulo" placeholder="Ej: Mi Negocio — Venta mayorista">
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Descripción SEO</label>
+          <textarea class="form-control" id="cfgSeoDescripcion" rows="2" placeholder="Descripción corta que aparece en Google y al compartir el link"></textarea>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Palabras clave SEO <span class="text-muted" style="font-size:11px;">(separadas por coma)</span></label>
+          <input type="text" class="form-control" id="cfgSeoKeywords" placeholder="mayorista, juguetes, ...">
+        </div>
+
+        <div class="d-flex justify-content-end mt-3">
+          <button class="btn btn-success" onclick="guardarAparienciaForm()">💾 Guardar</button>
+        </div>
       </div>
 
       <div class="card p-3 mb-3">
@@ -1940,22 +2040,6 @@
           <input type="text" class="form-control" id="cfgPie" placeholder="Ej: ¡Gracias por su compra!">
         </div>
 
-        <hr class="my-4">
-        <h6 style="margin-bottom:6px;">🏦 Datos bancarios</h6>
-        <p class="text-muted" style="font-size:12.5px; margin-top:-4px; margin-bottom:14px;">
-          Se incluyen en el mensaje de WhatsApp que se manda al cliente cuando un pedido queda en estado "Nuevo".
-        </p>
-        <div class="row g-2 mb-3">
-          <div class="col-md-7">
-            <label class="form-label">CBU / Alias para transferencia</label>
-            <input type="text" class="form-control" id="cfgCbuTransferencia" placeholder="Ej: 0000000000000000000000">
-          </div>
-          <div class="col-md-5">
-            <label class="form-label">Titular de la cuenta</label>
-            <input type="text" class="form-control" id="cfgNombreTitularCbu" placeholder="Ej: NOMBRE APELLIDO">
-          </div>
-        </div>
-
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-3">
           <button class="btn btn-outline-secondary btn-sm" onclick="restablecerConfigNegocio()">↺ Restablecer valores</button>
           <div class="d-flex gap-2">
@@ -1970,90 +2054,53 @@
         </div>
       </div>
 
-      <div class="card p-3 mt-3">
-        <h6 style="margin-bottom:14px;">🔑 Acceso al panel</h6>
-        <p class="text-muted" style="font-size:12.5px; margin-top:-8px; margin-bottom:14px;">
-          Usuario y contraseña para entrar al panel admin. Por seguridad, necesitás escribir la contraseña actual para poder cambiarlos.
+      <div class="card p-3 mb-3">
+        <h6 style="margin-bottom:6px;">💵 Dólar de referencia (tipo de cambio)</h6>
+        <p class="text-muted" style="font-size:12.5px; margin-top:-2px; margin-bottom:14px;">
+          Qué cotización se trae sola como tipo de cambio en Ingreso de Productos (se usa el valor de <b>venta</b> del día). Igual lo podés editar en cada ingreso.
         </p>
-
-        <div class="mb-3">
-          <label class="form-label">Contraseña actual *</label>
-          <input type="password" class="form-control" id="credPasswordActual" placeholder="Tu contraseña actual" autocomplete="current-password">
+        <div class="mb-2">
+          <label class="form-label">Tipo de dólar</label>
+          <select class="form-select" id="cfgDolarTipo">
+            <option value="oficial">Oficial</option>
+            <option value="blue">Blue</option>
+            <option value="bolsa">MEP (Bolsa)</option>
+            <option value="mayorista">Mayorista</option>
+            <option value="tarjeta">Tarjeta</option>
+          </select>
+          <div class="form-text" id="cfgDolarHoy" style="font-size:12px;"></div>
         </div>
-
-        <div class="row g-2 mb-3">
-          <div class="col-6">
-            <label class="form-label">Nuevo usuario</label>
-            <input type="text" class="form-control" id="credNuevoUsuario" placeholder="Ej: admin" autocomplete="username">
-          </div>
-          <div class="col-6">
-            <label class="form-label">Nueva contraseña</label>
-            <input type="password" class="form-control" id="credNuevaPassword" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
-          </div>
-        </div>
-
-        <div class="d-flex justify-content-end mt-3">
-          <button class="btn btn-success" id="btnGuardarCredenciales" onclick="guardarCredencialesForm()">💾 Cambiar acceso</button>
+        <div class="d-flex justify-content-end">
+          <button class="btn btn-success" id="btnGuardarDolarTipo" onclick="guardarDolarTipoForm()">💾 Guardar dólar de referencia</button>
         </div>
       </div>
 
-      <div class="card p-3 mt-3">
-        <h6 style="margin-bottom:14px;">📦 Acceso a Gestión de Stock</h6>
+      <div class="card p-3 mb-3">
+        <h6 style="margin-bottom:14px;">🅰️ Logo y nombre del menú lateral</h6>
         <p class="text-muted" style="font-size:12.5px; margin-top:-8px; margin-bottom:14px;">
-          Contraseña propia para <code>stock.html</code> — a propósito distinta de la del panel completo, para poder dársela a alguien de depósito sin darle acceso a ventas, clientes ni el resto de la configuración. Para cambiarla necesitás tu contraseña del panel admin (no la de stock vieja).
+          Esto cambia solo lo que se ve aquí, en el menú lateral del panel — no afecta al catálogo web.
         </p>
 
-        <div class="mb-3">
-          <label class="form-label">Tu contraseña del panel admin *</label>
-          <input type="password" class="form-control" id="stockPasswordAdminActual" placeholder="Para confirmar el cambio" autocomplete="current-password">
-        </div>
-
-        <div class="mb-3">
-          <label class="form-label">Nueva contraseña de stock</label>
-          <input type="password" class="form-control" id="stockPasswordNueva" placeholder="Mínimo 4 caracteres" autocomplete="new-password">
+        <div class="row g-2 mb-3">
+          <div class="col-3">
+            <label class="form-label">Letra/ícono</label>
+            <input type="text" class="form-control text-center" id="cfgSidebarMark" placeholder="J" maxlength="2">
+          </div>
+          <div class="col-9">
+            <label class="form-label">Nombre <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+            <input type="text" class="form-control" id="cfgSidebarTexto" placeholder="Ej: MI NEGOCIO">
+          </div>
         </div>
 
         <div class="d-flex justify-content-end mt-3">
-          <button class="btn btn-success" id="btnGuardarPasswordStock" onclick="guardarPasswordStockForm()">💾 Cambiar contraseña de stock</button>
+          <button class="btn btn-success" id="btnGuardarSidebar" onclick="guardarSidebarForm()">💾 Guardar</button>
         </div>
       </div>
 
     </div>
 
-    <!-- =================================================================== -->
-    <!-- TAB 2: CATÁLOGO WEB — todo lo que ve el cliente en la página online -->
-    <!-- =================================================================== -->
+    <!-- ===== PESTAÑA: CATÁLOGO WEB — Cómo se ve la página pública ===== -->
     <div class="cfg-tab-pane" id="cfgTab-catalogo">
-
-      <div class="card p-3 mb-3">
-        <h6 style="margin-bottom:14px;">📱 Catálogo online (para los QR de precio)</h6>
-        <p class="text-muted" style="font-size:12.5px; margin-top:-8px; margin-bottom:14px;">
-          La URL donde está publicado tu catálogo online. Se usa para armar el link de los códigos QR que generás desde Productos — al escanearlos, abren una página chica con el nombre y precio actualizado de ese producto. También se usa para el SEO y las redes sociales, más abajo.
-        </p>
-
-        <div class="mb-3">
-          <label class="form-label">URL del catálogo (sin / al final)</label>
-          <input type="text" class="form-control" id="cfgUrlCatalogo" placeholder="https://tunegocio.com">
-        </div>
-
-        <div class="d-flex justify-content-end mt-3">
-          <button class="btn btn-success" id="btnGuardarUrlCatalogo" onclick="guardarUrlCatalogoForm()">💾 Guardar</button>
-        </div>
-      </div>
-
-      <div class="card p-3 mt-3">
-        <h6 style="margin-bottom:6px;">🛒 Pedido mínimo</h6>
-        <p class="text-muted" style="font-size:12.5px; margin-top:-2px; margin-bottom:14px;">
-          El cliente no puede enviar el pedido si el total no llega a este monto. Se aplica al instante en el catálogo.
-        </p>
-        <div class="mb-3">
-          <label class="form-label">Monto mínimo ($)</label>
-          <input type="number" class="form-control" id="cfgPedidoMinimo" min="0" step="1000" placeholder="Ej: 100000">
-        </div>
-        <div class="d-flex justify-content-end">
-          <button class="btn btn-success" id="btnGuardarPedidoMinimo" onclick="guardarPedidoMinimoForm()">💾 Guardar pedido mínimo</button>
-        </div>
-      </div>
 
       <div class="card p-3 mt-3">
         <h6 style="margin-bottom:14px;">🎨 Apariencia del catálogo web</h6>
@@ -2155,78 +2202,72 @@
       </div>
 
       <div class="card p-3 mt-3">
-        <h6 style="margin-bottom:6px;">🌐 Datos generales, ícono y SEO</h6>
-        <p class="text-muted" style="font-size:13px;">Se usan al compartir el link del catálogo (WhatsApp, Facebook, X) y para buscadores como Google.</p>
+        <h6 style="margin-bottom:6px;">📢 Banner superior (mensajes rotativos)</h6>
+        <p class="text-muted" style="font-size:12.5px; margin-top:-4px; margin-bottom:14px;">
+          Una franja verde arriba de todo el catálogo, que va rotando solo entre los mensajes que escribas acá. Escribí un mensaje por línea — si dejás solo uno, queda fijo sin rotar.
+        </p>
 
         <div class="mb-3">
-          <span class="form-label d-block">URL del catálogo online</span>
-          <div class="form-text" style="font-size:11.5px;">
-            Ese dato ya se edita en la sección <strong>"📱 Catálogo online (para los QR de precio)"</strong> más arriba — se usa tanto para los QR como para el SEO/redes, no hace falta repetirlo acá.
-          </div>
-        </div>
-
-        <div class="mb-3">
-          <label class="form-label">Nombre corto <span class="text-muted" style="font-size:11px;">(pantalla de acceso a Reportes)</span></label>
-          <input type="text" class="form-control" id="cfgNombreCorto" placeholder="Ej: MI NEGOCIO">
-        </div>
-
-        <div class="row g-2 mb-3">
-          <div class="col-md-6">
-            <label class="form-label">Ícono del catálogo <span class="text-muted" style="font-size:11px;">(archivo icon-512.png o URL)</span></label>
-            <input type="text" class="form-control" id="cfgIconoUrl" placeholder="icon-512.png">
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">Ícono del botón flotante de WhatsApp</label>
-            <input type="url" class="form-control" id="cfgWhatsappIconoUrl" placeholder="https://...">
-          </div>
-        </div>
-
-        <div class="mb-3">
-          <label class="form-label">Título SEO <span class="text-muted" style="font-size:11px;">(pestaña del navegador y buscadores)</span></label>
-          <input type="text" class="form-control" id="cfgSeoTitulo" placeholder="Ej: Mi Negocio — Venta mayorista">
-        </div>
-
-        <div class="mb-3">
-          <label class="form-label">Descripción SEO</label>
-          <textarea class="form-control" id="cfgSeoDescripcion" rows="2" placeholder="Descripción corta que aparece en Google y al compartir el link"></textarea>
-        </div>
-
-        <div class="mb-3">
-          <label class="form-label">Palabras clave SEO <span class="text-muted" style="font-size:11px;">(separadas por coma)</span></label>
-          <input type="text" class="form-control" id="cfgSeoKeywords" placeholder="mayorista, juguetes, ...">
+          <textarea class="form-control" id="cfgBannerTopMensajes" rows="4" placeholder="🚚 Envíos a todo el país&#10;✅ Stock actualizado&#10;💳 Aceptamos todos los medios de pago"></textarea>
+          <div class="form-text" style="font-size:11.5px;">Un mensaje por renglón. Vaciá el campo entero para ocultar la franja por completo.</div>
         </div>
 
         <div class="d-flex justify-content-end mt-3">
-          <button class="btn btn-success" onclick="guardarAparienciaForm()">💾 Guardar</button>
+          <button class="btn btn-success" id="btnGuardarBannerTop" onclick="guardarBannerTopForm()">💾 Guardar</button>
         </div>
       </div>
 
       <div class="card p-3 mt-3">
-        <h6 style="margin-bottom:6px;">🦶 Pie de página del catálogo</h6>
+        <h6 style="margin-bottom:14px;">🏷️ Beneficios del catálogo (debajo del banner)</h6>
+        <p class="text-muted" style="font-size:12.5px; margin-top:-8px; margin-bottom:14px;">
+          Estos son los 6 carteles cortos que aparecen debajo del banner del catálogo. El que dejes vacío, simplemente no se muestra.
+        </p>
 
         <div class="mb-3">
-          <label class="form-label">Título de la primera columna</label>
-          <input type="text" class="form-control" id="cfgFooterTitulo1" placeholder="Ej: Mi Negocio">
+          <label class="form-label">WhatsApp <span class="text-muted" style="font-size:11px;">(número, solo para este botón y para recibir pedidos)</span></label>
+          <input type="text" class="form-control" id="cfgBeneficioWhatsapp" placeholder="Ej: 5491112345678">
+          <div class="form-text" style="font-size:11.5px;">Con código de país y de área, sin espacios ni signos. Ej: 5491112345678.</div>
         </div>
+
         <div class="mb-3">
-          <label class="form-label">Texto de la primera columna</label>
-          <textarea class="form-control" id="cfgFooterTexto1" rows="2"></textarea>
+          <label class="form-label">Instagram <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+          <input type="text" class="form-control" id="cfgBeneficioInstagram" placeholder="https://instagram.com/tu_cuenta">
         </div>
-        <div class="mb-3">
-          <label class="form-label">Texto de la columna "Categorías"</label>
-          <textarea class="form-control" id="cfgFooterTexto2" rows="2"></textarea>
+
+        <div class="row g-2 mb-3">
+          <div class="col-6">
+            <label class="form-label">Teléfono 1 <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+            <input type="text" class="form-control" id="cfgBeneficioTelefono1" placeholder="Ej: 11-2345-6789">
+          </div>
+          <div class="col-6">
+            <label class="form-label">Teléfono 2 <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+            <input type="text" class="form-control" id="cfgBeneficioTelefono2" placeholder="Ej: 11-9876-5432">
+          </div>
         </div>
+
         <div class="mb-3">
-          <label class="form-label">Texto de la columna "Envíos y pedidos"</label>
-          <textarea class="form-control" id="cfgFooterTexto3" rows="2"></textarea>
+          <label class="form-label">Dirección <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+          <input type="text" class="form-control" id="cfgBeneficioDireccion" placeholder="Ej: Av. Siempre Viva 123, Buenos Aires">
         </div>
-        <div class="mb-3">
-          <label class="form-label">Copyright (línea final del footer)</label>
-          <input type="text" class="form-control" id="cfgFooterCopyright" placeholder="© 2026 Mi Negocio">
+
+        <div class="row g-2 mb-3">
+          <div class="col-6">
+            <label class="form-label">Texto libre 1 <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+            <input type="text" class="form-control" id="cfgBeneficioTexto1" placeholder="Ej: ✅ Stock actualizado">
+          </div>
+          <div class="col-6">
+            <label class="form-label">Texto libre 2 <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+            <input type="text" class="form-control" id="cfgBeneficioTexto2" placeholder="Ej: 🚚 Envíos a todo el país">
+          </div>
+        </div>
+
+        <div class="config-preview-hint mb-3">
+          <span class="ic">ℹ️</span>
+          El número de WhatsApp que pongas aquí es el que usa el botón flotante de ayuda y al que llegan los pedidos del catálogo.
         </div>
 
         <div class="d-flex justify-content-end mt-3">
-          <button class="btn btn-success" onclick="guardarAparienciaForm()">💾 Guardar</button>
+          <button class="btn btn-success" id="btnGuardarBeneficios" onclick="guardarBeneficiosForm()">💾 Guardar beneficios</button>
         </div>
       </div>
 
@@ -2292,72 +2333,66 @@
       </div>
 
       <div class="card p-3 mt-3">
-        <h6 style="margin-bottom:14px;">🏷️ Beneficios del catálogo (debajo del banner)</h6>
-        <p class="text-muted" style="font-size:12.5px; margin-top:-8px; margin-bottom:14px;">
-          Estos son los 6 carteles cortos que aparecen debajo del banner del catálogo. El que dejes vacío, simplemente no se muestra.
-        </p>
+        <h6 style="margin-bottom:6px;">🦶 Pie de página del catálogo</h6>
 
         <div class="mb-3">
-          <label class="form-label">WhatsApp <span class="text-muted" style="font-size:11px;">(número, solo para este botón y para recibir pedidos)</span></label>
-          <input type="text" class="form-control" id="cfgBeneficioWhatsapp" placeholder="Ej: 5491112345678">
-          <div class="form-text" style="font-size:11.5px;">Con código de país y de área, sin espacios ni signos. Ej: 5491112345678.</div>
+          <label class="form-label">Título de la primera columna</label>
+          <input type="text" class="form-control" id="cfgFooterTitulo1" placeholder="Ej: Mi Negocio">
         </div>
-
         <div class="mb-3">
-          <label class="form-label">Instagram <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
-          <input type="text" class="form-control" id="cfgBeneficioInstagram" placeholder="https://instagram.com/tu_cuenta">
+          <label class="form-label">Texto de la primera columna</label>
+          <textarea class="form-control" id="cfgFooterTexto1" rows="2"></textarea>
         </div>
-
-        <div class="row g-2 mb-3">
-          <div class="col-6">
-            <label class="form-label">Teléfono 1 <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
-            <input type="text" class="form-control" id="cfgBeneficioTelefono1" placeholder="Ej: 11-2345-6789">
-          </div>
-          <div class="col-6">
-            <label class="form-label">Teléfono 2 <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
-            <input type="text" class="form-control" id="cfgBeneficioTelefono2" placeholder="Ej: 11-9876-5432">
-          </div>
-        </div>
-
         <div class="mb-3">
-          <label class="form-label">Dirección <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
-          <input type="text" class="form-control" id="cfgBeneficioDireccion" placeholder="Ej: Av. Siempre Viva 123, Buenos Aires">
+          <label class="form-label">Texto de la columna "Categorías"</label>
+          <textarea class="form-control" id="cfgFooterTexto2" rows="2"></textarea>
         </div>
-
-        <div class="row g-2 mb-3">
-          <div class="col-6">
-            <label class="form-label">Texto libre 1 <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
-            <input type="text" class="form-control" id="cfgBeneficioTexto1" placeholder="Ej: ✅ Stock actualizado">
-          </div>
-          <div class="col-6">
-            <label class="form-label">Texto libre 2 <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
-            <input type="text" class="form-control" id="cfgBeneficioTexto2" placeholder="Ej: 🚚 Envíos a todo el país">
-          </div>
+        <div class="mb-3">
+          <label class="form-label">Texto de la columna "Envíos y pedidos"</label>
+          <textarea class="form-control" id="cfgFooterTexto3" rows="2"></textarea>
         </div>
-
-        <div class="config-preview-hint mb-3">
-          <span class="ic">ℹ️</span>
-          El número de WhatsApp que pongas aquí es el que usa el botón flotante de ayuda y al que llegan los pedidos del catálogo.
+        <div class="mb-3">
+          <label class="form-label">Copyright (línea final del footer)</label>
+          <input type="text" class="form-control" id="cfgFooterCopyright" placeholder="© 2026 Mi Negocio">
         </div>
 
         <div class="d-flex justify-content-end mt-3">
-          <button class="btn btn-success" id="btnGuardarBeneficios" onclick="guardarBeneficiosForm()">💾 Guardar beneficios</button>
+          <button class="btn btn-success" onclick="guardarAparienciaForm()">💾 Guardar</button>
         </div>
       </div>
 
-      <div class="card p-3 mt-3">
-        <h6 style="margin-bottom:6px;">📢 Banner superior (mensajes rotativos)</h6>
-        <p class="text-muted" style="font-size:12.5px; margin-top:-4px; margin-bottom:14px;">
-          Una franja verde arriba de todo el catálogo, que va rotando solo entre los mensajes que escribas acá. Escribí un mensaje por línea — si dejás solo uno, queda fijo sin rotar.
+      <div class="card p-3 mb-3">
+        <h6 style="margin-bottom:14px;">📱 Catálogo online (para los QR de precio)</h6>
+        <p class="text-muted" style="font-size:12.5px; margin-top:-8px; margin-bottom:14px;">
+          La URL donde está publicado tu catálogo online. Se usa para armar el link de los códigos QR que generás desde Productos — al escanearlos, abren una página chica con el nombre y precio actualizado de ese producto. También se usa para el SEO y las redes sociales, más abajo.
         </p>
 
         <div class="mb-3">
-          <textarea class="form-control" id="cfgBannerTopMensajes" rows="4" placeholder="🚚 Envíos a todo el país&#10;✅ Stock actualizado&#10;💳 Aceptamos todos los medios de pago"></textarea>
-          <div class="form-text" style="font-size:11.5px;">Un mensaje por renglón. Vaciá el campo entero para ocultar la franja por completo.</div>
+          <label class="form-label">URL del catálogo (sin / al final)</label>
+          <input type="text" class="form-control" id="cfgUrlCatalogo" placeholder="https://tunegocio.com">
         </div>
 
         <div class="d-flex justify-content-end mt-3">
-          <button class="btn btn-success" id="btnGuardarBannerTop" onclick="guardarBannerTopForm()">💾 Guardar</button>
+          <button class="btn btn-success" id="btnGuardarUrlCatalogo" onclick="guardarUrlCatalogoForm()">💾 Guardar</button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ===== PESTAÑA: PEDIDOS — Reglas y datos de los pedidos del catálogo ===== -->
+    <div class="cfg-tab-pane" id="cfgTab-pedidos">
+
+      <div class="card p-3 mt-3">
+        <h6 style="margin-bottom:6px;">🛒 Pedido mínimo</h6>
+        <p class="text-muted" style="font-size:12.5px; margin-top:-2px; margin-bottom:14px;">
+          El cliente no puede enviar el pedido si el total no llega a este monto. Se aplica al instante en el catálogo.
+        </p>
+        <div class="mb-3">
+          <label class="form-label">Monto mínimo ($)</label>
+          <input type="number" class="form-control" id="cfgPedidoMinimo" min="0" step="1000" placeholder="Ej: 100000">
+        </div>
+        <div class="d-flex justify-content-end">
+          <button class="btn btn-success" id="btnGuardarPedidoMinimo" onclick="guardarPedidoMinimoForm()">💾 Guardar pedido mínimo</button>
         </div>
       </div>
 
@@ -2377,59 +2412,31 @@
         </div>
       </div>
 
-    </div>
-
-    <!-- =================================================================== -->
-    <!-- TAB 3: PRODUCTOS Y PEDIDOS — dónde se guardan fotos y PDFs en Drive  -->
-    <!-- =================================================================== -->
-    <div class="cfg-tab-pane" id="cfgTab-productos">
-
       <div class="card p-3 mb-3">
-        <h6 style="margin-bottom:6px;">💵 Dólar de referencia (tipo de cambio)</h6>
-        <p class="text-muted" style="font-size:12.5px; margin-top:-2px; margin-bottom:14px;">
-          Qué cotización se trae sola como tipo de cambio en Ingreso de Productos (se usa el valor de <b>venta</b> del día). Igual lo podés editar en cada ingreso.
+        <h6 style="margin-bottom:6px;">🏦 Datos bancarios</h6>
+        <p class="text-muted" style="font-size:12.5px; margin-top:-4px; margin-bottom:14px;">
+          Se incluyen en el mensaje de WhatsApp que se manda al cliente cuando un pedido queda en estado "Nuevo".
         </p>
-        <div class="mb-2">
-          <label class="form-label">Tipo de dólar</label>
-          <select class="form-select" id="cfgDolarTipo">
-            <option value="oficial">Oficial</option>
-            <option value="blue">Blue</option>
-            <option value="bolsa">MEP (Bolsa)</option>
-            <option value="mayorista">Mayorista</option>
-            <option value="tarjeta">Tarjeta</option>
-          </select>
-          <div class="form-text" id="cfgDolarHoy" style="font-size:12px;"></div>
-        </div>
-        <div class="d-flex justify-content-end">
-          <button class="btn btn-success" id="btnGuardarDolarTipo" onclick="guardarDolarTipoForm()">💾 Guardar dólar de referencia</button>
-        </div>
-      </div>
-
-      <div class="card p-3 mb-3">
-        <h6 style="margin-bottom:14px;">🖼️ Imágenes de productos</h6>
-        <p class="text-muted" style="font-size:12.5px; margin-top:-8px; margin-bottom:14px;">
-          Las fotos que subís desde "Nuevo Producto" se guardan en esta carpeta de tu Google Drive. Pegá el link de la carpeta (o solo el ID) — tiene que ser una carpeta de la misma cuenta de Google donde está la planilla.
-        </p>
-
-        <div class="mb-3">
-          <label class="form-label">Link o ID de la carpeta de Drive</label>
-          <input type="text" class="form-control" id="cfgDriveCarpetaProductos" placeholder="https://drive.google.com/drive/folders/...">
+        <div class="row g-2 mb-3">
+          <div class="col-md-7">
+            <label class="form-label">CBU / Alias para transferencia</label>
+            <input type="text" class="form-control" id="cfgCbuTransferencia" placeholder="Ej: 0000000000000000000000">
+          </div>
+          <div class="col-md-5">
+            <label class="form-label">Titular de la cuenta</label>
+            <input type="text" class="form-control" id="cfgNombreTitularCbu" placeholder="Ej: NOMBRE APELLIDO">
+          </div>
         </div>
 
-        <div class="config-preview-hint">
-          <span class="ic">ℹ️</span>
-          En Drive: abrí la carpeta → botón "Compartir" → "Cualquier persona con el enlace" puede ver → copiá el link y pegalo aquí.
-        </div>
-
-        <div class="d-flex justify-content-end mt-3">
-          <button class="btn btn-success" id="btnGuardarDriveProductos" onclick="guardarDriveProductosForm()">💾 Guardar</button>
+        <div class="d-flex justify-content-end mt-2">
+          <button class="btn btn-success" onclick="guardarConfigNegocioForm()">💾 Guardar</button>
         </div>
       </div>
 
       <div class="card p-3 mt-3">
         <h6 style="margin-bottom:14px;">📄 PDF de pedidos</h6>
         <p class="text-muted" style="font-size:12.5px; margin-top:-8px; margin-bottom:14px;">
-          Cada pedido genera un PDF con el detalle del cliente y los productos. El título y el WhatsApp del encabezado usan el <strong>nombre del local</strong> y el <strong>WhatsApp</strong> que configuraste en la pestaña General / Catálogo Web — los textos de abajo son específicos de este PDF.
+          Cada pedido genera un PDF con el detalle del cliente y los productos. El título y el WhatsApp del encabezado usan el <strong>nombre del local</strong> y el <strong>WhatsApp</strong> que configuraste en la pestaña Negocio (Encabezado del ticket) — los textos de abajo son específicos de este PDF.
         </p>
 
         <div class="mb-3">
@@ -2465,70 +2472,8 @@
 
     </div>
 
-    <!-- =================================================================== -->
-    <!-- TAB 4: PAGOS Y CONEXIÓN — licencia, Sheets, red local, Mercado Pago  -->
-    <!-- =================================================================== -->
-    <div class="cfg-tab-pane" id="cfgTab-pagos">
-
-      <!-- ===== LICENCIA ===== -->
-      <div class="card p-3 mb-3" id="cardLicencia">
-        <div class="d-flex align-items-center gap-2" style="margin-bottom:12px;">
-          <h6 style="margin:0;">🔑 Licencia</h6>
-          <span id="licenciaBadge" class="licencia-badge">…</span>
-        </div>
-        <div id="licenciaEstadoBox">Cargando estado de la licencia...</div>
-        <div class="d-flex flex-wrap gap-2 mt-3" id="licenciaAcciones">
-          <button class="btn btn-outline-secondary btn-sm" id="btnVerificarLicencia" onclick="validarLicenciaAhoraBtn()">🔄 Verificar ahora</button>
-          <button class="btn btn-outline-secondary btn-sm" id="btnCambiarLicencia" onclick="cambiarLicencia()">Cambiar licencia…</button>
-          <button class="btn btn-outline-danger btn-sm" id="btnQuitarLicencia" onclick="quitarLicenciaDeEstaPC()">Quitar de esta PC</button>
-        </div>
-        <div id="licenciaIdInstalacion" class="text-muted" style="font-size:11.5px; margin-top:12px;"></div>
-        <style>
-          .licencia-badge { font-size:11.5px; font-weight:600; padding:2px 10px; border-radius:999px; background:var(--slate-100); color:var(--slate-500); }
-          .licencia-badge.ok { background:rgba(34,197,94,.15); color:var(--green-600, #16a34a); }
-          .licencia-badge.warn { background:rgba(245,158,11,.15); color:#b45309; }
-          .licencia-badge.bad { background:rgba(239,68,68,.15); color:var(--red-500, #ef4444); }
-          .licencia-datos { display:grid; grid-template-columns:max-content 1fr; gap:4px 18px; font-size:13px; }
-          .licencia-datos .lbl { color:var(--slate-500); }
-        </style>
-      </div>
-
-      <!-- Tarjeta API URL — solo visible en Electron -->
-      <div class="card p-3 mt-3" id="cardConexionNegocio" style="display:none;">
-        <h6 style="margin-bottom:6px;">🔗 Conexión con tu Google Sheets</h6>
-        <p class="text-muted" style="font-size:12.5px; margin-top:-4px; margin-bottom:10px;">
-          URL de la API que conecta el VeekPOS con tu planilla de Google Sheets.
-        </p>
-        <div class="mb-2">
-          <label class="form-label">URL de la API</label>
-          <input type="url" class="form-control" id="conexionNegocioUrl"
-            placeholder="https://script.google.com/macros/s/.../exec">
-        </div>
-        <div id="conexionNegocioUrlActual" class="text-muted mb-2" style="font-size:12px;"></div>
-        <button class="btn btn-success btn-sm" onclick="guardarApiUrlDesdeConfig()">💾 Guardar URL</button>
-      </div>
-
-      <!-- Tarjeta red local multicaja — solo visible en Electron -->
-      <div class="card p-3 mt-3" id="cardMultiCajaRed" style="display:none;">
-        <h6 style="margin-bottom:6px;">🌐 Red local (multi-caja)</h6>
-        <p class="text-muted" style="font-size:12.5px; margin-top:-4px; margin-bottom:10px;">
-          Configurá este equipo como servidor o cliente en una red local.
-        </p>
-        <div class="mb-2">
-          <label class="form-label">Rol en la red</label>
-          <select class="form-select" id="cfgRolRed" onchange="actualizarVisibilidadCampoNombreCaja(this.value)">
-            <option value="">Sin red local</option>
-            <option value="servidor">Servidor (caja principal)</option>
-            <option value="cliente">Cliente (caja secundaria)</option>
-          </select>
-        </div>
-        <div id="campoNombreCaja" style="display:none;" class="mb-2">
-          <label class="form-label">Nombre de esta caja</label>
-          <input type="text" class="form-control" id="cfgNombreCaja" placeholder="Ej: Caja 1, Caja Mostrador">
-        </div>
-        <div id="estadoRedLocal" class="text-muted mb-2" style="font-size:12px;"></div>
-        <button class="btn btn-success btn-sm" onclick="guardarConfigRed()">💾 Guardar configuración de red</button>
-      </div>
+    <!-- ===== PESTAÑA: COBROS — Medios de cobro ===== -->
+    <div class="cfg-tab-pane" id="cfgTab-cobros">
 
       <!-- Tarjeta Mercado Pago — solo visible en Electron -->
       <div class="card p-3 mt-3" id="cardMercadoPago" style="display:none;">
@@ -2594,10 +2539,14 @@
 
     </div>
 
-    <!-- =================================================================== -->
-    <!-- TAB 5: HARDWARE — impresoras                                        -->
-    <!-- =================================================================== -->
-    <div class="cfg-tab-pane" id="cfgTab-hardware">
+    <!-- ===== PESTAÑA: ESTA COMPUTADORA — Solo afecta a esta caja ===== -->
+    <div class="cfg-tab-pane" id="cfgTab-equipo">
+
+      <div class="card p-3 mb-3">
+        <h6 style="margin-bottom:4px;">🖥️ Estilo del panel en esta computadora</h6>
+        <p class="text-muted" style="font-size:13px;margin-bottom:14px;">Cambia cómo se ve el panel solo en esta caja (cada una puede elegir el suyo). El color del negocio se sigue eligiendo en Catálogo Web → Color del sitio.</p>
+        <div class="estilos-grid" id="selectorEstilosPanel" role="group" aria-label="Estilo del panel"></div>
+      </div>
 
       <!-- Tarjeta impresora — solo visible en Electron (pos-offline.js la muestra) -->
       <div class="card p-3 mb-3" id="cardImpresoraPOS" style="display:none;">
@@ -2647,32 +2596,89 @@
         </div>
       </div>
 
+      <!-- Tarjeta red local multicaja — solo visible en Electron -->
+      <div class="card p-3 mt-3" id="cardMultiCajaRed" style="display:none;">
+        <h6 style="margin-bottom:6px;">🌐 Red local (multi-caja)</h6>
+        <p class="text-muted" style="font-size:12.5px; margin-top:-4px; margin-bottom:10px;">
+          Configurá este equipo como servidor o cliente en una red local.
+        </p>
+        <div class="mb-2">
+          <label class="form-label">Rol en la red</label>
+          <select class="form-select" id="cfgRolRed" onchange="actualizarVisibilidadCampoNombreCaja(this.value)">
+            <option value="">Sin red local</option>
+            <option value="servidor">Servidor (caja principal)</option>
+            <option value="cliente">Cliente (caja secundaria)</option>
+          </select>
+        </div>
+        <div id="campoNombreCaja" style="display:none;" class="mb-2">
+          <label class="form-label">Nombre de esta caja</label>
+          <input type="text" class="form-control" id="cfgNombreCaja" placeholder="Ej: Caja 1, Caja Mostrador">
+        </div>
+        <div id="estadoRedLocal" class="text-muted mb-2" style="font-size:12px;"></div>
+        <button class="btn btn-success btn-sm" onclick="guardarConfigRed()">💾 Guardar configuración de red</button>
+      </div>
+
     </div>
 
-    <!-- =================================================================== -->
-    <!-- TAB 6: AVANZADO — apariencia del panel y mantenimiento técnico       -->
-    <!-- =================================================================== -->
-    <div class="cfg-tab-pane" id="cfgTab-avanzado">
+    <!-- ===== PESTAÑA: SISTEMA — Licencia, conexión y mantenimiento ===== -->
+    <div class="cfg-tab-pane" id="cfgTab-sistema">
+
+      <!-- ===== LICENCIA ===== -->
+      <div class="card p-3 mb-3" id="cardLicencia">
+        <div class="d-flex align-items-center gap-2" style="margin-bottom:12px;">
+          <h6 style="margin:0;">🔑 Licencia</h6>
+          <span id="licenciaBadge" class="licencia-badge">…</span>
+        </div>
+        <div id="licenciaEstadoBox">Cargando estado de la licencia...</div>
+        <div class="d-flex flex-wrap gap-2 mt-3" id="licenciaAcciones">
+          <button class="btn btn-outline-secondary btn-sm" id="btnVerificarLicencia" onclick="validarLicenciaAhoraBtn()">🔄 Verificar ahora</button>
+          <button class="btn btn-outline-secondary btn-sm" id="btnCambiarLicencia" onclick="cambiarLicencia()">Cambiar licencia…</button>
+          <button class="btn btn-outline-danger btn-sm" id="btnQuitarLicencia" onclick="quitarLicenciaDeEstaPC()">Quitar de esta PC</button>
+        </div>
+        <div id="licenciaIdInstalacion" class="text-muted" style="font-size:11.5px; margin-top:12px;"></div>
+        <style>
+          .licencia-badge { font-size:11.5px; font-weight:600; padding:2px 10px; border-radius:999px; background:var(--slate-100); color:var(--slate-500); }
+          .licencia-badge.ok { background:rgba(34,197,94,.15); color:var(--green-600, #16a34a); }
+          .licencia-badge.warn { background:rgba(245,158,11,.15); color:#b45309; }
+          .licencia-badge.bad { background:rgba(239,68,68,.15); color:var(--red-500, #ef4444); }
+          .licencia-datos { display:grid; grid-template-columns:max-content 1fr; gap:4px 18px; font-size:13px; }
+          .licencia-datos .lbl { color:var(--slate-500); }
+        </style>
+      </div>
+
+      <!-- Tarjeta API URL — solo visible en Electron -->
+      <div class="card p-3 mt-3" id="cardConexionNegocio" style="display:none;">
+        <h6 style="margin-bottom:6px;">🔗 Conexión con tu Google Sheets</h6>
+        <p class="text-muted" style="font-size:12.5px; margin-top:-4px; margin-bottom:10px;">
+          URL de la API que conecta el VeekPOS con tu planilla de Google Sheets.
+        </p>
+        <div class="mb-2">
+          <label class="form-label">URL de la API</label>
+          <input type="url" class="form-control" id="conexionNegocioUrl"
+            placeholder="https://script.google.com/macros/s/.../exec">
+        </div>
+        <div id="conexionNegocioUrlActual" class="text-muted mb-2" style="font-size:12px;"></div>
+        <button class="btn btn-success btn-sm" onclick="guardarApiUrlDesdeConfig()">💾 Guardar URL</button>
+      </div>
 
       <div class="card p-3 mb-3">
-        <h6 style="margin-bottom:14px;">🅰️ Apariencia del panel admin (este sidebar)</h6>
+        <h6 style="margin-bottom:14px;">🖼️ Imágenes de productos</h6>
         <p class="text-muted" style="font-size:12.5px; margin-top:-8px; margin-bottom:14px;">
-          Esto cambia solo lo que se ve aquí, en el menú lateral del panel — no afecta al catálogo web.
+          Las fotos que subís desde "Nuevo Producto" se guardan en esta carpeta de tu Google Drive. Pegá el link de la carpeta (o solo el ID) — tiene que ser una carpeta de la misma cuenta de Google donde está la planilla.
         </p>
 
-        <div class="row g-2 mb-3">
-          <div class="col-3">
-            <label class="form-label">Letra/ícono</label>
-            <input type="text" class="form-control text-center" id="cfgSidebarMark" placeholder="J" maxlength="2">
-          </div>
-          <div class="col-9">
-            <label class="form-label">Nombre <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
-            <input type="text" class="form-control" id="cfgSidebarTexto" placeholder="Ej: MI NEGOCIO">
-          </div>
+        <div class="mb-3">
+          <label class="form-label">Link o ID de la carpeta de Drive</label>
+          <input type="text" class="form-control" id="cfgDriveCarpetaProductos" placeholder="https://drive.google.com/drive/folders/...">
+        </div>
+
+        <div class="config-preview-hint">
+          <span class="ic">ℹ️</span>
+          En Drive: abrí la carpeta → botón "Compartir" → "Cualquier persona con el enlace" puede ver → copiá el link y pegalo aquí.
         </div>
 
         <div class="d-flex justify-content-end mt-3">
-          <button class="btn btn-success" id="btnGuardarSidebar" onclick="guardarSidebarForm()">💾 Guardar</button>
+          <button class="btn btn-success" id="btnGuardarDriveProductos" onclick="guardarDriveProductosForm()">💾 Guardar</button>
         </div>
       </div>
 
@@ -2688,6 +2694,7 @@
       </div>
 
     </div>
+
 
   </div>
 
