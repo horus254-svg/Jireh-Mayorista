@@ -561,13 +561,14 @@
       <div><h1>Productos</h1><div class="sub">Catálogo e inventario</div></div>
       <div class="d-flex gap-2">
         <button class="btn btn-outline-secondary btn-sm" onclick="actualizarCatalogoProductosManual()">↻ Actualizar</button>
+        <button class="btn btn-outline-primary btn-sm" onclick="abrirOrdenCatalogo()" title="Elegir en qué orden aparecen categorías y productos en la página">↕️ Ordenar catálogo</button>
         <button class="btn btn-outline-secondary btn-sm" onclick="abrirPapeleraProductos()" title="Productos eliminados — se pueden restaurar">🗑️ Papelera</button>
         <button class="btn btn-success" onclick="nuevoProducto()">+ Nuevo Producto</button>
       </div>
     </div>
 
     <div class="alert alert-info d-flex align-items-center gap-2 mb-2" id="avisoOrdenProductos" style="font-size:13px; display:none;">
-      <span>↕️ Arrastrá las filas desde <strong>⠿</strong> para elegir en qué orden aparecen los productos en el catálogo/POS.</span>
+      <span>↕️ Para elegir en qué orden aparecen los productos en la página, usá <a href="#" onclick="abrirOrdenCatalogo(); return false;"><strong>Ordenar catálogo</strong></a> (por categoría, con fotos). También podés arrastrar las filas desde <strong>⠿</strong>.</span>
     </div>
 
     <div style="position:sticky; top:-26px; z-index:10; background:var(--slate-50); padding:8px 0 6px; margin:-26px -30px 0; padding-left:30px; padding-right:30px;">
@@ -2878,6 +2879,44 @@
 <!-- ===== MODAL PAPELERA DE PRODUCTOS =====
      Va ANTES del modal de confirmación genérico para que ese quede por
      encima cuando se confirma un borrado definitivo / vaciar. -->
+<!-- ===== ORDENAR CATÁLOGO (categorías y productos) ===== -->
+<div class="product-modal-backdrop" id="ordenCatalogoBackdrop">
+  <div class="product-modal oc-modal">
+    <div class="product-modal-header">
+      <h6>↕️ Ordenar catálogo <span class="oc-sub">Así aparecen en la página: primero el orden de las categorías y, dentro de cada una, sus productos.</span></h6>
+      <button onclick="cerrarOrdenCatalogo()">✕</button>
+    </div>
+    <div class="product-modal-body oc-body">
+      <aside class="oc-cats">
+        <div class="oc-titulo">1 · Categorías</div>
+        <div class="oc-ayuda">Arrastrá o usá ▲ ▼. Tocá una para ordenar sus productos.</div>
+        <ul id="ocCategorias" class="oc-cat-lista"></ul>
+      </aside>
+      <section class="oc-prods">
+        <div class="oc-prods-head">
+          <div>
+            <div class="oc-titulo">2 · Productos de <span id="ocCatNombre"></span></div>
+            <div class="oc-ayuda">Arrastrá las tarjetas, o usá los botones. El número es la posición dentro de la categoría.</div>
+          </div>
+          <div class="oc-herramientas">
+            <span>Ordenar rápido:</span>
+            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="ocOrdenRapido('nombre')">A → Z</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="ocOrdenRapido('precioAsc')">Precio ↑</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="ocOrdenRapido('precioDesc')">Precio ↓</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="ocOrdenRapido('stock')">Más stock</button>
+          </div>
+        </div>
+        <div id="ocProductos" class="oc-grid"></div>
+      </section>
+    </div>
+    <div class="product-modal-actions">
+      <span id="ocEstado" class="oc-estado">Sin cambios</span>
+      <button class="btn btn-outline-secondary" onclick="cerrarOrdenCatalogo()">Cerrar</button>
+      <button class="btn btn-primary" id="btnGuardarOrdenCatalogo" onclick="guardarOrdenCatalogo()" disabled>💾 Guardar orden</button>
+    </div>
+  </div>
+</div>
+
 <div class="product-modal-backdrop" id="papeleraProductosModalBackdrop">
   <div class="product-modal" style="width:min(640px, 94vw);">
     <div class="product-modal-header">

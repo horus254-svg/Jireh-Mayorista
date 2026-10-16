@@ -4167,7 +4167,7 @@ async function guardarNuevoOrdenProductos(codigos) {
     if (!data.success) {
       toast(data.message || "No se pudo guardar el nuevo orden", "error");
       cargarProductos();
-      return;
+      return false;
     }
 
     // Reordenar en memoria (y en la caché local) según lo recién guardado,
@@ -4183,11 +4183,226 @@ async function guardarNuevoOrdenProductos(codigos) {
     } catch (e) {}
 
     toast("Orden guardado", "success");
+    return true;
   } catch (error) {
     console.error("Error al guardar el orden de productos:", error);
     toast("Error de conexión al guardar el orden", "error");
     cargarProductos();
+    return false;
   }
+}
+
+/* =====================================================================
+   ORDENAR CATÁLOGO — pantalla para elegir el orden de las categorías
+   y, dentro de cada una, el de sus productos (con fotos, arrastrando o
+   con botones). Al guardar se arma la lista completa: categoría 1 con
+   sus productos, categoría 2 con los suyos… y se manda al mismo
+   "reordenarProductos" de siempre (columna ORDEN). No hace falta tocar
+   el backend. La página pública muestra el cambio en pocos minutos.
+===================================================================== */
+const OC_SIN_CATEGORIA = "__sin_categoria__";
+let _oc = null;          // { cats:[clave], porCat:{clave:[codigo]}, prod:Map, sel, sucio }
+let _ocArrastre = null;  // elemento que se está arrastrando
+
+function _ocClaveCat(p) { return String(p.CATEGORIA || "").trim() || OC_SIN_CATEGORIA; }
+function _ocNombreCat(clave) { return clave === OC_SIN_CATEGORIA ? "Sin categoría" : clave; }
+
+async function abrirOrdenCatalogo() {
+  if (!productosAdminGlobal || !productosAdminGlobal.length) {
+    toast("Cargando productos...", "success");
+    await cargarProductos();
+  }
+  if (!productosAdminGlobal || !productosAdminGlobal.length) { toast("No hay productos para ordenar", "error"); return; }
+  const cats = [], porCat = {}, prod = new Map();
+  productosAdminGlobal.forEach(p => {   // ya viene ordenado por ORDEN
+    const clave = _ocClaveCat(p);
+    if (!porCat[clave]) { porCat[clave] = []; cats.push(clave); }
+    porCat[clave].push(String(p.CODIGO));
+    prod.set(String(p.CODIGO), p);
+  });
+  _oc = { cats, porCat, prod, sel: cats[0], sucio: false };
+  document.getElementById("ordenCatalogoBackdrop").classList.add("show");
+  _ocRender();
+}
+
+function cerrarOrdenCatalogo() {
+  if (_oc && _oc.sucio && !confirm("Hay cambios de orden sin guardar. ¿Cerrar igual y descartarlos?")) return;
+  document.getElementById("ordenCatalogoBackdrop").classList.remove("show");
+  _oc = null;
+}
+
+function _ocMarcarSucio() {
+  _oc.sucio = true;
+  const est = document.getElementById("ocEstado");
+  est.textContent = "Cambios sin guardar";
+  est.classList.add("sucio");
+  document.getElementById("btnGuardarOrdenCatalogo").disabled = false;
+}
+
+function _ocRender() { _ocRenderCats(); _ocRenderProds(); }
+
+function _ocRenderCats() {
+  const ul = document.getElementById("ocCategorias");
+  const n = _oc.cats.length;
+  ul.innerHTML = _oc.cats.map((c, i) => `
+    <li class="oc-cat ${c === _oc.sel ? "activa" : ""}" draggable="true" data-cat="${escapeHtml(c)}" onclick="ocElegirCategoria(this.dataset.cat)">
+      <span class="oc-handle" title="Arrastrar">⠿</span>
+      <span class="oc-num">${i + 1}</span>
+      <span class="oc-nombre" title="${escapeHtml(_ocNombreCat(c))}">${escapeHtml(_ocNombreCat(c))}</span>
+      <span class="oc-cant">${_oc.porCat[c].length}</span>
+      <button type="button" class="oc-mini" title="Subir" ${i === 0 ? "disabled" : ""} onclick="event.stopPropagation(); ocMoverCategoria(${i}, -1)">▲</button>
+      <button type="button" class="oc-mini" title="Bajar" ${i === n - 1 ? "disabled" : ""} onclick="event.stopPropagation(); ocMoverCategoria(${i}, 1)">▼</button>
+    </li>`).join("");
+  ul.querySelectorAll(".oc-cat").forEach(li => _ocHacerArrastrable(li, "y", _ocFinArrastreCats));
+}
+
+function _ocRenderProds(destacar) {
+  document.getElementById("ocCatNombre").textContent = _ocNombreCat(_oc.sel);
+  const grid = document.getElementById("ocProductos");
+  const lista = _oc.porCat[_oc.sel] || [];
+  if (!lista.length) { grid.innerHTML = `<div class="oc-vacio">Esta categoría no tiene productos.</div>`; return; }
+  const n = lista.length;
+  grid.innerHTML = lista.map((cod, i) => {
+    const p = _oc.prod.get(cod) || {};
+    const img = String(p.IMAGEN || "").trim();
+    const oculto = String(p.PUBLICADO || "").toUpperCase() !== "SI";
+    return `
+      <div class="oc-card ${cod === destacar ? "recien-movido" : ""}" draggable="true" data-codigo="${escapeHtml(cod)}">
+        <span class="oc-pos" title="Escribir la posición" onclick="ocEditarPosicion(this, ${i})">${i + 1}</span>
+        ${oculto ? `<span class="oc-oculto" title="No se muestra en la página">Oculto</span>` : ""}
+        <div class="oc-foto">${img ? `<img src="${escapeHtml(img)}" alt="" loading="lazy" onerror="this.parentElement.textContent='🛒'">` : "🛒"}</div>
+        <div class="oc-nombre-prod" title="${escapeHtml(p.PRODUCTO || cod)}">${escapeHtml(p.PRODUCTO || cod)}</div>
+        <div class="oc-precio">$${Number(p.PRECIO || 0).toLocaleString("es-AR")}</div>
+        <div class="oc-acciones">
+          <button type="button" class="oc-mini" title="Al principio" ${i === 0 ? "disabled" : ""} onclick="ocMoverProducto(${i}, 0)">⤒</button>
+          <button type="button" class="oc-mini" title="Uno antes" ${i === 0 ? "disabled" : ""} onclick="ocMoverProducto(${i}, ${i - 1})">◀</button>
+          <button type="button" class="oc-mini" title="Uno después" ${i === n - 1 ? "disabled" : ""} onclick="ocMoverProducto(${i}, ${i + 1})">▶</button>
+          <button type="button" class="oc-mini" title="Al final" ${i === n - 1 ? "disabled" : ""} onclick="ocMoverProducto(${i}, ${n - 1})">⤓</button>
+        </div>
+      </div>`;
+  }).join("");
+  grid.querySelectorAll(".oc-card").forEach(card => _ocHacerArrastrable(card, "xy", _ocFinArrastreProds));
+  if (destacar) {
+    const el = grid.querySelector(`.oc-card[data-codigo="${cssEscape(destacar)}"]`);
+    if (el) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
+}
+
+function ocElegirCategoria(clave) {
+  if (!_oc || clave === _oc.sel) return;
+  _oc.sel = clave;
+  _ocRender();
+  document.getElementById("ocProductos").scrollTop = 0;
+}
+
+function ocMoverCategoria(i, delta) {
+  const j = i + delta;
+  if (j < 0 || j >= _oc.cats.length) return;
+  const [c] = _oc.cats.splice(i, 1);
+  _oc.cats.splice(j, 0, c);
+  _ocMarcarSucio();
+  _ocRenderCats();
+}
+
+function ocMoverProducto(desde, hasta) {
+  const lista = _oc.porCat[_oc.sel];
+  hasta = Math.max(0, Math.min(lista.length - 1, hasta));
+  if (desde === hasta) return;
+  const [cod] = lista.splice(desde, 1);
+  lista.splice(hasta, 0, cod);
+  _ocMarcarSucio();
+  _ocRenderProds(cod);
+}
+
+/** Clic en el número: se convierte en un campo para escribir la posición (Enter para mover). */
+function ocEditarPosicion(badge, i) {
+  const n = _oc.porCat[_oc.sel].length;
+  const input = document.createElement("input");
+  input.type = "number"; input.min = 1; input.max = n; input.value = i + 1;
+  input.className = "oc-pos"; input.style.width = "56px"; input.style.border = "none"; input.style.outline = "2px solid var(--blue-500)";
+  let hecho = false;
+  const aplicar = () => {
+    if (hecho) return; hecho = true;
+    const destino = parseInt(input.value, 10);
+    if (isFinite(destino) && destino >= 1) ocMoverProducto(i, Math.min(destino, n) - 1);
+    else _ocRenderProds();
+  };
+  input.addEventListener("keydown", e => {
+    if (e.key === "Enter") { e.preventDefault(); aplicar(); }
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); hecho = true; _ocRenderProds(); }
+  });
+  input.addEventListener("blur", aplicar);
+  input.addEventListener("mousedown", e => e.stopPropagation());
+  badge.replaceWith(input);
+  input.focus(); input.select();
+}
+
+function ocOrdenRapido(criterio) {
+  const lista = _oc.porCat[_oc.sel];
+  const p = c => _oc.prod.get(c) || {};
+  const cmp = {
+    nombre: (a, b) => String(p(a).PRODUCTO || "").localeCompare(String(p(b).PRODUCTO || ""), "es", { numeric: true, sensitivity: "base" }),
+    precioAsc: (a, b) => Number(p(a).PRECIO || 0) - Number(p(b).PRECIO || 0),
+    precioDesc: (a, b) => Number(p(b).PRECIO || 0) - Number(p(a).PRECIO || 0),
+    stock: (a, b) => Number(p(b).STOCK || 0) - Number(p(a).STOCK || 0)
+  }[criterio];
+  if (!cmp) return;
+  lista.sort(cmp);
+  _ocMarcarSucio();
+  _ocRenderProds();
+  toast("Ordenado — acordate de tocar Guardar orden", "success");
+}
+
+/* Arrastre (mouse): mueve el elemento en vivo y al soltar se lee el orden del DOM. */
+function _ocHacerArrastrable(el, eje, alTerminar) {
+  el.addEventListener("dragstart", ev => {
+    _ocArrastre = el;
+    el.classList.add("arrastrando");
+    ev.dataTransfer.effectAllowed = "move";
+    ev.dataTransfer.setData("text/plain", el.dataset.codigo || el.dataset.cat || "");
+  });
+  el.addEventListener("dragover", ev => {
+    if (!_ocArrastre || _ocArrastre === el || _ocArrastre.parentNode !== el.parentNode) return;
+    ev.preventDefault();
+    const r = el.getBoundingClientRect();
+    const despues = eje === "y"
+      ? ev.clientY > r.top + r.height / 2
+      : (ev.clientY > r.bottom - r.height * 0.25) || (ev.clientY >= r.top && ev.clientX > r.left + r.width / 2);
+    if (despues) el.after(_ocArrastre); else el.before(_ocArrastre);
+  });
+  el.addEventListener("drop", ev => ev.preventDefault());
+  el.addEventListener("dragend", () => {
+    el.classList.remove("arrastrando");
+    if (_ocArrastre) { _ocArrastre = null; alTerminar(); }
+  });
+}
+
+function _ocFinArrastreCats() {
+  const nuevo = [...document.querySelectorAll("#ocCategorias .oc-cat")].map(li => li.dataset.cat);
+  if (nuevo.join("\n") !== _oc.cats.join("\n")) { _oc.cats = nuevo; _ocMarcarSucio(); }
+  _ocRenderCats();
+}
+
+function _ocFinArrastreProds() {
+  const nuevo = [...document.querySelectorAll("#ocProductos .oc-card")].map(c => c.dataset.codigo);
+  if (nuevo.join("\n") !== _oc.porCat[_oc.sel].join("\n")) { _oc.porCat[_oc.sel] = nuevo; _ocMarcarSucio(); }
+  _ocRenderProds();
+}
+
+async function guardarOrdenCatalogo() {
+  if (!_oc || !_oc.sucio) return;
+  const btn = document.getElementById("btnGuardarOrdenCatalogo");
+  btn.disabled = true; btn.textContent = "Guardando...";
+  const codigos = [];
+  _oc.cats.forEach(c => codigos.push(..._oc.porCat[c]));
+  const ok = await guardarNuevoOrdenProductos(codigos);
+  btn.textContent = "💾 Guardar orden";
+  if (!ok) { btn.disabled = false; return; }
+  _oc.sucio = false;
+  const est = document.getElementById("ocEstado");
+  est.textContent = "✓ Guardado — la página lo muestra en unos minutos";
+  est.classList.remove("sucio");
+  filtrarProductos();
 }
 
 /** Fills the category <select> filter with the distinct categories currently in use */
