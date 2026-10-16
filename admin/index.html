@@ -1953,7 +1953,7 @@
       <button type="button" class="cfg-tab-btn" data-cfg-tab="pedidos" onclick="mostrarConfigTab('pedidos', this)" title="Reglas y datos de los pedidos del catálogo"><span class="ic">📦</span> Pedidos</button>
       <button type="button" class="cfg-tab-btn" data-cfg-tab="cobros" onclick="mostrarConfigTab('cobros', this)" title="Medios de cobro"><span class="ic">💳</span> Cobros</button>
       <button type="button" class="cfg-tab-btn" data-cfg-tab="equipo" onclick="mostrarConfigTab('equipo', this)" title="Solo afecta a esta caja"><span class="ic">🖥️</span> Esta computadora</button>
-      <button type="button" class="cfg-tab-btn" data-cfg-tab="sistema" onclick="mostrarConfigTab('sistema', this)" title="Licencia, conexión y mantenimiento"><span class="ic">🔧</span> Sistema</button>
+      <button type="button" class="cfg-tab-btn" data-cfg-tab="sistema" onclick="mostrarConfigTab('sistema', this)" title="Licencia, conexión y carpeta de imágenes"><span class="ic">🔧</span> Sistema</button>
     </div>
 
     <!-- ===== PESTAÑA: NEGOCIO — Datos del negocio, ticket y moneda ===== -->
@@ -2620,7 +2620,7 @@
 
     </div>
 
-    <!-- ===== PESTAÑA: SISTEMA — Licencia, conexión y mantenimiento ===== -->
+    <!-- ===== PESTAÑA: SISTEMA — Licencia, conexión y carpeta de imágenes ===== -->
     <div class="cfg-tab-pane" id="cfgTab-sistema">
 
       <!-- ===== LICENCIA ===== -->
@@ -2680,17 +2680,6 @@
         <div class="d-flex justify-content-end mt-3">
           <button class="btn btn-success" id="btnGuardarDriveProductos" onclick="guardarDriveProductosForm()">💾 Guardar</button>
         </div>
-      </div>
-
-      <div class="card p-3 mt-3">
-        <h6 style="margin-bottom:6px;">🔧 Mantenimiento de la planilla</h6>
-        <p class="text-muted" style="font-size:12.5px; margin-bottom:10px;">
-          Si los movimientos de caja no muestran la forma de pago correcta, ejecutá esta migración para agregar la columna FORMA_PAGO a la planilla.
-        </p>
-        <button class="btn btn-outline-secondary btn-sm" onclick="ejecutarMigracionFormaPago()">
-          🔄 Migrar columna FORMA_PAGO
-        </button>
-        <span id="migracionStatus" class="ms-2 text-muted" style="font-size:12px;"></span>
       </div>
 
     </div>

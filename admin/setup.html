@@ -124,6 +124,7 @@ body{
 .btn.loading .btn-text{ display:none; }
 @keyframes spin{ to{ transform:rotate(360deg); } }
 
+.progreso{ text-align:center; font-size:12.5px; color:var(--slate-500); margin:10px 0 0; min-height:1em; }
 .footnote{ text-align:center; font-size:11.5px; color:rgba(255,255,255,.45); margin-top:18px; }
 
 .check-overlay{
@@ -162,7 +163,7 @@ body{
 
     <div id="setupContent" style="display:none;">
       <h1>Conectá esta caja con tu negocio</h1>
-      <p class="sub">Esta es la primera vez que se abre VeekPOS en esta computadora. Completá estos datos para conectar esta caja con tu backend y activar tu licencia — solo hay que hacerlo una vez.</p>
+      <p class="sub">Esta es la primera vez que se abre VeekPOS en esta computadora. Completá estos datos para conectar esta caja con tu planilla (si es nueva, se preparan solas todas las hojas) y activar tu licencia — solo hay que hacerlo una vez.</p>
 
       <form id="setupForm">
 
@@ -192,6 +193,7 @@ body{
           <span class="spinner"></span>
           <span class="btn-text">Conectar y continuar</span>
         </button>
+        <p class="progreso" id="progresoTexto" aria-live="polite"></p>
       </form>
     </div>
 
@@ -215,7 +217,15 @@ function normalizarUrl(url){
   return url.endsWith("/") ? url.slice(0, -1) : url;
 }
 
+const MENSAJE_PERMISOS = "Falta aprobar los permisos de Google. En la planilla: Extensiones → Apps Script → elegí la función \"autorizarVeekPOS\" → ▶ Ejecutar → aceptá los permisos (si aparece \"app no verificada\": Configuración avanzada → Ir a…). Después: Implementar → Administrar implementaciones → Versión nueva, y volvé a tocar Conectar.";
+
+function mostrarProgreso(texto){
+  const el = document.getElementById("progresoTexto");
+  if(el) el.textContent = texto || "";
+}
+
 function mostrarError(mensaje){
+  mostrarProgreso("");
   const box = document.getElementById("errorBox");
   document.getElementById("errorTexto").textContent = mensaje;
   box.classList.add("show");
@@ -341,20 +351,39 @@ document.getElementById("setupForm").addEventListener("submit", async function(e
   btn.classList.add("loading");
 
   try{
-    // Confirmamos que la API URL realmente responde antes de guardar
-    // nada, para no dejar la caja "configurada" con datos que no sirven.
-    let respuesta;
+    // Se conecta con el backend Y deja la planilla lista: crea las hojas
+    // que falten (con sus columnas) e instala los triggers. En una planilla
+    // que ya funcionaba no toca nada. Si esto falla, no se guarda nada,
+    // para no dejar la caja "configurada" con un backend que no sirve.
+    mostrarProgreso("Conectando con tu planilla y preparando las hojas…");
+    let respuesta, datos;
     try{
-      respuesta = await fetch(apiUrl + "?action=productos", { signal: AbortSignal.timeout(30000) });
+      respuesta = await fetch(apiUrl + "?action=inicializarHojas", { signal: AbortSignal.timeout(60000) });
     }catch(errRed){
-      throw new Error("No se pudo conectar con esa URL. Revisá que tengas internet y que la URL sea la de \"Aplicación web\" (termina en /exec).");
+      // Lo más común: la implementación no está con acceso "Cualquier
+      // usuario" (Google redirige a su pantalla de inicio de sesión).
+      throw new Error("No se pudo conectar con esa URL. Revisá: 1) que haya internet; 2) que sea la URL de \"Aplicación web\" (termina en /exec); 3) que en Implementar → Administrar implementaciones el acceso diga \"Cualquier usuario\" (y \"Ejecutar como: Yo\").");
     }
     if(!respuesta.ok){
       throw new Error("La URL no respondió correctamente (código " + respuesta.status + ")");
     }
-    // Alcanza con que la respuesta sea JSON válido — algunas acciones
-    // devuelven array plano, otras {success:true, productos:[...]}.
-    await respuesta.json();
+    const texto = await respuesta.text();
+    try{ datos = JSON.parse(texto); }catch(errJson){
+      if(/autoriz|authoriz|permis/i.test(texto)){
+        throw new Error(MENSAJE_PERMISOS);
+      }
+      throw new Error("Esa URL no es la de VeekPOS (no respondió lo esperado). Revisá que sea la URL de la implementación \"Aplicación web\" del Code.gs.");
+    }
+    if(datos && datos.faltanPermisos){
+      throw new Error(MENSAJE_PERMISOS);
+    }
+    if(!datos || datos.success !== true){
+      throw new Error((datos && datos.message) || "El backend respondió con un error al preparar la planilla. Revisá que el Code.gs esté actualizado y publicado como \"Versión nueva\".");
+    }
+    const carpetasNuevas = datos.carpetas && datos.carpetas.creadas ? datos.carpetas.creadas.length : 0;
+    mostrarProgreso(datos.creadas && datos.creadas.length
+      ? "Planilla lista (" + datos.creadas.length + " hojas" + (carpetasNuevas ? " y " + carpetasNuevas + " carpetas de Drive" : "") + "). Activando la licencia…"
+      : "Planilla conectada. Activando la licencia…");
 
     // Activamos la licencia ANTES de guardar nada como definitivo —
     // si el correo/contraseña están mal, preferimos que la persona

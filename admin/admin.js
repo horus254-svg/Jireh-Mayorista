@@ -13579,20 +13579,6 @@ function cancelarCobroMercadoPago() {
   toast("Cobro cancelado — el ticket sigue abierto", "info");
 }
 
-/** Ejecuta la migración de columna FORMA_PAGO en MOVIMIENTOS_CAJA */
-async function ejecutarMigracionFormaPago() {
-  const status = document.getElementById("migracionStatus");
-  if (status) status.textContent = "Migrando...";
-  try {
-    const res = await fetchAPI(API_URL + "?action=migrarColumnaFormaPago");
-    const data = await res.json();
-    if (status) status.textContent = data.message || (data.success ? "✓ OK" : "❌ Error");
-    toast(data.message || "Migración completada", data.success ? "success" : "error");
-  } catch(e) {
-    if (status) status.textContent = "Error de conexión";
-    toast("Error al ejecutar migración", "error");
-  }
-}
 
 /* ===================================================================
    INGRESO DE PRODUCTOS — recepción de mercadería con proveedor
