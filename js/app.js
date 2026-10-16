@@ -1964,6 +1964,29 @@ async function checkoutWhatsapp(){
             return;
         }
 
+        // Nunca mandar un WhatsApp sin número de pedido. Si el servidor dijo
+        // "ok" pero no devolvió el número, se le vuelve a preguntar con el
+        // MISMO idOperacion (no duplica: devuelve el pedido ya guardado).
+        if(!resultado.pedidoId){
+            console.warn("[pedido] el servidor respondió sin número de pedido:", resultado);
+            try{
+                const r2 = await fetchAPI(API_URL, {
+                    method: "POST",
+                    headers: { "Content-Type": "text/plain;charset=utf-8" },
+                    body: cuerpoPedido
+                }, { timeoutMs: 90000, reintentos: 0 });
+                const j2 = await r2.json();
+                console.warn("[pedido] segunda consulta:", j2);
+                if(j2 && j2.success && j2.pedidoId) resultado = j2;
+            }catch(e){ console.warn("[pedido] segunda consulta falló:", e); }
+        }
+        if(!resultado.pedidoId){
+            mostrarToast("No pudimos confirmar el número de tu pedido. Tocá \"Enviar pedido\" de nuevo (no se va a duplicar).", "error");
+            desactivarCargaCheckout();
+            return;
+        }
+        if(resultado.version) console.info("[pedido] backend " + resultado.version + " — " + resultado.pedidoId);
+
         let mensaje = `*PEDIDO ${nombreNegocio.toUpperCase()}*
 
 🧾 Pedido: ${resultado.pedidoId}
