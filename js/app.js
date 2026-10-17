@@ -1410,7 +1410,8 @@ function actualizarContador(){
         mcb.classList.add("d-none");
     }
 
-    actualizarBarraMinimo(totalPrecio);
+    // El mínimo se mide con el total que de verdad paga (con cupón)
+    actualizarBarraMinimo(totalPrecio - descuentoDelCupon(totalPrecio), totalPrecio);
 }
 
 /**
@@ -1419,7 +1420,8 @@ function actualizarContador(){
  * carrito. Se oculta sola cuando ya se llegó al mínimo o cuando el
  * carrito está vacío, para no ocupar espacio innecesariamente.
  */
-function actualizarBarraMinimo(totalPrecio){
+function actualizarBarraMinimo(totalPrecio, subtotalSinCupon){
+    const hayCupon = subtotalSinCupon !== undefined && subtotalSinCupon > totalPrecio;
 
     const cont = document.getElementById("minimo-progress");
     if(!cont) return;
@@ -1446,8 +1448,9 @@ function actualizarBarraMinimo(totalPrecio){
 
         cont.classList.remove("minimo-progress-completo");
         fill.style.width = porcentaje + "%";
-        texto.innerHTML =
-            `🛒 Te faltan <b>$${formatearPrecio(falta)}</b> para llegar al pedido mínimo de $${formatearPrecio(pedidoMinimo)}`;
+        texto.innerHTML = hayCupon
+            ? `🛒 Con tu cupón te faltan <b>$${formatearPrecio(falta)}</b> para el pedido mínimo de $${formatearPrecio(pedidoMinimo)}`
+            : `🛒 Te faltan <b>$${formatearPrecio(falta)}</b> para llegar al pedido mínimo de $${formatearPrecio(pedidoMinimo)}`;
     }
 
     cont.classList.remove("d-none");
@@ -1706,10 +1709,14 @@ function abrirCarrito(){
     pintarTotalesConCupon(total);
 
     const avisoMinimo = document.getElementById("cart-minimo-aviso");
+    // El mínimo se compara con el total final (después del cupón)
+    const totalFinal = total - descuentoDelCupon(total);
     if(avisoMinimo){
-        if(total > 0 && total < pedidoMinimo){
-            const falta = pedidoMinimo - total;
-            avisoMinimo.textContent = `⚠️ Te faltan $${formatearPrecio(falta)} para el pedido mínimo de $${formatearPrecio(pedidoMinimo)}`;
+        if(totalFinal > 0 && totalFinal < pedidoMinimo){
+            const falta = pedidoMinimo - totalFinal;
+            avisoMinimo.textContent = totalFinal < total
+                ? `⚠️ Con el cupón tu total es $${formatearPrecio(totalFinal)}: te faltan $${formatearPrecio(falta)} para el pedido mínimo de $${formatearPrecio(pedidoMinimo)}`
+                : `⚠️ Te faltan $${formatearPrecio(falta)} para el pedido mínimo de $${formatearPrecio(pedidoMinimo)}`;
             avisoMinimo.classList.remove("d-none");
         }else{
             avisoMinimo.classList.add("d-none");
@@ -1829,6 +1836,7 @@ async function aplicarCupon(){
         estado.cupon = { codigo: data.codigo, tipo: data.tipo, valor: Number(data.valor) || 0, minimo: Number(data.minimo) || 0, etiqueta: data.etiqueta || "" };
         input.value = "";
         abrirCarrito();
+        if(typeof actualizarContador === "function") actualizarContador();
     }catch(e){
         mostrarMensajeCupon("No pudimos verificar el cupón (revisá tu conexión) y probá de nuevo.", "error");
     }finally{
@@ -1840,6 +1848,7 @@ function quitarCupon(){
     estado.cupon = null;
     mostrarMensajeCupon("");
     abrirCarrito();
+    if(typeof actualizarContador === "function") actualizarContador();
 }
 
 /* Delegación de eventos dentro del carrito */
