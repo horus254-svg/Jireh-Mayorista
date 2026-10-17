@@ -4267,8 +4267,12 @@ async function abrirOrdenCatalogo() {
   _ocRender();
 }
 
-function cerrarOrdenCatalogo() {
-  if (_oc && _oc.sucio && !confirm("Hay cambios de orden sin guardar. ¿Cerrar igual y descartarlos?")) return;
+function cerrarOrdenCatalogo(forzar) {
+  // Modal propio (no confirm() nativo: en Electron deja el teclado sin foco)
+  if (!forzar && _oc && _oc.sucio) {
+    confirmarAccion("Hay cambios de orden sin guardar. ¿Cerrar igual y descartarlos?", () => cerrarOrdenCatalogo(true), "↕️ Cambios sin guardar");
+    return;
+  }
   document.getElementById("ordenCatalogoBackdrop").classList.remove("show");
   _oc = null;
 }
@@ -16226,7 +16230,11 @@ async function alternarCupon(codigo) {
 async function eliminarCuponClick(codigo) {
   const c = cuponesGlobal.find(x => x.codigo === codigo);
   const extra = c && c.usos > 0 ? ` Ya se usó ${c.usos} ${c.usos === 1 ? "vez" : "veces"}; los pedidos que lo usaron no cambian.` : "";
-  if (!confirm(`¿Eliminar el cupón ${codigo}?${extra}`)) return;
+  // Modal propio (no confirm() nativo: en Electron deja el teclado sin foco)
+  confirmarAccion(`¿Eliminar el cupón ${codigo}?${extra}`, () => _eliminarCuponConfirmado(codigo), "🗑️ Eliminar cupón");
+}
+
+async function _eliminarCuponConfirmado(codigo) {
   try {
     const res = await fetchAPI(API_URL, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "eliminarCupon", codigo }) }, { timeoutMs: 20000 });
     const data = await res.json();

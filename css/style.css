@@ -1178,6 +1178,26 @@ select:focus-visible{
     font-family:var(--font-price);
 }
 
+/* ---- Cupón de descuento ---- */
+.cupon-box{ margin-top:4px; }
+.cupon-form{ display:flex; gap:8px; }
+.cupon-form .form-control{ text-transform:uppercase; letter-spacing:.04em; font-weight:600; }
+.cupon-form .form-control::placeholder{ text-transform:none; letter-spacing:0; font-weight:400; }
+.cupon-form .btn{ white-space:nowrap; }
+.cupon-aplicado{
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    background:var(--green-ok-bg); color:var(--green-ok-text);
+    border:1px dashed currentColor; border-radius:10px; padding:8px 12px; font-size:.92rem;
+    animation:cuponEntra .35s cubic-bezier(.3,1.5,.5,1);
+}
+.cupon-quitar{ background:none; border:none; color:inherit; text-decoration:underline; font-size:.85rem; cursor:pointer; padding:0; }
+.cupon-msg{ font-size:.85rem; margin-top:6px; min-height:0; }
+.cupon-msg.error{ color:#b3261e; }
+.cupon-msg.info{ color:var(--ink-600); }
+.cart-sub-row{ display:flex; justify-content:space-between; font-size:.95rem; color:var(--ink-600); margin-bottom:4px; }
+.cart-desc-row{ color:var(--green-ok-text); font-weight:600; }
+@keyframes cuponEntra{ from{ opacity:0; transform:scale(.96); } to{ opacity:1; transform:none; } }
+
 .cart-empty{
     text-align:center;
     padding:30px 10px;
