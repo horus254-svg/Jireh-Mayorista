@@ -134,7 +134,8 @@ const estado = {
     categoria: "",
     precioMin: null,
     precioMax: null,
-    orden: "relevancia"
+    orden: "relevancia",
+    cupon: null          // { codigo, tipo, valor, minimo, etiqueta } — se valida en el servidor al enviar
 };
 
 // Número de WhatsApp usado por el botón flotante y por el checkout.
@@ -1702,7 +1703,7 @@ function abrirCarrito(){
         cont.innerHTML = html;
     }
 
-    document.getElementById("cart-total").innerText = formatearPrecio(total);
+    pintarTotalesConCupon(total);
 
     const avisoMinimo = document.getElementById("cart-minimo-aviso");
     if(avisoMinimo){
@@ -1747,6 +1748,99 @@ function prepararServidorParaPedido(){
 document.getElementById("cartModal")?.addEventListener("focusin", function(){
     if(estado.carrito.length > 0) prepararServidorParaPedido();
 });
+
+/* =========================================================
+   CUPÓN DE DESCUENTO
+   El carrito pregunta al servidor si el código sirve (validarCupon) y
+   muestra el descuento. Al enviar, el servidor lo vuelve a validar y
+   descuenta el uso junto con el pedido — acá es solo para mostrar.
+========================================================= */
+
+function descuentoDelCupon(subtotal){
+    const c = estado.cupon;
+    if(!c || !(subtotal > 0)) return 0;
+    if(c.minimo > 0 && subtotal < c.minimo) return 0;
+    let d = c.tipo === "MONTO" ? c.valor : subtotal * c.valor / 100;
+    d = Math.min(Math.max(d, 0), subtotal);
+    return Math.round(d * 100) / 100;
+}
+
+function mostrarMensajeCupon(texto, tipo){
+    const el = document.getElementById("cupon-msg");
+    if(!el) return;
+    el.textContent = texto || "";
+    el.className = "cupon-msg" + (tipo ? " " + tipo : "");
+}
+
+/** Subtotal, descuento y total del carrito (lo llama abrirCarrito). */
+function pintarTotalesConCupon(subtotal){
+    const c = estado.cupon;
+    const desc = descuentoDelCupon(subtotal);
+    const total = Math.round((subtotal - desc) * 100) / 100;
+    document.getElementById("cart-total").innerText = formatearPrecio(total);
+
+    const filaSub = document.getElementById("cart-subtotal-row");
+    const filaDesc = document.getElementById("cart-descuento-row");
+    const form = document.getElementById("cupon-form");
+    const aplicado = document.getElementById("cupon-aplicado");
+    if(!filaSub || !filaDesc) return;
+
+    filaSub.classList.toggle("d-none", !c);
+    filaDesc.classList.toggle("d-none", !(c && desc > 0));
+    form.classList.toggle("d-none", !!c);
+    aplicado.classList.toggle("d-none", !c);
+    document.getElementById("cart-subtotal").innerText = formatearPrecio(subtotal);
+
+    if(c){
+        document.getElementById("cupon-codigo").textContent = c.codigo;
+        document.getElementById("cupon-detalle").textContent = c.tipo === "MONTO" ? "(−$" + formatearPrecio(c.valor) + ")" : "(" + c.valor + "% off)";
+        document.getElementById("cart-descuento-label").textContent = "Cupón " + c.codigo;
+        document.getElementById("cart-descuento").innerText = formatearPrecio(desc);
+        if(c.minimo > 0 && subtotal < c.minimo){
+            mostrarMensajeCupon(`Este cupón es para compras desde $${formatearPrecio(c.minimo)} — te faltan $${formatearPrecio(c.minimo - subtotal)}.`, "info");
+        }else if(desc > 0){
+            mostrarMensajeCupon(`¡Listo! Ahorrás $${formatearPrecio(desc)}.`, "info");
+        }
+    }
+}
+
+async function aplicarCupon(){
+    const input = document.getElementById("cupon-input");
+    const codigo = String(input.value || "").trim().toUpperCase().replace(/\s+/g, "");
+    if(!codigo){ mostrarMensajeCupon("Escribí el código del cupón.", "error"); input.focus(); return; }
+    let subtotal = 0;
+    estado.carrito.forEach(item => { subtotal += item.PRECIO * item.cantidad; });
+    if(!(subtotal > 0)){ mostrarMensajeCupon("Agregá productos al carrito antes de aplicar el cupón.", "error"); return; }
+
+    const btn = document.getElementById("cupon-aplicar");
+    btn.disabled = true; btn.textContent = "…";
+    mostrarMensajeCupon("Verificando el cupón…", "info");
+    try{
+        const dni = (document.getElementById("clienteDni")?.value || "").trim();
+        const url = API_URL + (API_URL.indexOf("?") === -1 ? "?" : "&") +
+            "action=validarCupon&codigo=" + encodeURIComponent(codigo) + "&subtotal=" + encodeURIComponent(subtotal) +
+            (dni ? "&dni=" + encodeURIComponent(dni) : "");
+        const r = await fetchAPI(url, { cache: "no-store" }, { timeoutMs: 30000 });
+        const data = await r.json();
+        if(!data.success){
+            mostrarMensajeCupon(data.message || "Ese cupón no es válido.", "error");
+            return;
+        }
+        estado.cupon = { codigo: data.codigo, tipo: data.tipo, valor: Number(data.valor) || 0, minimo: Number(data.minimo) || 0, etiqueta: data.etiqueta || "" };
+        input.value = "";
+        abrirCarrito();
+    }catch(e){
+        mostrarMensajeCupon("No pudimos verificar el cupón (revisá tu conexión) y probá de nuevo.", "error");
+    }finally{
+        btn.disabled = false; btn.textContent = "Aplicar";
+    }
+}
+
+function quitarCupon(){
+    estado.cupon = null;
+    mostrarMensajeCupon("");
+    abrirCarrito();
+}
 
 /* Delegación de eventos dentro del carrito */
 document.getElementById("cart-items").addEventListener("click", function(e){
@@ -1894,6 +1988,10 @@ async function checkoutWhatsapp(){
 
     let total = 0;
     estado.carrito.forEach(item => { total += item.PRECIO * item.cantidad; });
+    const subtotalPedido = total;
+    const descuentoCuponPedido = descuentoDelCupon(subtotalPedido);
+    const codigoCuponPedido = descuentoCuponPedido > 0 ? estado.cupon.codigo : "";
+    total = Math.round((subtotalPedido - descuentoCuponPedido) * 100) / 100;
 
     // El mínimo NO se bloquea acá con el valor local (puede estar viejo
     // en caché y frenar pedidos válidos tras bajar el mínimo). La decisión
@@ -1926,6 +2024,7 @@ async function checkoutWhatsapp(){
             telefono,
             dni,
             total,
+            cupon: codigoCuponPedido,
             carrito: estado.carrito
         });
 
@@ -1955,6 +2054,18 @@ async function checkoutWhatsapp(){
                 if(previa){ previa.pedidoMinimo = pedidoMinimo; localStorage.setItem(CLAVE_CACHE_CONFIG, JSON.stringify(previa)); }
             }catch(e){}
             if(typeof actualizarContador === "function") actualizarContador();
+        }
+
+        if(!resultado.success && resultado.cuponInvalido){
+            // El cupón ya no sirve (se agotó, venció, ya lo usó este DNI…):
+            // se quita y se muestra el total sin descuento para que decida.
+            estado.idOperacionPedido = null;
+            estado.cupon = null;
+            abrirCarrito();
+            mostrarMensajeCupon(resultado.message || "El cupón ya no se puede usar.", "error");
+            mostrarToast((resultado.message || "El cupón ya no se puede usar.") + " Revisá el total y volvé a enviar el pedido.", "error");
+            desactivarCargaCheckout();
+            return;
         }
 
         if(!resultado.success){
@@ -2012,11 +2123,19 @@ Subtotal: $${formatearPrecio(subtotal)}
 `;
         });
 
+        if(codigoCuponPedido){
+            mensaje += `
+Subtotal del pedido: $${formatearPrecio(subtotalPedido)}
+🎟️ Cupón ${codigoCuponPedido}: -$${formatearPrecio(descuentoCuponPedido)}
+`;
+        }
+
         mensaje += `
 💰 TOTAL: $${formatearPrecio(total)}
 `;
 
         estado.idOperacionPedido = null;
+        estado.cupon = null;
         estado.carrito = [];
         localStorage.removeItem("carrito");
         guardarCarrito();

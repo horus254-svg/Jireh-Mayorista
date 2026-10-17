@@ -304,6 +304,7 @@
     <div class="nav-grupo">Vender</div>
     <a href="#" data-target="pos"              onclick="mostrarSeccion('pos')"><span class="ic">🏪</span> Punto de Venta</a>
     <a href="#" data-target="pedidos"          onclick="mostrarSeccion('pedidos')"><span class="ic">📦</span> Pedidos web</a>
+    <a href="#" data-target="cupones"          onclick="mostrarSeccion('cupones')"><span class="ic">🎟️</span> Cupones</a>
 
     <div class="nav-grupo">Caja</div>
     <a href="#" data-target="ventasPOS"        onclick="mostrarSeccion('ventasPOS')"><span class="ic">🧾</span> Historial de ventas</a>
@@ -1941,6 +1942,26 @@
     </div>
   </div>
 
+  <!-- ===== CUPONES (descuentos con código para el catálogo web) ===== -->
+  <div id="cupones" class="seccion">
+    <div class="page-header">
+      <div><h1>Cupones</h1><div class="sub">Descuentos con código para el catálogo web · cada cliente (DNI/CUIT) puede usar cada cupón una sola vez</div></div>
+      <div class="d-flex gap-2">
+        <button class="btn btn-outline-secondary btn-sm" onclick="cargarCupones()">↻ Actualizar</button>
+        <button class="btn btn-success" onclick="abrirModalCupon()">+ Nuevo cupón</button>
+      </div>
+    </div>
+
+    <div class="card p-3">
+      <div class="table-responsive">
+        <table class="table align-middle mb-0 tabla-cupones">
+          <thead><tr><th>Código</th><th>Descuento</th><th>Usos</th><th>Vigencia</th><th>Compra mínima</th><th>Estado</th><th class="text-end">Acciones</th></tr></thead>
+          <tbody id="tablaCupones"><tr><td colspan="7" class="text-center text-muted py-4">Cargando...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <!-- ===== CONFIGURACION ===== -->
   <div id="configuracion" class="seccion">
     <div class="page-header">
@@ -2875,6 +2896,74 @@
 <!-- ===== MODAL PAPELERA DE PRODUCTOS =====
      Va ANTES del modal de confirmación genérico para que ese quede por
      encima cuando se confirma un borrado definitivo / vaciar. -->
+<!-- ===== MODAL CUPÓN ===== -->
+<div class="product-modal-backdrop" id="cuponModalBackdrop">
+  <div class="product-modal" style="width:min(520px, 94vw);">
+    <div class="product-modal-header">
+      <h6 id="cuponModalTitulo">🎟️ Nuevo cupón</h6>
+      <button onclick="cerrarModalCupon()">✕</button>
+    </div>
+    <div class="product-modal-body">
+      <input type="hidden" id="cupCodigoOriginal">
+      <div class="mb-3">
+        <label class="form-label">Código *</label>
+        <input type="text" class="form-control mono" id="cupCodigo" maxlength="30" placeholder="Ej: VERANO10" autocomplete="off"
+               oninput="this.value = this.value.toUpperCase().replace(/[^A-Z0-9_-]/g, '')">
+        <div class="form-text">Lo que el cliente escribe en el carrito. Letras, números, guion. Sin espacios.</div>
+      </div>
+      <div class="row g-2 mb-3">
+        <div class="col-6">
+          <label class="form-label">Tipo de descuento *</label>
+          <select class="form-select" id="cupTipo" onchange="actualizarAyudaCupon()">
+            <option value="PORCENTAJE">Porcentaje (%)</option>
+            <option value="MONTO">Monto fijo ($)</option>
+          </select>
+        </div>
+        <div class="col-6">
+          <label class="form-label" id="cupValorLabel">Porcentaje *</label>
+          <input type="number" class="form-control" id="cupValor" min="0" step="any" placeholder="Ej: 10" oninput="actualizarAyudaCupon()">
+        </div>
+      </div>
+      <div class="row g-2 mb-3">
+        <div class="col-6">
+          <label class="form-label">Cantidad de usos *</label>
+          <input type="number" class="form-control" id="cupUsosMax" min="1" step="1" placeholder="Ej: 50">
+          <div class="form-text" id="cupUsosInfo">Se descuenta uno por cada pedido que lo use.</div>
+        </div>
+        <div class="col-6">
+          <label class="form-label">Compra mínima <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+          <input type="number" class="form-control" id="cupMinimo" min="0" step="any" placeholder="Ej: 150000">
+        </div>
+      </div>
+      <div class="row g-2 mb-3">
+        <div class="col-6">
+          <label class="form-label">Válido desde <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+          <input type="date" class="form-control" id="cupDesde" onchange="actualizarAyudaCupon()">
+          <div class="form-text">Se activa solo ese día (desde las 00:00).</div>
+        </div>
+        <div class="col-6">
+          <label class="form-label">Vence <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+          <input type="date" class="form-control" id="cupVence" onchange="actualizarAyudaCupon()">
+          <div class="form-text">Sirve hasta ese día inclusive.</div>
+        </div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Nota interna <span class="text-muted" style="font-size:11px;">(opcional, no la ve el cliente)</span></label>
+        <input type="text" class="form-control" id="cupNota" maxlength="200" placeholder="Ej: campaña Instagram octubre">
+      </div>
+      <label class="pm-switch">
+        <input type="checkbox" id="cupActivo" checked>
+        <span>Activo (se puede usar)</span>
+      </label>
+      <div class="cupon-resumen" id="cupResumen"></div>
+    </div>
+    <div class="product-modal-actions">
+      <button class="btn btn-outline-secondary" onclick="cerrarModalCupon()">Cancelar</button>
+      <button class="btn btn-success" id="btnGuardarCupon" onclick="guardarCuponForm()">💾 Guardar cupón</button>
+    </div>
+  </div>
+</div>
+
 <!-- ===== ORDENAR CATÁLOGO (categorías y productos) ===== -->
 <div class="product-modal-backdrop" id="ordenCatalogoBackdrop">
   <div class="product-modal oc-modal">

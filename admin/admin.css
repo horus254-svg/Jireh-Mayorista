@@ -2569,6 +2569,18 @@ kbd{
 @keyframes anModal{ from{ opacity:0; transform:translateY(14px) scale(.97); } to{ opacity:1; transform:none; } }
 @keyframes anOnda{ to{ transform:scale(2.6); opacity:0; } }
 
+/* ===================== CUPONES ===================== */
+.tabla-cupones .cup-codigo{ font-family:var(--font-mono); font-weight:700; font-size:14px; letter-spacing:.03em; }
+.tabla-cupones .cup-nota{ font-size:11.5px; color:var(--slate-500); }
+.cup-usos{ min-width:120px; }
+.cup-usos .barra{ height:6px; border-radius:6px; background:var(--slate-100); overflow:hidden; margin-top:4px; }
+.cup-usos .barra > span{ display:block; height:100%; background:var(--blue-500); border-radius:6px; transition:width .4s ease; }
+.cup-usos.lleno .barra > span{ background:var(--red-500); }
+.cup-acciones{ white-space:nowrap; text-align:right; }
+.cup-acciones .btn{ padding:4px 9px; font-size:13px; }
+.cupon-resumen{ margin-top:14px; padding:10px 12px; border-radius:10px; background:var(--slate-50); font-size:13px; color:var(--slate-700); }
+.cupon-resumen:empty{ display:none; }
+
 /* Pantallas bajas (notebooks 1366×768 con barra de tareas): menú más compacto */
 @media (max-height:800px){
   .sidebar{ padding-top:14px; padding-bottom:14px; }

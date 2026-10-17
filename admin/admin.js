@@ -2065,6 +2065,7 @@ function mostrarSeccion(id) {
     cargarResumenCierreCaja(selector ? selector.value : null);
   }
   if (id === "movimientosCaja") cargarMovimientosCajaHoy();
+  if (id === "cupones") cargarCupones();
   if (id === "reportes") {
     // Pasado el tiempo de caché de secciones, se vuelve a pedir todo al entrar
     cargarSiVencido("reportes", () => { Object.keys(_repTabRangoCargado).forEach(k => _repTabRangoCargado[k] = null); });
@@ -16054,3 +16055,189 @@ function eliminarUsuarioClick(usuarioId, nombre) {
     setTimeout(() => capa.remove(), 600);
   }, { passive: true });
 })();
+
+
+/* =====================================================================
+   CUPONES — descuentos con código para el catálogo web.
+   Cada cupón: % o monto fijo, cupo de usos, vencimiento y compra mínima
+   opcionales. Cada DNI/CUIT lo puede usar una vez (lo controla el
+   backend al guardar el pedido, dentro del mismo lock).
+===================================================================== */
+let cuponesGlobal = [];
+
+function _textoDescuentoCupon(c) {
+  return c.tipo === "MONTO" ? "$" + Number(c.valor).toLocaleString("es-AR") : c.valor + "%";
+}
+
+function _estadoCupon(c) {
+  if (!c.activo) return { txt: "Pausado", cls: "bg-secondary" };
+  if (c.vencido) return { txt: "Vencido", cls: "bg-secondary" };
+  if (c.programado) return { txt: "Programado", cls: "bg-info text-dark" };
+  if (c.usosMax > 0 && c.usos >= c.usosMax) return { txt: "Agotado", cls: "bg-danger" };
+  return { txt: "Activo", cls: "bg-success" };
+}
+
+async function cargarCupones() {
+  const tbody = document.getElementById("tablaCupones");
+  if (!tbody) return;
+  try {
+    const res = await fetchAPI(API_URL + "?action=cupones");
+    const data = await res.json();
+    if (!data.success) throw new Error(data.message || "No se pudieron cargar los cupones");
+    cuponesGlobal = data.cupones || [];
+    renderCupones();
+  } catch (e) {
+    console.error("Cupones:", e);
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-4">${escapeHtml(e.message || "Error de conexión")}</td></tr>`;
+  }
+}
+
+function renderCupones() {
+  const tbody = document.getElementById("tablaCupones");
+  if (!cuponesGlobal.length) {
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-5">Todavía no hay cupones.<br><button class="btn btn-success btn-sm mt-2" onclick="abrirModalCupon()">+ Crear el primero</button></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = cuponesGlobal.map(c => {
+    const est = _estadoCupon(c);
+    const pct = c.usosMax > 0 ? Math.min(100, Math.round(c.usos * 100 / c.usosMax)) : 0;
+    const cod = escapeJsAttr(c.codigo);
+    return `<tr>
+      <td><div class="cup-codigo">${escapeHtml(c.codigo)}</div>${c.nota ? `<div class="cup-nota">${escapeHtml(c.nota)}</div>` : ""}</td>
+      <td><strong>${_textoDescuentoCupon(c)}</strong></td>
+      <td><div class="cup-usos ${c.usos >= c.usosMax ? "lleno" : ""}">${c.usos} / ${c.usosMax} <span class="text-muted" style="font-size:12px;">· quedan ${Math.max(0, c.usosMax - c.usos)}</span>
+        <div class="barra"><span style="width:${pct}%"></span></div></div></td>
+      <td>${_textoVigenciaCupon(c)}</td>
+      <td>${c.minimo > 0 ? "$" + Number(c.minimo).toLocaleString("es-AR") : '<span class="text-muted">—</span>'}</td>
+      <td><span class="badge ${est.cls}">${est.txt}</span></td>
+      <td class="cup-acciones">
+        <button class="btn btn-outline-secondary" title="Copiar código" onclick="copiarCodigoCupon('${cod}')">📋</button>
+        <button class="btn btn-outline-secondary" title="${c.activo ? "Pausar" : "Activar"}" onclick="alternarCupon('${cod}')">${c.activo ? "⏸" : "▶"}</button>
+        <button class="btn btn-outline-primary" title="Editar" onclick="abrirModalCupon('${cod}')">✏️</button>
+        <button class="btn btn-outline-danger" title="Eliminar" onclick="eliminarCuponClick('${cod}')">🗑️</button>
+      </td>
+    </tr>`;
+  }).join("");
+}
+
+const _fechaCorta = (iso) => iso ? iso.split("-").reverse().join("/") : "";
+
+function _textoVigenciaCupon(c) {
+  if (!c.desde && !c.vence) return '<span class="text-muted">Siempre</span>';
+  const partes = [];
+  if (c.desde) partes.push(`<span class="${c.programado ? "text-primary fw-semibold" : ""}">desde ${escapeHtml(_fechaCorta(c.desde))}</span>`);
+  if (c.vence) partes.push(`<span class="${c.vencido ? "text-danger" : ""}">hasta ${escapeHtml(_fechaCorta(c.vence))}</span>`);
+  return partes.join("<br>");
+}
+
+function abrirModalCupon(codigo) {
+  const c = codigo ? cuponesGlobal.find(x => x.codigo === codigo) : null;
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v ?? ""; };
+  document.getElementById("cuponModalTitulo").textContent = c ? "🎟️ Editar cupón " + c.codigo : "🎟️ Nuevo cupón";
+  set("cupCodigoOriginal", c ? c.codigo : "");
+  set("cupCodigo", c ? c.codigo : "");
+  set("cupTipo", c ? c.tipo : "PORCENTAJE");
+  set("cupValor", c ? c.valor : "");
+  set("cupUsosMax", c ? c.usosMax : "");
+  set("cupVence", c ? c.vence : "");
+  set("cupDesde", c ? c.desde : "");
+  set("cupMinimo", c && c.minimo ? c.minimo : "");
+  set("cupNota", c ? c.nota : "");
+  document.getElementById("cupActivo").checked = c ? !!c.activo : true;
+  // un cupón ya usado no puede cambiar de código (el historial lo referencia)
+  document.getElementById("cupCodigo").disabled = !!(c && c.usos > 0);
+  document.getElementById("cupUsosInfo").textContent = c && c.usos > 0
+    ? `Ya se usó ${c.usos} ${c.usos === 1 ? "vez" : "veces"}. Podés ampliar el cupo.`
+    : "Se descuenta uno por cada pedido que lo use.";
+  actualizarAyudaCupon();
+  document.getElementById("cuponModalBackdrop").classList.add("show");
+  setTimeout(() => document.getElementById(c ? "cupValor" : "cupCodigo")?.focus(), 80);
+}
+
+function cerrarModalCupon() {
+  document.getElementById("cuponModalBackdrop").classList.remove("show");
+}
+
+/** Resumen en palabras de lo que va a hacer el cupón (ayuda a no equivocarse). */
+function actualizarAyudaCupon() {
+  const tipo = document.getElementById("cupTipo").value;
+  document.getElementById("cupValorLabel").textContent = tipo === "MONTO" ? "Monto a descontar ($) *" : "Porcentaje *";
+  const v = Number(document.getElementById("cupValor").value);
+  const r = document.getElementById("cupResumen");
+  if (!v) { r.textContent = ""; return; }
+  const ej = 100000;
+  const desc = tipo === "MONTO" ? Math.min(v, ej) : Math.round(ej * v / 100);
+  const desde = document.getElementById("cupDesde")?.value, vence = document.getElementById("cupVence")?.value;
+  const vig = desde && vence ? ` Vale del ${_fechaCorta(desde)} al ${_fechaCorta(vence)}.`
+            : desde ? ` Empieza a valer el ${_fechaCorta(desde)}.`
+            : vence ? ` Vale hasta el ${_fechaCorta(vence)}.` : "";
+  r.textContent = `Ejemplo: en un pedido de $${ej.toLocaleString("es-AR")}, descuenta $${desc.toLocaleString("es-AR")} y el cliente paga $${(ej - desc).toLocaleString("es-AR")}.` + vig;
+}
+
+async function guardarCuponForm() {
+  const val = id => document.getElementById(id).value.trim();
+  const datos = {
+    action: "guardarCupon",
+    codigoOriginal: val("cupCodigoOriginal"),
+    codigo: val("cupCodigo"),
+    tipo: val("cupTipo"),
+    valor: val("cupValor"),
+    usosMax: val("cupUsosMax"),
+    vence: val("cupVence"),
+    desde: val("cupDesde"),
+    minimo: val("cupMinimo") || 0,
+    nota: val("cupNota"),
+    activo: document.getElementById("cupActivo").checked
+  };
+  if (datos.codigo.length < 3) { toast("El código tiene que tener al menos 3 caracteres", "error"); return; }
+  if (!(Number(datos.valor) > 0)) { toast("Poné cuánto descuenta el cupón", "error"); return; }
+  if (!(Number(datos.usosMax) >= 1)) { toast("Poné la cantidad de usos (1 o más)", "error"); return; }
+  if (datos.desde && datos.vence && datos.desde > datos.vence) { toast("La fecha de inicio no puede ser posterior al vencimiento", "error"); return; }
+  const btn = document.getElementById("btnGuardarCupon");
+  btn.disabled = true; btn.textContent = "Guardando...";
+  try {
+    const res = await fetchAPI(API_URL, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(datos) }, { timeoutMs: 20000 });
+    const data = await res.json();
+    if (!data.success) { toast(data.message || "No se pudo guardar el cupón", "error"); return; }
+    toast(`Cupón ${data.codigo} guardado`, "success");
+    cerrarModalCupon();
+    cargarCupones();
+  } catch (e) {
+    toast("Error de conexión al guardar el cupón", "error");
+  } finally {
+    btn.disabled = false; btn.textContent = "💾 Guardar cupón";
+  }
+}
+
+async function alternarCupon(codigo) {
+  const c = cuponesGlobal.find(x => x.codigo === codigo);
+  if (!c) return;
+  try {
+    const res = await fetchAPI(API_URL, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({
+      action: "guardarCupon", codigoOriginal: c.codigo, codigo: c.codigo, tipo: c.tipo, valor: c.valor, usosMax: c.usosMax,
+      vence: c.vence, desde: c.desde, minimo: c.minimo, nota: c.nota, activo: !c.activo }) }, { timeoutMs: 20000 });
+    const data = await res.json();
+    if (!data.success) { toast(data.message || "No se pudo cambiar el cupón", "error"); return; }
+    toast(c.activo ? `Cupón ${codigo} pausado` : `Cupón ${codigo} activado`, "success");
+    cargarCupones();
+  } catch (e) { toast("Error de conexión", "error"); }
+}
+
+async function eliminarCuponClick(codigo) {
+  const c = cuponesGlobal.find(x => x.codigo === codigo);
+  const extra = c && c.usos > 0 ? ` Ya se usó ${c.usos} ${c.usos === 1 ? "vez" : "veces"}; los pedidos que lo usaron no cambian.` : "";
+  if (!confirm(`¿Eliminar el cupón ${codigo}?${extra}`)) return;
+  try {
+    const res = await fetchAPI(API_URL, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "eliminarCupon", codigo }) }, { timeoutMs: 20000 });
+    const data = await res.json();
+    if (!data.success) { toast(data.message || "No se pudo eliminar", "error"); return; }
+    toast(`Cupón ${codigo} eliminado`, "success");
+    cargarCupones();
+  } catch (e) { toast("Error de conexión", "error"); }
+}
+
+function copiarCodigoCupon(codigo) {
+  try {
+    navigator.clipboard.writeText(codigo).then(() => toast(`Código ${codigo} copiado`, "success"), () => toast(codigo, "success"));
+  } catch (e) { toast(codigo, "success"); }
+}

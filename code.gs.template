@@ -582,13 +582,13 @@ function conCachePolling(clave, ttlSegundos, fnImpl){
 // SEO usan SIN iniciar sesión. Todo lo demás requiere token.
 // Versión del backend: aparece en las respuestas de pedidos y en
 // ?action=prepararPedido, para saber qué código está publicado.
-const VERSION_BACKEND = "1.5.4";
+const VERSION_BACKEND = "1.6.1";
 
 const ACCIONES_PUBLICAS = {
   productos: true, categorias: true, destacados: true, ofertas: true,
   producto: true, configLanding: true, configuracionNegocio: true,
   catalogoVersion: true, catalogoPDFInfo: true, imagenProxy: true,
-  guardarPedido: true, consultarPedido: true, prepararPedido: true,
+  guardarPedido: true, consultarPedido: true, prepararPedido: true, validarCupon: true,
   login: true, loginStock: true, inicializarHojas: true,
   qrEstado: true, qrPantalla: true
 };
@@ -598,6 +598,7 @@ const ACCIONES_SOLO_ADMIN = {
   usuarios: true, crearUsuario: true, editarUsuario: true, eliminarUsuario: true,
   guardarCredencialesAdmin: true, guardarPasswordStock: true,
   guardarConfiguracionNegocio: true,
+  cupones: true, guardarCupon: true, eliminarCupon: true,
   cerrarTodasLasSesiones: true
 };
 
@@ -1135,6 +1136,12 @@ case "reportesVentas":
 
     case "producto":
       return getProducto(e.parameter.codigo);
+
+    case "validarCupon":
+      return validarCuponPublico(e.parameter || {});
+
+    case "cupones":
+      return listarCupones();
 
     case "categorias":
       return getCategorias();
@@ -2208,6 +2215,8 @@ function inicializarHojasNuevoNegocio(){
   getOrCrearHojaDeudasExtra();
   getOrCrearHojaIngresosProductos();
   getOrCrearHojaUsuarios();
+  getOrCrearHojaCupones();
+  getOrCrearHojaCuponesUsos();
 
   return jsonResponse({
     success: true,
@@ -6035,6 +6044,15 @@ function guardarPedidoPublico(entrada){
     return jsonResponse({ success:false, message:"Completá Nombre, Dirección, Localidad, Provincia, Teléfono y DNI o CUIT." });
   }
 
+  // --- Reintento de un pedido ya guardado (se perdió la respuesta): se
+  // devuelve el pedido existente ANTES de validar nada más — si no, un
+  // cupón de "uno por cliente" diría que ya se usó (justamente en ese pedido).
+  const idOpPrevio = String(d.idOperacion || "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 64);
+  if(idOpPrevio){
+    const previo = buscarPedidoPorIdOperacionRapido(null, idOpPrevio);
+    if(previo) return jsonResponse({ success:true, pedidoId: previo, repetido:true, version: VERSION_BACKEND });
+  }
+
   // --- Frenos contra abuso automatizado ---
   const dniNorm = normalizarDni(dni) || dni;
   if(!permitirIntentosJuntos([["pedido_dni:" + dniNorm, 10, 3600], ["pedido_global", 200, 600]])){
@@ -6128,6 +6146,21 @@ function guardarPedidoPublico(entrada){
 
   totalReal = Math.round(totalReal * 100) / 100;
 
+  // --- Cupón de descuento (opcional). Acá se valida y se calcula; el
+  // uso se descuenta recién dentro del lock de guardarPedido, junto con
+  // el pedido, para que dos clientes no se lleven el último uso.
+  const subtotalReal = totalReal;
+  let cuponAplicado = null;
+  const codigoCupon = normalizarCodigoCupon(d.cupon);
+  if(codigoCupon){
+    const ev = evaluarCupon(codigoCupon, subtotalReal, normalizarDni(dni));
+    if(!ev.ok){
+      return jsonResponse({ success:false, cuponInvalido:true, message: ev.message });
+    }
+    cuponAplicado = { codigo: ev.cupon.CODIGO, descuento: ev.descuento, etiqueta: ev.etiqueta };
+    totalReal = Math.round((subtotalReal - ev.descuento) * 100) / 100;
+  }
+
   // Si el total que vio el cliente no coincide con el real, los precios
   // cambiaron mientras tenía el carrito abierto: se le avisa, no se guarda.
   const totalCliente = Number(d.total);
@@ -6147,13 +6180,250 @@ function guardarPedidoPublico(entrada){
     localidad: localidad,
     provincia: provincia,
     total: totalReal,
+    subtotal: subtotalReal,
+    descuento: cuponAplicado ? cuponAplicado.descuento : 0,
+    descuentoEtiqueta: cuponAplicado ? cuponAplicado.etiqueta : "",
     carrito: carritoReal,
+    _cupon: cuponAplicado,
     _stockValidado: true
     // origenPOS, moneda, descuento, subtotal: a propósito NO se aceptan desde el público
   });
   // Visible en Apps Script → Ejecuciones: cuánto tardó cada pedido.
   console.log("guardarPedido: pedido completo en " + (Date.now() - _t0Pedido) + " ms");
   return _respuestaPedido;
+}
+
+/* =====================================================================
+   CUPONES DE DESCUENTO (catálogo web)
+   Hojas:
+     CUPONES       CODIGO | TIPO (PORCENTAJE/MONTO) | VALOR | USOS_MAX |
+                   USOS | VENCE | MINIMO | ACTIVO | NOTA | CREADO | DESDE
+     CUPONES_USOS  FECHA | CODIGO | DNI | PEDIDO_ID | DESCUENTO
+   Reglas: cada cupón tiene un cupo total de usos y cada DNI/CUIT puede
+   usar un mismo cupón UNA vez. El uso se descuenta dentro del lock que
+   guarda el pedido (ver guardarPedido), así no se pasa del cupo.
+===================================================================== */
+const ENC_CUPONES = ["CODIGO", "TIPO", "VALOR", "USOS_MAX", "USOS", "VENCE", "MINIMO", "ACTIVO", "NOTA", "CREADO", "DESDE"];
+const ENC_CUPONES_USOS = ["FECHA", "CODIGO", "DNI", "PEDIDO_ID", "DESCUENTO"];
+
+function getOrCrearHojaCupones(){
+  let sheet = getHoja("CUPONES");
+  if(!sheet){
+    sheet = getSS().insertSheet("CUPONES");
+    sheet.appendRow(ENC_CUPONES);
+    sheet.setFrozenRows(1);
+    _hojaCache["CUPONES"] = sheet;
+    return sheet;
+  }
+  // Hojas creadas antes de que existiera una columna (ej. DESDE): se
+  // completa el encabezado en su posición (siempre se agregan al final).
+  const enc = sheet.getRange(1, 1, 1, ENC_CUPONES.length).getValues()[0];
+  ENC_CUPONES.forEach((k, i) => { if(String(enc[i] || "").trim() !== k && !String(enc[i] || "").trim()) sheet.getRange(1, i + 1).setValue(k); });
+  return sheet;
+}
+
+function getOrCrearHojaCuponesUsos(){
+  let sheet = getHoja("CUPONES_USOS");
+  if(!sheet){
+    sheet = getSS().insertSheet("CUPONES_USOS");
+    sheet.appendRow(ENC_CUPONES_USOS);
+    sheet.setFrozenRows(1);
+    _hojaCache["CUPONES_USOS"] = sheet;
+  }
+  return sheet;
+}
+
+function normalizarCodigoCupon(c){
+  return String(c || "").trim().toUpperCase().replace(/\s+/g, "").replace(/[^A-Z0-9_-]/g, "").slice(0, 30);
+}
+
+/** Todas las filas de CUPONES como objetos (con _fila = número de fila en la hoja). */
+function _leerCupones(){
+  const sheet = getOrCrearHojaCupones();
+  const ultima = sheet.getLastRow();
+  if(ultima < 2) return [];
+  const datos = sheet.getRange(1, 1, ultima, ENC_CUPONES.length).getValues();
+  const enc = datos[0].map(h => String(h || "").trim());
+  const out = [];
+  for(let i = 1; i < datos.length; i++){
+    const o = { _fila: i + 1 };
+    ENC_CUPONES.forEach(k => { const j = enc.indexOf(k); o[k] = j === -1 ? "" : datos[i][j]; });
+    o.CODIGO = normalizarCodigoCupon(o.CODIGO);
+    if(o.CODIGO) out.push(o);
+  }
+  return out;
+}
+
+/** Día desde el que vale el cupón (a las 00:00), o null si no tiene. */
+function _fechaDesdeCupon(v){
+  if(!v) return null;
+  const f = v instanceof Date ? new Date(v.getTime()) : new Date(String(v) + (/^\d{4}-\d{2}-\d{2}$/.test(String(v)) ? "T00:00:00" : ""));
+  if(isNaN(f)) return null;
+  f.setHours(0, 0, 0, 0);
+  return f;
+}
+
+function _fechaVenceCupon(v){
+  if(!v) return null;
+  const f = v instanceof Date ? new Date(v.getTime()) : new Date(String(v) + (/^\d{4}-\d{2}-\d{2}$/.test(String(v)) ? "T00:00:00" : ""));
+  if(isNaN(f)) return null;
+  f.setHours(23, 59, 59, 999); // vale todo el día de vencimiento
+  return f;
+}
+
+function _textoFechaCupon(v){
+  const f = _fechaDesdeCupon(v);
+  return f ? Utilities.formatDate(f, Session.getScriptTimeZone(), "yyyy-MM-dd") : "";
+}
+
+function calcularDescuentoCupon(cupon, subtotal){
+  const valor = Number(cupon.VALOR) || 0;
+  let d = String(cupon.TIPO).toUpperCase() === "MONTO" ? valor : subtotal * valor / 100;
+  d = Math.min(Math.max(d, 0), subtotal);
+  return Math.round(d * 100) / 100;
+}
+
+function etiquetaCupon(cupon){
+  const valor = Number(cupon.VALOR) || 0;
+  return "Cupón " + cupon.CODIGO + " · " + (String(cupon.TIPO).toUpperCase() === "MONTO" ? "$" + valor.toLocaleString("es-AR") : valor + "%");
+}
+
+function _dniYaUsoCupon(codigo, dniNorm){
+  if(!dniNorm) return false;
+  const sheet = getOrCrearHojaCuponesUsos();
+  const ultima = sheet.getLastRow();
+  if(ultima < 2) return false;
+  const filas = sheet.getRange(2, 2, ultima - 1, 2).getValues(); // CODIGO, DNI
+  return filas.some(f => normalizarCodigoCupon(f[0]) === codigo && normalizarDni(f[1]) === dniNorm);
+}
+
+/**
+ * ¿Se puede usar este cupón? Devuelve { ok, message, cupon, descuento, etiqueta }.
+ * dniNorm es opcional (al validar desde el carrito todavía puede no estar).
+ */
+function evaluarCupon(codigo, subtotal, dniNorm){
+  codigo = normalizarCodigoCupon(codigo);
+  const cupon = _leerCupones().find(c => c.CODIGO === codigo);
+  if(!cupon) return { ok:false, message:"El cupón \"" + codigo + "\" no existe. Revisá que esté bien escrito." };
+  if(String(cupon.ACTIVO || "SI").toUpperCase() !== "SI") return { ok:false, message:"El cupón " + codigo + " no está disponible en este momento." };
+  const desde = _fechaDesdeCupon(cupon.DESDE);
+  if(desde && new Date() < desde){
+    return { ok:false, message:"El cupón " + codigo + " empieza a valer el " + Utilities.formatDate(desde, Session.getScriptTimeZone(), "dd/MM") + "." };
+  }
+  const vence = _fechaVenceCupon(cupon.VENCE);
+  if(vence && new Date() > vence) return { ok:false, message:"El cupón " + codigo + " ya venció." };
+  const max = Number(cupon.USOS_MAX) || 0, usados = Number(cupon.USOS) || 0;
+  if(max > 0 && usados >= max) return { ok:false, message:"El cupón " + codigo + " ya se agotó." };
+  const minimo = Number(cupon.MINIMO) || 0;
+  if(minimo > 0 && Number(subtotal) < minimo) return { ok:false, message:"El cupón " + codigo + " es para compras desde $" + minimo.toLocaleString("es-AR") + "." };
+  if(dniNorm && _dniYaUsoCupon(codigo, dniNorm)) return { ok:false, message:"Ya usaste el cupón " + codigo + " en otro pedido (es uno por cliente)." };
+  return { ok:true, cupon: cupon, descuento: calcularDescuentoCupon(cupon, Number(subtotal) || 0), etiqueta: etiquetaCupon(cupon) };
+}
+
+/** Se llama DENTRO del lock de guardarPedido, después de escribir el pedido. */
+function registrarUsoCupon(ev, dniNorm, pedidoId){
+  const sheet = getOrCrearHojaCupones();
+  const colUsos = ENC_CUPONES.indexOf("USOS") + 1;
+  const enc = sheet.getRange(1, 1, 1, ENC_CUPONES.length).getValues()[0].map(h => String(h || "").trim());
+  const col = enc.indexOf("USOS") + 1 || colUsos;
+  sheet.getRange(ev.cupon._fila, col).setValue((Number(ev.cupon.USOS) || 0) + 1);
+  getOrCrearHojaCuponesUsos().appendRow([new Date(), ev.cupon.CODIGO, dniNorm, pedidoId, ev.descuento]);
+}
+
+/** Público: el carrito pregunta si un código sirve y cuánto descuenta. */
+function validarCuponPublico(p){
+  // Freno a quien pruebe códigos al azar
+  if(!permitirIntento("validar_cupon", 300, 600)){
+    return jsonResponse({ success:false, message:"Demasiados intentos. Probá de nuevo en unos minutos." });
+  }
+  const codigo = normalizarCodigoCupon(p.codigo || p.cupon);
+  if(!codigo) return jsonResponse({ success:false, message:"Escribí un código de cupón." });
+  const ev = evaluarCupon(codigo, Number(p.subtotal) || 0, normalizarDni(p.dni));
+  if(!ev.ok) return jsonResponse({ success:false, message: ev.message });
+  return jsonResponse({
+    success:true,
+    codigo: ev.cupon.CODIGO,
+    tipo: String(ev.cupon.TIPO).toUpperCase() === "MONTO" ? "MONTO" : "PORCENTAJE",
+    valor: Number(ev.cupon.VALOR) || 0,
+    minimo: Number(ev.cupon.MINIMO) || 0,
+    descuento: ev.descuento,
+    etiqueta: ev.etiqueta
+  });
+}
+
+/** Admin: lista de cupones con sus usos. */
+function listarCupones(){
+  const cupones = _leerCupones().map(c => ({
+    codigo: c.CODIGO,
+    tipo: String(c.TIPO).toUpperCase() === "MONTO" ? "MONTO" : "PORCENTAJE",
+    valor: Number(c.VALOR) || 0,
+    usosMax: Number(c.USOS_MAX) || 0,
+    usos: Number(c.USOS) || 0,
+    vence: _textoFechaCupon(c.VENCE),
+    desde: _textoFechaCupon(c.DESDE),
+    programado: !!(_fechaDesdeCupon(c.DESDE) && new Date() < _fechaDesdeCupon(c.DESDE)),
+    minimo: Number(c.MINIMO) || 0,
+    activo: String(c.ACTIVO || "SI").toUpperCase() === "SI",
+    nota: String(c.NOTA || ""),
+    vencido: !!(_fechaVenceCupon(c.VENCE) && new Date() > _fechaVenceCupon(c.VENCE))
+  }));
+  return jsonResponse({ success:true, cupones: cupones });
+}
+
+/** Admin: crea o edita un cupón (codigoOriginal = el que se está editando). */
+function guardarCupon(d){
+  const codigo = normalizarCodigoCupon(d.codigo);
+  const original = normalizarCodigoCupon(d.codigoOriginal);
+  const tipo = String(d.tipo || "").toUpperCase() === "MONTO" ? "MONTO" : "PORCENTAJE";
+  const valor = Number(d.valor);
+  const usosMax = Math.floor(Number(d.usosMax));
+  const minimo = Number(d.minimo || 0);
+  const vence = String(d.vence || "").trim();
+  const desde = String(d.desde || "").trim();
+
+  if(codigo.length < 3) return jsonResponse({ success:false, message:"El código tiene que tener al menos 3 letras o números (sin espacios)." });
+  if(!isFinite(valor) || valor <= 0) return jsonResponse({ success:false, message:"Poné cuánto descuenta el cupón." });
+  if(tipo === "PORCENTAJE" && valor > 100) return jsonResponse({ success:false, message:"Un porcentaje no puede ser mayor a 100." });
+  if(!isFinite(usosMax) || usosMax < 1) return jsonResponse({ success:false, message:"La cantidad de usos tiene que ser 1 o más." });
+  if(!isFinite(minimo) || minimo < 0) return jsonResponse({ success:false, message:"La compra mínima no puede ser negativa." });
+  if(vence && !/^\d{4}-\d{2}-\d{2}$/.test(vence)) return jsonResponse({ success:false, message:"La fecha de vencimiento no es válida." });
+  if(desde && !/^\d{4}-\d{2}-\d{2}$/.test(desde)) return jsonResponse({ success:false, message:"La fecha de inicio no es válida." });
+  if(desde && vence && desde > vence) return jsonResponse({ success:false, message:"La fecha de inicio no puede ser posterior al vencimiento." });
+
+  const lock = LockService.getScriptLock();
+  if(!lock.tryLock(15000)) return jsonResponse({ success:false, message:"El sistema está ocupado, probá de nuevo en unos segundos." });
+  try{
+    const sheet = getOrCrearHojaCupones();
+    const cupones = _leerCupones();
+    const existente = original ? cupones.find(c => c.CODIGO === original) : null;
+    if(original && !existente) return jsonResponse({ success:false, message:"No se encontró el cupón " + original + " (¿lo borraron?)." });
+    const choca = cupones.find(c => c.CODIGO === codigo && c !== existente);
+    if(choca) return jsonResponse({ success:false, message:"Ya existe un cupón con el código " + codigo + "." });
+    const usos = existente ? (Number(existente.USOS) || 0) : 0;
+    if(existente && original !== codigo && usos > 0) return jsonResponse({ success:false, message:"Este cupón ya se usó: no se le puede cambiar el código (creá uno nuevo)." });
+    const activo = d.activo === false || String(d.activo).toUpperCase() === "NO" ? "NO" : "SI";
+    const fila = [codigo, tipo, valor, usosMax, usos, vence, minimo, activo, String(d.nota || "").slice(0, 200), existente ? existente.CREADO : new Date(), desde];
+    if(existente) sheet.getRange(existente._fila, 1, 1, fila.length).setValues([fila]);
+    else sheet.appendRow(fila);
+  } finally {
+    lock.releaseLock();
+  }
+  return jsonResponse({ success:true, codigo: codigo });
+}
+
+/** Admin: borra un cupón (el historial de usos queda en CUPONES_USOS). */
+function eliminarCupon(d){
+  const codigo = normalizarCodigoCupon(d.codigo);
+  const lock = LockService.getScriptLock();
+  if(!lock.tryLock(15000)) return jsonResponse({ success:false, message:"El sistema está ocupado, probá de nuevo en unos segundos." });
+  try{
+    const c = _leerCupones().find(x => x.CODIGO === codigo);
+    if(!c) return jsonResponse({ success:false, message:"No se encontró el cupón " + codigo + "." });
+    getOrCrearHojaCupones().deleteRow(c._fila);
+  } finally {
+    lock.releaseLock();
+  }
+  return jsonResponse({ success:true });
 }
 
 /**
@@ -6231,7 +6501,9 @@ function guardarPedido(data){
     // que el navegador tenga en caché) y se devuelve para que el cliente
     // se actualice.
     const minimoVigente = leerPedidoMinimoActual();
-    if(minimoVigente !== null && Number(data.total) < minimoVigente){
+    // Se compara contra el subtotal (antes de cupones de descuento)
+    const montoParaMinimo = Number(data.subtotal !== undefined && data.subtotal !== "" ? data.subtotal : data.total);
+    if(minimoVigente !== null && montoParaMinimo < minimoVigente){
       return jsonResponse({
         success:false,
         pedidoMinimo: minimoVigente,
@@ -6307,6 +6579,20 @@ function guardarPedido(data){
       }
     }
 
+    // Cupón: se vuelve a validar con los datos frescos (otro pedido pudo
+    // haber usado el último cupo mientras este esperaba el lock).
+    let cuponEnLock = null;
+    if(data._cupon){
+      const ev = evaluarCupon(data._cupon.codigo, Number(data.subtotal), normalizarDni(data.dni));
+      if(!ev.ok){
+        return jsonResponse({ success:false, cuponInvalido:true, message: ev.message });
+      }
+      if(Math.abs(ev.descuento - Number(data._cupon.descuento)) > 0.01){
+        return jsonResponse({ success:false, cuponInvalido:true, message:"El cupón cambió mientras armabas el pedido. Volvé a aplicarlo." });
+      }
+      cuponEnLock = ev;
+    }
+
     const ultimaFilaPedidos = pedidosSheet.getLastRow();
     pedidoId = generarIdCorto("PED", pedidosSheet, 1, ultimaFilaPedidos);
     const fecha = new Date();
@@ -6371,6 +6657,8 @@ function guardarPedido(data){
         .getRange(detalleSheet.getLastRow() + 1, 1, filas.length, filas[0].length)
         .setValues(filas);
     }
+
+    if(cuponEnLock) registrarUsoCupon(cuponEnLock, normalizarDni(data.dni), pedidoId);
 
     // Un reintento del mismo pedido (respuesta perdida) se resuelve con la caché.
     recordarPedidoPorIdOperacion(idOperacion, pedidoId);
@@ -6484,7 +6772,8 @@ function buscarPedidoPorIdOperacionRapido(pedidosSheet, idOperacion){
     const enCache = CacheService.getScriptCache().get(PREFIJO_CACHE_OP_PEDIDO + idOperacion);
     return enCache ? String(enCache) : null;
   }catch(e){
-    return buscarPedidoPorIdOperacion(pedidosSheet, idOperacion);
+    const hoja = pedidosSheet || getHoja("PEDIDOS");
+    return hoja ? buscarPedidoPorIdOperacion(hoja, idOperacion) : null;
   }
 }
 
@@ -11444,6 +11733,9 @@ function manejarAccionesExtraPost(data) {
     case "vaciarPapeleraProductos":    return vaciarPapeleraProductos(data);
     case "editarDatosClientePedido":   return editarDatosClientePedido(data);
     case "guardarClienteDesdeRotulo":  return guardarClienteDesdeRotulo(data);
+    case "guardarCupon":               return guardarCupon(data);
+    case "eliminarCupon":              return eliminarCupon(data);
+    case "validarCupon":               return validarCuponPublico(data);
     default: return null;
   }
 }
