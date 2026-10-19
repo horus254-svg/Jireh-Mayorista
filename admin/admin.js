@@ -150,6 +150,164 @@ let ventasPOSGlobal = [];
 // Ahora esa decisión se toma recién dentro de DOMContentLoaded, una
 // vez que ya se supo si esta instalación tiene config.json propio o no.
 
+/* =========================================================
+   AVISO DE PEDIDO WEB NUEVO
+   Cada ~30 s (o ~60 s con la ventana minimizada) se pregunta al
+   backend por action=avisoPedidos — no lee hojas, es liviano. Si
+   entró un pedido del catálogo: sonido, notificación de Windows,
+   aviso en pantalla y un número en "Pedidos web" del menú, que se
+   borra al entrar a esa sección. Se puede apagar por computadora en
+   Configuración → Esta computadora.
+========================================================= */
+const AVISO_PED_LS = "vpos_aviso_pedidos";      // { sonido, notificacion }
+const AVISO_PED_VISTO_LS = "vpos_aviso_pedidos_visto"; // n ya visto en esta computadora
+let _avisoPedN = null;          // último n del servidor
+let _avisoPedUltimoChequeo = 0;
+let _avisoPedDeshabilitado = false;
+
+function prefsAvisoPedidos() {
+  try { return Object.assign({ sonido: true, notificacion: true }, JSON.parse(localStorage.getItem(AVISO_PED_LS) || "{}")); }
+  catch (e) { return { sonido: true, notificacion: true }; }
+}
+
+function guardarPrefAvisoPedidos(clave, valor) {
+  const p = prefsAvisoPedidos(); p[clave] = !!valor;
+  try { localStorage.setItem(AVISO_PED_LS, JSON.stringify(p)); } catch (e) {}
+  if (clave === "notificacion" && valor) pedirPermisoNotificaciones(true);
+  if (clave === "sonido" && valor) sonarAvisoPedido();
+  pintarPrefsAvisoPedidos();
+}
+
+function pintarPrefsAvisoPedidos() {
+  const p = prefsAvisoPedidos();
+  const s = document.getElementById("cfgAvisoPedSonido"), n = document.getElementById("cfgAvisoPedNotif");
+  if (s) s.checked = p.sonido;
+  if (n) n.checked = p.notificacion;
+  const est = document.getElementById("cfgAvisoPedEstado");
+  if (est) {
+    if (!("Notification" in window)) est.textContent = "Este navegador no permite notificaciones: se avisa con sonido y en pantalla.";
+    else if (Notification.permission === "denied") est.textContent = "Las notificaciones están bloqueadas para este sitio (se pueden habilitar desde el candado de la barra de direcciones).";
+    else est.textContent = "";
+  }
+}
+
+function pedirPermisoNotificaciones(forzar) {
+  if (!("Notification" in window) || Notification.permission !== "default") return;
+  if (!forzar && !prefsAvisoPedidos().notificacion) return;
+  try { Notification.requestPermission().then(pintarPrefsAvisoPedidos).catch(() => {}); } catch (e) {}
+}
+
+function _pedidosVistos() {
+  let crudo = null;
+  try { crudo = localStorage.getItem(AVISO_PED_VISTO_LS); } catch (e) {}
+  if (crudo === null || crudo === "") return null;
+  const v = Number(crudo);
+  return isFinite(v) ? v : null;
+}
+
+function pintarBadgePedidos() {
+  const visto = _pedidosVistos();
+  const pendientes = _avisoPedN !== null && visto !== null ? Math.max(0, _avisoPedN - visto) : 0;
+  document.querySelectorAll('a[data-target="pedidos"]').forEach(a => {
+    let b = a.querySelector(".nav-aviso");
+    if (!pendientes) { if (b) b.remove(); return; }
+    if (!b) { b = document.createElement("span"); b.className = "nav-aviso"; a.appendChild(b); }
+    b.textContent = pendientes > 99 ? "99+" : String(pendientes);
+    b.title = pendientes === 1 ? "1 pedido web nuevo" : pendientes + " pedidos web nuevos";
+  });
+}
+
+function marcarPedidosVistos() {
+  if (_avisoPedN === null) return;
+  try { localStorage.setItem(AVISO_PED_VISTO_LS, String(_avisoPedN)); } catch (e) {}
+  pintarBadgePedidos();
+}
+
+/** Tres tonos tipo "timbre", distinto del beep de transferencias. */
+function sonarAvisoPedido() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [659, 880, 1319].forEach((freq, i) => {
+      const t = ctx.currentTime + i * 0.16;
+      const osc = ctx.createOscillator(), gain = ctx.createGain();
+      osc.type = "triangle"; osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.0001, t);
+      gain.gain.exponentialRampToValueAtTime(0.22, t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(t); osc.stop(t + 0.32);
+    });
+    setTimeout(() => { try { ctx.close(); } catch (e) {} }, 1200);
+  } catch (e) { /* sin audio: el aviso visual alcanza */ }
+}
+
+function _abrirPedidosDesdeAviso() {
+  try { if (window.veekpos && window.veekpos.enfocarVentana) window.veekpos.enfocarVentana(); else window.focus(); } catch (e) {}
+  mostrarSeccion("pedidos");
+}
+
+function avisarPedidosNuevos(nuevos, cantidad) {
+  const ultimo = nuevos[0] || {};
+  const monto = ultimo.total ? " · $" + Number(ultimo.total).toLocaleString("es-AR") : "";
+  const titulo = cantidad === 1 ? "🛒 Pedido web nuevo" : `🛒 ${cantidad} pedidos web nuevos`;
+  const cuerpo = cantidad === 1
+    ? `${ultimo.cliente || "Cliente"}${monto} (${ultimo.id || ""})`
+    : `El último: ${ultimo.cliente || "cliente"}${monto}`;
+  const prefs = prefsAvisoPedidos();
+  if (prefs.sonido) sonarAvisoPedido();
+  if (prefs.notificacion && "Notification" in window && Notification.permission === "granted") {
+    try {
+      const n = new Notification(titulo, { body: cuerpo, tag: "veekpos-pedido-web", renotify: true, icon: "../icon-192.png" });
+      n.onclick = () => { _abrirPedidosDesdeAviso(); n.close(); };
+    } catch (e) {}
+  }
+  if (typeof toast === "function") toast(`${titulo}: ${cuerpo}`, "success");
+  // Si la caja ya está mirando Pedidos, se refresca la lista.
+  const secPed = document.getElementById("pedidos");
+  if (secPed && secPed.style.display === "block") { cargarPedidos(); marcarPedidosVistos(); }
+}
+
+async function chequearPedidosNuevos(forzar) {
+  if (_avisoPedDeshabilitado || !navigator.onLine) return;
+  const rol = obtenerRolActual();
+  if (rol !== "admin" && rol !== "vendedor") return;
+  const ahora = Date.now();
+  if (!forzar && document.hidden && ahora - _avisoPedUltimoChequeo < 55000) return;
+  _avisoPedUltimoChequeo = ahora;
+  try {
+    const res = await fetchAPI(API_URL + "?action=avisoPedidos", {}, { reintentos: 1, timeoutMs: 15000 });
+    const data = await res.json();
+    if (!data || !data.success) {
+      if (data && data.sinPermiso) _avisoPedDeshabilitado = true;
+      return;
+    }
+    const n = Number(data.n) || 0;
+    const visto = _pedidosVistos();
+    if (visto === null || visto > n) {
+      // Primera vez en esta computadora (o se reinició el contador):
+      // lo que ya había no se anuncia.
+      try { localStorage.setItem(AVISO_PED_VISTO_LS, String(n)); } catch (e) {}
+    } else if (_avisoPedN !== null && n > _avisoPedN) {
+      const cantidad = n - _avisoPedN;
+      avisarPedidosNuevos((data.recientes || []).slice(0, cantidad), cantidad);
+    } else if (_avisoPedN === null && n > visto) {
+      // Entraron pedidos mientras el panel estaba cerrado: solo el número en el menú.
+    }
+    _avisoPedN = n;
+    pintarBadgePedidos();
+  } catch (e) { /* sin red o backend viejo: se reintenta en el próximo ciclo */ }
+}
+
+function iniciarAvisoPedidos() {
+  pintarPrefsAvisoPedidos();
+  // El permiso de notificaciones se pide con el primer clic (los
+  // navegadores no lo muestran sin una acción de la persona).
+  document.addEventListener("pointerdown", () => pedirPermisoNotificaciones(false), { once: true, capture: true });
+  setTimeout(() => chequearPedidosNuevos(true), 2500);
+  setInterval(() => chequearPedidosNuevos(false), 30000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) chequearPedidosNuevos(true); });
+}
+
 function iniciarPollingSecciones() {
   const offsetInicial = Math.floor(Math.random() * 4000);
 
@@ -266,6 +424,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   cargarConfigNegocioDesdeBackend();
   reconectarImpresoraUSBSiPosible();
   iniciarPollingSecciones();
+  iniciarAvisoPedidos();
 
   // Ventas pendientes de sesiones anteriores: aviso + reintento en segundo plano
   actualizarBadgeVentasPendientes(_leerColaVentasPendientes().length);
@@ -2066,6 +2225,7 @@ function mostrarSeccion(id) {
   }
   if (id === "movimientosCaja") cargarMovimientosCajaHoy();
   if (id === "cupones") cargarCupones();
+  if (id === "pedidos") marcarPedidosVistos();
   if (id === "reportes") {
     // Pasado el tiempo de caché de secciones, se vuelve a pedir todo al entrar
     cargarSiVencido("reportes", () => { Object.keys(_repTabRangoCargado).forEach(k => _repTabRangoCargado[k] = null); });
@@ -16068,6 +16228,7 @@ function eliminarUsuarioClick(usuarioId, nombre) {
    backend al guardar el pedido, dentro del mismo lock).
 ===================================================================== */
 let cuponesGlobal = [];
+let reporteCuponesGlobal = null; // { cupones:[...], totales:{...} } del rango elegido
 
 function _textoDescuentoCupon(c) {
   return c.tipo === "MONTO" ? "$" + Number(c.valor).toLocaleString("es-AR") : c.valor + "%";
@@ -16090,16 +16251,17 @@ async function cargarCupones() {
     if (!data.success) throw new Error(data.message || "No se pudieron cargar los cupones");
     cuponesGlobal = data.cupones || [];
     renderCupones();
+    cargarReporteCupones();
   } catch (e) {
     console.error("Cupones:", e);
-    tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-4">${escapeHtml(e.message || "Error de conexión")}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger py-4">${escapeHtml(e.message || "Error de conexión")}</td></tr>`;
   }
 }
 
 function renderCupones() {
   const tbody = document.getElementById("tablaCupones");
   if (!cuponesGlobal.length) {
-    tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-5">Todavía no hay cupones.<br><button class="btn btn-success btn-sm mt-2" onclick="abrirModalCupon()">+ Crear el primero</button></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted py-5">Todavía no hay cupones.<br><button class="btn btn-success btn-sm mt-2" onclick="abrirModalCupon()">+ Crear el primero</button></td></tr>`;
     return;
   }
   tbody.innerHTML = cuponesGlobal.map(c => {
@@ -16111,10 +16273,12 @@ function renderCupones() {
       <td><strong>${_textoDescuentoCupon(c)}</strong></td>
       <td><div class="cup-usos ${c.usos >= c.usosMax ? "lleno" : ""}">${c.usos} / ${c.usosMax} <span class="text-muted" style="font-size:12px;">· quedan ${Math.max(0, c.usosMax - c.usos)}</span>
         <div class="barra"><span style="width:${pct}%"></span></div></div></td>
+      <td class="cup-vendido" data-cup-vendido="${escapeHtml(c.codigo)}">${_celdaVendidoCupon(c.codigo)}</td>
       <td>${_textoVigenciaCupon(c)}</td>
       <td>${c.minimo > 0 ? "$" + Number(c.minimo).toLocaleString("es-AR") : '<span class="text-muted">—</span>'}</td>
       <td><span class="badge ${est.cls}">${est.txt}</span></td>
       <td class="cup-acciones">
+        <button class="btn btn-outline-secondary" title="Ver pedidos con este cupón" onclick="abrirReporteCupon('${cod}')">📊</button>
         <button class="btn btn-outline-secondary" title="Copiar código" onclick="copiarCodigoCupon('${cod}')">📋</button>
         <button class="btn btn-outline-secondary" title="${c.activo ? "Pausar" : "Activar"}" onclick="alternarCupon('${cod}')">${c.activo ? "⏸" : "▶"}</button>
         <button class="btn btn-outline-primary" title="Editar" onclick="abrirModalCupon('${cod}')">✏️</button>
@@ -16122,6 +16286,98 @@ function renderCupones() {
       </td>
     </tr>`;
   }).join("");
+}
+
+const _pesos = n => "$" + Math.round(Number(n) || 0).toLocaleString("es-AR");
+
+function _celdaVendidoCupon(codigo) {
+  if (!reporteCuponesGlobal) return '<span class="text-muted">…</span>';
+  const r = (reporteCuponesGlobal.cupones || []).find(x => x.codigo === codigo);
+  if (!r || !r.usos) return '<span class="text-muted">—</span>';
+  return `${_pesos(r.vendido)}<div class="sub">−${_pesos(r.descontado)} descontado</div>`;
+}
+
+async function cargarReporteCupones() {
+  const desde = document.getElementById("cupRepDesde")?.value || "";
+  const hasta = document.getElementById("cupRepHasta")?.value || "";
+  try {
+    const qs = "&desde=" + encodeURIComponent(desde) + "&hasta=" + encodeURIComponent(hasta);
+    const res = await fetchAPI(API_URL + "?action=reporteCupones" + qs);
+    const data = await res.json();
+    if (!data.success) throw new Error(data.message || "No se pudo armar el reporte");
+    reporteCuponesGlobal = data;
+  } catch (e) {
+    console.error("Reporte de cupones:", e);
+    reporteCuponesGlobal = { cupones: [], totales: null, error: e.message || "Error de conexión" };
+  }
+  renderReporteCupones();
+}
+
+function limpiarFechasReporteCupones() {
+  const d = document.getElementById("cupRepDesde"), h = document.getElementById("cupRepHasta");
+  if (d) d.value = ""; if (h) h.value = "";
+  cargarReporteCupones();
+}
+
+function renderReporteCupones() {
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  const t = reporteCuponesGlobal && reporteCuponesGlobal.totales;
+  if (!t) {
+    ["cupKpiUsos", "cupKpiVendido", "cupKpiDesc", "cupKpiProm"].forEach(id => set(id, "—"));
+    set("cupKpiCanc", reporteCuponesGlobal && reporteCuponesGlobal.error ? reporteCuponesGlobal.error : "");
+    set("cupKpiPct", "");
+  } else {
+    const validos = t.usos - t.cancelados;
+    set("cupKpiUsos", String(t.usos));
+    set("cupKpiCanc", t.cancelados ? `${t.cancelados} cancelado${t.cancelados === 1 ? "" : "s"} (no suman)` : "en el período elegido");
+    set("cupKpiVendido", _pesos(t.vendido));
+    set("cupKpiDesc", _pesos(t.descontado));
+    const bruto = t.vendido + t.descontado;
+    set("cupKpiPct", bruto > 0 ? `${(t.descontado * 100 / bruto).toFixed(1).replace(".", ",")}% de lo vendido sin descuento` : "");
+    set("cupKpiProm", validos > 0 ? _pesos(t.vendido / validos) : "—");
+  }
+  document.querySelectorAll("[data-cup-vendido]").forEach(td => {
+    td.innerHTML = _celdaVendidoCupon(td.getAttribute("data-cup-vendido"));
+  });
+}
+
+function abrirReporteCupon(codigo) {
+  const r = reporteCuponesGlobal && (reporteCuponesGlobal.cupones || []).find(x => x.codigo === codigo);
+  const desde = document.getElementById("cupRepDesde")?.value, hasta = document.getElementById("cupRepHasta")?.value;
+  const rango = desde || hasta ? ` · ${desde ? "desde " + _fechaCorta(desde) : ""} ${hasta ? "hasta " + _fechaCorta(hasta) : ""}` : "";
+  document.getElementById("cuponRepTitulo").textContent = "📊 Cupón " + codigo + rango;
+  const kpis = document.getElementById("cuponRepKpis");
+  const tbody = document.getElementById("cuponRepTabla");
+  if (!r || !r.usos) {
+    kpis.innerHTML = "";
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">${reporteCuponesGlobal ? "Todavía nadie usó este cupón" + (rango ? " en ese período" : "") + "." : "Cargando…"}</td></tr>`;
+  } else {
+    const validos = r.usos - r.cancelados;
+    kpis.innerHTML = `
+      <div class="cup-kpi"><div class="lbl">Pedidos</div><div class="val">${r.usos}</div><div class="sub">${r.clientes} cliente${r.clientes === 1 ? "" : "s"}${r.cancelados ? ` · ${r.cancelados} cancelado${r.cancelados === 1 ? "" : "s"}` : ""}</div></div>
+      <div class="cup-kpi"><div class="lbl">Vendido</div><div class="val">${_pesos(r.vendido)}</div><div class="sub">ya con descuento</div></div>
+      <div class="cup-kpi"><div class="lbl">Descontado</div><div class="val">${_pesos(r.descontado)}</div></div>
+      <div class="cup-kpi"><div class="lbl">Ticket promedio</div><div class="val">${validos > 0 ? _pesos(r.vendido / validos) : "—"}</div></div>`;
+    tbody.innerHTML = r.pedidos.map(p => {
+      const f = p.fecha ? new Date(p.fecha) : null;
+      const fecha = f && !isNaN(f) ? f.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "2-digit" }) + " " + f.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }) : "";
+      const cancelado = String(p.estado).toUpperCase() === "CANCELADO";
+      const id = escapeJsAttr(p.pedidoId);
+      return `<tr class="${cancelado ? "cancelado" : ""}">
+        <td style="white-space:nowrap;">${escapeHtml(fecha)}</td>
+        <td>${p.pedidoId && p.estado !== "NO ENCONTRADO" ? `<a href="#" onclick="cerrarReporteCupon();abrirDetallePedido('${id}');return false;">${escapeHtml(p.pedidoId)}</a>` : escapeHtml(p.pedidoId || "—")}</td>
+        <td>${escapeHtml(p.nombre || "")}<div class="text-muted" style="font-size:11.5px;">DNI/CUIT ${escapeHtml(p.dni || "—")}</div></td>
+        <td class="text-end" style="white-space:nowrap;">${_pesos(p.total)}</td>
+        <td class="text-end" style="white-space:nowrap;">−${_pesos(p.descuento)}</td>
+        <td><span class="badge bg-light text-dark border">${escapeHtml(p.estado || "")}</span></td>
+      </tr>`;
+    }).join("");
+  }
+  document.getElementById("cuponRepModalBackdrop").classList.add("show");
+}
+
+function cerrarReporteCupon() {
+  document.getElementById("cuponRepModalBackdrop").classList.remove("show");
 }
 
 const _fechaCorta = (iso) => iso ? iso.split("-").reverse().join("/") : "";

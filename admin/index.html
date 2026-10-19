@@ -1952,11 +1952,28 @@
       </div>
     </div>
 
+    <div class="card p-3 mb-3 cup-reporte">
+      <div class="cup-reporte-head">
+        <h6 class="mb-0">📊 Resultados de los cupones</h6>
+        <div class="cup-reporte-fechas">
+          <label>Desde <input type="date" class="form-control form-control-sm" id="cupRepDesde" onchange="cargarReporteCupones()"></label>
+          <label>Hasta <input type="date" class="form-control form-control-sm" id="cupRepHasta" onchange="cargarReporteCupones()"></label>
+          <button class="btn btn-sm btn-outline-secondary" onclick="limpiarFechasReporteCupones()" title="Todo el historial">Todo</button>
+        </div>
+      </div>
+      <div class="cup-kpis" id="cupKpis">
+        <div class="cup-kpi"><div class="lbl">Pedidos con cupón</div><div class="val" id="cupKpiUsos">—</div><div class="sub" id="cupKpiCanc"></div></div>
+        <div class="cup-kpi"><div class="lbl">Vendido con cupones</div><div class="val" id="cupKpiVendido">—</div><div class="sub">total de esos pedidos, ya con descuento</div></div>
+        <div class="cup-kpi"><div class="lbl">Descontado</div><div class="val" id="cupKpiDesc">—</div><div class="sub" id="cupKpiPct"></div></div>
+        <div class="cup-kpi"><div class="lbl">Ticket promedio</div><div class="val" id="cupKpiProm">—</div><div class="sub">por pedido con cupón</div></div>
+      </div>
+    </div>
+
     <div class="card p-3">
       <div class="table-responsive">
         <table class="table align-middle mb-0 tabla-cupones">
-          <thead><tr><th>Código</th><th>Descuento</th><th>Usos</th><th>Vigencia</th><th>Compra mínima</th><th>Estado</th><th class="text-end">Acciones</th></tr></thead>
-          <tbody id="tablaCupones"><tr><td colspan="7" class="text-center text-muted py-4">Cargando...</td></tr></tbody>
+          <thead><tr><th>Código</th><th>Descuento</th><th>Usos</th><th>Vendido</th><th>Vigencia</th><th>Compra mínima</th><th>Estado</th><th class="text-end">Acciones</th></tr></thead>
+          <tbody id="tablaCupones"><tr><td colspan="8" class="text-center text-muted py-4">Cargando...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -2569,6 +2586,23 @@
         <div class="estilos-grid" id="selectorEstilosPanel" role="group" aria-label="Estilo del panel"></div>
       </div>
 
+      <div class="card p-3 mb-3">
+        <h6 style="margin-bottom:4px;">🔔 Aviso de pedidos web nuevos</h6>
+        <p class="text-muted" style="font-size:13px;margin-bottom:10px;">Cuando entra un pedido del catálogo, esta computadora avisa (revisa cada 30 segundos) y "Pedidos web" del menú muestra cuántos hay sin mirar.</p>
+        <div class="form-check form-switch mb-1">
+          <input class="form-check-input" type="checkbox" id="cfgAvisoPedSonido" onchange="guardarPrefAvisoPedidos('sonido', this.checked)">
+          <label class="form-check-label" for="cfgAvisoPedSonido">Sonido</label>
+        </div>
+        <div class="form-check form-switch mb-1">
+          <input class="form-check-input" type="checkbox" id="cfgAvisoPedNotif" onchange="guardarPrefAvisoPedidos('notificacion', this.checked)">
+          <label class="form-check-label" for="cfgAvisoPedNotif">Notificación de Windows (aparece aunque el panel esté minimizado)</label>
+        </div>
+        <div class="d-flex gap-2 align-items-center mt-2">
+          <button type="button" class="btn btn-outline-secondary btn-sm" onclick="avisarPedidosNuevos([{cliente:'Cliente de prueba', total:123456, id:'PED-PRUEBA'}], 1)">Probar aviso</button>
+          <span class="text-muted" id="cfgAvisoPedEstado" style="font-size:12px;"></span>
+        </div>
+      </div>
+
       <!-- Tarjeta impresora — solo visible en Electron (pos-offline.js la muestra) -->
       <div class="card p-3 mb-3" id="cardImpresoraPOS" style="display:none;">
         <h6 style="margin-bottom:6px;">🖨️ Impresora para tickets</h6>
@@ -2897,6 +2931,24 @@
      Va ANTES del modal de confirmación genérico para que ese quede por
      encima cuando se confirma un borrado definitivo / vaciar. -->
 <!-- ===== MODAL CUPÓN ===== -->
+<div class="product-modal-backdrop" id="cuponRepModalBackdrop" onclick="if(event.target===this)cerrarReporteCupon()">
+  <div class="product-modal" style="width:min(760px, 96vw);">
+    <div class="product-modal-header">
+      <h6 id="cuponRepTitulo">📊 Pedidos con el cupón</h6>
+      <button onclick="cerrarReporteCupon()">✕</button>
+    </div>
+    <div class="product-modal-body">
+      <div class="cup-kpis mb-3" id="cuponRepKpis"></div>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead><tr><th>Fecha</th><th>Pedido</th><th>Cliente</th><th class="text-end">Total</th><th class="text-end">Descuento</th><th>Estado</th></tr></thead>
+          <tbody id="cuponRepTabla"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="product-modal-backdrop" id="cuponModalBackdrop">
   <div class="product-modal" style="width:min(520px, 94vw);">
     <div class="product-modal-header">

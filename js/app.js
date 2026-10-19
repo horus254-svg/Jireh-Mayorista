@@ -204,9 +204,29 @@ function obtenerEstadoStock(stock){
    TOASTS
 ========================================================= */
 
+/** Celular: muestra/oculta "Ordenar" y "Precio" (en pantallas grandes siempre se ven) */
+function alternarFiltrosMovil(forzar){
+    const cont = document.getElementById("filtros-extra");
+    const btn = document.getElementById("btn-filtros-movil");
+    if(!cont || !btn) return;
+    const abrir = forzar !== undefined ? forzar : !cont.classList.contains("abierto");
+    cont.classList.toggle("abierto", abrir);
+    btn.setAttribute("aria-expanded", abrir ? "true" : "false");
+}
+
 function mostrarToast(mensaje, tipo){
 
     const cont = document.getElementById("toast-container");
+
+    // Con el carrito abierto (o en el celular) se muestra un solo aviso
+    // a la vez: apilados tapan los campos del formulario.
+    const maxVisibles = (document.body.classList.contains("modal-open") || window.innerWidth < 576) ? 1 : 3;
+    const actuales = [...cont.querySelectorAll(".app-toast:not(.saliendo)")];
+    actuales.slice(0, Math.max(0, actuales.length - maxVisibles + 1)).forEach(viejo => {
+        viejo.classList.add("saliendo");
+        viejo.classList.remove("show");
+        setTimeout(() => viejo.remove(), 300);
+    });
 
     const el = document.createElement("div");
     el.className = "app-toast " + (tipo || "info");
@@ -236,7 +256,7 @@ function mostrarSkeleton(n){
 
     for(let i=0;i<n;i++){
         html += `
-        <div class="col-xl-3 col-lg-4 col-md-6 col-sm-6 mb-4">
+        <div class="col-6 col-lg-4 col-xl-3 mb-3 mb-sm-4">
             <div class="skeleton-card">
                 <div class="skeleton-img"></div>
                 <div class="skeleton-line w-80"></div>
@@ -586,6 +606,7 @@ function mostrarProductos(lista){
         container.innerHTML = "";
         sinResultados.classList.remove("d-none");
         info.textContent = "";
+        document.getElementById("cargar-mas")?.classList.add("d-none");
 
         return;
     }
@@ -606,7 +627,7 @@ function mostrarProductos(lista){
         const stock = obtenerEstadoStock(p.STOCK);
 
         return `
-        <div class="col-xl-3 col-lg-4 col-md-6 col-sm-6 mb-4">
+        <div class="col-6 col-lg-4 col-xl-3 mb-3 mb-sm-4">
 
             <div class="card-product h-100" data-code="${codigo}" data-action="quickview">
 
@@ -660,34 +681,57 @@ function mostrarProductos(lista){
         </div>`;
     };
 
-    // Con catálogos grandes (varios cientos de productos), armar y
-    // escribir todo el HTML de una sola vez puede trabar el navegador
-    // un instante — más notorio en el celular de un cliente navegando
-    // el catálogo que en una PC de local. Se arma en tandas: la
-    // primera tanda se ve al instante, el resto se agrega de a poco
-    // sin congelar la pantalla.
-    const PRIMERA_TANDA = 24; // alcanza para llenar la pantalla inicial en cualquier tamaño
-    const TANDA = 40;
+    // Se muestran de a POR_PAGINA productos: el resto se agrega solo
+    // cuando el cliente se acerca al final de la grilla (o toca
+    // "Ver más"). En el celular evita armar cientos de tarjetas y
+    // descargar sus fotos de entrada.
+    const POR_PAGINA = 40;
+    let mostrados = 0;
 
-    const primeros = lista.slice(0, PRIMERA_TANDA);
-    container.innerHTML = primeros.map(tarjetaHtml).join("");
+    const cargarMas = document.getElementById("cargar-mas");
+    const cargarMasBtn = document.getElementById("cargar-mas-btn");
+    const cargarMasTxt = document.getElementById("cargar-mas-txt");
 
-    if (lista.length <= PRIMERA_TANDA) return;
+    if (_observadorCargarMas) { _observadorCargarMas.disconnect(); _observadorCargarMas = null; }
 
-    let idx = PRIMERA_TANDA;
-    const renderTanda = () => {
-        if (miGen !== _renderGenCatalogo) return; // superado por una búsqueda/filtro más nuevo — no seguir escribiendo
-        const fin = Math.min(idx + TANDA, lista.length);
-        const frag = document.createDocumentFragment();
-        const tmp = document.createElement("div");
-        tmp.innerHTML = lista.slice(idx, fin).map(tarjetaHtml).join("");
-        while (tmp.firstElementChild) frag.appendChild(tmp.firstElementChild);
-        container.appendChild(frag);
-        idx = fin;
-        if (idx < lista.length) requestAnimationFrame(renderTanda);
+    const actualizarPie = () => {
+        if (!cargarMas) return;
+        const quedan = lista.length - mostrados;
+        cargarMas.classList.toggle("d-none", quedan <= 0);
+        if (cargarMasTxt) cargarMasTxt.textContent = `Mostrando ${mostrados} de ${lista.length}`;
+        if (cargarMasBtn) cargarMasBtn.textContent = `Ver ${Math.min(POR_PAGINA, quedan)} más`;
     };
-    requestAnimationFrame(renderTanda);
+
+    const agregarPagina = () => {
+        if (miGen !== _renderGenCatalogo || mostrados >= lista.length) return;
+        const fin = Math.min(mostrados + POR_PAGINA, lista.length);
+        const html = lista.slice(mostrados, fin).map(tarjetaHtml).join("");
+        if (mostrados === 0) {
+            container.innerHTML = html;
+        } else {
+            container.insertAdjacentHTML("beforeend", html);
+        }
+        mostrados = fin;
+        actualizarPie();
+        if (mostrados >= lista.length && _observadorCargarMas) {
+            _observadorCargarMas.disconnect();
+            _observadorCargarMas = null;
+        }
+    };
+
+    agregarPagina();
+
+    if (cargarMasBtn) cargarMasBtn.onclick = agregarPagina;
+
+    if (mostrados < lista.length && cargarMas && "IntersectionObserver" in window) {
+        _observadorCargarMas = new IntersectionObserver(entradas => {
+            if (entradas.some(en => en.isIntersecting)) agregarPagina();
+        }, { rootMargin: "900px 0px" });
+        _observadorCargarMas.observe(cargarMas);
+    }
 }
+
+let _observadorCargarMas = null;
 
 /* Delegación de eventos en la grilla de productos */
 document.getElementById("productos").addEventListener("click", function(e){
@@ -1225,6 +1269,32 @@ function abrirProductoDesdeURL(){
     const producto = estado.productos.find(p => String(p.CODIGO) === String(codigo));
     if(producto) abrirQuickView(producto, false);
 }
+
+/* Compartir el producto abierto: menú nativo del celular
+   (WhatsApp, Instagram, copiar…) o, si no existe, WhatsApp directo. */
+function linkDelProducto(producto){
+    const base = (urlBase || window.location.href.split("?")[0].split("#")[0]);
+    const slug = generarSlug(producto.PRODUCTO);
+    return base + "?producto=" + encodeURIComponent(producto.CODIGO) + (slug ? "-" + slug : "");
+}
+
+async function compartirProducto(producto){
+    if(!producto) return;
+    const url = linkDelProducto(producto);
+    const precio = Number(producto.PRECIO) > 0 ? " — $" + formatearPrecio(producto.PRECIO) : "";
+    const texto = producto.PRODUCTO + precio + (nombreNegocio ? "\nMirálo en " + nombreNegocio + ":" : "");
+    if(navigator.share){
+        try{
+            await navigator.share({ title: producto.PRODUCTO, text: texto, url });
+            return;
+        }catch(err){
+            if(err && err.name === "AbortError") return; // el cliente cerró el menú
+        }
+    }
+    window.open("https://wa.me/?text=" + encodeURIComponent(texto + "\n" + url), "_blank", "noopener");
+}
+
+document.getElementById("qv-compartir")?.addEventListener("click", () => compartirProducto(qvProductoActual));
 
 document.getElementById("qv-agregar").addEventListener("click", function(){
 
@@ -1785,6 +1855,10 @@ function pintarTotalesConCupon(subtotal){
     const desc = descuentoDelCupon(subtotal);
     const total = Math.round((subtotal - desc) * 100) / 100;
     document.getElementById("cart-total").innerText = formatearPrecio(total);
+    const totFoot = document.getElementById("cart-total-footer");
+    if(totFoot) totFoot.innerText = formatearPrecio(total);
+    const notaFoot = document.getElementById("cart-footer-nota");
+    if(notaFoot) notaFoot.textContent = desc > 0 ? " con cupón" : "";
 
     const filaSub = document.getElementById("cart-subtotal-row");
     const filaDesc = document.getElementById("cart-descuento-row");
@@ -2322,7 +2396,15 @@ function aplicarConfigApariencia(cfg){
         const heroEl = document.getElementById("hero");
 
         if(heroEl && cfg.bannerImagen){
-            heroEl.style.setProperty("--hero-bg-img", `url("${cfg.bannerImagen}")`);
+            // El banner incluido en el sitio tiene versión WebP (≈75 KB en
+            // vez de ≈200 KB): se usa si el navegador la soporta.
+            let fondoHero = `url("${cfg.bannerImagen}")`;
+            if(/(^|\/)img\/banner-hero\.png$/.test(cfg.bannerImagen) &&
+               window.CSS && CSS.supports("background-image", 'image-set(url("a.webp") type("image/webp"))')){
+                const webp = cfg.bannerImagen.replace(/\.png$/, ".webp");
+                fondoHero = `image-set(url("${webp}") type("image/webp"), url("${cfg.bannerImagen}") type("image/png"))`;
+            }
+            heroEl.style.setProperty("--hero-bg-img", fondoHero);
             heroEl.classList.add("hero--imagen");
 
             // Si no hay título de texto del sistema, tampoco hace falta el

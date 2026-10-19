@@ -1913,3 +1913,88 @@ body[data-tema="rojo"]{
   fill:currentColor;
   vertical-align:-0.125em;
 }
+
+
+/* =========================================================
+   CELULAR — grilla de 2 columnas, carrito con total fijo,
+   avisos que no tapan el carrito, filtros plegables
+========================================================= */
+
+/* Botón de filtros: solo en celular */
+.btn-filtros-movil{ display:none; }
+
+@media (max-width:575.98px){
+
+    /* --- Grilla compacta de 2 columnas --- */
+    #productos{ --bs-gutter-x:.65rem; }
+    .card-product{ border-radius:14px; }
+    .card-product:hover{ transform:none; box-shadow:var(--shadow-card); }
+    .card-product:hover img{ transform:none; }
+    .card-product img{ padding:8px; }
+    .ticket-perf{ margin:0 10px; }
+    .card-product .card-body-custom{ padding:9px 10px 11px; }
+    .card-product small{ font-size:9.5px; letter-spacing:.4px; margin-bottom:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .card-product h5{
+        font-size:12.5px; line-height:1.3; min-height:0; height:2.6em;
+        display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+    }
+    .price{ font-size:1.08rem; margin-top:6px; }
+    .stock-badge{ font-size:.62rem; padding:2px 8px; margin-top:5px; }
+    .caja-oferta{ font-size:10.5px; padding:6px 7px; gap:5px; margin-top:6px; }
+    .caja-oferta b{ font-size:11.5px; }
+    .btn-caja{ width:100%; padding:5px 8px; font-size:11px; }
+    .qty-stepper{ gap:4px; margin-top:8px; }
+    .qty-btn{ width:30px; height:30px; flex-shrink:0; font-size:1rem; }
+    .qty-input{ height:30px; max-width:none; min-width:0; flex:1; font-size:13px; }
+    .card-product .btn-primary{ margin-top:8px; padding:7px 4px; font-size:13.5px; border-radius:10px; }
+    .ribbon-destacado, .ribbon-oferta, .ribbon-nuevo{ top:7px; font-size:9px; padding:3px 7px; }
+    .ribbon-destacado, .ribbon-nuevo{ left:7px; }
+    .ribbon-oferta{ right:7px; }
+
+    /* --- Filtros plegables --- */
+    .btn-filtros-movil{
+        display:flex; width:100%; justify-content:space-between; align-items:center;
+        margin-top:10px; padding:10px 14px; border-radius:12px;
+        background:var(--bg-card); border:1px solid var(--paper-line);
+        font-weight:600; font-size:.92rem; color:var(--ink-900);
+    }
+    .btn-filtros-movil .flecha{ transition:transform .2s ease; }
+    .btn-filtros-movil[aria-expanded="true"] .flecha{ transform:rotate(180deg); }
+    .filtros-extra{ display:none; }
+    .filtros-extra.abierto{ display:block; animation:filtrosAbren .2s ease; }
+}
+@keyframes filtrosAbren{ from{ opacity:0; transform:translateY(-4px); } to{ opacity:1; transform:none; } }
+
+/* --- Pie del carrito: total siempre visible + vaciar discreto --- */
+.cart-footer{ display:flex; flex-wrap:wrap; align-items:center; gap:10px; justify-content:flex-end; }
+.cart-footer-total{ display:none; }
+.btn-vaciar-link{
+    background:none; border:none; padding:6px 4px; margin-right:auto;
+    color:#b3261e; font-size:.88rem; font-weight:600; text-decoration:underline; text-underline-offset:3px;
+}
+@media (max-width:768px){
+    .cart-footer{ padding:10px 14px calc(10px + env(safe-area-inset-bottom, 0px)); gap:6px 10px; }
+    .cart-footer-total{
+        display:flex; width:100%; justify-content:space-between; align-items:baseline;
+        font-weight:600; color:var(--ink-900);
+    }
+    .cart-footer-total small{ font-weight:500; color:var(--green-ok-text); margin-left:4px; }
+    .cart-footer-total b{ font-family:var(--font-price); font-size:1.35rem; }
+    .cart-footer #btn-checkout{ flex:1; }
+}
+
+/* --- Con el carrito abierto, los avisos van abajo (no tapan los productos) --- */
+body.modal-open .toast-container{
+    top:auto;
+    bottom:calc(150px + env(safe-area-inset-bottom, 0px));
+    align-items:center;
+}
+
+/* Paginación del catálogo: "Mostrando X de Y" + Ver más */
+.cargar-mas{display:flex;flex-direction:column;align-items:center;gap:.5rem;padding:1rem 0 2rem}
+.cargar-mas-txt{font-size:.85rem;color:#6c757d}
+.cargar-mas .btn{min-width:180px;border-radius:999px}
+
+/* Botón Compartir del producto */
+.btn-compartir{background:transparent;border:1.5px solid var(--paper-line,#f0e2cf);color:var(--ink-900,#2a1f1a);font-weight:600;border-radius:12px}
+.btn-compartir:hover,.btn-compartir:focus-visible{border-color:var(--indigo-600,#ff6a39);color:var(--indigo-700,#e8531f)}
