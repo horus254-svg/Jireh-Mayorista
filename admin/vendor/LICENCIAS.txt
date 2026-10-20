@@ -7,3 +7,5 @@ Copias locales de librerías de código abierto (para que el panel funcione sin 
 - jsPDF-AutoTable 5.0.2 (MIT) — https://github.com/simonbengtsson/jsPDF-AutoTable
 - Chart.js 4.4.1 (MIT) — https://www.chartjs.org
 - Inter, JetBrains Mono, Figtree, Bricolage Grotesque, IBM Plex Sans, IBM Plex Mono, Sora, Archivo y Caveat (SIL Open Font License 1.1) — vía Fontsource
+
+- html2canvas-pro 2.5.0 (MIT) — https://github.com/yorickshan/html2canvas-pro — captura opcional en "Informar un problema" (se carga solo cuando se pide)

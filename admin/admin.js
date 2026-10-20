@@ -1905,7 +1905,10 @@ function renderVentasPOSHistorial(lista) {
       const motivo  = v.MOTIVO_ANULACION || "";
       const _vid = String(v.VENTA_ID || v.ID || "");
       _ventasMapPOS[_vid] = v;
+      // Resumen de ventas viejas (ver compactarVentasAntiguas en code.gs): no se reimprime ni se anula
+      const esResumen = /^RES-/i.test(_vid);
       const tr = document.createElement("tr");
+      if (esResumen) tr.className = "fila-resumen-ventas";
       if (anulada) tr.style.cssText = "background:#fff0f0;color:#b91c1c;";
       const badgeAnulada = anulada
         ? `<span class="badge bg-danger ms-1" style="font-size:10px;text-decoration:none;">ANULADA${motivo ? " · " + escapeHtml(motivo) : ""}</span>`
@@ -1916,12 +1919,12 @@ function renderVentasPOSHistorial(lista) {
         <td>${escapeHtml(String(items))}</td>
         <td>${escapeHtml(String(pago))}</td>
         <td class="money" style="${anulada ? 'text-decoration:line-through;' : ''}">$${total}</td>
-        <td>
+        <td>${esResumen ? `<span class="text-muted" style="font-size:12px;" title="Las ventas de hace más de 6 meses se guardan resumidas por día (el detalle completo quedó en Drive → Respaldo de ventas)">📦 ${escapeHtml(String(v.OBSERVACIONES || "Resumen del día"))}</span>` : `
           <button class="btn btn-sm btn-outline-secondary"
             onclick="imprimirVentaDesdeData(_ventasMapPOS['${escapeJsAttr(_vid)}'])" title="Reimprimir">🖨️ Reimprimir</button>
           <button class="btn btn-sm btn-outline-danger ms-1"
             onclick="eliminarVentaPOS(_ventasMapPOS['${escapeJsAttr(_vid)}'])"
-            ${anulada ? 'disabled title="Ya anulada"' : 'title="Anular"'}>🗑️ Anular</button>
+            ${anulada ? 'disabled title="Ya anulada"' : 'title="Anular"'}>🗑️ Anular</button>`}
         </td>`;
       frag.appendChild(tr);
     }
@@ -2067,6 +2070,7 @@ function mostrarConfigTab(tabId, btnEl) {
   }
 
   try { localStorage.setItem("veekpos_cfg_tab", tabId); } catch (e) {}
+  if (tabId === "sistema" && typeof cargarEstadoVentasResumidas === "function") cargarEstadoVentasResumidas();
 }
 
 /**
@@ -2232,6 +2236,88 @@ function mostrarSeccion(id) {
     cargarSiVencido("reportes", () => { Object.keys(_repTabRangoCargado).forEach(k => _repTabRangoCargado[k] = null); });
     mostrarTabReportes(_repTabActiva || _repTabPorDefecto());
   }
+}
+
+/* ===================================================================
+   CONFIGURACIÓN → SISTEMA → Historial de ventas en la planilla
+   (ver compactarVentasAntiguas en code.gs)
+=================================================================== */
+let _estadoVentasResumidas = null;
+
+function _fechaDMA(iso) {
+  if (!iso) return "";
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(iso) ? new Date(iso + "T12:00:00") : new Date(iso);
+  return isNaN(d) ? String(iso) : d.toLocaleDateString("es-AR");
+}
+
+async function cargarEstadoVentasResumidas() {
+  const caja = document.getElementById("ventasResumidasEstado");
+  const btn = document.getElementById("btnResumirVentas");
+  if (!caja) return;
+  caja.textContent = "Cargando…";
+  try {
+    const res = await fetchAPI(API_URL + "?action=estadoVentasResumidas");
+    const d = await res.json();
+    if (!d.success) throw new Error(d.message || "No se pudo leer el estado");
+    _estadoVentasResumidas = d;
+    const num = n => Number(n || 0).toLocaleString("es-AR");
+    const lineas = [];
+    if (d.desactivado) {
+      lineas.push("⏸ Desactivado (MESES_DETALLE_VENTAS = 0 en code.gs): se guarda todo el detalle.");
+    } else {
+      lineas.push(`Se guarda el detalle de los últimos <b>${d.meses} meses</b> (desde el ${escapeHtml(_fechaDMA(d.conservaDesde))}).`);
+    }
+    lineas.push(`Filas hoy: <b>${num(d.filasVentas)}</b> en VENTAS_LOCAL y <b>${num(d.filasDetalle)}</b> en DETALLE_VENTAS` + (d.filasResumen ? ` (${num(d.filasResumen)} son resúmenes)` : "") + ".");
+    lineas.push(d.paraResumir
+      ? `Para resumir ahora: <b>${num(d.paraResumir)} venta${d.paraResumir === 1 ? "" : "s"}</b> anteriores al ${escapeHtml(_fechaDMA(d.conservaDesde))}.`
+      : "No hay ventas para resumir: todo está dentro del período que se guarda completo.");
+    if (d.ultimo && d.ultimo.fecha) {
+      const u = d.ultimo;
+      const origen = u.origen === "panel" ? "desde el panel" : (u.origen === "editor" ? "desde el editor" : "automático");
+      let t = `Último resumen: ${escapeHtml(new Date(u.fecha).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }))} (${origen})`;
+      if (u.resumidas) t += ` — ${num(u.resumidas)} ventas: ${num(u.filasVentasAntes)} → ${num(u.filasVentasDespues)} filas de ventas, ${num(u.filasDetalleAntes)} → ${num(u.filasDetalleDespues)} de detalle`;
+      else if (u.mensaje) t += ` — ${escapeHtml(u.mensaje)}`;
+      if (u.respaldo && u.respaldo.carpeta) t += ` · <a href="${escapeHtml(u.respaldo.carpeta)}" target="_blank" rel="noopener">ver respaldo en Drive</a>`;
+      lineas.push(t + ".");
+    }
+    caja.innerHTML = lineas.map(l => `<div>${l}</div>`).join("");
+    if (btn) btn.disabled = d.desactivado || !d.paraResumir;
+  } catch (e) {
+    caja.textContent = "No se pudo leer el estado: " + (e.message || "error de conexión");
+    if (btn) btn.disabled = true;
+  }
+}
+
+function resumirVentasViejasClick() {
+  const d = _estadoVentasResumidas;
+  if (!d || !d.paraResumir) return;
+  const msg = `Se van a resumir ${Number(d.paraResumir).toLocaleString("es-AR")} ventas anteriores al ${_fechaDMA(d.conservaDesde)}.\n\n` +
+    "Los reportes siguen dando lo mismo; esas ventas dejan de verse ticket por ticket (y ya no se pueden anular ni reimprimir). " +
+    "Antes, el detalle completo se guarda en Drive → \"Respaldo de ventas\".\n\nPuede tardar hasta un par de minutos. ¿Seguir?";
+  confirmarAccion(msg, async () => {
+    const btn = document.getElementById("btnResumirVentas");
+    const caja = document.getElementById("ventasResumidasEstado");
+    if (btn) { btn.disabled = true; btn.textContent = "Resumiendo…"; }
+    if (caja) caja.insertAdjacentHTML("afterbegin", '<div class="text-primary">⏳ Resumiendo y guardando el respaldo… no cierres esta ventana.</div>');
+    try {
+      const res = await fetchAPI(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ action: "resumirVentasViejas" })
+      }, { timeoutMs: 330000 });
+      const r = await res.json();
+      if (!r.success) { toast(r.message || "No se pudo resumir", "error"); return; }
+      toast(r.resumidas
+        ? `✅ ${Number(r.resumidas).toLocaleString("es-AR")} ventas resumidas: ${r.filasVentasAntes} → ${r.filasVentasDespues} filas de ventas`
+        : (r.mensaje || "No había ventas para resumir"), "success");
+      try { invalidarCache("ventasPOS"); } catch (e) {}
+    } catch (e) {
+      toast("No se pudo resumir: " + (e && e.name === "AbortError" ? "tardó demasiado (puede que haya terminado igual; tocá Actualizar)" : "error de conexión"), "error");
+    } finally {
+      if (btn) btn.textContent = "📦 Resumir ventas viejas ahora";
+      cargarEstadoVentasResumidas();
+    }
+  }, "📦 Resumir ventas viejas");
 }
 
 /* ===================== PEDIDOS ===================== */
@@ -4284,7 +4370,7 @@ function renderTablaProductos(lista) {
         <td>${escapeHtml(p.CATEGORIA || "—")}</td>
         <td class="money">$${Number(p.PRECIO || 0).toLocaleString("es-AR")}</td>
         <td>${stockBadge}</td>
-        <td><span class="badge ${publicado ? "bg-success" : "bg-secondary"}">${publicado ? "Publicado" : "Oculto"}</span></td>
+        <td><span class="badge ${publicado ? "bg-success" : "bg-secondary"}">${publicado ? "Publicado" : "Oculto"}</span>${String(p.DESTACADO || "").trim().toUpperCase() === "SI" ? ' <span class="marca-prod" title="Destacado">⭐</span>' : ""}${String(p.OFERTA || "").trim().toUpperCase() === "SI" ? ' <span class="marca-prod" title="En oferta">🔥</span>' : ""}</td>
         <td class="celda-acciones-producto">
           <button class="btn btn-outline-success btn-sm btn-accion-producto" onclick="abrirModalStock('${escapeJsAttr(p.CODIGO)}')" title="Sumar stock">📦 <span class="btn-accion-texto">Stock</span></button>
           <button class="btn btn-primary btn-sm btn-accion-producto ms-2" onclick="editarProducto('${escapeJsAttr(p.CODIGO)}')" title="Editar">✏️ <span class="btn-accion-texto">Editar</span></button>
@@ -4666,6 +4752,12 @@ function filtrarProductos() {
     filtrados = filtrados.filter(p => !String(p.IMAGEN || "").trim() && Number(p.STOCK ?? 0) <= 0);
   } else if (estado === "ocultos") {
     filtrados = filtrados.filter(p => String(p.PUBLICADO || "").toUpperCase() !== "SI");
+  } else if (estado === "publicados") {
+    filtrados = filtrados.filter(p => String(p.PUBLICADO || "").toUpperCase() === "SI");
+  } else if (estado === "destacados") {
+    filtrados = filtrados.filter(p => String(p.DESTACADO || "").trim().toUpperCase() === "SI");
+  } else if (estado === "ofertas") {
+    filtrados = filtrados.filter(p => String(p.OFERTA || "").trim().toUpperCase() === "SI");
   }
 
   renderTablaProductos(filtrados);
@@ -12249,7 +12341,7 @@ function actualizarSeleccionEtiquetas() {
   const btnEtiquetas = document.getElementById("btnGenerarEtiquetas");
   const btnQR = document.getElementById("btnGenerarQR");
   const btnQROffline = document.getElementById("btnGenerarQROffline");
-  const btnHacerVisibles = document.getElementById("btnHacerVisibles");
+  const btnCambiarLote = document.getElementById("btnCambiarLote");
 
   const cantidad = checks.length;
 
@@ -12264,91 +12356,107 @@ function actualizarSeleccionEtiquetas() {
   if (btnEtiquetas) btnEtiquetas.disabled = cantidad === 0;
   if (btnQR) btnQR.disabled = cantidad === 0;
   if (btnQROffline) btnQROffline.disabled = cantidad === 0;
-  if (btnHacerVisibles) btnHacerVisibles.disabled = cantidad === 0;
+  if (btnCambiarLote) btnCambiarLote.disabled = cantidad === 0;
+  if (cantidad === 0) cerrarMenuLote();
 }
 
-/**
- * Publica (PUBLICADO = "SI") todos los productos tildados, sin tener
- * que entrar a editarlos uno por uno. Pensado para usarse junto con
- * el filtro "Ocultos (no publicados)": el usuario filtra, tilda los
- * que quiere reactivar y aprieta este botón una sola vez.
- *
- * El backend (actualizarProducto) sobreescribe TODO el producto, así
- * que cada llamada manda el registro completo tal cual está hoy en
- * productosAdminGlobal, cambiando únicamente PUBLICADO a "SI".
- */
-async function hacerVisiblesProductosSeleccionados() {
+/* ===================================================================
+   CAMBIOS EN LOTE (Productos): mostrar/ocultar, destacado, oferta para
+   todos los tildados de una vez — ej. al cambiar de temporada: filtrar
+   la categoría, tildar todos (casilla del encabezado) y elegir la acción.
+   Va al backend en UNA sola llamada (actualizarProductosLote), que toca
+   solo esas columnas: no pisa stock, precio ni fotos. (Antes "Hacer
+   visibles" mandaba el producto entero, uno por uno.)
+=================================================================== */
+function alternarMenuLote(ev) {
+  if (ev) ev.stopPropagation();
+  const menu = document.getElementById("menuLoteProductos");
+  const btn = document.getElementById("btnCambiarLote");
+  if (!menu || !btn || btn.disabled) return;
+  const abrir = !menu.classList.contains("abierto");
+  menu.classList.toggle("abierto", abrir);
+  btn.setAttribute("aria-expanded", abrir ? "true" : "false");
+  if (abrir) setTimeout(() => menu.querySelector("button")?.focus(), 30);
+}
+
+function cerrarMenuLote() {
+  const menu = document.getElementById("menuLoteProductos");
+  if (menu) menu.classList.remove("abierto");
+  document.getElementById("btnCambiarLote")?.setAttribute("aria-expanded", "false");
+}
+
+document.addEventListener("click", (e) => { if (!e.target.closest || !e.target.closest(".lote-menu-wrap")) cerrarMenuLote(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") cerrarMenuLote(); });
+
+function _textoCambioLote(cambios) {
+  const partes = [];
+  if (cambios.PUBLICADO) partes.push(cambios.PUBLICADO === "SI" ? "mostrar en el catálogo" : "ocultar del catálogo y del POS");
+  if (cambios.DESTACADO) partes.push(cambios.DESTACADO === "SI" ? "marcar como destacados" : "quitar destacado");
+  if (cambios.OFERTA) partes.push(cambios.OFERTA === "SI" ? "poner en oferta" : "quitar oferta");
+  return partes.join(", ");
+}
+
+function aplicarCambioLote(cambios) {
+  cerrarMenuLote();
   const codigos = obtenerCodigosSeleccionados();
   if (codigos.length === 0) { toast("Seleccioná al menos un producto", "error"); return; }
 
-  const yaVisibles = codigos.filter(cod => {
+  const yaEstan = codigos.filter(cod => {
     const p = productosAdminGlobal.find(x => String(x.CODIGO) === String(cod));
-    return p && String(p.PUBLICADO || "").toUpperCase() === "SI";
-  });
-  const aActualizar = codigos.length - yaVisibles.length;
-
-  if (aActualizar === 0) {
-    toast("Los productos seleccionados ya estaban visibles", "success");
+    return p && Object.keys(cambios).every(k => {
+      const actual = String(p[k] || "").trim().toUpperCase() || (k === "PUBLICADO" ? "SI" : "NO");
+      return actual === cambios[k];
+    });
+  }).length;
+  if (yaEstan === codigos.length) {
+    toast(codigos.length === 1 ? "Ese producto ya estaba así" : "Los productos seleccionados ya estaban así", "success");
     return;
   }
 
-  const mensaje = codigos.length === 1
-    ? "¿Publicar este producto para que vuelva a verse en el catálogo/POS?"
-    : `¿Publicar ${codigos.length} productos seleccionados para que vuelvan a verse en el catálogo/POS?`;
+  const accion = _textoCambioLote(cambios);
+  const mensaje = `¿${accion.charAt(0).toUpperCase() + accion.slice(1)}: ${codigos.length === 1 ? "1 producto" : codigos.length + " productos"}?` +
+    (yaEstan ? ` (${yaEstan} ya estaba${yaEstan === 1 ? "" : "n"} así)` : "") +
+    (cambios.PUBLICADO === "NO" ? "\n\nLos productos ocultos no se ven en la página ni en el POS, pero no se borran: se vuelven a mostrar con \"Mostrar (publicar)\" (filtro \"Ocultos\")." : "");
 
   confirmarAccion(mensaje, async () => {
-    const btn = document.getElementById("btnHacerVisibles");
+    const btn = document.getElementById("btnCambiarLote");
     const textoOriginal = btn ? btn.innerHTML : "";
-    if (btn) { btn.disabled = true; btn.innerHTML = "Publicando..."; }
+    if (btn) { btn.disabled = true; btn.innerHTML = "Guardando…"; }
+    try {
+      const response = await fetchAPI(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ action: "actualizarProductosLote", rol: obtenerRolActual(), codigos, cambios })
+      }, { timeoutMs: 60000 });
+      const data = await response.json();
+      if (!data.success) { toast(data.message || "No se pudieron guardar los cambios", "error"); return; }
 
-    let exitosos = 0, fallidos = 0;
+      // Reflejo local inmediato (la caché del catálogo se refresca abajo)
+      const set = new Set(codigos.map(String));
+      productosAdminGlobal.forEach(p => { if (set.has(String(p.CODIGO))) Object.assign(p, cambios); });
+      const n = data.actualizados || 0;
+      let msg = n === 0 ? "No hubo nada que cambiar" : (n === 1 ? "1 producto actualizado" : `${n} productos actualizados`);
+      if (data.noEncontrados && data.noEncontrados.length) msg += ` · ${data.noEncontrados.length} no se encontraron (¿los borraron?)`;
+      toast(msg + (n ? " — la página lo muestra en unos minutos" : ""), data.noEncontrados && data.noEncontrados.length ? "error" : "success");
 
-    // Uno por vez (no en paralelo) para no saturar el backend de Apps
-    // Script, que ya de por sí es lento con muchas requests simultáneas.
-    for (const codigo of codigos) {
-      const p = productosAdminGlobal.find(x => String(x.CODIGO) === String(codigo));
-      if (!p) { fallidos++; continue; }
-
-      try {
-        const params = new URLSearchParams({
-          action: "actualizarProducto",
-          rol: obtenerRolActual(),
-          codigoOriginal: p.CODIGO,
-          CODIGO: p.CODIGO,
-          PRODUCTO: p.PRODUCTO || "",
-          CATEGORIA: p.CATEGORIA || "",
-          ALIAS: p.ALIAS || "",
-          PRECIO: p.PRECIO ?? 0,
-          STOCK: p.STOCK ?? 0,
-          IMAGEN: p.IMAGEN || "",
-          PUBLICADO: "SI",
-          DESTACADO: p.DESTACADO || "NO",
-          OFERTA: p.OFERTA || "NO",
-          CODIGO_CAJA: p.CODIGO_CAJA || "",
-          UNIDADES_POR_CAJA: p.UNIDADES_POR_CAJA || 0,
-          PRECIO_CAJA: p.PRECIO_CAJA || 0
-        });
-        const response = await fetchAPI(API_URL + "?" + params.toString());
-        const data = await response.json();
-        if (data.success) exitosos++; else fallidos++;
-      } catch (error) {
-        console.error("Error al publicar producto", codigo, error);
-        fallidos++;
+      productosPOS = []; // el POS vuelve a leer el catálogo
+      if (typeof window.refrescarCatalogoLocalDesdeSheets === "function") {
+        try { await window.refrescarCatalogoLocalDesdeSheets(); } catch (e) {}
       }
+      try { localStorage.setItem("vpos_cache_productosAdmin", JSON.stringify({ ts: Date.now(), data: productosAdminGlobal })); } catch (e) {}
+      filtrarProductos();
+    } catch (error) {
+      console.error("Cambio en lote:", error);
+      toast(navigator.onLine ? "No se pudo guardar: el servidor no respondió. Probá de nuevo." : "Hace falta internet para cambiar varios productos a la vez.", "error");
+    } finally {
+      if (btn) { btn.innerHTML = textoOriginal; }
+      actualizarSeleccionEtiquetas();
     }
-
-    if (btn) { btn.disabled = false; btn.innerHTML = textoOriginal; }
-
-    if (fallidos === 0) {
-      toast(exitosos === 1 ? "1 producto publicado" : `${exitosos} productos publicados`, "success");
-    } else {
-      toast(`${exitosos} publicados, ${fallidos} con error`, exitosos > 0 ? "success" : "error");
-    }
-
-    productosPOS = []; // refrescar catálogo del POS en memoria
-    cargarProductos();
-  }, "👁️ Publicar productos");
+  }, "✏️ Cambiar productos seleccionados");
 }
+
+/** Compatibilidad: lo llamaba el botón viejo "Hacer visibles". */
+function hacerVisiblesProductosSeleccionados() { aplicarCambioLote({ PUBLICADO: "SI" }); }
 
 /** Toggles every visible product checkbox via the header checkbox */
 function toggleTodosProductos(checkboxHeader) {
