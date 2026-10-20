@@ -84,7 +84,10 @@ async function fetchAPI(url, opciones = {}, config = {}) {
 ========================================================= */
 const _registroErroresCatalogo = [];
 const _erroresCatalogoAvisados = new Set();
-const _RUIDO_CATALOGO = /ResizeObserver loop|^Script error\.?$|AbortError|aborted|Failed to fetch|NetworkError|Load failed|Network request failed|chrome-extension:|moz-extension:|safari-extension:|webkit-masked-url/i;
+// Ruido: red caída, extensiones, y código que inyectan los navegadores
+// internos de apps (Instagram, Facebook, TikTok, WeChat…) — no son
+// fallas del sitio y el cliente no ve nada.
+const _RUIDO_CATALOGO = /ResizeObserver loop|^Script error\.?$|AbortError|aborted|Failed to fetch|NetworkError|Load failed|Network request failed|chrome-extension:|moz-extension:|safari-extension:|webkit-masked-url|_AutofillCallbackHandler|webkit\.messageHandlers|__gCrWeb|instantSearchSDKJSBridge|WeixinJSBridge|zaloJSV2|TTNativeBridge|FBNavigation|fbq is not defined|__firefox__|SymBrowser_|ucbrowser|_pcmBridgeCallbackHandler|vivoNewsDetailPage|getReadModeExtract|feedNativeBridge/i;
 
 function _anotarErrorCatalogo(mensaje, origen, pila){
     _registroErroresCatalogo.push({
@@ -115,14 +118,24 @@ function avisarErrorASoporte(titulo, descripcion, extra){
     }catch(e){ /* nunca molestar al cliente por esto */ }
 }
 
+function _esErrorDelSitio(archivo, pila){
+    const propio = (u) => !!u && u.indexOf(location.origin) === 0 && /\.js(\?|#|:|$)/i.test(u);
+    if(propio(archivo)) return true;
+    // Error lanzado dentro de una función del sitio aunque el archivo venga vacío
+    const enPila = String(pila || "").match(/https?:\/\/[^\s)]+\.js/gi) || [];
+    return enPila.some(propio);
+}
+
 window.addEventListener("error", (e) => {
     if(!e || (e.target && e.target !== window && !e.error)) return; // imágenes que no cargan: no es código
     const msg = e.message || (e.error && e.error.message) || "Error";
     const origen = (e.filename ? e.filename.split("/").pop() : "") + (e.lineno ? ":" + e.lineno + ":" + (e.colno || 0) : "");
     if(_RUIDO_CATALOGO.test(msg) || _RUIDO_CATALOGO.test(e.filename || "")) return;
     _anotarErrorCatalogo(msg, origen, e.error && e.error.stack);
-    // Solo errores de los archivos del propio sitio
-    if(e.filename && e.filename.indexOf(location.origin) !== 0) return;
+    // Solo se avisa si el error viene de un archivo .js del propio sitio.
+    // Lo que inyectan las apps (Instagram, Facebook, Chrome de iPhone…)
+    // llega sin archivo, o como si fuera la línea 1 del HTML: no es del sitio.
+    if(!_esErrorDelSitio(e.filename, e.error && e.error.stack)) return;
     setTimeout(() => avisarErrorASoporte(msg, "Error de JavaScript en el catálogo."), 3000);
 }, true);
 
@@ -131,6 +144,7 @@ window.addEventListener("unhandledrejection", (e) => {
     const msg = (r && (r.message || String(r))) || "Promesa rechazada";
     if(_RUIDO_CATALOGO.test(msg)) return;
     _anotarErrorCatalogo(msg, "", r && r.stack);
+    if(!_esErrorDelSitio("", r && r.stack)) return;
     setTimeout(() => avisarErrorASoporte(msg, "Promesa rechazada en el catálogo."), 3000);
 });
 
