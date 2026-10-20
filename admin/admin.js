@@ -4560,7 +4560,7 @@ function renderTablaProductos(lista) {
         <td class="celda-check-orden">
           <span class="check-orden-inner">
             <span class="drag-handle-producto" title="${ordenamientoHabilitado ? "Arrastrá para reordenar" : "Limpiá la búsqueda y los filtros para poder reordenar"}">${ordenamientoHabilitado ? "⠿" : ""}</span>
-            <input type="checkbox" class="check-producto-etiqueta" value="${escapeHtml(p.CODIGO)}" onchange="actualizarSeleccionEtiquetas()">
+            <input type="checkbox" class="check-producto-etiqueta" value="${escapeHtml(p.CODIGO)}" onchange="alCambiarCheckProducto(this)"${_seleccionProductos.has(String(p.CODIGO)) ? " checked" : ""}>
           </span>
         </td>
         <td class="celda-foto-producto"><div class="tabla-producto-thumb">${fotoHtml}</div></td>
@@ -4584,9 +4584,7 @@ function renderTablaProductos(lista) {
       // Ceder control al browser entre chunks para que no congele la UI
       requestAnimationFrame(renderChunk);
     } else {
-      // Fin del render — actualizar estado de checkboxes
-      const checkTodos = document.getElementById("checkTodosProductos");
-      if (checkTodos) checkTodos.checked = false;
+      // Fin del render — la casilla del encabezado refleja los visibles
       actualizarSeleccionEtiquetas();
     }
   };
@@ -8932,14 +8930,16 @@ const ANCHO_TICKET_USB = 42; // columnas para fuente normal en 80mm (12 cpl apro
 // (80mm, pensado para el ticket térmico) incluso al imprimir una
 // etiqueta o un A4, dando como resultado una impresión con forma de
 // ticket térmico en vez del tamaño esperado.
-function _setPrintPageSize(size) {
+function _setPrintPageSize(size, cssPropio) {
   let tag = document.getElementById("dynamicPrintPageSize");
   if (!tag) {
     tag = document.createElement("style");
     tag.id = "dynamicPrintPageSize";
     document.head.appendChild(tag);
   }
-  tag.textContent = size === "REMITO"
+  tag.textContent = size === "CUSTOM" && cssPropio
+    ? cssPropio
+    : size === "REMITO"
     ? "@media print { @page { size:A4; margin:0; } }"
     : size === "A4"
     ? "@media print { @page { size:A4; margin:8mm; } }"
@@ -12539,8 +12539,40 @@ async function guardarMovimientoCajaForm() {
 =================================================================== */
 
 /** Updates the selection counter and enables/disables the three label/QR generation buttons */
+/* Selección de productos: se guarda aparte de las casillas que se ven,
+   así no se pierde al buscar otro producto o cambiar de categoría
+   (antes la tabla se redibujaba y se borraba todo lo tildado). */
+const _seleccionProductos = new Set();
+
+function alCambiarCheckProducto(chk) {
+  if (chk.checked) _seleccionProductos.add(String(chk.value));
+  else _seleccionProductos.delete(String(chk.value));
+  actualizarSeleccionEtiquetas();
+}
+
+function quitarSeleccionProductos() {
+  _seleccionProductos.clear();
+  document.querySelectorAll(".check-producto-etiqueta").forEach(c => { c.checked = false; });
+  actualizarSeleccionEtiquetas();
+}
+
+/** Los tildados que ya no existen (borrados) se sacan de la selección. */
+function _limpiarSeleccionInexistente() {
+  if (!_seleccionProductos.size || !productosAdminGlobal || !productosAdminGlobal.length) return;
+  const existen = new Set(productosAdminGlobal.map(p => String(p.CODIGO)));
+  [..._seleccionProductos].forEach(c => { if (!existen.has(c)) _seleccionProductos.delete(c); });
+}
+
 function actualizarSeleccionEtiquetas() {
-  const checks = document.querySelectorAll(".check-producto-etiqueta:checked");
+  _limpiarSeleccionInexistente();
+  const visibles = [...document.querySelectorAll(".check-producto-etiqueta")];
+  const checkTodos = document.getElementById("checkTodosProductos");
+  if (checkTodos) {
+    const tildadosVisibles = visibles.filter(c => c.checked).length;
+    checkTodos.checked = visibles.length > 0 && tildadosVisibles === visibles.length;
+    checkTodos.indeterminate = tildadosVisibles > 0 && tildadosVisibles < visibles.length;
+  }
+  const checks = { length: _seleccionProductos.size };
   const info = document.getElementById("etiquetasSeleccionInfo");
   const btnEtiquetas = document.getElementById("btnGenerarEtiquetas");
   const btnQR = document.getElementById("btnGenerarQR");
@@ -12550,11 +12582,15 @@ function actualizarSeleccionEtiquetas() {
   const cantidad = checks.length;
 
   if (info) {
-    info.textContent = cantidad === 0
-      ? "Ningún producto seleccionado"
-      : cantidad === 1
-        ? "1 producto seleccionado"
-        : `${cantidad} productos seleccionados`;
+    if (cantidad === 0) {
+      info.textContent = "Ningún producto seleccionado";
+    } else {
+      const visiblesTildados = visibles.filter(c => c.checked).length;
+      const fuera = cantidad - visiblesTildados;
+      info.innerHTML = `<b>${cantidad === 1 ? "1 producto seleccionado" : cantidad + " productos seleccionados"}</b>` +
+        (fuera > 0 ? ` <span class="text-muted">(${fuera} no se ve${fuera === 1 ? "" : "n"} con este filtro)</span>` : "") +
+        ` · <a href="#" onclick="quitarSeleccionProductos(); return false;">Quitar selección</a>`;
+    }
   }
 
   if (btnEtiquetas) btnEtiquetas.disabled = cantidad === 0;
@@ -12643,6 +12679,8 @@ function aplicarCambioLote(cambios) {
       if (data.noEncontrados && data.noEncontrados.length) msg += ` · ${data.noEncontrados.length} no se encontraron (¿los borraron?)`;
       toast(msg + (n ? " — la página lo muestra en unos minutos" : ""), data.noEncontrados && data.noEncontrados.length ? "error" : "success");
 
+      // Se limpia la selección: así un próximo cambio no se aplica sin querer a estos mismos
+      if (n > 0 || !(data.noEncontrados && data.noEncontrados.length)) _seleccionProductos.clear();
       productosPOS = []; // el POS vuelve a leer el catálogo
       if (typeof window.refrescarCatalogoLocalDesdeSheets === "function") {
         try { await window.refrescarCatalogoLocalDesdeSheets(); } catch (e) {}
@@ -12664,122 +12702,347 @@ function hacerVisiblesProductosSeleccionados() { aplicarCambioLote({ PUBLICADO: 
 
 /** Toggles every visible product checkbox via the header checkbox */
 function toggleTodosProductos(checkboxHeader) {
+  // Solo los que muestra el filtro actual; los de otras búsquedas quedan como estaban
   document.querySelectorAll(".check-producto-etiqueta").forEach(c => {
     c.checked = checkboxHeader.checked;
+    if (c.checked) _seleccionProductos.add(String(c.value)); else _seleccionProductos.delete(String(c.value));
   });
   actualizarSeleccionEtiquetas();
 }
 
-/** Returns the list of currently-checked product codes */
+/** Códigos seleccionados (también los que no se ven con el filtro actual), en el orden del catálogo */
 function obtenerCodigosSeleccionados() {
-  return Array.from(document.querySelectorAll(".check-producto-etiqueta:checked")).map(c => c.value);
+  _limpiarSeleccionInexistente();
+  if (!_seleccionProductos.size) return [];
+  const orden = (productosAdminGlobal || []).map(p => String(p.CODIGO)).filter(c => _seleccionProductos.has(c));
+  const resto = [..._seleccionProductos].filter(c => orden.indexOf(c) === -1);
+  return orden.concat(resto);
+}
+
+/* ===================================================================
+   ETIQUETAS: tamaños (hoja A4 o rollo de impresora de etiquetas),
+   qué datos llevan y estilo. Vista previa en vivo con los mismos
+   estilos que la impresión. La última configuración se guarda en esta
+   computadora (localStorage "vpos_etq_config").
+=================================================================== */
+const ETQ_TAMANOS = {
+  A4: [
+    { id: "a4-38x21",  txt: "Chica — 38 × 21 mm",          w: 38,  h: 21 },
+    { id: "a4-48x25",  txt: "Chica — 48 × 25 mm",          w: 48,  h: 25 },
+    { id: "a4-52x30",  txt: "Mediana chica — 52 × 30 mm", w: 52,  h: 30 },
+    { id: "a4-63x38",  txt: "Mediana — 63 × 38 mm",        w: 63,  h: 38 },
+    { id: "a4-99x57",  txt: "Grande — 99 × 57 mm",         w: 99,  h: 57 },
+    { id: "a4-95x67",  txt: "Góndola — 95 × 67 mm",        w: 95,  h: 67 },
+    { id: "custom",    txt: "Personalizada…" }
+  ],
+  ROLLO: [
+    { id: "r-30x20",  txt: "30 × 20 mm",  w: 30,  h: 20 },
+    { id: "r-40x30",  txt: "40 × 30 mm",  w: 40,  h: 30 },
+    { id: "r-50x25",  txt: "50 × 25 mm",  w: 50,  h: 25 },
+    { id: "r-50x30",  txt: "50 × 30 mm",  w: 50,  h: 30 },
+    { id: "r-58x40",  txt: "58 × 40 mm",  w: 58,  h: 40 },
+    { id: "r-60x40",  txt: "60 × 40 mm",  w: 60,  h: 40 },
+    { id: "r-100x50", txt: "100 × 50 mm", w: 100, h: 50 },
+    { id: "custom",   txt: "Personalizada…" }
+  ]
+};
+
+const ETQ_FABRICA = {
+  papel: "A4", tamano: "a4-63x38", ancho: 63, alto: 38, separacion: 2, margen: 5, copias: 1, borde: "punteado",
+  verNegocio: false, verNombre: true, verCategoria: false, verPrecio: true, verPrecioCaja: false,
+  verBarras: true, verCodigo: true, verFecha: false, textoExtra: "",
+  tamPrecio: "auto", tamNombre: "1", lineasNombre: "2", altoBarras: "0.26", alineacion: "center", decimales: "0",
+  precioResaltado: false, negrita: true
+};
+
+const _ETQ_CAMPOS = {
+  papel: "etqPapel", tamano: "etqTamano", ancho: "etqAncho", alto: "etqAlto", separacion: "etqSeparacion", margen: "etqMargen",
+  copias: "etqCantidadCopias", borde: "etqBorde", verNegocio: "etqVerNegocio", verNombre: "etqVerNombre", verCategoria: "etqVerCategoria",
+  verPrecio: "etqVerPrecio", verPrecioCaja: "etqVerPrecioCaja", verBarras: "etqVerBarras", verCodigo: "etqVerCodigo", verFecha: "etqVerFecha",
+  textoExtra: "etqTextoExtra", tamPrecio: "etqTamPrecio", tamNombre: "etqTamNombre", lineasNombre: "etqLineasNombre",
+  altoBarras: "etqAltoBarras", alineacion: "etqAlineacion", decimales: "etqDecimales", precioResaltado: "etqPrecioResaltado", negrita: "etqNegrita"
+};
+
+function _configEtiquetasGuardada() {
+  try { return Object.assign({}, ETQ_FABRICA, JSON.parse(localStorage.getItem("vpos_etq_config") || "{}")); }
+  catch (e) { return Object.assign({}, ETQ_FABRICA); }
+}
+
+function _llenarTamanosEtiqueta(papel, elegido) {
+  const sel = document.getElementById("etqTamano");
+  if (!sel) return;
+  sel.innerHTML = (ETQ_TAMANOS[papel] || ETQ_TAMANOS.A4).map(t => `<option value="${t.id}">${escapeHtml(t.txt)}</option>`).join("");
+  sel.value = (ETQ_TAMANOS[papel] || []).some(t => t.id === elegido) ? elegido : (papel === "ROLLO" ? "r-50x30" : "a4-63x38");
+}
+
+function _ponerConfigEtiquetas(cfg) {
+  _llenarTamanosEtiqueta(cfg.papel, cfg.tamano);
+  Object.keys(_ETQ_CAMPOS).forEach(k => {
+    if (k === "tamano") return;
+    const el = document.getElementById(_ETQ_CAMPOS[k]);
+    if (!el) return;
+    if (el.type === "checkbox") el.checked = !!cfg[k]; else el.value = cfg[k];
+  });
+}
+
+function leerConfigEtiquetas() {
+  const cfg = {};
+  Object.keys(_ETQ_CAMPOS).forEach(k => {
+    const el = document.getElementById(_ETQ_CAMPOS[k]);
+    if (!el) { cfg[k] = ETQ_FABRICA[k]; return; }
+    cfg[k] = el.type === "checkbox" ? el.checked : el.value;
+  });
+  // medidas: del tamaño elegido o personalizadas
+  const t = (ETQ_TAMANOS[cfg.papel] || []).find(x => x.id === cfg.tamano);
+  const num = (v, min, max, def) => { const n = Number(v); return isFinite(n) && n > 0 ? Math.min(max, Math.max(min, n)) : def; };
+  cfg.w = t && t.w ? t.w : num(cfg.ancho, 15, 200, 63);
+  cfg.h = t && t.h ? t.h : num(cfg.alto, 10, 280, 38);
+  cfg.separacion = num(cfg.separacion, 0, 15, 3) || 0;
+  cfg.margen = cfg.papel === "ROLLO" ? 0 : (Number(cfg.margen) >= 0 ? Math.min(25, Number(cfg.margen)) : 8);
+  cfg.copias = Math.max(1, Math.min(50, Math.floor(Number(cfg.copias) || 1)));
+  return cfg;
+}
+
+function _guardarConfigEtiquetas(cfg) {
+  const guardar = {};
+  Object.keys(ETQ_FABRICA).forEach(k => { guardar[k] = cfg[k]; });
+  try { localStorage.setItem("vpos_etq_config", JSON.stringify(guardar)); } catch (e) {}
+}
+
+function restablecerConfigEtiquetas() {
+  try { localStorage.removeItem("vpos_etq_config"); } catch (e) {}
+  _ponerConfigEtiquetas(Object.assign({}, ETQ_FABRICA));
+  actualizarPreviewEtiquetas();
+}
+
+/** Cuántas entran en una hoja A4 */
+function _etiquetasPorHoja(cfg) {
+  if (cfg.papel === "ROLLO") return { cols: 1, filas: 1, total: 1 };
+  const anchoUtil = 210 - 2 * cfg.margen, altoUtil = 297 - 2 * cfg.margen;
+  const cols = Math.max(1, Math.floor((anchoUtil + cfg.separacion) / (cfg.w + cfg.separacion)));
+  const filas = Math.max(1, Math.floor((altoUtil + cfg.separacion) / (cfg.h + cfg.separacion)));
+  return { cols, filas, total: cols * filas };
+}
+
+function _precioEtiqueta(valor, cfg) {
+  const d = Number(cfg.decimales) || 0;
+  return "$" + Number(valor || 0).toLocaleString("es-AR", { minimumFractionDigits: d, maximumFractionDigits: d });
+}
+
+/** HTML de una etiqueta (medidas en mm; el código de barras se dibuja después en el <svg>). */
+function _htmlEtiqueta(p, cfg, idSvg) {
+  const H = cfg.h, W = cfg.w;
+  const pt = (mm) => (mm * 2.835).toFixed(1) + "pt"; // 1 mm = 2,835 pt
+  const chico = pt(Math.max(1.9, Math.min(H * 0.085, 3.4)));
+  const lineas = Number(cfg.lineasNombre) || 2;
+  const tamNombreMm = Math.max(2.1, Math.min(H * 0.08, W * 0.06, 4.2)) * (Number(cfg.tamNombre) || 1);
+  let tamPrecioMm;
+  if (cfg.tamPrecio === "auto") {
+    let base = Math.min(H * 0.3, W * 0.16);
+    const ocupan = (cfg.verBarras ? 1 : 0) + (cfg.verNombre ? 0.6 : 0);
+    tamPrecioMm = base * (ocupan >= 1.5 ? 0.7 : ocupan >= 1 ? 0.8 : 1);
+  } else {
+    tamPrecioMm = Math.min(H * 0.3, W * 0.16) * Number(cfg.tamPrecio);
+  }
+  const partes = [];
+  const fecha = new Date().toLocaleDateString("es-AR");
+  if (cfg.verNegocio && configNegocioCache.nombre) partes.push(`<div class="etq-negocio" style="font-size:${chico}">${escapeHtml(configNegocioCache.nombre)}</div>`);
+  if (cfg.verNombre) partes.push(`<div class="etq-nombre" style="font-size:${pt(tamNombreMm)};-webkit-line-clamp:${lineas};font-weight:${cfg.negrita ? 700 : 400}">${escapeHtml(p.PRODUCTO || "")}</div>`);
+  if (cfg.verCategoria && p.CATEGORIA) partes.push(`<div class="etq-chico" style="font-size:${chico}">${escapeHtml(p.CATEGORIA)}</div>`);
+  if (cfg.textoExtra) partes.push(`<div class="etq-extra" style="font-size:${pt(Math.max(2.2, Math.min(H * 0.09, 4)))}">${escapeHtml(cfg.textoExtra)}</div>`);
+  if (cfg.verPrecio) partes.push(`<div class="etq-precio${cfg.precioResaltado ? " resaltado" : ""}" style="font-size:${pt(tamPrecioMm)}">${_precioEtiqueta(p.PRECIO, cfg)}</div>`);
+  if (cfg.verPrecioCaja && Number(p.UNIDADES_POR_CAJA) > 0 && Number(p.PRECIO_CAJA) > 0) {
+    partes.push(`<div class="etq-chico" style="font-size:${chico}">Caja x${escapeHtml(p.UNIDADES_POR_CAJA)}: <b>${_precioEtiqueta(p.PRECIO_CAJA, cfg)}</b></div>`);
+  }
+  if (cfg.verBarras) partes.push(`<svg class="etq-barras" id="${idSvg}" preserveAspectRatio="none" style="height:${(H * Number(cfg.altoBarras || 0.26)).toFixed(1)}mm;flex-basis:${(H * Number(cfg.altoBarras || 0.26)).toFixed(1)}mm"></svg>`);
+  if (cfg.verCodigo) partes.push(`<div class="etq-chico etq-codigo" style="font-size:${chico}">${escapeHtml(p.CODIGO)}</div>`);
+  if (cfg.verFecha) partes.push(`<div class="etq-chico" style="font-size:${chico}">${fecha}</div>`);
+  const borde = cfg.borde === "ninguno" ? "none" : (cfg.borde === "solido" ? "0.2mm solid #555" : "0.25mm dashed #999");
+  const pad = Math.max(0.8, Math.min(H, W) * 0.05).toFixed(1);
+  return `<div class="etq" style="width:${W}mm;height:${H}mm;padding:${pad}mm;border:${borde};text-align:${cfg.alineacion};align-items:${cfg.alineacion === "left" ? "flex-start" : "center"}">${partes.join("")}</div>`;
+}
+
+function _dibujarBarrasEtiquetas(cont, items) {
+  items.forEach(({ id, codigo }) => {
+    const svg = cont.querySelector("#" + id);
+    if (!svg) return;
+    try {
+      JsBarcode(svg, String(codigo), { format: "CODE128", displayValue: false, width: 2, height: 60, margin: 0 });
+      svg.setAttribute("preserveAspectRatio", "none");
+      svg.removeAttribute("width");
+    } catch (error) {
+      // Código vacío o con caracteres no soportados: no frena el resto
+      console.error("No se pudo generar el código de barras para", codigo, error);
+      svg.outerHTML = `<div class="etq-chico" style="color:#b91c1c">(sin código de barras)</div>`;
+    }
+  });
 }
 
 function abrirModalEtiquetas() {
   const codigos = obtenerCodigosSeleccionados();
   if (codigos.length === 0) { toast("Seleccioná al menos un producto", "error"); return; }
-
-  actualizarPreviewEtiquetas();
+  _ponerConfigEtiquetas(_configEtiquetasGuardada());
+  const papel = document.getElementById("etqPapel");
+  if (papel && !papel.__conCambio) {
+    papel.addEventListener("change", () => {
+      _llenarTamanosEtiqueta(papel.value, "");
+      // En rollo las etiquetas ya vienen troqueladas: sin borde; en hoja, punteado para recortar
+      const borde = document.getElementById("etqBorde");
+      if (borde) borde.value = papel.value === "ROLLO" ? "ninguno" : "punteado";
+      actualizarPreviewEtiquetas();
+    });
+    papel.__conCambio = true;
+  }
+  _etqHojaPreview = 0;
   document.getElementById("etiquetasModalBackdrop").classList.add("show");
+  actualizarPreviewEtiquetas();
 }
 
 function cerrarModalEtiquetas() {
   document.getElementById("etiquetasModalBackdrop").classList.remove("show");
 }
 
-/** Shows a quick text summary (no barcodes yet — those render only at print time) */
-function actualizarPreviewEtiquetas() {
+/* Vista previa: "hoja" muestra la hoja A4 entera (o un tramo del rollo)
+   achicada para que entre, con las etiquetas acomodadas igual que al
+   imprimir; "real" muestra una etiqueta a tamaño real (aproximado). */
+let _etqModoPreview = "hoja";
+let _etqHojaPreview = 0;
+
+function cambiarModoPreviewEtiquetas(modo) {
+  _etqModoPreview = modo === "real" ? "real" : "hoja";
+  document.querySelectorAll(".etq-modo button").forEach(b => b.classList.toggle("activo", b.dataset.modo === _etqModoPreview));
+  actualizarPreviewEtiquetas();
+}
+
+function moverHojaPreviewEtiquetas(delta) {
+  _etqHojaPreview = Math.max(0, _etqHojaPreview + delta);
+  actualizarPreviewEtiquetas();
+}
+
+/** Lista de etiquetas a imprimir (producto repetido por cada copia), en orden. */
+function _listaEtiquetas(cfg) {
   const codigos = obtenerCodigosSeleccionados();
-  const copias = Math.max(1, Number(document.getElementById("etqCantidadCopias").value || 1));
-  const totalEtiquetas = codigos.length * copias;
+  const productos = codigos.map(c => productosAdminGlobal.find(p => String(p.CODIGO) === String(c))).filter(Boolean);
+  const lista = [];
+  productos.forEach(p => { for (let i = 0; i < cfg.copias; i++) lista.push(p); });
+  return { productos, lista };
+}
+
+function actualizarPreviewEtiquetas() {
+  const cfg = leerConfigEtiquetas();
+  const personalizada = cfg.tamano === "custom";
+  const med = document.getElementById("etqMedidasPersonalizadas");
+  if (med) med.style.display = personalizada ? "" : "none";
+  const hojaOpc = document.getElementById("etqOpcionesHoja");
+  if (hojaOpc) hojaOpc.style.display = cfg.papel === "A4" ? "" : "none";
+
+  const { productos, lista } = _listaEtiquetas(cfg);
+  const total = lista.length;
+  const ph = _etiquetasPorHoja(cfg);
+  const hojas = cfg.papel === "A4" ? Math.max(1, Math.ceil(total / ph.total)) : 1;
+  if (_etqHojaPreview > hojas - 1) _etqHojaPreview = hojas - 1;
 
   const info = document.getElementById("etiquetasPreviewInfo");
   if (info) {
-    info.textContent = `Se van a imprimir ${totalEtiquetas} etiqueta${totalEtiquetas === 1 ? "" : "s"} en total (${codigos.length} producto${codigos.length === 1 ? "" : "s"} × ${copias} copia${copias === 1 ? "" : "s"}).`;
+    let txt = `${total} etiqueta${total === 1 ? "" : "s"} (${productos.length} producto${productos.length === 1 ? "" : "s"} × ${cfg.copias} copia${cfg.copias === 1 ? "" : "s"}) de ${cfg.w} × ${cfg.h} mm.`;
+    if (cfg.papel === "A4") {
+      txt += ` Entran ${ph.total} por hoja A4 (${ph.cols} × ${ph.filas}) → ${hojas} hoja${hojas === 1 ? "" : "s"}.`;
+      if (cfg.w > 210 - 2 * cfg.margen || cfg.h > 297 - 2 * cfg.margen) txt += " ⚠️ La etiqueta no entra en la hoja: achicala o bajá el margen.";
+    } else {
+      txt += " Una etiqueta por cada salto del rollo: en la impresora elegí ese mismo tamaño de papel.";
+    }
+    info.textContent = txt;
   }
+
+  const marco = document.getElementById("etqPreview");
+  const pag = document.getElementById("etqPaginas");
+  if (!marco) return;
+  const MM = 96 / 25.4; // px por mm en pantalla
+  const disponible = Math.max(140, marco.clientWidth - 16);
+  const items = [];
+  const etiqueta = (p, i) => { const id = "etqPrev" + i; items.push({ id, codigo: p.CODIGO }); return _htmlEtiqueta(p, cfg, id); };
+
+  let anchoMm, altoMm, contenido;
+  if (_etqModoPreview === "real") {
+    anchoMm = cfg.w; altoMm = cfg.h;
+    contenido = lista.length ? etiqueta(lista[0], 0) : "";
+    if (pag) pag.style.display = "none";
+  } else if (cfg.papel === "A4") {
+    anchoMm = 210; altoMm = 297;
+    const desde = _etqHojaPreview * ph.total;
+    const enHoja = lista.slice(desde, desde + ph.total);
+    contenido = `<div class="etq-hoja-a4" style="width:210mm;height:297mm;padding:${cfg.margen}mm">
+        <div class="etq-hoja" style="gap:${cfg.separacion}mm">${enHoja.map((p, i) => etiqueta(p, i)).join("")}</div>
+      </div>`;
+    if (pag) {
+      pag.style.display = hojas > 1 ? "" : "none";
+      const txt = document.getElementById("etqPaginasTexto");
+      if (txt) txt.textContent = `Hoja ${_etqHojaPreview + 1} de ${hojas}`;
+      const [ant, sig] = pag.querySelectorAll("button");
+      if (ant) ant.disabled = _etqHojaPreview <= 0;
+      if (sig) sig.disabled = _etqHojaPreview >= hojas - 1;
+    }
+  } else {
+    // Rollo: tramo con las primeras etiquetas, una debajo de la otra
+    const n = Math.min(lista.length, 4);
+    const salto = 3; // mm entre etiquetas en el rollo (solo para mostrar)
+    anchoMm = cfg.w + 8; altoMm = n * cfg.h + (n + 1) * salto;
+    contenido = `<div class="etq-rollo-preview" style="width:${anchoMm}mm;height:${altoMm}mm;padding:${salto}mm 4mm;gap:${salto}mm">
+        ${lista.slice(0, n).map((p, i) => etiqueta(p, i)).join("")}
+      </div>`;
+    if (pag) pag.style.display = "none";
+  }
+
+  // Escala: que entre a lo ancho (y en hoja, que no pase de un alto razonable)
+  const altoMax = _etqModoPreview === "real" ? Infinity : Math.max(260, Math.min(560, window.innerHeight * 0.62));
+  const f = Math.min(1, disponible / (anchoMm * MM), altoMax / (altoMm * MM));
+  marco.innerHTML = `<div class="etq-escala" style="width:${(anchoMm * MM * f).toFixed(1)}px;height:${(altoMm * MM * f).toFixed(1)}px">
+      <div class="etq-escala-in" style="transform:scale(${f.toFixed(4)})">${contenido}</div>
+    </div>`;
+  _dibujarBarrasEtiquetas(marco, items);
+  const nota = _etqModoPreview === "real"
+    ? (f < 1 ? `Achicada al ${Math.round(f * 100)}% para que entre en pantalla.` : "A tamaño real (puede variar según la pantalla).")
+    : (cfg.papel === "A4" ? `Hoja A4 al ${Math.round(f * 100)}%.` : `Rollo al ${Math.round(f * 100)}%.`);
+  marco.insertAdjacentHTML("beforeend", `<div class="etq-escala-nota">${nota}</div>`);
 }
 
 /**
- * Builds the printable label grid (one <div> per label, with an <svg>
- * placeholder per barcode) and renders the actual barcodes into those
- * placeholders with JsBarcode — then triggers the browser's print
- * dialog. Runs entirely client-side, same approach as the PDF catalog
- * download: no server round-trip per label.
+ * Arma la grilla de impresión (A4) o una etiqueta por página (rollo),
+ * dibuja los códigos de barras y abre el diálogo de impresión.
  */
 function imprimirEtiquetas() {
   const codigos = obtenerCodigosSeleccionados();
   if (codigos.length === 0) { toast("Seleccioná al menos un producto", "error"); return; }
+  const cfg = leerConfigEtiquetas();
+  _guardarConfigEtiquetas(cfg);
 
-  const copias = Math.max(1, Number(document.getElementById("etqCantidadCopias").value || 1));
-  const columnas = document.getElementById("etqColumnas").value;
-
-  const productos = codigos
-    .map(codigo => productosAdminGlobal.find(p => String(p.CODIGO) === String(codigo)))
-    .filter(Boolean);
-
-  if (productos.length === 0) {
-    toast("No se encontraron los productos seleccionados", "error");
-    return;
-  }
+  const productos = codigos.map(c => productosAdminGlobal.find(p => String(p.CODIGO) === String(c))).filter(Boolean);
+  if (productos.length === 0) { toast("No se encontraron los productos seleccionados", "error"); return; }
 
   const printArea = document.getElementById("etiquetasPrintArea");
-
-  // Por si quedó contenido de una impresión de ticket térmico anterior
-  // a medio camino, se limpia el otro contenedor de impresión para que
-  // el CSS de :empty/:not(:empty) elija el correcto sin ambigüedad.
   const thermalFrame = document.getElementById("thermalPrintFrame");
   if (thermalFrame) thermalFrame.innerHTML = "";
 
-  let html = `<div class="etiquetas-grid cols-${columnas}">`;
-
-  let idx = 0;
+  const items = [];
+  let html = "", idx = 0;
   productos.forEach(p => {
-    for (let copia = 0; copia < copias; copia++) {
-      const svgId = `etqSvg${idx}`;
-      html += `
-        <div class="etiqueta-item">
-          <div class="etiqueta-nombre">${escapeHtml(p.PRODUCTO)}</div>
-          <svg class="etiqueta-barcode-svg" id="${svgId}"></svg>
-          <div class="etiqueta-codigo-texto">${escapeHtml(p.CODIGO)}</div>
-          <div class="etiqueta-precio">$${Number(p.PRECIO || 0).toLocaleString("es-AR")}</div>
-        </div>`;
-      idx++;
+    for (let copia = 0; copia < cfg.copias; copia++) {
+      const id = "etqSvg" + (idx++);
+      items.push({ id, codigo: p.CODIGO });
+      html += _htmlEtiqueta(p, cfg, id);
     }
   });
-
-  html += `</div>`;
-  printArea.innerHTML = html;
-
-  // JsBarcode necesita que el <svg> ya esté en el DOM antes de dibujar
-  // adentro — por eso se llena el HTML primero y se recorre después.
-  idx = 0;
-  productos.forEach(p => {
-    for (let copia = 0; copia < copias; copia++) {
-      try {
-        JsBarcode(`#etqSvg${idx}`, String(p.CODIGO), {
-          format: "CODE128",
-          displayValue: false, // el código ya se muestra como texto aparte, en una fuente más legible
-          width: 1.6,
-          height: 38,
-          margin: 4
-        });
-      } catch (error) {
-        // Un código vacío o con caracteres no soportados no debe
-        // frenar la impresión del resto de las etiquetas.
-        console.error("No se pudo generar el código de barras para", p.CODIGO, error);
-      }
-      idx++;
-    }
-  });
+  const clase = cfg.papel === "ROLLO" ? "etq-hoja etq-rollo" : "etq-hoja";
+  printArea.innerHTML = `<div class="${clase}" style="gap:${cfg.separacion}mm">${html}</div>`;
+  _dibujarBarrasEtiquetas(printArea, items);
 
   cerrarModalEtiquetas();
-
-  _setPrintPageSize("A4");
-  // Pequeño delay para asegurar que los SVG ya se pintaron en el DOM
-  // antes de que el navegador capture el contenido para imprimir.
-  setTimeout(() => {
-    window.print();
-  }, 200);
+  if (cfg.papel === "ROLLO") {
+    _setPrintPageSize("CUSTOM", `@media print { @page { size:${cfg.w}mm ${cfg.h}mm; margin:0; } }`);
+  } else {
+    _setPrintPageSize("CUSTOM", `@media print { @page { size:A4; margin:${cfg.margen}mm; } }`);
+  }
+  setTimeout(() => { window.print(); }, 200);
 }
 
 /* ===================================================================

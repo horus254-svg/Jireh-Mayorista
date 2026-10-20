@@ -16,7 +16,7 @@
 // Versión del panel: va en cada informe para saber si ese navegador o
 // esa caja tiene el panel al día. Se sube junto con VERSION_BACKEND y
 // desktop/package.json (la prueba del backend avisa si no coinciden).
-const VERSION_PANEL = "1.8.2";
+const VERSION_PANEL = "1.8.3";
 
 (function () {
   const MAX_REGISTRO = 30;
