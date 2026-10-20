@@ -80,6 +80,7 @@ async function fetchAPI(url, opciones = {}, config = {}) {
     } catch (error) {
       clearTimeout(timer);
       ultimoError = error;
+      if (window.anotarErrorParaInforme) window.anotarErrorParaInforme("servidor", "Falló la llamada " + (accionUrl || (opciones.body ? (() => { try { return JSON.parse(opciones.body).action; } catch (e) { return ""; } })() : "")) + " (intento " + intento + "): " + (error && error.name === "AbortError" ? "sin respuesta en " + Math.round(timeoutMs / 1000) + " s" : (error && error.message)), "", "");
       if (!esLectura || intento === maxIntentos) throw ultimoError;
       // Corte momentáneo — pequeña espera antes de reintentar
       await new Promise(r => setTimeout(r, 400 * intento));

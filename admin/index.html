@@ -332,7 +332,10 @@
     <span class="sync-txt" id="syncEstadoTexto">Sincronizado</span>
     <span class="sync-count" id="syncEstadoCantidad"></span>
   </button>
-  <button class="logout-btn" onclick="logout()">⏻ Cerrar sesión</button>
+  <div class="sidebar-pie">
+    <button type="button" class="informe-btn" onclick="abrirInformeProblema()" title="Informar un problema a soporte" aria-label="Informar un problema">🐞</button>
+    <button class="logout-btn" onclick="logout()">⏻ Cerrar sesión</button>
+  </div>
 </div>
 
 <!-- =================== BOTTOM NAV (mobile) =================== -->
@@ -2678,6 +2681,12 @@
     <!-- ===== PESTAÑA: SISTEMA — Licencia, conexión y carpeta de imágenes ===== -->
     <div class="cfg-tab-pane" id="cfgTab-sistema">
 
+      <div class="card p-3 mb-3">
+        <h6 style="margin-bottom:4px;">🐞 Informar un problema</h6>
+        <p class="text-muted" style="font-size:13px;margin-bottom:10px;">Si algo no funciona como debería, contalo acá: le llega por correo a soporte junto con los datos técnicos para encontrar la causa. Los errores inesperados del sistema también se avisan solos.</p>
+        <div><button type="button" class="btn btn-outline-secondary btn-sm" onclick="abrirInformeProblema()">🐞 Informar un problema</button></div>
+      </div>
+
       <!-- ===== LICENCIA ===== -->
       <div class="card p-3 mb-3" id="cardLicencia">
         <div class="d-flex align-items-center gap-2" style="margin-bottom:12px;">
@@ -2931,6 +2940,40 @@
      Va ANTES del modal de confirmación genérico para que ese quede por
      encima cuando se confirma un borrado definitivo / vaciar. -->
 <!-- ===== MODAL CUPÓN ===== -->
+<div class="product-modal-backdrop" id="informeModalBackdrop" onclick="if(event.target===this)cerrarInformeProblema()">
+  <div class="product-modal" style="width:min(560px, 94vw);" role="dialog" aria-labelledby="informeTitulo">
+    <div class="product-modal-header">
+      <h6 id="informeTitulo">🐞 Informar un problema</h6>
+      <button onclick="cerrarInformeProblema()" aria-label="Cerrar">✕</button>
+    </div>
+    <div class="product-modal-body">
+      <div class="mb-3">
+        <label class="form-label" for="informeDescripcion">¿Qué pasó? *</label>
+        <textarea class="form-control" id="informeDescripcion" rows="4" maxlength="4000" oninput="document.getElementById('informeEstado').textContent=''"
+          placeholder="Ej: Al cobrar con tarjeta en el Punto de Venta, tocé Finalizar y quedó cargando. Pasó 2 veces hoy."></textarea>
+        <div class="form-text">Qué estabas haciendo, qué esperabas que pasara y qué pasó. Si apareció un mensaje con un código, copialo.</div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label" for="informeContacto">Tu correo o teléfono <span class="text-muted" style="font-size:11px;">(opcional, para responderte)</span></label>
+        <input type="text" class="form-control" id="informeContacto" maxlength="120" autocomplete="email">
+      </div>
+      <div class="form-check mb-1">
+        <input class="form-check-input" type="checkbox" id="informeIncluirDatos" checked>
+        <label class="form-check-label" for="informeIncluirDatos">Incluir datos técnicos <span class="text-muted" id="informeResumenDatos" style="font-size:12px;"></span></label>
+      </div>
+      <details class="informe-detalle">
+        <summary>Ver qué datos se envían</summary>
+        <pre id="informeDetalleDatos"></pre>
+      </details>
+      <div id="informeEstado" class="informe-estado" role="status"></div>
+      <div class="d-flex justify-content-end gap-2 mt-3 flex-wrap">
+        <button type="button" class="btn btn-outline-secondary" onclick="cerrarInformeProblema()">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="btnEnviarInforme" onclick="enviarInformeProblema()">Enviar a soporte</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="product-modal-backdrop" id="cuponRepModalBackdrop" onclick="if(event.target===this)cerrarReporteCupon()">
   <div class="product-modal" style="width:min(760px, 96vw);">
     <div class="product-modal-header">
@@ -4139,6 +4182,7 @@
 
 <script defer src="vendor/chart.umd.min.js"></script>
 
+<script src="informe-errores.js"></script>
 <script src="veek-auth.js"></script>
 <script src="admin.js"></script>
 <script>
