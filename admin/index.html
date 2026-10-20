@@ -555,7 +555,12 @@
     </div>
     <div class="card p-3">
       <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
-        <input type="text" id="buscarPedido" class="form-control" style="max-width:320px" placeholder="🔍 Buscar por pedido, cliente o DNI..." oninput="filtrarPedidos()">
+        <input type="text" id="buscarPedido" class="form-control" style="max-width:320px" placeholder="🔍 Buscar por pedido, cliente, DNI o teléfono..." oninput="filtrarPedidos(); programarBusquedaPedidosAntiguos()">
+        <div class="pedidos-fechas" title="Para buscar pedidos de cualquier fecha, también los más viejos">
+          <label>📅 Desde <input type="date" class="form-control form-control-sm" id="pedidosDesde" onchange="filtrarPedidos(); programarBusquedaPedidosAntiguos(true)"></label>
+          <label>Hasta <input type="date" class="form-control form-control-sm" id="pedidosHasta" onchange="filtrarPedidos(); programarBusquedaPedidosAntiguos(true)"></label>
+          <button type="button" class="btn btn-link btn-sm p-0" id="pedidosLimpiarFechas" onclick="limpiarBusquedaPedidos()" style="display:none;">Quitar fechas</button>
+        </div>
         <div class="d-flex gap-2 ms-auto flex-wrap">
           <select class="form-select form-select-sm" id="filtroPedidoEstado" style="max-width:160px;" onchange="filtrarPedidos()">
             <option value="">Todos los estados</option>
@@ -566,6 +571,7 @@
           </select>
         </div>
       </div>
+      <div id="pedidosBusquedaAntiguos" class="pedidos-busqueda-antiguos" role="status"></div>
       <div id="tablaPedidos"></div>
     </div>
   </div>

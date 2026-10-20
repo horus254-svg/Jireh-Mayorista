@@ -38,7 +38,27 @@ let API_URL = "";
  *   "Guardando..." colgado para siempre — así el usuario puede
  *   revisar si se guardó o no antes de reintentar a mano.
  */
+/* Pedidos al servidor en curso — los usan los botones "↻ Actualizar"
+   para mostrar que están trabajando y cuándo terminaron (ver
+   iniciarBotonesActualizar). */
+const _redEnCurso = { n: 0, fallos: 0, cambios: 0 };
+function _avisarCambioRed() { _redEnCurso.cambios++; }
+
 async function fetchAPI(url, opciones = {}, config = {}) {
+  _redEnCurso.n++; _avisarCambioRed();
+  try {
+    const r = await _fetchAPIBase(url, opciones, config);
+    if (!r || !r.ok) _redEnCurso.fallos++;
+    return r;
+  } catch (e) {
+    _redEnCurso.fallos++;
+    throw e;
+  } finally {
+    _redEnCurso.n = Math.max(0, _redEnCurso.n - 1); _avisarCambioRed();
+  }
+}
+
+async function _fetchAPIBase(url, opciones = {}, config = {}) {
   // El backend (code.gs) está armado sobre doGet con ?action=..., así
   // que la GRAN MAYORÍA de las mutaciones (actualizarProducto,
   // guardarProducto, sumarStockProducto, guardarPedidoAdmin, etc.)
@@ -2239,6 +2259,68 @@ function mostrarSeccion(id) {
 }
 
 /* ===================================================================
+   BOTONES "↻ ACTUALIZAR": respuesta visible al tocarlos
+   Para todos los botones que empiezan con ↻ (o 🔄): el ícono gira y
+   dice "Actualizando…" mientras haya pedidos al servidor en curso;
+   al terminar muestra "✓ Actualizado" (o "Sin conexión") un momento.
+=================================================================== */
+function _esBotonActualizar(btn) {
+  if (!btn || btn.tagName !== "BUTTON" || btn.dataset.sinAnimacion !== undefined) return false;
+  return /^\s*(↻|🔄)/.test(btn.textContent || "");
+}
+
+function _animarBotonActualizar(btn) {
+  if (btn.classList.contains("btn-actualizando")) return;
+  const original = btn.innerHTML;
+  const anchoOriginal = btn.offsetWidth;
+  const soloIcono = (btn.textContent || "").replace(/↻|🔄/g, "").trim() === "";
+  const fallosAntes = _redEnCurso.fallos;
+  const inicio = Date.now();
+  let vioPedido = false, quietoDesde = 0;
+
+  btn.classList.add("btn-actualizando");
+  btn.setAttribute("aria-busy", "true");
+  btn.style.minWidth = anchoOriginal + "px";
+  btn.disabled = true;
+  btn.innerHTML = '<span class="giro" aria-hidden="true">↻</span>' + (soloIcono ? "" : " Actualizando…");
+
+  const terminar = () => {
+    const fallo = _redEnCurso.fallos > fallosAntes;
+    btn.classList.remove("btn-actualizando");
+    btn.classList.add(fallo ? "btn-actualizado-error" : "btn-actualizado");
+    btn.innerHTML = soloIcono ? (fallo ? "⚠️" : "✓") : (fallo ? "⚠️ Sin conexión" : "✓ Actualizado");
+    btn.removeAttribute("aria-busy");
+    setTimeout(() => {
+      btn.classList.remove("btn-actualizado", "btn-actualizado-error");
+      btn.innerHTML = original;
+      btn.disabled = false;
+      btn.style.minWidth = "";
+    }, fallo ? 2200 : 1300);
+  };
+
+  const revisar = () => {
+    const t = Date.now() - inicio;
+    if (_redEnCurso.n > 0) { vioPedido = true; quietoDesde = 0; }
+    else if (!quietoDesde) quietoDesde = Date.now();
+    const quieto = quietoDesde && Date.now() - quietoDesde > 250;
+    // Mínimo 600 ms para que se vea; si no hubo pedido al servidor (datos
+    // frescos en memoria) se termina igual; tope 60 s.
+    if ((t > 600 && quieto && (vioPedido || t > 900)) || t > 60000) { terminar(); return; }
+    setTimeout(revisar, 120);
+  };
+  setTimeout(revisar, 120);
+}
+
+document.addEventListener("click", (e) => {
+  const btn = e.target && e.target.closest ? e.target.closest("button") : null;
+  if (!_esBotonActualizar(btn) || btn.disabled) return;
+  const antes = btn.innerHTML;
+  // Después de que corra el onclick del botón (que arranca el pedido).
+  // Si esa función ya cambió el botón por su cuenta, no se pisa.
+  setTimeout(() => { if (btn.innerHTML === antes && !btn.disabled) _animarBotonActualizar(btn); }, 0);
+}, true);
+
+/* ===================================================================
    CONFIGURACIÓN → SISTEMA → Historial de ventas en la planilla
    (ver compactarVentasAntiguas en code.gs)
 =================================================================== */
@@ -2569,6 +2651,36 @@ function cacheSet(clave, data) {
   } catch(e) {}
 }
 
+/**
+ * Redibuja una lista sin que la pantalla salte al principio: mantiene la
+ * altura del contenedor mientras se vacía y se vuelve a llenar (las
+ * listas se dibujan en tandas) y devuelve el scroll a donde estaba.
+ * Si la persona mueve la rueda o toca la pantalla, se deja de corregir.
+ */
+function redibujarSinSalto(idContenedor, dibujar) {
+  const cont = document.getElementById(idContenedor);
+  const y = window.scrollY;
+  const seccion = cont ? cont.closest(".seccion") : null;
+  const ySeccion = seccion ? seccion.scrollTop : 0;
+  if (cont) cont.style.minHeight = cont.offsetHeight + "px";
+  let cancelado = false;
+  const cancelar = () => { cancelado = true; };
+  const eventos = ["wheel", "touchstart", "keydown", "pointerdown"];
+  eventos.forEach(ev => window.addEventListener(ev, cancelar, { once: true, passive: true, capture: true }));
+  dibujar();
+  const fin = Date.now() + 1500;
+  const corregir = () => {
+    if (!cancelado) {
+      if (Math.abs(window.scrollY - y) > 2) window.scrollTo(0, y);
+      if (seccion && Math.abs(seccion.scrollTop - ySeccion) > 2) seccion.scrollTop = ySeccion;
+    }
+    if (!cancelado && Date.now() < fin) { requestAnimationFrame(corregir); return; }
+    if (cont) cont.style.minHeight = "";
+    eventos.forEach(ev => window.removeEventListener(ev, cancelar, { capture: true }));
+  };
+  requestAnimationFrame(corregir);
+}
+
 let _cargandoPedidos = null; // evita que el polling y la apertura de la sección pidan la lista a la vez
 
 function cargarPedidos() {
@@ -2581,8 +2693,13 @@ async function _cargarPedidosImpl() {
   // Mostrar caché al instante si existe
   const cached = cacheGet("pedidos");
   if (cached) {
-    pedidosGlobal = cached.data;
-    filtrarPedidos();
+    // La copia guardada se dibuja solo si todavía no hay nada en pantalla.
+    // Antes se redibujaba en cada actualización automática (cuando la
+    // copia ya tenía más de 5 min) y eso hacía saltar la lista arriba.
+    if (!pedidosGlobal || pedidosGlobal.length === 0) {
+      pedidosGlobal = cached.data;
+      filtrarPedidos();
+    }
     if (!cached.stale) return; // fresco, no hace falta recargar
   }
   try {
@@ -2605,7 +2722,7 @@ async function _cargarPedidosImpl() {
     pedidosGlobal = data.pedidos;
     cacheSet("pedidos", pedidosGlobal);
     _avisoPedidosCaido = false; // se pudo actualizar bien — resetea el aviso para el próximo corte
-    if (cambio && _pedidosEnProceso.size === 0) filtrarPedidos(); // no pisar el "Guardando…" de una acción en curso
+    if (cambio && _pedidosEnProceso.size === 0) redibujarSinSalto("tablaPedidos", filtrarPedidos); // no pisar el "Guardando…" de una acción en curso
   } catch (error) {
     if (error && error.name === "AbortError") {
       console.warn("Pedidos: el servidor tardó demasiado en responder (se reintenta en el próximo ciclo).");
@@ -2795,7 +2912,7 @@ async function cambiarEstado(pedidoId, estado, el) {
       mensaje = data.message || "No se pudo actualizar el pedido";
     } else {
       ok = true;
-      const p = pedidosGlobal.find(x => x.PEDIDO_ID === pedidoId);
+      const p = _pedidoLocalPorId(pedidoId);
       if (p) { p.ESTADO = estado; invalidarCache("pedidos"); }
     }
   } catch (error) {
@@ -2879,7 +2996,7 @@ async function aplicarCobroPedido(pedidoId, cobrado, formaPago, el) {
       mensaje = data.message || "No se pudo actualizar el cobro del pedido";
     } else {
       ok = true;
-      const p = pedidosGlobal.find(x => x.PEDIDO_ID === pedidoId);
+      const p = _pedidoLocalPorId(pedidoId);
       if (p) {
         p.COBRADO = cobrado ? "SI" : "NO";
         p.FORMA_PAGO_COBRO = formaPago || "";
@@ -2906,16 +3023,98 @@ async function aplicarCobroPedido(pedidoId, cobrado, formaPago, el) {
   }
 }
 
+/* Pedidos viejos encontrados en el servidor para la búsqueda actual
+   (la lista general solo trae los en curso y los resueltos de los
+   últimos 30 días). Se muestran junto con los demás, marcados. */
+let _pedidosAntiguos = { clave: "", lista: [] };
+let _timerBusquedaPedidos = null;
+let _genBusquedaPedidos = 0;
+
+function _claveBusquedaPedidos() {
+  const q = (document.getElementById("buscarPedido")?.value || "").trim().toLowerCase();
+  const desde = document.getElementById("pedidosDesde")?.value || "";
+  const hasta = document.getElementById("pedidosHasta")?.value || "";
+  return { q, desde, hasta, clave: q + "|" + desde + "|" + hasta, activa: q.length >= 3 || !!desde || !!hasta };
+}
+
+/** Pedido por número, en la lista general o entre los viejos encontrados. */
+function _pedidoLocalPorId(pedidoId) {
+  return pedidosGlobal.find(x => x.PEDIDO_ID === pedidoId) || (_pedidosAntiguos.lista || []).find(x => x.PEDIDO_ID === pedidoId);
+}
+
+function programarBusquedaPedidosAntiguos(inmediata) {
+  clearTimeout(_timerBusquedaPedidos);
+  const b = _claveBusquedaPedidos();
+  const btnFechas = document.getElementById("pedidosLimpiarFechas");
+  if (btnFechas) btnFechas.style.display = (b.desde || b.hasta) ? "" : "none";
+  const aviso = document.getElementById("pedidosBusquedaAntiguos");
+  if (!b.activa) {
+    _pedidosAntiguos = { clave: "", lista: [] };
+    if (aviso) aviso.innerHTML = (b.q.length > 0 ? '<span class="text-muted">Escribí al menos 3 letras o números para buscar también en pedidos anteriores.</span>' : "");
+    return;
+  }
+  if (b.clave === _pedidosAntiguos.clave) return;
+  _timerBusquedaPedidos = setTimeout(() => buscarPedidosAntiguos(), inmediata ? 0 : 650);
+}
+
+async function buscarPedidosAntiguos() {
+  const b = _claveBusquedaPedidos();
+  if (!b.activa) return;
+  const aviso = document.getElementById("pedidosBusquedaAntiguos");
+  const miGen = ++_genBusquedaPedidos;
+  if (aviso) aviso.innerHTML = '<span class="text-muted"><span class="giro-chico">↻</span> Buscando también en pedidos anteriores…</span>';
+  try {
+    const qs = new URLSearchParams({ action: "buscarPedidos", q: b.q, desde: b.desde, hasta: b.hasta });
+    const res = await fetchAPI(API_URL + "?" + qs.toString(), {}, { timeoutMs: 45000, reintentos: 1 });
+    const data = await res.json();
+    if (miGen !== _genBusquedaPedidos) return; // ya se escribió otra cosa
+    if (!data.success) { if (aviso) aviso.innerHTML = `<span class="text-danger">${escapeHtml(data.message || "No se pudo buscar")}</span>`; return; }
+    const enLista = new Set(pedidosGlobal.map(p => String(p.PEDIDO_ID)));
+    const extra = (data.pedidos || []).filter(p => !enLista.has(String(p.PEDIDO_ID))).map(p => Object.assign(p, { _antiguo: true }));
+    _pedidosAntiguos = { clave: b.clave, lista: extra };
+    if (aviso) {
+      aviso.innerHTML = extra.length
+        ? `🗄️ <b>${extra.length}</b> pedido${extra.length === 1 ? "" : "s"} anterior${extra.length === 1 ? "" : "es"} encontrado${extra.length === 1 ? "" : "s"}` + (data.limitado ? ` (se muestran los 100 más nuevos de ${data.total}; afiná la búsqueda)` : "") + "."
+        : '<span class="text-muted">No hay pedidos anteriores con esa búsqueda.</span>';
+    }
+    filtrarPedidos();
+  } catch (e) {
+    if (miGen !== _genBusquedaPedidos) return;
+    if (aviso) aviso.innerHTML = '<span class="text-danger">No se pudo buscar en pedidos anteriores (sin conexión). Probá de nuevo.</span>';
+  }
+}
+
+function limpiarBusquedaPedidos() {
+  const d = document.getElementById("pedidosDesde"), h = document.getElementById("pedidosHasta");
+  if (d) d.value = ""; if (h) h.value = "";
+  filtrarPedidos();
+  programarBusquedaPedidosAntiguos(true);
+}
+
 function filtrarPedidos() {
-  const texto = document.getElementById("buscarPedido").value.toLowerCase();
+  const texto = document.getElementById("buscarPedido").value.toLowerCase().trim();
+  const textoNum = texto.replace(/\D/g, "");
   const estadoFiltro = (document.getElementById("filtroPedidoEstado")?.value || "").toUpperCase();
-  const filtrados = pedidosGlobal.filter(p => {
-    const coincideTexto =
+  const b = _claveBusquedaPedidos();
+  const desde = b.desde ? new Date(b.desde + "T00:00:00") : null;
+  const hasta = b.hasta ? new Date(b.hasta + "T23:59:59") : null;
+  // Los viejos encontrados en el servidor solo para la búsqueda que los trajo
+  const antiguos = (_pedidosAntiguos.clave === b.clave) ? _pedidosAntiguos.lista : [];
+  const filtrados = pedidosGlobal.concat(antiguos).filter(p => {
+    const coincideTexto = !texto ||
       String(p.PEDIDO_ID || "").toLowerCase().includes(texto) ||
       String(p.CLIENTE   || "").toLowerCase().includes(texto) ||
-      String(p.DNI       || "").toLowerCase().includes(texto);
+      String(p.DNI       || "").toLowerCase().includes(texto) ||
+      String(p.EMPRESA   || "").toLowerCase().includes(texto) ||
+      (textoNum.length >= 4 && String(p.TELEFONO || "").replace(/\D/g, "").includes(textoNum)) ||
+      !!p._antiguo; // el servidor ya filtró (sin acentos, DNI con guiones, etc.)
     const coincideEstado = !estadoFiltro || String(p.ESTADO || "").toUpperCase() === estadoFiltro;
-    return coincideTexto && coincideEstado;
+    let coincideFecha = true;
+    if (desde || hasta) {
+      const f = new Date(p.FECHA);
+      coincideFecha = !isNaN(f) && (!desde || f >= desde) && (!hasta || f <= hasta);
+    }
+    return coincideTexto && coincideEstado && coincideFecha;
   });
   renderPedidos(filtrados);
 }
@@ -4200,8 +4399,8 @@ function renderPedidos(listaOriginal) {
       tmp.innerHTML = `<div class="pedido-card estado-${claseEstado}${_pedidosEnProceso.has(p.PEDIDO_ID) ? " pedido-procesando" : ""}" data-pedido-card="${escapeHtml(p.PEDIDO_ID)}">
         <div class="pedido-card-top">
           <div>
-            <div class="pedido-card-id">${escapeHtml(p.PEDIDO_ID)}</div>
-            <div class="pedido-card-cliente">${escapeHtml(p.CLIENTE)}${p.EMPRESA ? ` <span style="font-weight:500;color:var(--slate-500);font-size:13px;">· 🚚 ${escapeHtml(p.EMPRESA)}</span>` : ""}</div>
+            <div class="pedido-card-id">${escapeHtml(p.PEDIDO_ID)}${p._antiguo ? ' <span class="pedido-antiguo-badge" title="Pedido de hace más de 30 días: no está en la lista general, apareció por la búsqueda">🗄️ Anterior</span>' : ""}</div>
+            <div class="pedido-card-cliente">${escapeHtml(p.CLIENTE || p.NOMBRE || "")}${p.EMPRESA ? ` <span style="font-weight:500;color:var(--slate-500);font-size:13px;">· 🚚 ${escapeHtml(p.EMPRESA)}</span>` : ""}</div>
             ${p.DIRECCION ? `<div class="pedido-card-dir">📍 ${escapeHtml(p.DIRECCION)}${p.LOCALIDAD ? ", " + escapeHtml(p.LOCALIDAD) : ""}</div>` : ""}
             <div class="pedido-card-fecha">📅 ${new Date(p.FECHA).toLocaleDateString("es-AR", {day:"2-digit", month:"2-digit", year:"numeric"})}</div>
           </div>
@@ -6176,18 +6375,23 @@ async function actualizarClientesForm() {
 async function cargarClientesDesdeBackend() {
   const cached = cacheGet("clientes");
   if (cached) {
-    clientesGlobal = cached.data;
-    filtrarClientes();
+    // Igual que en pedidos: la copia guardada solo si la lista está vacía
+    if (!clientesGlobal || clientesGlobal.length === 0) {
+      clientesGlobal = cached.data;
+      filtrarClientes();
+    }
     if (!cached.stale) return;
   }
   try {
     const response = await fetchAPI(API_URL + "?action=clientesConCredito");
     const data = await response.json();
     if (!data.clientes) return;
+    // Redibujar solo si algo cambió (antes se redibujaba siempre → salto)
+    const cambio = JSON.stringify(clientesGlobal || []) !== JSON.stringify(data.clientes);
     clientesGlobal = data.clientes;
     cacheSet("clientes", clientesGlobal);
     _avisoClientesCaido = false; // se pudo actualizar bien — resetea el aviso para el próximo corte
-    filtrarClientes();
+    if (cambio) redibujarSinSalto("tablaClientes", filtrarClientes);
   } catch (error) {
     console.error("Error clientes:", error);
     if (!_avisoClientesCaido) {

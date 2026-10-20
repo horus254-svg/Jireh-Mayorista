@@ -16,7 +16,7 @@
 // Versión del panel: va en cada informe para saber si ese navegador o
 // esa caja tiene el panel al día. Se sube junto con VERSION_BACKEND y
 // desktop/package.json (la prueba del backend avisa si no coinciden).
-const VERSION_PANEL = "1.8.1";
+const VERSION_PANEL = "1.8.2";
 
 (function () {
   const MAX_REGISTRO = 30;
@@ -33,7 +33,7 @@ const VERSION_PANEL = "1.8.1";
   const limpio = (t) => String(t || "").replace(/\s+/g, " ").trim();
 
   // Ruido que no son fallas del sistema (extensiones del navegador, red caída, etc.)
-  const RUIDO = /ResizeObserver loop|^Script error\.?$|AbortError|The user aborted|Failed to fetch|NetworkError|Load failed|Network request failed|signal is aborted|chrome-extension:|moz-extension:/i;
+  const RUIDO = /ResizeObserver loop|^Script error\.?$|AbortError|The user aborted|Failed to fetch|NetworkError|Load failed|Network request failed|signal is aborted|chrome-extension:|moz-extension:|_AutofillCallbackHandler|webkit\.messageHandlers|__gCrWeb|instantSearchSDKJSBridge|WeixinJSBridge|zaloJSV2|TTNativeBridge|FBNavigation|fbq is not defined|__firefox__|SymBrowser_|ucbrowser|_pcmBridgeCallbackHandler|vivoNewsDetailPage|getReadModeExtract|feedNativeBridge/i;
 
   function anotar(tipo, mensaje, origen, pila) {
     registro.push({ hora: hora(), tipo, mensaje: corto(mensaje, 600), origen: corto(origen, 200), pila: corto(pila, 1500) });
