@@ -75,6 +75,65 @@ async function fetchAPI(url, opciones = {}, config = {}) {
   throw ultimoError;
 }
 
+/* =========================================================
+   AVISO AUTOMÁTICO DE ERRORES A SOPORTE
+   Errores de JavaScript de la página y pedidos que no se pudieron
+   enviar se avisan solos (action=reportarErrorCatalogo; el servidor
+   los agrupa y tiene tope diario). No se manda ningún dato personal
+   del cliente: solo página, navegador, pantalla y el error.
+========================================================= */
+const _registroErroresCatalogo = [];
+const _erroresCatalogoAvisados = new Set();
+const _RUIDO_CATALOGO = /ResizeObserver loop|^Script error\.?$|AbortError|aborted|Failed to fetch|NetworkError|Load failed|Network request failed|chrome-extension:|moz-extension:|safari-extension:|webkit-masked-url/i;
+
+function _anotarErrorCatalogo(mensaje, origen, pila){
+    _registroErroresCatalogo.push({
+        hora: new Date().toLocaleTimeString("es-AR", { hour12: false }),
+        mensaje: String(mensaje || "").slice(0, 500), origen: String(origen || "").slice(0, 200), pila: String(pila || "").slice(0, 1200)
+    });
+    if(_registroErroresCatalogo.length > 10) _registroErroresCatalogo.shift();
+}
+
+function avisarErrorASoporte(titulo, descripcion, extra){
+    try{
+        if(!API_URL || !navigator.onLine) return;
+        const clave = String(titulo).slice(0, 160);
+        if(_erroresCatalogoAvisados.has(clave) || _erroresCatalogoAvisados.size >= 4) return;
+        _erroresCatalogoAvisados.add(clave);
+        const contexto = Object.assign({
+            pagina: location.pathname + location.search.replace(/[?&](dni|tel|telefono|nombre)=[^&]*/gi, ""),
+            navegador: navigator.userAgent,
+            pantalla: window.innerWidth + "×" + window.innerHeight,
+            productosEnCarrito: (typeof estado !== "undefined" && estado.carrito) ? estado.carrito.length : ""
+        }, extra || {});
+        fetch(API_URL, {
+            method: "POST",
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify({ action: "reportarErrorCatalogo", titulo: clave, descripcion: descripcion || "", contexto, errores: _registroErroresCatalogo.slice(-6) }),
+            keepalive: true
+        }).catch(()=>{});
+    }catch(e){ /* nunca molestar al cliente por esto */ }
+}
+
+window.addEventListener("error", (e) => {
+    if(!e || (e.target && e.target !== window && !e.error)) return; // imágenes que no cargan: no es código
+    const msg = e.message || (e.error && e.error.message) || "Error";
+    const origen = (e.filename ? e.filename.split("/").pop() : "") + (e.lineno ? ":" + e.lineno + ":" + (e.colno || 0) : "");
+    if(_RUIDO_CATALOGO.test(msg) || _RUIDO_CATALOGO.test(e.filename || "")) return;
+    _anotarErrorCatalogo(msg, origen, e.error && e.error.stack);
+    // Solo errores de los archivos del propio sitio
+    if(e.filename && e.filename.indexOf(location.origin) !== 0) return;
+    setTimeout(() => avisarErrorASoporte(msg, "Error de JavaScript en el catálogo."), 3000);
+}, true);
+
+window.addEventListener("unhandledrejection", (e) => {
+    const r = e && e.reason;
+    const msg = (r && (r.message || String(r))) || "Promesa rechazada";
+    if(_RUIDO_CATALOGO.test(msg)) return;
+    _anotarErrorCatalogo(msg, "", r && r.stack);
+    setTimeout(() => avisarErrorASoporte(msg, "Promesa rechazada en el catálogo."), 3000);
+});
+
 // Esta página sí necesita productos + configuración: se piden juntos al
 // Worker en un solo pedido (ver obtenerInicioCatalogo en config.js).
 if (typeof window !== "undefined") window.VEEK_PEDIR_INICIO = true;
@@ -482,7 +541,32 @@ function limpiarFiltroPrecio(){
    FILTRADO (BÚSQUEDA + CATEGORÍA COMBINADOS)
 ========================================================= */
 
+/**
+ * Celular: el botón "Ordenar y filtrar" dice qué está aplicado
+ * (orden elegido y rango de precio) y se resalta, así se nota aunque
+ * el panel esté cerrado.
+ */
+function actualizarBotonFiltrosMovil(){
+    const btn = document.getElementById("btn-filtros-movil");
+    const detalle = document.getElementById("btn-filtros-detalle");
+    if(!btn || !detalle) return;
+    const partes = [];
+    const sel = document.getElementById("orden-select");
+    if(sel && sel.value && sel.value !== "relevancia"){
+        const opt = sel.options[sel.selectedIndex];
+        if(opt) partes.push(opt.textContent.trim());
+    }
+    const min = estado.precioMin, max = estado.precioMax;
+    if(min !== null && min !== undefined && max !== null && max !== undefined) partes.push(`$${formatearPrecio(min)} a $${formatearPrecio(max)}`);
+    else if(min !== null && min !== undefined) partes.push(`desde $${formatearPrecio(min)}`);
+    else if(max !== null && max !== undefined) partes.push(`hasta $${formatearPrecio(max)}`);
+    detalle.textContent = partes.join(" · ");
+    btn.classList.toggle("activo", partes.length > 0);
+}
+
 function aplicarFiltros(){
+
+    actualizarBotonFiltrosMovil();
 
     let lista = estado.productos;
 
@@ -2175,6 +2259,7 @@ async function checkoutWhatsapp(){
             }catch(e){ console.warn("[pedido] segunda consulta falló:", e); }
         }
         if(!resultado.pedidoId){
+            avisarErrorASoporte("Pedido sin número de pedido", "El servidor respondió OK pero sin número de pedido, también en la segunda consulta.", { respuesta: JSON.stringify(resultado).slice(0, 300) });
             mostrarToast("No pudimos confirmar el número de tu pedido. Tocá \"Enviar pedido\" de nuevo (no se va a duplicar).", "error");
             desactivarCargaCheckout();
             return;
@@ -2247,6 +2332,12 @@ Subtotal del pedido: $${formatearPrecio(subtotalPedido)}
     }catch(error){
 
         console.error(error);
+        _anotarErrorCatalogo(error && error.message, "checkout", error && error.stack);
+        // Sin internet no es una falla del sistema
+        if(navigator.onLine){
+            avisarErrorASoporte("No se pudo enviar un pedido: " + String(error && (error.name === "AbortError" ? "el servidor no respondió a tiempo" : error.message) || "error").slice(0, 100),
+                "Un cliente tocó Enviar pedido y falló.", { total: typeof estado !== "undefined" ? String(estado.carrito.reduce((t, i) => t + i.PRECIO * i.cantidad, 0)) : "" });
+        }
 
         mostrarToast("Error al registrar el pedido.", "error");
 

@@ -1958,6 +1958,10 @@ body[data-tema="rojo"]{
         background:var(--bg-card); border:1px solid var(--paper-line);
         font-weight:600; font-size:.92rem; color:var(--ink-900);
     }
+    .btn-filtros-texto{ display:flex; flex-direction:column; align-items:flex-start; text-align:left; min-width:0; gap:1px; }
+    .btn-filtros-detalle{ font-size:.78rem; font-weight:600; color:var(--indigo-700,#e8531f); line-height:1.25; overflow-wrap:anywhere; }
+    .btn-filtros-detalle:empty{ display:none; }
+    .btn-filtros-movil.activo{ border-color:var(--indigo-600,#ff6a39); background:color-mix(in srgb, var(--indigo-600,#ff6a39) 7%, var(--bg-card,#fff)); }
     .btn-filtros-movil .flecha{ transition:transform .2s ease; }
     .btn-filtros-movil[aria-expanded="true"] .flecha{ transform:rotate(180deg); }
     .filtros-extra{ display:none; }
