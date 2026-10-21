@@ -2167,6 +2167,51 @@
     <!-- ===== PESTAÑA: CATÁLOGO WEB — Cómo se ve la página pública ===== -->
     <div class="cfg-tab-pane" id="cfgTab-catalogo">
 
+      <div class="card p-3 mt-3" id="cardTemporada">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+          <div>
+            <h6 style="margin-bottom:2px;">🎉 Tema de temporada</h6>
+            <p class="text-muted mb-0" style="font-size:13px;">Cambia el catálogo para una fecha especial: colores, adornos, fondo, animación, cartel arriba de todo e ícono en los productos. Los colores también se aplican a este panel mientras el tema está activo.</p>
+          </div>
+          <span class="temp-estado" id="tempEstado"></span>
+        </div>
+
+        <div class="temp-grilla mt-3" id="tempGrilla" role="radiogroup" aria-label="Tema de temporada"></div>
+
+        <div class="row g-2 mt-2">
+          <div class="col-md-4 col-6">
+            <label class="form-label" for="tempDesde">Desde <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+            <input type="date" class="form-control form-control-sm" id="tempDesde" onchange="actualizarEstadoTemporada()">
+          </div>
+          <div class="col-md-4 col-6">
+            <label class="form-label" for="tempHasta">Hasta <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+            <input type="date" class="form-control form-control-sm" id="tempHasta" onchange="actualizarEstadoTemporada()">
+          </div>
+          <div class="col-md-4 d-flex align-items-end">
+            <div class="form-text" style="font-size:11.5px;">Sin fechas: queda puesto hasta que elijas otro o "Sin tema". Con fechas: se activa y se saca solo.</div>
+          </div>
+          <div class="col-12">
+            <label class="form-label" for="tempCartel">Cartel arriba de todo <span class="text-muted" style="font-size:11px;">(vacío = sin cartel; va antes de los mensajes rotativos)</span></label>
+            <input type="text" class="form-control form-control-sm" id="tempCartel" maxlength="140">
+          </div>
+          <div class="col-12 d-flex flex-wrap gap-3">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="tempAnimacion" checked>
+              <label class="form-check-label" for="tempAnimacion">Animación (nieve, confeti, corazones…)</label>
+            </div>
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="tempColores" checked onchange="previsualizarColoresTemporadaPanel()">
+              <label class="form-check-label" for="tempColores">Usar los colores del tema (catálogo y panel)</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="d-flex flex-wrap gap-2 justify-content-end mt-3">
+          <button type="button" class="btn btn-outline-secondary" onclick="vistaPreviaTemporada()">👁️ Ver en el catálogo</button>
+          <button type="button" class="btn btn-success" id="btnGuardarTemporada" onclick="guardarTemporada()">💾 Guardar tema</button>
+        </div>
+      </div>
+
       <div class="card p-3 mt-3">
         <h6 style="margin-bottom:14px;">🎨 Apariencia del catálogo web</h6>
 
@@ -4296,6 +4341,7 @@
 
 <script defer src="vendor/chart.umd.min.js"></script>
 
+<script src="temporadas.js"></script>
 <script src="informe-errores.js"></script>
 <script src="veek-auth.js"></script>
 <script src="admin.js"></script>

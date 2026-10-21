@@ -2449,6 +2449,7 @@ function aplicarConfigApariencia(cfg){
         const tema = (cfg.tema || "navy").toLowerCase();
         document.body.setAttribute("data-tema", tema);
 
+
         // --- Texto e ícono del encabezado (navbar) ---
         const navbarTextoEl = document.getElementById("navbar-brand-texto");
         const navbarIconoEl = document.getElementById("navbar-brand-icono");
@@ -2468,6 +2469,18 @@ function aplicarConfigApariencia(cfg){
             document.body.style.removeProperty("--grad-a");
             document.body.style.removeProperty("--grad-b");
         }
+
+        // --- Tema de temporada (Navidad, Día del Niño…) — después del gradiente, para que sus colores ganen ---
+        // ?vistaTemporada=<id> muestra uno sin guardarlo (botón "Vista previa" del panel)
+        try{
+            if(window.VeekTemporadas){
+                const qs = new URLSearchParams(location.search);
+                const forzar = qs.get("vistaTemporada");
+                const opciones = forzar ? { forzar, animacion: qs.get("anim") !== "0", colores: qs.get("colores") !== "0" } : {};
+                const t = window.VeekTemporadas.aplicarCatalogo(cfg.temporada, opciones);
+                window.__temporadaCartel = t ? (forzar ? (qs.get("cartel") !== null ? qs.get("cartel") : t.cartel) : ((cfg.temporada && cfg.temporada.cartel) || "")) : "";
+            }
+        }catch(errTemp){ console.warn("Tema de temporada:", errTemp); }
 
         // --- Título / subtítulo del banner ---
         // Si vienen vacíos desde Configuración, se ocultan del todo (en vez
@@ -2684,7 +2697,8 @@ function aplicarBeneficios(cfg){
     renderBeneficioTextoLibre("beneficio-texto2-wrap", texto2);
     configurarChipBeneficio("beneficio-texto2-wrap", !!texto2);
 
-    aplicarBannerTop(cfg.bannerTopMensajes);
+    // El cartel del tema de temporada va primero en la franja de arriba
+    aplicarBannerTop([window.__temporadaCartel || "", cfg.bannerTopMensajes || ""].filter(Boolean).join("\n"));
 
     // Pedido mínimo configurable
     const minimoConfigurado = Number(cfg.pedidoMinimo);

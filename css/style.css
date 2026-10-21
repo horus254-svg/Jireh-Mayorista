@@ -2002,3 +2002,40 @@ body.modal-open .toast-container{
 /* Botón Compartir del producto */
 .btn-compartir{background:transparent;border:1.5px solid var(--paper-line,#f0e2cf);color:var(--ink-900,#2a1f1a);font-weight:600;border-radius:12px}
 .btn-compartir:hover,.btn-compartir:focus-visible{border-color:var(--indigo-600,#ff6a39);color:var(--indigo-700,#e8531f)}
+
+/* =========================================================
+   TEMAS DE TEMPORADA (ver js/temporadas.js)
+   Adorno colgando del encabezado, fondo con motivos, animación,
+   ícono en las tarjetas y borde de los destacados.
+========================================================= */
+.temp-adorno{
+    position:absolute; left:0; right:0; top:100%;
+    background-repeat:repeat-x; background-position:0 0;
+    pointer-events:none; z-index:2;
+    filter:drop-shadow(0 2px 2px rgba(0,0,0,.18));
+}
+.temp-adorno--luces{ animation:tempLuces 2.4s ease-in-out infinite alternate; }
+@keyframes tempLuces{ from{ filter:drop-shadow(0 2px 2px rgba(0,0,0,.18)) brightness(.92); } to{ filter:drop-shadow(0 0 6px rgba(255,220,120,.55)) brightness(1.12); } }
+.temp-esquina{ position:absolute; top:100%; width:90px; height:90px; background-size:90px 90px; background-repeat:no-repeat; pointer-events:none; z-index:2; }
+.temp-esquina--izq{ left:0; }
+.temp-esquina--der{ right:0; transform:scaleX(-1); }
+.temp-fondo{ position:fixed; inset:0; z-index:-1; pointer-events:none; background-repeat:repeat; background-size:180px 180px; }
+.temp-animacion{ position:fixed; inset:0; width:100vw; height:100vh; pointer-events:none; z-index:1025; }
+/* Ícono de temporada en la esquina de la foto */
+body[data-temporada] .card-product .card-img-wrap::after{
+    content:var(--temp-icono);
+    position:absolute; right:8px; bottom:8px; width:30px; height:30px;
+    display:grid; place-items:center; font-size:17px; line-height:1;
+    background:rgba(255,255,255,.92); border-radius:50%;
+    box-shadow:0 2px 6px rgba(0,0,0,.12); pointer-events:none;
+}
+/* Destacados con el color del tema */
+body[data-temporada] .card-product:has(.ribbon-destacado){
+    box-shadow:0 0 0 2px var(--indigo-600), var(--shadow-card);
+}
+body[data-temporada] .top-banner{ background:linear-gradient(90deg, var(--navy-950), var(--indigo-700)); }
+@media (max-width:575.98px){
+    body[data-temporada] .card-product .card-img-wrap::after{ width:24px; height:24px; font-size:13px; right:5px; bottom:5px; }
+    .temp-esquina{ width:60px; height:60px; background-size:60px 60px; }
+}
+@media (prefers-reduced-motion: reduce){ .temp-adorno--luces{ animation:none; } }

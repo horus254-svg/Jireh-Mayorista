@@ -1077,6 +1077,145 @@ const APARIENCIA_DEFAULT = {
 function aplicarTemaAdmin(cfg) {
   const tema = (cfg.tema || APARIENCIA_DEFAULT.tema).toLowerCase();
   document.body.setAttribute("data-tema", tema);
+  // Tema de temporada activo: sus colores pisan los del tema (ver temporadas.js)
+  let t = null;
+  try { if (window.VeekTemporadas) t = window.VeekTemporadas.aplicarPanel(cfg.temporada || null); } catch (e) {}
+  const marca = document.getElementById("sidebarTemporada");
+  if (t && !marca) {
+    const brand = document.querySelector(".sidebar .sidebar-brand, .sidebar-brand");
+    if (brand) brand.insertAdjacentHTML("beforeend", `<span id="sidebarTemporada" class="sidebar-temporada" title="Tema de temporada: ${escapeHtml(t.nombre)}">${t.emoji}</span>`);
+  } else if (t && marca) {
+    marca.textContent = t.emoji; marca.title = "Tema de temporada: " + t.nombre;
+  } else if (!t && marca) {
+    marca.remove();
+  }
+}
+
+/* ===================================================================
+   TEMA DE TEMPORADA (Configuración → Catálogo web)
+=================================================================== */
+let _temporadaElegida = "";
+
+function _datosTemporadaForm() {
+  return {
+    id: _temporadaElegida,
+    desde: document.getElementById("tempDesde")?.value || "",
+    hasta: document.getElementById("tempHasta")?.value || "",
+    cartel: (document.getElementById("tempCartel")?.value || "").trim(),
+    animacion: !!document.getElementById("tempAnimacion")?.checked,
+    colores: !!document.getElementById("tempColores")?.checked
+  };
+}
+
+function cargarTemporadaForm(cfg) {
+  const T = window.VeekTemporadas;
+  const grilla = document.getElementById("tempGrilla");
+  if (!T || !grilla) return;
+  const tc = cfg.temporada || {};
+  _temporadaElegida = tc.id || "";
+  const opcion = (id, nombre, emoji, t) => {
+    let muestra = '<div class="temp-muestra temp-muestra--ninguno">Estilo normal</div>';
+    if (t) {
+      const tira = T.adornoTira(t.adorno);
+      const c = t.colores;
+      muestra = `<div class="temp-muestra" style="background:linear-gradient(135deg, ${c.a}, ${c.b})">
+          <div class="temp-muestra-adorno" style="background-image:${tira ? tira.fondo : "none"};background-size:${tira ? tira.ancho / 1.6 + "px " + tira.alto / 1.6 + "px" : "auto"}"></div>
+          <div class="temp-muestra-papel" style="background-color:${c.papel};background-image:${T.fondoMotivos(t.fondo, c.acento)};background-size:90px 90px">
+            <span class="temp-muestra-btn" style="background:${c.acento}">Agregar</span><span class="temp-muestra-icono">${t.icono}</span>
+          </div>
+        </div>`;
+    }
+    return `<button type="button" class="temp-opcion${id === _temporadaElegida ? " activa" : ""}" role="radio" aria-checked="${id === _temporadaElegida}" data-temp="${id}" onclick="elegirTemporada('${id}')">
+        ${muestra}<span class="temp-nombre">${emoji} ${escapeHtml(nombre)}</span></button>`;
+  };
+  grilla.innerHTML = opcion("", "Sin tema", "⚪", null) + T.ORDEN.map(id => opcion(id, T.TEMPORADAS[id].nombre, T.TEMPORADAS[id].emoji, T.TEMPORADAS[id])).join("");
+  document.getElementById("tempDesde").value = tc.desde || "";
+  document.getElementById("tempHasta").value = tc.hasta || "";
+  document.getElementById("tempCartel").value = tc.cartel || "";
+  document.getElementById("tempCartel").placeholder = _temporadaElegida && T.TEMPORADAS[_temporadaElegida] ? T.TEMPORADAS[_temporadaElegida].cartel : "Ej: 🎄 ¡Felices fiestas!";
+  document.getElementById("tempAnimacion").checked = tc.animacion !== false;
+  document.getElementById("tempColores").checked = tc.colores !== false;
+  actualizarEstadoTemporada();
+}
+
+function elegirTemporada(id) {
+  const T = window.VeekTemporadas;
+  const anterior = _temporadaElegida;
+  _temporadaElegida = id;
+  document.querySelectorAll("#tempGrilla .temp-opcion").forEach(b => {
+    const activa = b.dataset.temp === id;
+    b.classList.toggle("activa", activa);
+    b.setAttribute("aria-checked", activa ? "true" : "false");
+  });
+  // Cartel sugerido: si estaba vacío o era el sugerido del tema anterior
+  const cartel = document.getElementById("tempCartel");
+  const sugeridoAnterior = anterior && T.TEMPORADAS[anterior] ? T.TEMPORADAS[anterior].cartel : "";
+  if (cartel && (!cartel.value.trim() || cartel.value.trim() === sugeridoAnterior)) cartel.value = id ? T.TEMPORADAS[id].cartel : "";
+  if (cartel) cartel.placeholder = id ? T.TEMPORADAS[id].cartel : "Ej: 🎄 ¡Felices fiestas!";
+  actualizarEstadoTemporada();
+  previsualizarColoresTemporadaPanel();
+}
+
+/** Muestra en el panel cómo quedarían los colores (sin guardar todavía) */
+function previsualizarColoresTemporadaPanel() {
+  const d = _datosTemporadaForm();
+  try { window.VeekTemporadas.aplicarPanel(d.id ? { id: d.id, colores: d.colores } : null); } catch (e) {}
+}
+
+function actualizarEstadoTemporada() {
+  const el = document.getElementById("tempEstado");
+  if (!el || !window.VeekTemporadas) return;
+  const d = _datosTemporadaForm();
+  const T = window.VeekTemporadas;
+  const f = (iso) => iso ? iso.split("-").reverse().join("/") : "";
+  if (!d.id) { el.className = "temp-estado"; el.textContent = "Sin tema de temporada"; return; }
+  const nombre = T.TEMPORADAS[d.id].emoji + " " + T.TEMPORADAS[d.id].nombre;
+  if (d.desde && d.hasta && d.desde > d.hasta) { el.className = "temp-estado error"; el.textContent = "⚠️ \"Desde\" es posterior a \"Hasta\""; return; }
+  const hoy = T.hoyAR();
+  if (d.desde && hoy < d.desde) { el.className = "temp-estado programado"; el.textContent = `${nombre}: empieza el ${f(d.desde)}`; return; }
+  if (d.hasta && hoy > d.hasta) { el.className = "temp-estado vencido"; el.textContent = `${nombre}: terminó el ${f(d.hasta)}`; return; }
+  el.className = "temp-estado activo";
+  el.textContent = `${nombre}: activo` + (d.hasta ? ` hasta el ${f(d.hasta)}` : "");
+}
+
+function vistaPreviaTemporada() {
+  const d = _datosTemporadaForm();
+  let base = "../index.html";
+  if (typeof _esAppEscritorio === "function" && _esAppEscritorio()) {
+    base = (configNegocioCache && configNegocioCache.urlCatalogo) || "";
+    if (!base) { toast("Cargá la URL del catálogo (Catálogo web → Catálogo online) para ver la vista previa", "error"); return; }
+  }
+  if (!d.id) { window.open(base, "_blank", "noopener"); return; }
+  const url = base + (base.indexOf("?") === -1 ? "?" : "&") + new URLSearchParams({ vistaTemporada: d.id, anim: d.animacion ? "1" : "0", colores: d.colores ? "1" : "0", cartel: d.cartel }).toString();
+  window.open(url, "_blank", "noopener");
+}
+
+async function guardarTemporada() {
+  const d = _datosTemporadaForm();
+  if (d.desde && d.hasta && d.desde > d.hasta) { toast("La fecha \"desde\" no puede ser posterior a \"hasta\"", "error"); return; }
+  const btn = document.getElementById("btnGuardarTemporada");
+  const txt = btn ? btn.innerHTML : "";
+  if (btn) { btn.disabled = true; btn.innerHTML = "Guardando…"; }
+  try {
+    const params = new URLSearchParams({
+      action: "guardarConfiguracionNegocio",
+      temporada: d.id, temporadaDesde: d.desde, temporadaHasta: d.hasta,
+      temporadaAnimacion: d.animacion ? "SI" : "NO", temporadaColores: d.colores ? "SI" : "NO",
+      temporadaCartel: d.cartel
+    });
+    const res = await fetchAPI(API_URL + "?" + params.toString());
+    const data = await res.json();
+    if (!data.success) { toast(data.message || "No se pudo guardar el tema", "error"); return; }
+    configNegocioCache = { ...configNegocioCache, temporada: d };
+    aplicarTemaAdmin(configNegocioCache);
+    actualizarEstadoTemporada();
+    const T = window.VeekTemporadas;
+    toast(d.id ? `${T.TEMPORADAS[d.id].emoji} Tema "${T.TEMPORADAS[d.id].nombre}" guardado — el catálogo lo muestra en unos minutos` : "Tema de temporada quitado — el catálogo vuelve al estilo normal en unos minutos", "success");
+  } catch (e) {
+    toast("Error de conexión al guardar el tema", "error");
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = txt; }
+  }
 }
 
 /** Muestra u oculta los dos selectores de color del gradiente propio */
@@ -1087,6 +1226,7 @@ function toggleGradPersonalizado() {
 
 /** Loads the saved banner/tema config into the "Apariencia" form (called when Configuración opens) */
 function cargarAparienciaForm(cfg) {
+  try { cargarTemporadaForm(cfg); } catch (e) { console.warn("Tema de temporada:", e); }
   document.getElementById("cfgNavbarTexto").value     = cfg.navbarTexto     ?? APARIENCIA_DEFAULT.navbarTexto;
   document.getElementById("cfgNavbarIcono").value     = cfg.navbarIcono     ?? APARIENCIA_DEFAULT.navbarIcono;
   document.getElementById("cfgBannerTitulo").value    = cfg.bannerTitulo    ?? APARIENCIA_DEFAULT.bannerTitulo;

@@ -2723,3 +2723,21 @@ a[data-target="pedidos"]{ position:relative; }
 @media print{
   .etq-precio.resaltado{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
 }
+
+/* ===== Tema de temporada (Configuración → Catálogo web) ===== */
+.temp-grilla{ display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:10px; }
+.temp-opcion{ border:2px solid var(--slate-200); border-radius:12px; padding:6px; background:#fff; text-align:left; cursor:pointer; transition:border-color .15s, transform .15s, box-shadow .15s; display:flex; flex-direction:column; gap:6px; }
+.temp-opcion:hover{ transform:translateY(-1px); box-shadow:0 6px 16px rgba(15,23,42,.08); }
+.temp-opcion.activa{ border-color:var(--blue-500); box-shadow:0 0 0 3px color-mix(in srgb, var(--blue-500) 22%, transparent); }
+.temp-nombre{ font-size:12.5px; font-weight:600; padding:0 2px 2px; }
+.temp-muestra{ position:relative; height:74px; border-radius:8px; overflow:hidden; }
+.temp-muestra--ninguno{ display:grid; place-items:center; font-size:12px; color:var(--slate-500); background:repeating-linear-gradient(45deg, var(--slate-50,#f8fafc) 0 8px, #fff 8px 16px); border:1px dashed var(--slate-200); }
+.temp-muestra-adorno{ position:absolute; top:16px; left:0; right:0; height:16px; background-repeat:repeat-x; z-index:2; }
+.temp-muestra-papel{ position:absolute; left:0; right:0; bottom:0; height:46px; display:flex; align-items:center; justify-content:space-between; padding:0 8px; }
+.temp-muestra-btn{ color:#fff; font-size:10px; font-weight:700; border-radius:6px; padding:3px 8px; }
+.temp-muestra-icono{ font-size:16px; background:rgba(255,255,255,.9); border-radius:50%; width:24px; height:24px; display:grid; place-items:center; }
+.temp-estado{ font-size:12px; font-weight:600; border-radius:999px; padding:3px 10px; background:var(--slate-100); color:var(--slate-600,#475569); white-space:nowrap; }
+.temp-estado.activo{ background:color-mix(in srgb, #22c55e 15%, #fff); color:#15803d; }
+.temp-estado.programado{ background:color-mix(in srgb, var(--blue-500) 12%, #fff); color:var(--blue-500); }
+.temp-estado.vencido, .temp-estado.error{ background:#fef2f2; color:#b91c1c; }
+.sidebar-temporada{ margin-left:6px; font-size:16px; }
