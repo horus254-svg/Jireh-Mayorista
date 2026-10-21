@@ -2705,10 +2705,15 @@ a[data-target="pedidos"]{ position:relative; }
 .etq-paginas{ display:flex; align-items:center; justify-content:center; gap:10px; font-size:12.5px; margin:-2px 0 8px; }
 
 /* La etiqueta (pantalla e impresión) */
-.etq{ box-sizing:border-box; background:#fff; color:#000; font-family:Arial, Helvetica, sans-serif; display:flex; flex-direction:column; justify-content:center; gap:0.6mm; overflow:hidden; break-inside:avoid; page-break-inside:avoid; border-radius:1.5mm; }
+/* Centrado "seguro": si el contenido no entra, lo que sobra queda abajo
+   (nunca se corta la primera línea). Además _ajustarEtiquetas() achica
+   el código de barras y las letras hasta que entre todo. */
+.etq{ box-sizing:border-box; background:#fff; color:#000; font-family:Arial, Helvetica, sans-serif; display:flex; flex-direction:column; justify-content:flex-start; gap:0.6mm; overflow:hidden; break-inside:avoid; page-break-inside:avoid; border-radius:1.5mm; }
+.etq > :first-child{ margin-top:auto; }
+.etq > :last-child{ margin-bottom:auto; }
 .etq > *{ max-width:100%; flex-shrink:0; }
 .etq-negocio{ font-weight:700; text-transform:uppercase; letter-spacing:.04em; line-height:1.1; }
-.etq-nombre{ line-height:1.12; display:-webkit-box; -webkit-box-orient:vertical; overflow:hidden; overflow-wrap:anywhere; }
+.etq-nombre{ line-height:1.18; padding-top:0.05em; display:-webkit-box; -webkit-box-orient:vertical; overflow:hidden; overflow-wrap:anywhere; }
 .etq-chico{ line-height:1.15; color:#222; }
 .etq-codigo{ letter-spacing:.06em; color:#333; }
 .etq-extra{ font-weight:800; text-transform:uppercase; line-height:1.1; }

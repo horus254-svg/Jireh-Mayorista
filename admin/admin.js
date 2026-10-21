@@ -13018,6 +13018,38 @@ function _dibujarBarrasEtiquetas(cont, items) {
   });
 }
 
+/**
+ * Si el contenido de una etiqueta no entra en su alto, achica primero el
+ * código de barras (hasta 5 mm) y después todas las letras, de a poco,
+ * hasta que entre. Así no se corta ninguna línea. Necesita que las
+ * etiquetas estén en pantalla (para imprimir se miden fuera de la vista).
+ */
+function _ajustarEtiquetas(cont) {
+  const MM = 96 / 25.4;
+  cont.querySelectorAll(".etq").forEach(e => {
+    const desborda = () => e.scrollHeight > e.clientHeight + 0.5;
+    for (let i = 0; i < 24 && desborda(); i++) {
+      const svg = e.querySelector("svg.etq-barras");
+      const altoSvg = svg ? svg.getBoundingClientRect().height : 0;
+      if (svg && altoSvg > 5 * MM) {
+        const nuevo = Math.max(5, (altoSvg / MM) * 0.85);
+        svg.style.height = nuevo.toFixed(2) + "mm";
+        svg.style.flexBasis = nuevo.toFixed(2) + "mm";
+        continue;
+      }
+      // Las letras: todas un 8% más chicas (mínimo 4,5 pt)
+      let achico = false;
+      e.querySelectorAll("[style*='font-size']").forEach(t => {
+        const m = /([\d.]+)pt/.exec(t.style.fontSize || "");
+        if (!m) return;
+        const pt = Math.max(4.5, parseFloat(m[1]) * 0.92);
+        if (pt < parseFloat(m[1])) { t.style.fontSize = pt.toFixed(1) + "pt"; achico = true; }
+      });
+      if (!achico) break; // ya no se puede achicar más: lo que sobre queda abajo
+    }
+  });
+}
+
 function abrirModalEtiquetas() {
   const codigos = obtenerCodigosSeleccionados();
   if (codigos.length === 0) { toast("Seleccioná al menos un producto", "error"); return; }
@@ -13140,6 +13172,7 @@ function actualizarPreviewEtiquetas() {
       <div class="etq-escala-in" style="transform:scale(${f.toFixed(4)})">${contenido}</div>
     </div>`;
   _dibujarBarrasEtiquetas(marco, items);
+  _ajustarEtiquetas(marco);
   const nota = _etqModoPreview === "real"
     ? (f < 1 ? `Achicada al ${Math.round(f * 100)}% para que entre en pantalla.` : "A tamaño real (puede variar según la pantalla).")
     : (cfg.papel === "A4" ? `Hoja A4 al ${Math.round(f * 100)}%.` : `Rollo al ${Math.round(f * 100)}%.`);
@@ -13175,6 +13208,10 @@ function imprimirEtiquetas() {
   const clase = cfg.papel === "ROLLO" ? "etq-hoja etq-rollo" : "etq-hoja";
   printArea.innerHTML = `<div class="${clase}" style="gap:${cfg.separacion}mm">${html}</div>`;
   _dibujarBarrasEtiquetas(printArea, items);
+  // Para medir, el área de impresión se muestra un instante fuera de la vista
+  const estiloPrevio = printArea.getAttribute("style") || "";
+  printArea.setAttribute("style", "display:block !important; position:absolute; left:-10000px; top:0; width:210mm; visibility:hidden;");
+  try { _ajustarEtiquetas(printArea); } finally { printArea.setAttribute("style", estiloPrevio); if (!estiloPrevio) printArea.removeAttribute("style"); }
 
   cerrarModalEtiquetas();
   if (cfg.papel === "ROLLO") {
