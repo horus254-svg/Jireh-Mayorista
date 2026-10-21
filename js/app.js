@@ -1351,8 +1351,7 @@ window.addEventListener("popstate", function(){
         return;
     }
 
-    const codigo = codigoParam.split("-")[0];
-    const producto = estado.productos.find(p => String(p.CODIGO) === String(codigo));
+    const producto = productoDesdeParametro(codigoParam);
     if(producto) abrirQuickView(producto, false); // false: no volver a pushear la URL
 });
 
@@ -1363,9 +1362,26 @@ function abrirProductoDesdeURL(){
     const codigoParam = new URLSearchParams(window.location.search).get("producto");
     if(!codigoParam) return;
 
-    const codigo = codigoParam.split("-")[0];
-    const producto = estado.productos.find(p => String(p.CODIGO) === String(codigo));
+    const producto = productoDesdeParametro(codigoParam);
     if(producto) abrirQuickView(producto, false);
+    else mostrarToast("Ese producto ya no está disponible en el catálogo.", "error");
+}
+
+// ?producto=CODIGO-slug → producto. El código puede tener guiones
+// (ej. PRD-1792442698715-885), así que no se corta en el primer "-":
+// se busca el código más largo que coincida con el comienzo del parámetro.
+function productoDesdeParametro(param){
+    const valor = String(param || "").trim().toLowerCase();
+    if(!valor) return null;
+    let mejor = null;
+    for(const p of estado.productos){
+        const cod = String(p.CODIGO || "").trim().toLowerCase();
+        if(!cod) continue;
+        if(valor === cod || valor.startsWith(cod + "-")){
+            if(!mejor || cod.length > String(mejor.CODIGO).trim().length) mejor = p;
+        }
+    }
+    return mejor;
 }
 
 /* Compartir el producto abierto: menú nativo del celular
