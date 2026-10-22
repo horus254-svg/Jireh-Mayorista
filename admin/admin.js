@@ -12887,8 +12887,25 @@ const ETQ_TAMANOS = {
   ]
 };
 
+/** Hojas para imprimir etiquetas en impresora común (medidas en mm; css = tamaño para @page) */
+const ETQ_HOJAS = {
+  A4:     { nombre: "A4",     w: 210,   h: 297,   css: "A4" },
+  CARTA:  { nombre: "Carta",  w: 215.9, h: 279.4, css: "letter" },
+  OFICIO: { nombre: "Oficio", w: 216,   h: 340,   css: "216mm 340mm" }
+};
+
+/** Medidas de la hoja elegida, o null si es rollo */
+function _hojaEtiquetas(cfg) {
+  if (cfg.papel === "ROLLO") return null;
+  if (cfg.papel === "HOJA") return { nombre: "personalizada", w: cfg.hojaW, h: cfg.hojaH, css: `${cfg.hojaW}mm ${cfg.hojaH}mm` };
+  return ETQ_HOJAS[cfg.papel] || ETQ_HOJAS.A4;
+}
+
+/** Los tamaños de etiqueta de hoja sirven para cualquier hoja (A4, Carta, Oficio o personalizada) */
+const _tamanosDePapel = (papel) => papel === "ROLLO" ? ETQ_TAMANOS.ROLLO : ETQ_TAMANOS.A4;
+
 const ETQ_FABRICA = {
-  papel: "A4", tamano: "a4-63x38", ancho: 63, alto: 38, separacion: 2, margen: 5, copias: 1, borde: "punteado",
+  papel: "A4", hojaAncho: 210, hojaAlto: 297, tamano: "a4-63x38", ancho: 63, alto: 38, separacion: 2, margen: 5, copias: 1, borde: "punteado",
   verNegocio: false, verNombre: true, verCategoria: false, verPrecio: true, verPrecioCaja: false,
   verBarras: true, verCodigo: true, verFecha: false, textoExtra: "",
   tamPrecio: "auto", tamNombre: "1", lineasNombre: "2", altoBarras: "0.26", alineacion: "center", decimales: "0",
@@ -12896,7 +12913,7 @@ const ETQ_FABRICA = {
 };
 
 const _ETQ_CAMPOS = {
-  papel: "etqPapel", tamano: "etqTamano", ancho: "etqAncho", alto: "etqAlto", separacion: "etqSeparacion", margen: "etqMargen",
+  papel: "etqPapel", hojaAncho: "etqHojaAncho", hojaAlto: "etqHojaAlto", tamano: "etqTamano", ancho: "etqAncho", alto: "etqAlto", separacion: "etqSeparacion", margen: "etqMargen",
   copias: "etqCantidadCopias", borde: "etqBorde", verNegocio: "etqVerNegocio", verNombre: "etqVerNombre", verCategoria: "etqVerCategoria",
   verPrecio: "etqVerPrecio", verPrecioCaja: "etqVerPrecioCaja", verBarras: "etqVerBarras", verCodigo: "etqVerCodigo", verFecha: "etqVerFecha",
   textoExtra: "etqTextoExtra", tamPrecio: "etqTamPrecio", tamNombre: "etqTamNombre", lineasNombre: "etqLineasNombre",
@@ -12911,8 +12928,9 @@ function _configEtiquetasGuardada() {
 function _llenarTamanosEtiqueta(papel, elegido) {
   const sel = document.getElementById("etqTamano");
   if (!sel) return;
-  sel.innerHTML = (ETQ_TAMANOS[papel] || ETQ_TAMANOS.A4).map(t => `<option value="${t.id}">${escapeHtml(t.txt)}</option>`).join("");
-  sel.value = (ETQ_TAMANOS[papel] || []).some(t => t.id === elegido) ? elegido : (papel === "ROLLO" ? "r-50x30" : "a4-63x38");
+  const lista = _tamanosDePapel(papel);
+  sel.innerHTML = lista.map(t => `<option value="${t.id}">${escapeHtml(t.txt)}</option>`).join("");
+  sel.value = lista.some(t => t.id === elegido) ? elegido : (papel === "ROLLO" ? "r-50x30" : "a4-63x38");
 }
 
 function _ponerConfigEtiquetas(cfg) {
@@ -12933,8 +12951,11 @@ function leerConfigEtiquetas() {
     cfg[k] = el.type === "checkbox" ? el.checked : el.value;
   });
   // medidas: del tamaño elegido o personalizadas
-  const t = (ETQ_TAMANOS[cfg.papel] || []).find(x => x.id === cfg.tamano);
+  if (!ETQ_HOJAS[cfg.papel] && cfg.papel !== "HOJA" && cfg.papel !== "ROLLO") cfg.papel = "A4";
+  const t = _tamanosDePapel(cfg.papel).find(x => x.id === cfg.tamano);
   const num = (v, min, max, def) => { const n = Number(v); return isFinite(n) && n > 0 ? Math.min(max, Math.max(min, n)) : def; };
+  cfg.hojaW = num(cfg.hojaAncho, 50, 500, 210);
+  cfg.hojaH = num(cfg.hojaAlto, 50, 1000, 297);
   cfg.w = t && t.w ? t.w : num(cfg.ancho, 15, 200, 63);
   cfg.h = t && t.h ? t.h : num(cfg.alto, 10, 280, 38);
   cfg.separacion = num(cfg.separacion, 0, 15, 3) || 0;
@@ -12955,10 +12976,11 @@ function restablecerConfigEtiquetas() {
   actualizarPreviewEtiquetas();
 }
 
-/** Cuántas entran en una hoja A4 */
+/** Cuántas entran en la hoja elegida */
 function _etiquetasPorHoja(cfg) {
-  if (cfg.papel === "ROLLO") return { cols: 1, filas: 1, total: 1 };
-  const anchoUtil = 210 - 2 * cfg.margen, altoUtil = 297 - 2 * cfg.margen;
+  const hoja = _hojaEtiquetas(cfg);
+  if (!hoja) return { cols: 1, filas: 1, total: 1 };
+  const anchoUtil = hoja.w - 2 * cfg.margen, altoUtil = hoja.h - 2 * cfg.margen;
   const cols = Math.max(1, Math.floor((anchoUtil + cfg.separacion) / (cfg.w + cfg.separacion)));
   const filas = Math.max(1, Math.floor((altoUtil + cfg.separacion) / (cfg.h + cfg.separacion)));
   return { cols, filas, total: cols * filas };
@@ -12994,7 +13016,9 @@ function _htmlEtiqueta(p, cfg, idSvg) {
   if (cfg.verPrecioCaja && Number(p.UNIDADES_POR_CAJA) > 0 && Number(p.PRECIO_CAJA) > 0) {
     partes.push(`<div class="etq-chico" style="font-size:${chico}">Caja x${escapeHtml(p.UNIDADES_POR_CAJA)}: <b>${_precioEtiqueta(p.PRECIO_CAJA, cfg)}</b></div>`);
   }
-  if (cfg.verBarras) partes.push(`<svg class="etq-barras" id="${idSvg}" preserveAspectRatio="none" style="height:${(H * Number(cfg.altoBarras || 0.26)).toFixed(1)}mm;flex-basis:${(H * Number(cfg.altoBarras || 0.26)).toFixed(1)}mm"></svg>`);
+  // Alto del código: proporcional a la etiqueta según la opción elegida, nunca menos de 5 mm (más bajo cuesta leerlo)
+  const altoBarrasMm = Math.max(5, H * Number(cfg.altoBarras || 0.26)).toFixed(1);
+  if (cfg.verBarras) partes.push(`<svg class="etq-barras" id="${idSvg}" preserveAspectRatio="none" style="height:${altoBarrasMm}mm;flex-basis:${altoBarrasMm}mm"></svg>`);
   if (cfg.verCodigo) partes.push(`<div class="etq-chico etq-codigo" style="font-size:${chico}">${escapeHtml(p.CODIGO)}</div>`);
   if (cfg.verFecha) partes.push(`<div class="etq-chico" style="font-size:${chico}">${fecha}</div>`);
   const borde = cfg.borde === "ninguno" ? "none" : (cfg.borde === "solido" ? "0.2mm solid #555" : "0.25mm dashed #999");
@@ -13006,10 +13030,20 @@ function _dibujarBarrasEtiquetas(cont, items) {
   items.forEach(({ id, codigo }) => {
     const svg = cont.querySelector("#" + id);
     if (!svg) return;
+    // JsBarcode reescribe el atributo style del <svg>: se guarda el alto
+    // calculado (según el tamaño de etiqueta y la opción "Alto del código")
+    // y se vuelve a poner después. Antes se perdía y el código quedaba
+    // siempre en los 60 px de JsBarcode (≈16 mm) sin importar el tamaño.
+    const alto = svg.style.height;
     try {
-      JsBarcode(svg, String(codigo), { format: "CODE128", displayValue: false, width: 2, height: 60, margin: 0 });
+      // Margen blanco a los costados (10 barras finas de cada lado): los
+      // lectores necesitan esa "zona libre" para leer el código sin fallar.
+      JsBarcode(svg, String(codigo), { format: "CODE128", displayValue: false, width: 2, height: 60, margin: 0, marginLeft: 20, marginRight: 20 });
       svg.setAttribute("preserveAspectRatio", "none");
       svg.removeAttribute("width");
+      svg.removeAttribute("height");
+      svg.style.transform = "";
+      if (alto) { svg.style.height = alto; svg.style.flexBasis = alto; }
     } catch (error) {
       // Código vacío o con caracteres no soportados: no frena el resto
       console.error("No se pudo generar el código de barras para", codigo, error);
@@ -13019,20 +13053,37 @@ function _dibujarBarrasEtiquetas(cont, items) {
 }
 
 /**
+ * ¿Las barras de este código quedan demasiado finas para el ancho elegido?
+ * Rollo (impresora de etiquetas de 203 ppp): menos de 0,19 mm no se dibuja
+ * bien. Hoja A4 (láser/chorro de tinta, mucha más resolución): 0,1 mm.
+ */
+function _codigoMuyFinoParaEtiqueta(codigo, cfg) {
+  try {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    JsBarcode(svg, String(codigo), { format: "CODE128", displayValue: false, width: 2, height: 10, margin: 0, marginLeft: 20, marginRight: 20 });
+    const modulos = (parseFloat(svg.getAttribute("width")) || 0) / 2;
+    const pad = Math.max(0.8, Math.min(cfg.h, cfg.w) * 0.05);
+    return modulos > 0 && (cfg.w - 2 * pad) / modulos < (cfg.papel === "ROLLO" ? 0.19 : 0.1);
+  } catch (e) { return false; }
+}
+
+/**
  * Si el contenido de una etiqueta no entra en su alto, achica primero el
  * código de barras (hasta 5 mm) y después todas las letras, de a poco,
  * hasta que entre. Así no se corta ninguna línea. Necesita que las
  * etiquetas estén en pantalla (para imprimir se miden fuera de la vista).
  */
 function _ajustarEtiquetas(cont) {
-  const MM = 96 / 25.4;
+  let sinLugar = 0;
   cont.querySelectorAll(".etq").forEach(e => {
     const desborda = () => e.scrollHeight > e.clientHeight + 0.5;
     for (let i = 0; i < 24 && desborda(); i++) {
       const svg = e.querySelector("svg.etq-barras");
-      const altoSvg = svg ? svg.getBoundingClientRect().height : 0;
-      if (svg && altoSvg > 5 * MM) {
-        const nuevo = Math.max(5, (altoSvg / MM) * 0.85);
+      // El alto se lee del estilo (en mm): con la vista previa achicada,
+      // el tamaño medido en pantalla no es el real.
+      const altoMm = svg ? parseFloat(svg.style.height) || 0 : 0;
+      if (svg && altoMm > 5) {
+        const nuevo = Math.max(5, altoMm * 0.85);
         svg.style.height = nuevo.toFixed(2) + "mm";
         svg.style.flexBasis = nuevo.toFixed(2) + "mm";
         continue;
@@ -13047,7 +13098,9 @@ function _ajustarEtiquetas(cont) {
       });
       if (!achico) break; // ya no se puede achicar más: lo que sobre queda abajo
     }
+    if (desborda()) sinLugar++;
   });
+  return sinLugar;
 }
 
 function abrirModalEtiquetas() {
@@ -13074,7 +13127,7 @@ function cerrarModalEtiquetas() {
   document.getElementById("etiquetasModalBackdrop").classList.remove("show");
 }
 
-/* Vista previa: "hoja" muestra la hoja A4 entera (o un tramo del rollo)
+/* Vista previa: "hoja" muestra la hoja entera (A4, Carta, Oficio o personalizada) (o un tramo del rollo)
    achicada para que entre, con las etiquetas acomodadas igual que al
    imprimir; "real" muestra una etiqueta a tamaño real (aproximado). */
 let _etqModoPreview = "hoja";
@@ -13106,20 +13159,23 @@ function actualizarPreviewEtiquetas() {
   const med = document.getElementById("etqMedidasPersonalizadas");
   if (med) med.style.display = personalizada ? "" : "none";
   const hojaOpc = document.getElementById("etqOpcionesHoja");
-  if (hojaOpc) hojaOpc.style.display = cfg.papel === "A4" ? "" : "none";
+  if (hojaOpc) hojaOpc.style.display = cfg.papel === "ROLLO" ? "none" : "";
+  const medHoja = document.getElementById("etqMedidasHoja");
+  if (medHoja) medHoja.style.display = cfg.papel === "HOJA" ? "" : "none";
+  const hoja = _hojaEtiquetas(cfg);
 
   const { productos, lista } = _listaEtiquetas(cfg);
   const total = lista.length;
   const ph = _etiquetasPorHoja(cfg);
-  const hojas = cfg.papel === "A4" ? Math.max(1, Math.ceil(total / ph.total)) : 1;
+  const hojas = hoja ? Math.max(1, Math.ceil(total / ph.total)) : 1;
   if (_etqHojaPreview > hojas - 1) _etqHojaPreview = hojas - 1;
 
   const info = document.getElementById("etiquetasPreviewInfo");
   if (info) {
     let txt = `${total} etiqueta${total === 1 ? "" : "s"} (${productos.length} producto${productos.length === 1 ? "" : "s"} × ${cfg.copias} copia${cfg.copias === 1 ? "" : "s"}) de ${cfg.w} × ${cfg.h} mm.`;
-    if (cfg.papel === "A4") {
-      txt += ` Entran ${ph.total} por hoja A4 (${ph.cols} × ${ph.filas}) → ${hojas} hoja${hojas === 1 ? "" : "s"}.`;
-      if (cfg.w > 210 - 2 * cfg.margen || cfg.h > 297 - 2 * cfg.margen) txt += " ⚠️ La etiqueta no entra en la hoja: achicala o bajá el margen.";
+    if (hoja) {
+      txt += ` Entran ${ph.total} por hoja ${hoja.nombre} (${ph.cols} × ${ph.filas}) → ${hojas} hoja${hojas === 1 ? "" : "s"}.`;
+      if (cfg.w > hoja.w - 2 * cfg.margen || cfg.h > hoja.h - 2 * cfg.margen) txt += " ⚠️ La etiqueta no entra en la hoja: achicala o bajá el margen.";
     } else {
       txt += " Una etiqueta por cada salto del rollo: en la impresora elegí ese mismo tamaño de papel.";
     }
@@ -13139,11 +13195,11 @@ function actualizarPreviewEtiquetas() {
     anchoMm = cfg.w; altoMm = cfg.h;
     contenido = lista.length ? etiqueta(lista[0], 0) : "";
     if (pag) pag.style.display = "none";
-  } else if (cfg.papel === "A4") {
-    anchoMm = 210; altoMm = 297;
+  } else if (hoja) {
+    anchoMm = hoja.w; altoMm = hoja.h;
     const desde = _etqHojaPreview * ph.total;
     const enHoja = lista.slice(desde, desde + ph.total);
-    contenido = `<div class="etq-hoja-a4" style="width:210mm;height:297mm;padding:${cfg.margen}mm">
+    contenido = `<div class="etq-hoja-a4" style="width:${hoja.w}mm;height:${hoja.h}mm;padding:${cfg.margen}mm">
         <div class="etq-hoja" style="gap:${cfg.separacion}mm">${enHoja.map((p, i) => etiqueta(p, i)).join("")}</div>
       </div>`;
     if (pag) {
@@ -13172,10 +13228,14 @@ function actualizarPreviewEtiquetas() {
       <div class="etq-escala-in" style="transform:scale(${f.toFixed(4)})">${contenido}</div>
     </div>`;
   _dibujarBarrasEtiquetas(marco, items);
-  _ajustarEtiquetas(marco);
+  // Los códigos se revisan en TODOS los productos elegidos, no solo en los que se ven
+  const finos = cfg.verBarras ? [...new Set(productos.map(p => String(p.CODIGO)))].filter(c => _codigoMuyFinoParaEtiqueta(c, cfg)) : [];
+  if (finos.length && info) info.textContent += ` ⚠️ ${finos.length === 1 ? "El código " + finos[0] + " es largo" : finos.length + " códigos son largos"} para este ancho: las barras quedan muy finas y puede costar leerlas. Usá una etiqueta más ancha.`;
+  const sinLugar = _ajustarEtiquetas(marco);
+  if (sinLugar && info) info.textContent += " ⚠️ No entra todo en la etiqueta (se corta abajo): sacá algún dato o elegí un tamaño más grande.";
   const nota = _etqModoPreview === "real"
     ? (f < 1 ? `Achicada al ${Math.round(f * 100)}% para que entre en pantalla.` : "A tamaño real (puede variar según la pantalla).")
-    : (cfg.papel === "A4" ? `Hoja A4 al ${Math.round(f * 100)}%.` : `Rollo al ${Math.round(f * 100)}%.`);
+    : (hoja ? `Hoja ${hoja.nombre} al ${Math.round(f * 100)}%.` : `Rollo al ${Math.round(f * 100)}%.`);
   marco.insertAdjacentHTML("beforeend", `<div class="etq-escala-nota">${nota}</div>`);
 }
 
@@ -13210,14 +13270,15 @@ function imprimirEtiquetas() {
   _dibujarBarrasEtiquetas(printArea, items);
   // Para medir, el área de impresión se muestra un instante fuera de la vista
   const estiloPrevio = printArea.getAttribute("style") || "";
-  printArea.setAttribute("style", "display:block !important; position:absolute; left:-10000px; top:0; width:210mm; visibility:hidden;");
+  const hojaImp = _hojaEtiquetas(cfg);
+  printArea.setAttribute("style", `display:block !important; position:absolute; left:-10000px; top:0; width:${hojaImp ? hojaImp.w - 2 * cfg.margen : cfg.w}mm; visibility:hidden;`);
   try { _ajustarEtiquetas(printArea); } finally { printArea.setAttribute("style", estiloPrevio); if (!estiloPrevio) printArea.removeAttribute("style"); }
 
   cerrarModalEtiquetas();
   if (cfg.papel === "ROLLO") {
     _setPrintPageSize("CUSTOM", `@media print { @page { size:${cfg.w}mm ${cfg.h}mm; margin:0; } }`);
   } else {
-    _setPrintPageSize("CUSTOM", `@media print { @page { size:A4; margin:${cfg.margen}mm; } }`);
+    _setPrintPageSize("CUSTOM", `@media print { @page { size:${hojaImp.css}; margin:${cfg.margen}mm; } }`);
   }
   setTimeout(() => { window.print(); }, 200);
 }

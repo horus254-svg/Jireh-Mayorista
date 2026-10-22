@@ -3636,9 +3636,20 @@
             <div class="etq-grupo-tit">📐 Tamaño</div>
             <label class="form-label">Papel</label>
             <select class="form-select form-select-sm" id="etqPapel">
-              <option value="A4">Hoja A4 (impresora común)</option>
-              <option value="ROLLO">Rollo de etiquetas (impresora de etiquetas)</option>
+              <optgroup label="Hoja (impresora común)">
+                <option value="A4">Hoja A4 — 210 × 297 mm</option>
+                <option value="CARTA">Hoja Carta — 216 × 279 mm</option>
+                <option value="OFICIO">Hoja Oficio — 216 × 340 mm</option>
+                <option value="HOJA">Hoja de tamaño personalizado…</option>
+              </optgroup>
+              <optgroup label="Impresora de etiquetas">
+                <option value="ROLLO">Rollo de etiquetas</option>
+              </optgroup>
             </select>
+            <div class="row g-2 mt-1" id="etqMedidasHoja" style="display:none">
+              <div class="col-6"><label class="form-label">Ancho hoja (mm)</label><input type="number" class="form-control form-control-sm" id="etqHojaAncho" min="50" max="500" step="1" value="210"></div>
+              <div class="col-6"><label class="form-label">Alto hoja (mm)</label><input type="number" class="form-control form-control-sm" id="etqHojaAlto" min="50" max="1000" step="1" value="297"></div>
+            </div>
             <label class="form-label mt-2">Tamaño de la etiqueta</label>
             <select class="form-select form-select-sm" id="etqTamano"></select>
             <div class="row g-2 mt-1" id="etqMedidasPersonalizadas">
