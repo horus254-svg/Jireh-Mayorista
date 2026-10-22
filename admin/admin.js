@@ -14966,7 +14966,13 @@ async function generarCodigoIngresoAutomatico() {
       buscarProductoParaIngreso();
     }
   } catch (e) {
-    toast("No se pudo generar el código", "error");
+    // Sin conexión: mismo formato que genera el servidor (PRD-tiempo-azar),
+    // revisando que no exista en el catálogo cargado.
+    const existentes = new Set((productosAdminGlobal || []).map(p => String(p.CODIGO).trim()));
+    let codigo;
+    do { codigo = "PRD-" + Date.now() + "-" + Math.floor(Math.random() * 900 + 100); } while (existentes.has(codigo));
+    document.getElementById("ipCodigoScan").value = codigo;
+    buscarProductoParaIngreso();
   }
 }
 
@@ -16056,26 +16062,17 @@ async function guardarBoletaCompleta() {
   btn.disabled = true;
   btn.innerHTML = "Guardando...";
 
+  const payload = _payloadBoletaIngreso({ proveedor, proveedorContacto, numeroBoleta, observaciones, fecha, origen, sinDeuda });
+
   try {
     const res = await fetchAPI(API_URL, {
       method: "POST",
-      body: JSON.stringify({
-        action: "registrarIngresoProducto",
-        rol: obtenerRolActual(),
-        usuario: (sessionStorage.getItem("nombreUsuario") || sessionStorage.getItem("vendedor") || "ADMIN"),
-        proveedor, proveedorContacto, numeroBoleta, observaciones, fecha,
-        origen, sinDeuda,
-        items: ipCarritoBoleta.map(it => ({
-          codigo: it.codigo, producto: it.producto, categoria: it.categoria,
-          moneda: it.moneda, precio: it.precio, tipoCambio: it.tipoCambio, precioARS: it.precioARS,
-          precioVenta: it.precioVenta, cantidad: it.cantidad
-        }))
-      })
+      body: JSON.stringify(Object.assign({ action: "registrarIngresoProducto" }, payload))
     });
     const data = await res.json();
 
     if (!data.success) {
-      toast(data.message || "No se pudo guardar la boleta", "error");
+      toast(data.message || data.error || "No se pudo guardar la boleta", "error");
       return;
     }
 
@@ -16084,22 +16081,54 @@ async function guardarBoletaCompleta() {
       : `Boleta guardada — ${ipCarritoBoleta.length} producto(s), total $${Number(data.totalBoleta || 0).toLocaleString("es-AR")}`, "success");
 
     try { localStorage.removeItem("vpos_cache_productosAdmin"); } catch(e) {}
-    ipCarritoBoleta = [];
-    renderCarritoBoleta();
-    document.getElementById("ipbOrigen").value = "PROVEEDOR";
-    onCambioOrigenBoleta();
-    document.getElementById("ipbNumeroBoleta").value = "";
-    document.getElementById("ipbObservaciones").value = "";
+    _limpiarBoletaIngreso();
     await cargarProductos();
     await cargarHistorialIngresos();
 
   } catch (error) {
     console.error("Error al guardar la boleta:", error);
+    // App de escritorio: si se cortó la conexión, la boleta queda en la cola
+    // con la misma clave, así no se duplica si el servidor llegó a guardarla.
+    if (typeof window.encolarBoletaIngresoOffline === "function") {
+      const ok = await window.encolarBoletaIngresoOffline(payload);
+      if (ok) return;
+    }
     toast("Error de conexión al guardar la boleta", "error");
   } finally {
     btn.disabled = false;
     btn.innerHTML = textoOriginal;
   }
+}
+
+/** Arma lo que se manda al backend para registrar la boleta. La clave
+ *  idOperacionSync es la misma mientras no se vacíe la boleta: un
+ *  reintento (o la cola offline) no vuelve a sumar el stock. */
+let _ipClaveBoleta = null;
+function _payloadBoletaIngreso(cab) {
+  if (!_ipClaveBoleta) _ipClaveBoleta = "ING-" + Date.now() + "-" + Math.floor(Math.random() * 9000 + 1000);
+  return {
+    idOperacionSync: _ipClaveBoleta,
+    rol: obtenerRolActual(),
+    usuario: (sessionStorage.getItem("nombreUsuario") || sessionStorage.getItem("vendedor") || "ADMIN"),
+    proveedor: cab.proveedor, proveedorContacto: cab.proveedorContacto, numeroBoleta: cab.numeroBoleta,
+    observaciones: cab.observaciones, fecha: cab.fecha, origen: cab.origen, sinDeuda: cab.sinDeuda,
+    items: ipCarritoBoleta.map(it => ({
+      codigo: it.codigo, producto: it.producto, categoria: it.categoria,
+      moneda: it.moneda, precio: it.precio, tipoCambio: it.tipoCambio, precioARS: it.precioARS,
+      precioVenta: it.precioVenta, cantidad: it.cantidad
+    }))
+  };
+}
+
+/** Deja el formulario de boleta vacío después de guardarla (online u offline) */
+function _limpiarBoletaIngreso() {
+  _ipClaveBoleta = null;
+  ipCarritoBoleta = [];
+  renderCarritoBoleta();
+  document.getElementById("ipbOrigen").value = "PROVEEDOR";
+  onCambioOrigenBoleta();
+  document.getElementById("ipbNumeroBoleta").value = "";
+  document.getElementById("ipbObservaciones").value = "";
 }
 
 /** Carga el listado de boletas de proveedor (una fila = una boleta, con total/pagado/saldo) desde el backend */
@@ -16109,10 +16138,22 @@ async function cargarHistorialIngresos() {
     const res = await fetchAPI(API_URL + "?action=boletasProveedores");
     const data = await res.json();
     ingresosProductosGlobal = data.boletas || [];
+    try { localStorage.setItem("vpos_cache_boletasProveedores", JSON.stringify(ingresosProductosGlobal)); } catch (e) {}
     poblarDatalistProveedoresIngreso();
     filtrarHistorialIngresos();
   } catch (error) {
     console.error("Error al cargar boletas de proveedores:", error);
+    // Sin conexión: se muestra el último historial descargado (los proveedores
+    // también quedan para autocompletar la boleta nueva).
+    let copia = null;
+    try { copia = JSON.parse(localStorage.getItem("vpos_cache_boletasProveedores") || "null"); } catch (e) {}
+    if (Array.isArray(copia)) {
+      ingresosProductosGlobal = copia;
+      poblarDatalistProveedoresIngreso();
+      filtrarHistorialIngresos();
+      toast("Sin conexión: se muestra el último historial de boletas guardado", "info");
+      return;
+    }
     if (tbody) tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-3">Error al cargar el historial</td></tr>`;
   }
 }
