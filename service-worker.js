@@ -8,7 +8,7 @@
  * evitar para el uso en el depósito.
  */
 
-const CACHE_NAME = "lector-qr-v1";
+const CACHE_NAME = "lector-qr-v2";
 
 // Cada vez que se cambie algo en estos archivos y se quiera forzar
 // que los celulares ya instalados bajen la versión nueva, hay que

@@ -13300,6 +13300,38 @@ function abrirModalQR() {
   document.getElementById("qrModalBackdrop").classList.add("show");
 }
 
+/* ---- Pantalla de cobro (web/cobro.html) para el celular que mira el cliente ---- */
+function _urlPantallaCobro() {
+  let base = (configNegocioCache && configNegocioCache.urlCatalogo) || "";
+  if (!base && !(typeof _esAppEscritorio === "function" && _esAppEscritorio())) {
+    base = new URL("../", window.location.href).href; // panel web: el catálogo está una carpeta arriba
+  }
+  base = String(base || "").replace(/\/(index\.html)?$/i, "").replace(/\/+$/, "");
+  return base ? base + "/cobro.html" : "";
+}
+
+function abrirModalPantallaCobro() {
+  const url = _urlPantallaCobro();
+  if (!url) { toast("Cargá la URL del catálogo (Catálogo web → Catálogo online) para armar el enlace", "error"); return; }
+  document.getElementById("pantallaCobroUrl").value = url;
+  const cont = document.getElementById("pantallaCobroQR");
+  cont.innerHTML = "";
+  try { new QRCode(cont, { text: url, width: 200, height: 200, correctLevel: QRCode.CorrectLevel.M }); }
+  catch (e) { cont.textContent = "No se pudo dibujar el QR"; }
+  document.getElementById("pantallaCobroModalBackdrop").classList.add("show");
+}
+
+function cerrarModalPantallaCobro() {
+  document.getElementById("pantallaCobroModalBackdrop").classList.remove("show");
+}
+
+function copiarUrlPantallaCobro() {
+  const url = document.getElementById("pantallaCobroUrl").value;
+  const ok = () => toast("Enlace copiado", "success");
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(ok).catch(() => { document.getElementById("pantallaCobroUrl").select(); document.execCommand("copy"); ok(); });
+  else { document.getElementById("pantallaCobroUrl").select(); document.execCommand("copy"); ok(); }
+}
+
 function cerrarModalQR() {
   document.getElementById("qrModalBackdrop").classList.remove("show");
 }
