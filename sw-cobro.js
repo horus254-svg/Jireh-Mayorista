@@ -6,8 +6,8 @@
  * hay conexión, la copia. Las consultas al backend NO pasan por acá
  * (son de otro dominio) y nunca se guardan.
  */
-const CACHE_NAME = "cobro-qr-v1";
-const ARCHIVOS = ["cobro.html", "manifest-cobro.json", "config.json", "icon-192.png", "icon-512.png"];
+const CACHE_NAME = "cobro-qr-v2";
+const ARCHIVOS = ["cobro.html", "manifest-cobro.json", "config.json", "icon-192.png", "icon-512.png", "admin/vendor/qrcode.min.js"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((c) => c.addAll(ARCHIVOS)).catch(() => {}));

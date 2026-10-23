@@ -14399,6 +14399,7 @@ function abrirModalQRDePrueba() {
   // necesitar Mercado Pago configurado. Si no hay bridge (versión web)
   // o la tablet no está conectada, no pasa nada, es un no-op seguro.
   const bridge = window.veekpos || window.posOffline;
+  if (typeof window.enviarTokenAlProcesoPrincipal === "function") window.enviarTokenAlProcesoPrincipal();
   if (bridge && typeof bridge.mostrarQrDePruebaEnPantalla === "function") {
     bridge.mostrarQrDePruebaEnPantalla(svgFalso, 0).catch(() => {});
   }
@@ -14407,6 +14408,7 @@ function abrirModalQRDePrueba() {
 }
 
 async function iniciarCobroMercadoPago(total) {
+  if (typeof window.enviarTokenAlProcesoPrincipal === "function") window.enviarTokenAlProcesoPrincipal(); // para avisar el QR a la pantalla del celular
   document.getElementById("mpQrMontoLabel").textContent = "$" + Number(total).toLocaleString("es-AR");
   document.getElementById("mpQrError").style.display = "none";
   document.getElementById("mpQrEsperando").style.display = "block";

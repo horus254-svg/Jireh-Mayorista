@@ -101,6 +101,7 @@
     <div class="boton">Tocá para empezar</div>
   </button>
 
+<script src="admin/vendor/qrcode.min.js"></script>
 <script>
 (function () {
   "use strict";
@@ -144,13 +145,29 @@
     if (estado.activo && estado.pagada) {
       tarjeta.className = "pagada";
       tarjeta.innerHTML = '<div class="icono">✅</div><h1>¡Pago recibido!</h1><div class="monto">' + plata(estado.monto) + '</div><div class="sub">Gracias por tu compra</div>';
-    } else if (estado.activo && estado.qrImagenDataUrl) {
+    } else if (estado.activo && (estado.qrTexto || estado.qrImagenDataUrl)) {
       tarjeta.className = "cobro";
       tarjeta.innerHTML =
-        '<div class="marco"><img alt="QR de cobro"></div>' +
+        '<div class="marco"></div>' +
         '<div class="monto">' + plata(estado.monto) + '</div>' +
         '<div class="sub pulso">Escaneá con <b>Mercado Pago</b> para pagar</div>';
-      tarjeta.querySelector("img").src = estado.qrImagenDataUrl;
+      const marco = tarjeta.querySelector(".marco");
+      let dibujado = false;
+      // Con el texto del QR se dibuja acá, nítido al tamaño de la pantalla
+      if (estado.qrTexto && window.QRCode) {
+        try {
+          const tmp = document.createElement("div");
+          new QRCode(tmp, { text: estado.qrTexto, width: 600, height: 600, correctLevel: QRCode.CorrectLevel.M });
+          const cv = tmp.querySelector("canvas");
+          if (cv) {
+            const img = document.createElement("img"); img.alt = "QR de cobro"; img.src = cv.toDataURL("image/png");
+            marco.appendChild(img); dibujado = true;
+          }
+        } catch (e) {}
+      }
+      if (!dibujado && estado.qrImagenDataUrl) {
+        const img = document.createElement("img"); img.alt = "QR de cobro"; img.src = estado.qrImagenDataUrl; marco.appendChild(img);
+      }
     } else {
       tarjeta.className = "idle";
       tarjeta.innerHTML = '<div class="icono">🛒</div><h1>Esperando la próxima venta…</h1>';
