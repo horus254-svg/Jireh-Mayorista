@@ -287,7 +287,7 @@ function alternarFiltrosMovil(forzar){
     btn.setAttribute("aria-expanded", abrir ? "true" : "false");
 }
 
-function mostrarToast(mensaje, tipo){
+function mostrarToast(mensaje, tipo, duracionMs){
 
     const cont = document.getElementById("toast-container");
 
@@ -312,7 +312,7 @@ function mostrarToast(mensaje, tipo){
     setTimeout(()=>{
         el.classList.remove("show");
         setTimeout(()=> el.remove(), 300);
-    }, 2600);
+    }, duracionMs || (tipo === "error" ? 4500 : 2600));
 }
 
 /* =========================================================
@@ -1461,6 +1461,33 @@ document.getElementById("qv-agregar").addEventListener("click", function(){
    CARRITO
 ========================================================= */
 
+/* Ajustes del carrito por stock: se muestran dentro del carrito y quedan
+   a la vista hasta que el cliente los cierra (antes eran avisos que
+   desaparecían en 2 segundos y, con varios, solo se veía el último). */
+let _avisosCarrito = [];
+/** Anota la explicación dentro del carrito sin mostrar otro aviso flotante */
+function anotarAjusteCarrito(texto){
+    if(_avisosCarrito.indexOf(texto) === -1) _avisosCarrito.push(texto);
+    pintarAvisosCarrito();
+}
+function avisarAjusteCarrito(texto){
+    if(_avisosCarrito.indexOf(texto) === -1) _avisosCarrito.push(texto);
+    pintarAvisosCarrito();
+    const abierto = document.getElementById("cartModal")?.classList.contains("show");
+    if(!abierto) mostrarToast("Ajustamos tu carrito según el stock disponible. Abrilo para ver el detalle.", "error");
+}
+function pintarAvisosCarrito(){
+    const box = document.getElementById("cart-avisos");
+    if(!box) return;
+    if(!_avisosCarrito.length){ box.classList.add("d-none"); box.innerHTML = ""; return; }
+    box.classList.remove("d-none");
+    box.innerHTML = `<div class="cart-avisos-tit">Ajustamos tu carrito según el stock disponible</div>
+        <ul>${_avisosCarrito.map(t => `<li>${escapeHtml(t)}</li>`).join("")}</ul>
+        <div class="cart-avisos-nota">El stock se actualiza a medida que se venden los productos: no se pueden pedir más unidades de las que hay.</div>
+        <button type="button" class="cart-avisos-cerrar" onclick="cerrarAvisosCarrito()">Entendido</button>`;
+}
+function cerrarAvisosCarrito(){ _avisosCarrito = []; pintarAvisosCarrito(); }
+
 function agregarAlCarrito(producto, cantidad, color, imagenSeleccionada){
 
     if(!producto) return;
@@ -1488,13 +1515,19 @@ function agregarAlCarrito(producto, cantidad, color, imagenSeleccionada){
 
     if(totalSolicitado > stockDisponible){
         const podemos = stockDisponible - yaEnCarritoDeEsteCodigo;
+        const uds = (n) => n + (n === 1 ? " unidad" : " unidades");
         if(podemos <= 0){
-            mostrarToast(`⚠️ Ya tenés el máximo disponible de "${producto.PRODUCTO}" en el carrito (${stockDisponible} ud${stockDisponible !== 1 ? "s" : ""})`, "error");
+            const t = `"${producto.PRODUCTO}": ya tenés en el carrito todo el stock (${uds(stockDisponible)}). No hay más unidades disponibles.`;
+            mostrarToast(t, "error", 6000);
+            anotarAjusteCarrito(t);
             return;
         }
-        // Agrega solo lo que queda disponible
+        // Agrega solo lo que queda disponible, y la explicación queda en el
+        // carrito (el aviso flotante se iba enseguida o lo tapaba el siguiente)
+        const t = `"${producto.PRODUCTO}": pediste ${cantidad}, pero quedan ${uds(stockDisponible)} en stock${yaEnCarritoDeEsteCodigo ? " (ya tenías " + yaEnCarritoDeEsteCodigo + " en el carrito)" : ""}. Agregamos ${podemos}.`;
+        mostrarToast(t, "error", 7000);
+        anotarAjusteCarrito(t);
         cantidad = podemos;
-        mostrarToast(`⚠️ Solo se agregaron ${cantidad} ud${cantidad !== 1 ? "s" : ""} de "${producto.PRODUCTO}" (stock disponible: ${stockDisponible})`, "error");
     }
 
     if(existente){
@@ -1545,7 +1578,10 @@ function agregarCajaAlCarrito(producto){
         .reduce((acc, p) => acc + p.cantidad, 0);
 
     if(yaEnCarrito + unidades > stockDisponible){
-        mostrarToast(`⚠️ No hay suficiente stock para otra caja de "${producto.PRODUCTO}" (disponible: ${stockDisponible - yaEnCarrito} ud${(stockDisponible - yaEnCarrito) !== 1 ? "s" : ""})`, "error");
+        const libres = stockDisponible - yaEnCarrito;
+        const t = `"${producto.PRODUCTO}": una caja trae ${unidades} unidades y quedan ${libres} disponible${libres !== 1 ? "s" : ""}${yaEnCarrito ? " (ya tenés " + yaEnCarrito + " en el carrito)" : ""}. No se pudo agregar otra caja.`;
+        mostrarToast(t, "error", 7000);
+        anotarAjusteCarrito(t);
         return;
     }
 
@@ -1664,7 +1700,7 @@ function cambiarCantidad(codigo, cambio, color, caja){
     // Respeta el stock — el objeto item tiene STOCK porque viene del producto original
     const stockDisponible = Number(String(item.STOCK ?? "").trim()) || 0;
     if(stockDisponible > 0 && nuevaCantidad > stockDisponible){
-        mostrarToast(`⚠️ Stock máximo disponible: ${stockDisponible} ud${stockDisponible !== 1 ? "s" : ""}`, "error");
+        avisarAjusteCarrito(`"${item.PRODUCTO}": hay ${stockDisponible} unidad${stockDisponible !== 1 ? "es" : ""} en stock, no se pueden pedir más.`);
         return;
     }
 
@@ -1688,8 +1724,8 @@ function actualizarCantidadManual(codigo, cantidad, color, caja){
     // Respeta el stock — el objeto item tiene STOCK porque viene del producto original
     const stockDisponible = Number(String(item.STOCK ?? "").trim()) || 0;
     if(stockDisponible > 0 && cantidad > stockDisponible){
+        avisarAjusteCarrito(`"${item.PRODUCTO}": escribiste ${cantidad}, pero hay ${stockDisponible} unidad${stockDisponible !== 1 ? "es" : ""} en stock. Dejamos ${stockDisponible}.`);
         cantidad = stockDisponible;
-        mostrarToast(`⚠️ Stock máximo disponible: ${stockDisponible} ud${stockDisponible !== 1 ? "s" : ""}`, "error");
     }
 
     item.cantidad = cantidad;
@@ -1792,7 +1828,7 @@ function sincronizarCarritoConStockActual(){
 
         if(item.cantidad > stockActual){
             huboAjustes = true;
-            avisos.push(`"${item.PRODUCTO}": se ajustó de ${item.cantidad} a ${stockActual} unidad${stockActual !== 1 ? "es" : ""} (es lo que hay disponible)`);
+            avisos.push(`"${item.PRODUCTO}": tenías ${item.cantidad} y ahora quedan ${stockActual} unidad${stockActual !== 1 ? "es" : ""} en stock (se vendieron desde que lo agregaste). Ajustamos la cantidad a ${stockActual}.`);
             item.cantidad = stockActual;
         }
 
@@ -1803,7 +1839,7 @@ function sincronizarCarritoConStockActual(){
 
     if(huboAjustes){
         guardarCarrito();
-        avisos.forEach(msg => mostrarToast(`⚠️ ${msg}`, "error"));
+        avisos.forEach(msg => avisarAjusteCarrito(msg));
     }
 
     return huboAjustes;
@@ -1874,9 +1910,10 @@ function abrirCarrito(){
                                 data-action-input="cantidad"
                                 inputmode="numeric">
 
-                            <button type="button" class="qty-btn" data-action="mas" aria-label="Sumar">+</button>
+                            <button type="button" class="qty-btn" data-action="mas" aria-label="Sumar" ${Number(item.STOCK) > 0 && item.cantidad >= Number(item.STOCK) ? "disabled" : ""}>+</button>
 
                         </div>
+                        ${Number(item.STOCK) > 0 && item.cantidad >= Number(item.STOCK) ? `<div class="cart-item-limite">Máximo disponible: ${Number(item.STOCK)} (todo el stock)</div>` : ""}
 
                         <div class="cart-item-subtotal">$${formatearPrecio(subtotal)}</div>
 
@@ -2108,6 +2145,102 @@ function transporteEstaBloqueado(texto){
 // a la función antes de que el atributo "disabled" surta efecto.
 let enviandoPedido = false;
 
+/* Lo que falta para enviar el pedido se muestra en el pie del carrito (no
+   como aviso flotante, que tapaba el formulario) y se marcan los campos. */
+const CAMPOS_PEDIDO = [
+    ["clienteNombre", "Nombre"], ["clienteDireccion", "Dirección"], ["clienteLocalidad", "Localidad"],
+    ["clienteProvincia", "Provincia"], ["clienteTelefono", "Teléfono"], ["clienteDni", "DNI o CUIT"]
+];
+/* Errores de los datos (campos sin completar): el resumen va al principio
+   del formulario y cada campo muestra su propio mensaje debajo. Antes iba
+   en el pie del carrito, pegado a los últimos campos, y en el celular junto
+   con los avisos flotantes tapaba el formulario. Los errores que no son de
+   un campo (stock, servidor, conexión) siguen en el pie, junto al botón. */
+function mostrarErrorPedido(texto, idsCampos){
+    const deCampos = !!(idsCampos && idsCampos.length);
+    const box = document.getElementById(deCampos ? "cart-form-error-datos" : "cart-form-error");
+    (idsCampos || []).forEach(id => {
+        const campo = document.getElementById(id);
+        if(!campo) return;
+        campo.classList.add("is-invalid");
+        if(!campo.nextElementSibling || !campo.nextElementSibling.classList.contains("campo-error")){
+            const msg = document.createElement("div");
+            msg.className = "campo-error";
+            const nombre = (CAMPOS_PEDIDO.find(([c]) => c === id) || [])[1];
+            msg.textContent = nombre ? "Completá: " + nombre : "Revisá este dato";
+            campo.insertAdjacentElement("afterend", msg);
+        }
+    });
+    if(box){ box.textContent = texto; box.classList.remove("d-none"); }
+    const primero = deCampos && document.getElementById(idsCampos[0]);
+    if(primero){ primero.scrollIntoView({ block: "center", behavior: "smooth" }); setTimeout(() => primero.focus({ preventScroll: true }), 250); }
+    else if(box && !deCampos){ box.scrollIntoView({ block: "nearest", behavior: "smooth" }); }
+}
+function limpiarErrorPedido(){
+    document.getElementById("cart-form-error")?.classList.add("d-none");
+    document.getElementById("cart-form-error-datos")?.classList.add("d-none");
+    document.querySelectorAll(".campo-error").forEach(m => m.remove());
+}
+document.addEventListener("input", (e) => {
+    if(e.target && e.target.id && CAMPOS_PEDIDO.some(([id]) => id === e.target.id)){
+        if(e.target.value.trim()){
+            e.target.classList.remove("is-invalid");
+            const msg = e.target.nextElementSibling;
+            if(msg && msg.classList.contains("campo-error")) msg.remove();
+        }
+        if(!document.querySelector(".cart-col-datos .is-invalid")) limpiarErrorPedido();
+    }
+});
+
+/* Recordar los datos del cliente en este dispositivo (opcional) */
+const CLAVE_DATOS_CLIENTE = "datosClientePedido";
+const CAMPOS_RECORDAR = ["clienteNombre", "clienteEmpresa", "clienteDireccion", "clienteLocalidad", "clienteProvincia", "clienteCodigoPostal", "clienteTelefono", "clienteDni"];
+function cargarDatosCliente(){
+    let datos = null;
+    try{ datos = JSON.parse(localStorage.getItem(CLAVE_DATOS_CLIENTE) || "null"); }catch(e){}
+    const btn = document.getElementById("btnOlvidarDatos");
+    if(btn) btn.classList.toggle("d-none", !datos);
+    if(!datos) return;
+    CAMPOS_RECORDAR.forEach(id => { const el = document.getElementById(id); if(el && !el.value && datos[id]) el.value = datos[id]; });
+}
+function guardarDatosCliente(){
+    const recordar = document.getElementById("recordarDatos");
+    try{
+        if(recordar && !recordar.checked){ localStorage.removeItem(CLAVE_DATOS_CLIENTE); return; }
+        const datos = {};
+        CAMPOS_RECORDAR.forEach(id => { const el = document.getElementById(id); if(el) datos[id] = el.value.trim(); });
+        localStorage.setItem(CLAVE_DATOS_CLIENTE, JSON.stringify(datos));
+    }catch(e){}
+}
+function olvidarDatosCliente(){
+    try{ localStorage.removeItem(CLAVE_DATOS_CLIENTE); }catch(e){}
+    CAMPOS_RECORDAR.forEach(id => { const el = document.getElementById(id); if(el){ el.value = ""; el.classList.remove("is-invalid"); } });
+    document.getElementById("btnOlvidarDatos")?.classList.add("d-none");
+    mostrarToast("Borramos tus datos de este dispositivo", "success");
+}
+document.addEventListener("DOMContentLoaded", cargarDatosCliente);
+document.getElementById("cartModal")?.addEventListener("show.bs.modal", () => { cargarDatosCliente(); pintarAvisosCarrito(); limpiarErrorPedido(); });
+
+/* Pantalla de "pedido recibido" */
+function mostrarPedidoRecibido(datos){
+    document.getElementById("prNumero").textContent = datos.pedidoId;
+    document.getElementById("prItems").textContent = datos.unidades + (datos.unidades === 1 ? " unidad" : " unidades") + " · " + datos.lineas + (datos.lineas === 1 ? " producto" : " productos");
+    document.getElementById("prTotal").textContent = "$" + formatearPrecio(datos.total);
+    const filaCupon = document.getElementById("prCuponFila");
+    filaCupon.classList.toggle("d-none", !datos.cupon);
+    if(datos.cupon) document.getElementById("prCupon").textContent = datos.cupon + " (−$" + formatearPrecio(datos.descuento) + ")";
+    document.getElementById("prWhatsapp").href = datos.urlWhatsapp;
+    document.getElementById("prVerEstado").onclick = () => {
+        bootstrap.Modal.getInstance(document.getElementById("pedidoRecibidoModal"))?.hide();
+        abrirConsultaPedido();
+        setTimeout(() => {
+            const id = document.getElementById("consultaPedidoId"), dni = document.getElementById("consultaDni");
+            if(id) id.value = datos.pedidoId; if(dni) dni.value = datos.dni || "";
+        }, 350);
+    };
+    bootstrap.Modal.getOrCreateInstance(document.getElementById("pedidoRecibidoModal")).show();
+}
+
 /** Puts the checkout button into its "sending" state: spinner, disabled, locked */
 function activarCargaCheckout(){
     enviandoPedido = true;
@@ -2146,21 +2279,23 @@ async function checkoutWhatsapp(){
     const telefono = document.getElementById("clienteTelefono").value.trim();
     const dni = document.getElementById("clienteDni").value.trim();
 
-    if(nombre === "" || direccion === "" || localidad === "" || provincia === "" || telefono === "" || dni === ""){
-        mostrarToast("Completá Nombre, Dirección, Localidad, Provincia, Teléfono y DNI o CUIT.", "error");
+    limpiarErrorPedido();
+    const faltan = CAMPOS_PEDIDO.filter(([id]) => !document.getElementById(id).value.trim());
+    if(faltan.length){
+        mostrarErrorPedido("Falta completar: " + faltan.map(([, n]) => n).join(", ") + ".", faltan.map(([id]) => id));
         desactivarCargaCheckout();
         return;
     }
 
     if(transporteEstaBloqueado(empresa)){
         validarCampoTransporte(); // muestra el aviso debajo del campo, por si no lo había visto
-        mostrarToast("No trabajamos con la empresa de transporte indicada. Elegí otra para poder continuar.", "error");
+        mostrarErrorPedido("No trabajamos con la empresa de transporte indicada. Elegí otra para poder continuar.", ["clienteEmpresa"]);
         desactivarCargaCheckout();
         return;
     }
 
     if(estado.carrito.length === 0){
-        mostrarToast("Tu carrito está vacío.", "error");
+        mostrarErrorPedido("Tu carrito está vacío.");
         desactivarCargaCheckout();
         return;
     }
@@ -2172,13 +2307,15 @@ async function checkoutWhatsapp(){
     // y se le pide que revise el carrito ya actualizado, en vez de
     // mandar un pedido con datos viejos.
     if(sincronizarCarritoConStockActual()){
-        mostrarToast("Algunos productos de tu carrito cambiaron de stock — revisalo antes de enviar el pedido.", "error");
+        abrirCarrito();
+        mostrarErrorPedido("Algunos productos cambiaron (stock o precio): revisá los ajustes arriba del carrito y volvé a enviar.");
+        document.getElementById("cart-avisos")?.scrollIntoView({ block: "start", behavior: "smooth" });
         desactivarCargaCheckout();
         return;
     }
 
     if(estado.carrito.length === 0){
-        mostrarToast("Tu carrito quedó vacío después de actualizar el stock — agregá productos de nuevo.", "error");
+        mostrarErrorPedido("Tu carrito quedó vacío después de actualizar el stock: agregá productos de nuevo.");
         desactivarCargaCheckout();
         return;
     }
@@ -2260,14 +2397,36 @@ async function checkoutWhatsapp(){
             estado.cupon = null;
             abrirCarrito();
             mostrarMensajeCupon(resultado.message || "El cupón ya no se puede usar.", "error");
-            mostrarToast((resultado.message || "El cupón ya no se puede usar.") + " Revisá el total y volvé a enviar el pedido.", "error");
+            mostrarErrorPedido((resultado.message || "El cupón ya no se puede usar.") + " Revisá el total y volvé a enviar el pedido.");
+            desactivarCargaCheckout();
+            return;
+        }
+
+        if(!resultado.success && Array.isArray(resultado.stockInsuficiente) && resultado.stockInsuficiente.length){
+            // Otro cliente compró mientras tanto: se ajusta el carrito a lo que
+            // queda y se explica cada cambio adentro del carrito.
+            estado.idOperacionPedido = null;
+            resultado.stockInsuficiente.forEach(f => {
+                const disp = Math.max(0, Number(f.disponible) || 0);
+                const lineas = estado.carrito.filter(i => f.codigo ? String(i.CODIGO) === String(f.codigo) : i.PRODUCTO === f.producto);
+                let restante = disp;
+                lineas.forEach(i => { i.STOCK = disp; const n = Math.min(i.cantidad, restante); restante -= n; i.cantidad = n; });
+                estado.carrito = estado.carrito.filter(i => i.cantidad > 0);
+                anotarAjusteCarrito(disp > 0
+                    ? `"${f.producto}": pediste ${f.pedido}, pero ahora quedan ${disp} en stock (otro cliente compró mientras armabas el pedido). Ajustamos la cantidad a ${disp}.`
+                    : `"${f.producto}": se agotó mientras armabas el pedido (otro cliente compró las últimas unidades) y lo quitamos del carrito.`);
+            });
+            guardarCarrito();
+            abrirCarrito();
+            mostrarErrorPedido("Algunos productos se vendieron mientras armabas el pedido. Ajustamos las cantidades (mirá el detalle arriba del carrito): revisá el total y volvé a enviar.");
+            document.getElementById("cart-avisos")?.scrollIntoView({ block: "start", behavior: "smooth" });
             desactivarCargaCheckout();
             return;
         }
 
         if(!resultado.success){
             if(resultado.pedidoMinimo === undefined) estado.idOperacionPedido = null; // error definitivo: el próximo intento es un pedido nuevo
-            mostrarToast(resultado.message || "No se pudo guardar el pedido. Intentá de nuevo.", "error");
+            mostrarErrorPedido(resultado.message || "No se pudo guardar el pedido. Intentá de nuevo.");
             desactivarCargaCheckout();
             return;
         }
@@ -2290,7 +2449,7 @@ async function checkoutWhatsapp(){
         }
         if(!resultado.pedidoId){
             avisarErrorASoporte("Pedido sin número de pedido", "El servidor respondió OK pero sin número de pedido, también en la segunda consulta.", { respuesta: JSON.stringify(resultado).slice(0, 300) });
-            mostrarToast("No pudimos confirmar el número de tu pedido. Tocá \"Enviar pedido\" de nuevo (no se va a duplicar).", "error");
+            mostrarErrorPedido("No pudimos confirmar el número de tu pedido. Tocá \"Enviar pedido\" de nuevo (no se va a duplicar).");
             desactivarCargaCheckout();
             return;
         }
@@ -2332,6 +2491,15 @@ Subtotal del pedido: $${formatearPrecio(subtotalPedido)}
 💰 TOTAL: $${formatearPrecio(total)}
 `;
 
+        const resumenRecibido = {
+            pedidoId: resultado.pedidoId, total, dni,
+            cupon: codigoCuponPedido, descuento: descuentoCuponPedido,
+            lineas: estado.carrito.length,
+            unidades: estado.carrito.reduce((t, i) => t + (Number(i.cantidad) || 0), 0)
+        };
+        guardarDatosCliente();
+        _avisosCarrito = [];
+
         estado.idOperacionPedido = null;
         estado.cupon = null;
         estado.carrito = [];
@@ -2352,12 +2520,16 @@ Subtotal del pedido: $${formatearPrecio(subtotalPedido)}
         }
 
         desactivarCargaCheckout();
+        if(typeof actualizarContador === "function") actualizarContador();
 
-        setTimeout(()=>{
-            const numeroDestino = whatsappNumero ||
-                String((typeof CONFIG_NEGOCIO_RESPALDO !== "undefined" && CONFIG_NEGOCIO_RESPALDO.WHATSAPP_NUMERO) || "");
-            window.location.href = `https://api.whatsapp.com/send?phone=${numeroDestino}&text=${encodeURIComponent(mensaje)}`;
-        }, 300);
+        // Antes se abría WhatsApp directo, sin ninguna confirmación en la
+        // página. Ahora se muestra "¡Recibimos tu pedido!" con el número, y
+        // WhatsApp se abre con un toque (un toque del cliente nunca lo
+        // bloquea el navegador).
+        const numeroDestino = whatsappNumero ||
+            String((typeof CONFIG_NEGOCIO_RESPALDO !== "undefined" && CONFIG_NEGOCIO_RESPALDO.WHATSAPP_NUMERO) || "");
+        resumenRecibido.urlWhatsapp = `https://api.whatsapp.com/send?phone=${numeroDestino}&text=${encodeURIComponent(mensaje)}`;
+        setTimeout(() => mostrarPedidoRecibido(resumenRecibido), 350);
 
     }catch(error){
 
@@ -2369,7 +2541,9 @@ Subtotal del pedido: $${formatearPrecio(subtotalPedido)}
                 "Un cliente tocó Enviar pedido y falló.", { total: typeof estado !== "undefined" ? String(estado.carrito.reduce((t, i) => t + i.PRECIO * i.cantidad, 0)) : "" });
         }
 
-        mostrarToast("Error al registrar el pedido.", "error");
+        mostrarErrorPedido(navigator.onLine
+            ? "No pudimos registrar el pedido (el servidor no respondió). Tocá Enviar pedido de nuevo: no se va a duplicar."
+            : "Sin conexión a internet. Revisá tu conexión y tocá Enviar pedido de nuevo.");
 
         desactivarCargaCheckout();
     }
@@ -2955,7 +3129,8 @@ const ESTADO_COLOR = {
 };
 
 async function ejecutarConsultaPedido() {
-  const pedidoId = "PED-" + document.getElementById("consultaPedidoId").value.trim();
+  // Pedidos nuevos: 1001, 1002…; los viejos (PED-xxxxxx) también se encuentran
+  const pedidoId = document.getElementById("consultaPedidoId").value.trim().replace(/^#/, "");
   const dni = document.getElementById("consultaDni").value.trim();
   const errorBox = document.getElementById("consultaError");
 

@@ -67,8 +67,7 @@
 
 <!-- ===== BANNER DE MODO LIMITADO ===== -->
 <div class="license-limited-banner" id="licenseLimitedBanner" style="display:none;">
-  <span class="ic">⚠️</span>
-  <span id="licenseLimitedBannerText">Licencia vencida — modo limitado.</span>
+    <span id="licenseLimitedBannerText">Licencia vencida — modo limitado.</span>
 </div>
 
 <body>
@@ -97,7 +96,7 @@
 
   <style>
   /*
-   * 🐱 Loading Cat — inspirado en Whisky, la gata cálico que
+   * Loading Cat — inspirado en Whisky, la gata cálico que
    * desde 2015 apoya y sigue apoyando a su familia en todo momento.
    * Los colores naranja, negro y blanco son los suyos,
    * y la inspiración para este gato también viene de ella.
@@ -299,31 +298,31 @@
     <div class="label"><span id="sidebarLabelTexto"></span><small id="sidebarLabelSub">PANEL ADMIN</small></div>
   </div>
   <nav id="navLinks">
-    <a href="#" data-target="dashboard"        onclick="mostrarSeccion('dashboard')"><span class="ic">🏠</span> Inicio</a>
+    <a href="#" data-target="dashboard"        onclick="mostrarSeccion('dashboard')">Inicio</a>
 
     <div class="nav-grupo">Vender</div>
-    <a href="#" data-target="pos"              onclick="mostrarSeccion('pos')"><span class="ic">🏪</span> Punto de Venta</a>
-    <a href="#" data-target="pedidos"          onclick="mostrarSeccion('pedidos')"><span class="ic">📦</span> Pedidos web</a>
-    <a href="#" data-target="cupones"          onclick="mostrarSeccion('cupones')"><span class="ic">🎟️</span> Cupones</a>
+    <a href="#" data-target="pos"              onclick="mostrarSeccion('pos')">Punto de Venta</a>
+    <a href="#" data-target="pedidos"          onclick="mostrarSeccion('pedidos')">Pedidos web</a>
+    <a href="#" data-target="cupones"          onclick="mostrarSeccion('cupones')">Cupones</a>
 
     <div class="nav-grupo">Caja</div>
-    <a href="#" data-target="ventasPOS"        onclick="mostrarSeccion('ventasPOS')"><span class="ic">🧾</span> Historial de ventas</a>
-    <a href="#" data-target="movimientosCaja"  onclick="mostrarSeccion('movimientosCaja')"><span class="ic">💸</span> Movimientos</a>
-    <a href="#" data-target="cierreCaja"       onclick="mostrarSeccion('cierreCaja')"><span class="ic">🧮</span> Cierre de caja</a>
+    <a href="#" data-target="ventasPOS"        onclick="mostrarSeccion('ventasPOS')">Historial de ventas</a>
+    <a href="#" data-target="movimientosCaja"  onclick="mostrarSeccion('movimientosCaja')">Movimientos</a>
+    <a href="#" data-target="cierreCaja"       onclick="mostrarSeccion('cierreCaja')">Cierre de caja</a>
 
     <div class="nav-grupo">Mercadería</div>
-    <a href="#" data-target="productos"        onclick="mostrarSeccion('productos')"><span class="ic">🛒</span> Productos</a>
-    <a href="#" data-target="ingresoProductos" onclick="mostrarSeccion('ingresoProductos')"><span class="ic">📥</span> Ingreso de mercadería</a>
-    <a href="#" data-target="proveedores"      onclick="mostrarSeccion('proveedores'); cargarProveedores();"><span class="ic">🚚</span> Proveedores</a>
+    <a href="#" data-target="productos"        onclick="mostrarSeccion('productos')">Productos</a>
+    <a href="#" data-target="ingresoProductos" onclick="mostrarSeccion('ingresoProductos')">Ingreso de mercadería</a>
+    <a href="#" data-target="proveedores"      onclick="mostrarSeccion('proveedores'); cargarProveedores();">Proveedores</a>
 
     <div class="nav-grupo">Clientes y números</div>
-    <a href="#" data-target="clientes"         onclick="mostrarSeccion('clientes'); cargarClientes();"><span class="ic">👥</span> Clientes</a>
-    <a href="#" data-target="reportes"         onclick="mostrarSeccion('reportes')"><span class="ic">📈</span> Reportes</a>
+    <a href="#" data-target="clientes"         onclick="mostrarSeccion('clientes'); cargarClientes();">Clientes</a>
+    <a href="#" data-target="reportes"         onclick="mostrarSeccion('reportes')">Reportes</a>
 
     <div class="nav-grupo">Ajustes</div>
-    <a href="#" data-target="configuracion"    onclick="mostrarSeccion('configuracion')"><span class="ic">⚙️</span> Configuración</a>
-    <a href="#" data-target="usuarios"         onclick="mostrarSeccion('usuarios'); cargarUsuarios();"><span class="ic">🔐</span> Usuarios y accesos</a>
-    <a href="#" data-target="instalador"       onclick="mostrarSeccion('instalador')" style="display:none;" title="Oculto — descomentar el style para volver a mostrarlo"><span class="ic">🛠️</span> Instalador</a>
+    <a href="#" data-target="configuracion"    onclick="mostrarSeccion('configuracion')">Configuración</a>
+    <a href="#" data-target="usuarios"         onclick="mostrarSeccion('usuarios'); cargarUsuarios();">Usuarios y accesos</a>
+    <a href="#" data-target="instalador"       onclick="mostrarSeccion('instalador')" style="display:none;" title="Oculto — descomentar el style para volver a mostrarlo">Instalador</a>
   </nav>
   <!-- Estado de sincronización con Sheets (siempre visible) — lo pinta admin.js / pos-offline.js -->
   <button type="button" id="syncEstadoBtn" class="sync-estado-btn" data-estado="ok"
@@ -334,7 +333,7 @@
   </button>
   <div class="sidebar-pie">
     <button type="button" class="informe-btn" onclick="abrirInformeProblema()" title="Informar un problema a soporte" aria-label="Informar un problema">🐞</button>
-    <button class="logout-btn" onclick="logout()">⏻ Cerrar sesión</button>
+    <button class="logout-btn" onclick="logout()">Cerrar sesión</button>
   </div>
 </div>
 
@@ -342,12 +341,12 @@
 <div class="bottom-nav">
   <span id="syncEstadoDotMovil" class="sync-dot-movil" data-estado="ok" onclick="clickBotonEstadoSync()" title="Estado de sincronización"></span>
   <nav id="bottomNavLinks">
-    <a href="#" data-target="dashboard" onclick="mostrarSeccion('dashboard')"><span class="ic">🏠</span>Inicio</a>
-    <a href="#" data-target="pos"       onclick="mostrarSeccion('pos')"><span class="ic">🏪</span>Venta</a>
-    <a href="#" data-target="cierreCaja" onclick="mostrarSeccion('cierreCaja')"><span class="ic">🧮</span>Caja</a>
-    <a href="#" data-target="pedidos"   onclick="mostrarSeccion('pedidos')"><span class="ic">📦</span>Pedidos</a>
-    <a href="#" data-target="productos" onclick="mostrarSeccion('productos')"><span class="ic">🛒</span>Productos</a>
-    <a href="#" data-target="reportes"  onclick="mostrarSeccion('reportes')"><span class="ic">📈</span>Reportes</a>
+    <a href="#" data-target="dashboard" onclick="mostrarSeccion('dashboard')">Inicio</a>
+    <a href="#" data-target="pos"       onclick="mostrarSeccion('pos')">Venta</a>
+    <a href="#" data-target="cierreCaja" onclick="mostrarSeccion('cierreCaja')">Caja</a>
+    <a href="#" data-target="pedidos"   onclick="mostrarSeccion('pedidos')">Pedidos</a>
+    <a href="#" data-target="productos" onclick="mostrarSeccion('productos')">Productos</a>
+    <a href="#" data-target="reportes"  onclick="mostrarSeccion('reportes')">Reportes</a>
   </nav>
 </div>
 
@@ -382,77 +381,55 @@
         <div class="ps-value" id="posTotalPedBanner">0</div>
       </div>
       <div style="margin-left:auto;">
-        <span class="ps-badge" id="posLiveBadge">📊 POS en tiempo real</span>
+        <span class="ps-badge" id="posLiveBadge">POS en tiempo real</span>
       </div>
     </div>
 
     <div class="row g-3">
       <div class="col-6 col-md-3">
         <div class="card p-3 dashboard-card metric-card" onclick="irAMasVendidos()">
-          <div class="metric-icon bg-tint-amber">🏆</div>
           <h6>Más Vendido</h6>
           <h2 id="cantidadMasVendidos" style="font-size:18px;">Ver ranking →</h2>
         </div>
       </div>
       <div class="col-6 col-md-3">
         <div class="card p-3 dashboard-card metric-card" onclick="mostrarSeccion('productos')">
-          <div class="metric-icon bg-tint-blue">🛒</div>
           <h6>Productos Activos</h6>
           <h2 id="productosActivos">0</h2>
         </div>
       </div>
       <div class="col-6 col-md-3">
         <div class="card p-3 dashboard-card metric-card" onclick="irAProductosFiltrados('stock_bajo')">
-          <div class="metric-icon bg-tint-amber">⚠️</div>
           <h6>Stock Bajo</h6>
           <h2 id="stockBajo">0</h2>
         </div>
       </div>
       <div class="col-6 col-md-3">
         <div class="card p-3 dashboard-card metric-card" onclick="irAProductosFiltrados('sin_stock')">
-          <div class="metric-icon bg-tint-red">❌</div>
           <h6>Stock 0</h6>
           <h2 id="agotados">0</h2>
         </div>
       </div>
       <div class="col-6 col-md-3">
         <div class="card p-3 dashboard-card metric-card" onclick="mostrarSeccion('clientes'); cargarClientes();">
-          <div class="metric-icon bg-tint-blue">👥</div>
           <h6>Clientes</h6>
           <h2 id="clientesUnicos">0</h2>
         </div>
       </div>
       <div class="col-6 col-md-3">
         <div class="card p-3 dashboard-card metric-card" onclick="mostrarSeccion('pedidos')">
-          <div class="metric-icon bg-tint-blue">📦</div>
           <h6>Pedidos Nuevos</h6>
           <h2 id="pedidosNuevos">0</h2>
         </div>
       </div>
       <div class="col-6 col-md-3">
-        <div class="card p-3 dashboard-card metric-card" onclick="mostrarSeccion('ventasPOS')">
-          <div class="metric-icon bg-tint-green">🏪</div>
-          <h6>Ventas POS Hoy</h6>
-          <h2 id="ventasPOSHoy">$0</h2>
-        </div>
-      </div>
-      <div class="col-6 col-md-3">
-        <div class="card p-3 dashboard-card metric-card" onclick="mostrarSeccion('ventasPOS')">
-          <div class="metric-icon bg-tint-green">🏪</div>
-          <h6>Ventas POS Mes</h6>
-          <h2 id="ventasPOSMes">$0</h2>
-        </div>
-      </div>
-      <div class="col-6 col-md-3">
         <div class="card p-3 dashboard-card metric-card" onclick="mostrarSeccion('pedidos')">
-          <div class="metric-icon bg-tint-blue">📦</div>
           <h6>Ventas Pedidos Hoy</h6>
           <h2 id="ventasPedidosHoy">$0</h2>
         </div>
       </div>
       <div class="col-6 col-md-3">
         <div class="card p-3 dashboard-card metric-card" onclick="mostrarSeccion('pedidos')">
-          <div class="metric-icon bg-tint-blue">📦</div>
           <h6>Ventas Pedidos Mes</h6>
           <h2 id="ventasPedidosMes">$0</h2>
         </div>
@@ -548,16 +525,16 @@
       <div><h1>Pedidos web</h1><div class="sub">Seguimiento y estado de los pedidos del catálogo web</div></div>
       <div class="d-flex gap-2">
         <button class="btn btn-outline-secondary btn-sm" onclick="recargarPedidos()">↻ Actualizar</button>
-        <button class="btn btn-outline-primary btn-sm" onclick="abrirModalEtiquetaManual()">🏷️ Rótulo manual</button>
+        <button class="btn btn-outline-primary btn-sm" onclick="abrirModalEtiquetaManual()">Rótulo manual</button>
         <span class="separador-acciones" aria-hidden="true"></span>
-        <button class="btn btn-outline-danger btn-sm" id="btnEliminarPedidosCancelados" onclick="eliminarPedidosCancelados()" title="Borra de la lista todos los pedidos en estado Cancelado">🗑️ Eliminar cancelados</button>
+        <button class="btn btn-outline-danger btn-sm" id="btnEliminarPedidosCancelados" onclick="eliminarPedidosCancelados()" title="Borra de la lista todos los pedidos en estado Cancelado">Eliminar cancelados</button>
       </div>
     </div>
     <div class="card p-3">
       <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
-        <input type="text" id="buscarPedido" class="form-control" style="max-width:320px" placeholder="🔍 Buscar por pedido, cliente, DNI o teléfono..." oninput="filtrarPedidos(); programarBusquedaPedidosAntiguos()">
+        <input type="text" id="buscarPedido" class="form-control" style="max-width:320px" placeholder="Buscar por pedido, cliente, DNI o teléfono..." oninput="filtrarPedidos(); programarBusquedaPedidosAntiguos()">
         <div class="pedidos-fechas" title="Para buscar pedidos de cualquier fecha, también los más viejos">
-          <label>📅 Desde <input type="date" class="form-control form-control-sm" id="pedidosDesde" onchange="filtrarPedidos(); programarBusquedaPedidosAntiguos(true)"></label>
+          <label>Desde <input type="date" class="form-control form-control-sm" id="pedidosDesde" onchange="filtrarPedidos(); programarBusquedaPedidosAntiguos(true)"></label>
           <label>Hasta <input type="date" class="form-control form-control-sm" id="pedidosHasta" onchange="filtrarPedidos(); programarBusquedaPedidosAntiguos(true)"></label>
           <button type="button" class="btn btn-link btn-sm p-0" id="pedidosLimpiarFechas" onclick="limpiarBusquedaPedidos()" style="display:none;">Quitar fechas</button>
         </div>
@@ -583,7 +560,7 @@
       <div class="d-flex gap-2">
         <button class="btn btn-outline-secondary btn-sm" onclick="actualizarCatalogoProductosManual()">↻ Actualizar</button>
         <button class="btn btn-outline-primary btn-sm" onclick="abrirOrdenCatalogo()" title="Elegir en qué orden aparecen categorías y productos en la página">↕️ Ordenar catálogo</button>
-        <button class="btn btn-outline-secondary btn-sm" onclick="abrirPapeleraProductos()" title="Productos eliminados — se pueden restaurar">🗑️ Papelera</button>
+        <button class="btn btn-outline-secondary btn-sm" onclick="abrirPapeleraProductos()" title="Productos eliminados — se pueden restaurar">Papelera</button>
         <button class="btn btn-success" onclick="nuevoProducto()">+ Nuevo Producto</button>
       </div>
     </div>
@@ -609,8 +586,8 @@
             <option value="sin_imagen_y_stock">Sin imagen y sin stock</option>
             <option value="ocultos">Ocultos (no publicados)</option>
             <option value="publicados">Publicados</option>
-            <option value="destacados">⭐ Destacados</option>
-            <option value="ofertas">🔥 En oferta</option>
+            <option value="destacados">Destacados</option>
+            <option value="ofertas">En oferta</option>
           </select>
         </div>
       </div>
@@ -620,30 +597,30 @@
           <div class="d-flex gap-2 flex-wrap">
             <div class="lote-menu-wrap">
               <button class="btn btn-outline-success btn-sm" id="btnCambiarLote" onclick="alternarMenuLote(event)" disabled aria-haspopup="true" aria-expanded="false" title="Ocultar, mostrar, destacar o poner en oferta todos los seleccionados">
-                ✏️ Cambiar seleccionados ▾
+                Cambiar seleccionados ▾
               </button>
               <div class="lote-menu" id="menuLoteProductos" role="menu">
                 <div class="lote-menu-tit">Catálogo web</div>
-                <button type="button" role="menuitem" onclick="aplicarCambioLote({PUBLICADO:'SI'})">👁️ Mostrar (publicar)</button>
-                <button type="button" role="menuitem" onclick="aplicarCambioLote({PUBLICADO:'NO'})">🙈 Ocultar</button>
+                <button type="button" role="menuitem" onclick="aplicarCambioLote({PUBLICADO:'SI'})">Mostrar (publicar)</button>
+                <button type="button" role="menuitem" onclick="aplicarCambioLote({PUBLICADO:'NO'})">Ocultar</button>
                 <div class="lote-menu-tit">Destacado</div>
-                <button type="button" role="menuitem" onclick="aplicarCambioLote({DESTACADO:'SI'})">⭐ Marcar como destacados</button>
+                <button type="button" role="menuitem" onclick="aplicarCambioLote({DESTACADO:'SI'})">Marcar como destacados</button>
                 <button type="button" role="menuitem" onclick="aplicarCambioLote({DESTACADO:'NO'})">☆ Quitar destacado</button>
                 <div class="lote-menu-tit">Oferta</div>
-                <button type="button" role="menuitem" onclick="aplicarCambioLote({OFERTA:'SI'})">🔥 Poner en oferta</button>
+                <button type="button" role="menuitem" onclick="aplicarCambioLote({OFERTA:'SI'})">Poner en oferta</button>
                 <button type="button" role="menuitem" onclick="aplicarCambioLote({OFERTA:'NO'})">✖ Quitar oferta</button>
                 <div class="lote-menu-tit">Cambio de temporada</div>
-                <button type="button" role="menuitem" onclick="aplicarCambioLote({PUBLICADO:'NO', DESTACADO:'NO', OFERTA:'NO'})">📦 Ocultar y quitar destacado y oferta</button>
+                <button type="button" role="menuitem" onclick="aplicarCambioLote({PUBLICADO:'NO', DESTACADO:'NO', OFERTA:'NO'})">Ocultar y quitar destacado y oferta</button>
               </div>
             </div>
             <button class="btn btn-outline-dark btn-sm" id="btnGenerarQROffline" onclick="abrirModalQROffline()" disabled>
-              📦 Generar QR de Identificación
+              Generar QR de Identificación
             </button>
             <button class="btn btn-outline-secondary btn-sm" id="btnGenerarQR" onclick="abrirModalQR()" disabled>
-              📱 Generar QR de Precio
+              Generar QR de Precio
             </button>
             <button class="btn btn-outline-primary btn-sm" id="btnGenerarEtiquetas" onclick="abrirModalEtiquetas()" disabled>
-              🏷️ Generar Etiquetas
+              Generar Etiquetas
             </button>
           </div>
         </div>
@@ -680,7 +657,7 @@
       <div><h1>Ingreso de mercadería</h1><div class="sub">Recepción de mercadería con proveedor — un documento por boleta</div></div>
       <div class="d-flex gap-2">
         <button class="btn btn-outline-secondary btn-sm" onclick="cargarHistorialIngresos()">↻ Actualizar</button>
-        <button class="btn btn-outline-dark" onclick="exportarIngresosPDF()">📄 Informe PDF</button>
+        <button class="btn btn-outline-dark" onclick="exportarIngresosPDF()">Informe PDF</button>
       </div>
     </div>
 
@@ -688,7 +665,7 @@
     <div class="card p-3 mb-3" id="ingresoTcCard">
       <div class="d-flex flex-wrap align-items-end gap-2">
         <div>
-          <label class="form-label mb-1">💵 Dólar</label>
+          <label class="form-label mb-1">Dólar</label>
           <div style="font-size:14px; font-weight:700; line-height:1.1;" id="ingresoTcTipoNombre">Oficial</div>
           <a href="#" style="font-size:11px;" onclick="tcIrAConfiguracion(); return false;">cambiar en Configuración</a>
         </div>
@@ -743,12 +720,12 @@
 
     <!-- ===== Carga por foto (OCR gratis con Tesseract.js): lee la lista del proveedor y la vuelca al carrito de la boleta ===== -->
     <div class="card p-3 mb-3" id="ocrCard">
-      <h6 class="mb-2">📷 Cargar desde foto o PDF de la lista del proveedor <span class="badge bg-secondary">gratis</span></h6>
+      <h6 class="mb-2">Cargar desde foto o PDF de la lista del proveedor <span class="badge bg-secondary">gratis</span></h6>
       <div class="d-flex gap-2 flex-wrap align-items-center">
         <input type="file" id="ocrArchivo" accept="image/*,application/pdf,.pdf" class="form-control" style="max-width:340px" onchange="ocrProcesarArchivo(event)">
         <span id="ocrEstado" class="text-muted" style="font-size:13px;"></span>
         <label class="d-flex align-items-center gap-1 ms-auto" style="font-size:13px; cursor:pointer;" title="Muestra lo que lee el OCR y lo compara con lo esperado, sin agregar nada a la boleta ni a la base de datos">
-          <input type="checkbox" id="ocrModoPrueba"> 🧪 Modo prueba (no guarda nada)
+          <input type="checkbox" id="ocrModoPrueba"> Modo prueba (no guarda nada)
         </label>
       </div>
       <div class="progress mt-2" id="ocrProgWrap" style="height:6px; display:none;"><div class="progress-bar" id="ocrProg" style="width:0%"></div></div>
@@ -763,8 +740,8 @@
           placeholder="Código de barras — Enter para buscar"
           style="max-width:340px; font-size:16px;"
           onkeydown="if(event.key==='Enter'){ event.preventDefault(); buscarProductoParaIngreso(); }">
-        <button class="btn btn-primary" onclick="buscarProductoParaIngreso()">🔍 Buscar</button>
-        <button class="btn btn-outline-secondary" onclick="generarCodigoIngresoAutomatico()" title="Para productos sin código de barras propio">🔢 Generar código</button>
+        <button class="btn btn-primary" onclick="buscarProductoParaIngreso()">Buscar</button>
+        <button class="btn btn-outline-secondary" onclick="generarCodigoIngresoAutomatico()" title="Para productos sin código de barras propio">Generar código</button>
         <span class="text-muted align-self-center" id="ipEstadoBusqueda" style="font-size:13px;"></span>
       </div>
     </div>
@@ -822,7 +799,7 @@
             onkeydown="if(event.key==='Enter'){ event.preventDefault(); agregarItemABoleta(); }">
         </div>
         <div class="col-md-2 d-flex align-items-end">
-          <button class="btn btn-success w-100" id="btnConfirmarIngreso" onclick="agregarItemABoleta()">➕ Agregar a la boleta</button>
+          <button class="btn btn-success w-100" id="btnConfirmarIngreso" onclick="agregarItemABoleta()">Agregar a la boleta</button>
         </div>
       </div>
 
@@ -851,8 +828,8 @@
         </table>
       </div>
       <div class="d-flex gap-2 justify-content-end">
-        <button class="btn btn-outline-danger btn-sm" onclick="vaciarCarritoBoleta()">🗑️ Vaciar</button>
-        <button class="btn btn-success" id="btnGuardarBoleta" onclick="guardarBoletaCompleta()">💾 Guardar boleta</button>
+        <button class="btn btn-outline-danger btn-sm" onclick="vaciarCarritoBoleta()">Vaciar</button>
+        <button class="btn btn-success" id="btnGuardarBoleta" onclick="guardarBoletaCompleta()">Guardar boleta</button>
       </div>
     </div>
 
@@ -895,7 +872,7 @@
       <div class="product-modal-header">
         <h6 id="detalleBoletaTitulo">Boleta</h6>
         <div class="d-flex align-items-center gap-2">
-          <button class="btn btn-outline-secondary btn-sm" onclick="imprimirBoletaProveedor()">🖨️ Imprimir</button>
+          <button class="btn btn-outline-secondary btn-sm" onclick="imprimirBoletaProveedor()">Imprimir</button>
           <button onclick="cerrarModalDetalleBoleta()">✕</button>
         </div>
       </div>
@@ -954,7 +931,7 @@
               <input type="text" class="form-control form-control-sm" id="pagoProveedorObservaciones" placeholder="opcional">
             </div>
             <div class="col-md-2 d-flex align-items-end">
-              <button class="btn btn-success btn-sm w-100" id="btnRegistrarPagoProveedor" onclick="registrarPagoProveedorForm()">💾 Pagar</button>
+              <button class="btn btn-success btn-sm w-100" id="btnRegistrarPagoProveedor" onclick="registrarPagoProveedorForm()">Pagar</button>
             </div>
           </div>
           <div class="form-text mt-1" style="font-size:11px;" id="pagoProveedorSaldoHint"></div>
@@ -1058,7 +1035,7 @@
       <div><h1>Punto de Venta</h1><div class="sub">Escaneá, buscá o tocá un producto para agregarlo al ticket</div></div>
       <div class="d-flex gap-2">
         <button class="btn-shortcuts-help" id="btnActualizarCatalogo" onclick="actualizarCatalogoPOSManual()" title="Volver a pedir el catálogo">↻ Actualizar catálogo</button>
-        <button class="btn-shortcuts-help" id="btnShortcutsHelp" onclick="toggleShortcutsHelp()" title="Atajos de teclado (F1)">⌨️ Atajos</button>
+        <button class="btn-shortcuts-help" id="btnShortcutsHelp" onclick="toggleShortcutsHelp()" title="Atajos de teclado (F1)">Atajos</button>
       </div>
     </div>
 
@@ -1099,7 +1076,7 @@
       <!-- RIGHT: ticket -->
       <div class="ticket-panel">
         <div class="ticket-header">
-          <h5>🧾 Ticket</h5>
+          <h5>Ticket</h5>
           <span class="count-pill" id="ticketCount">0</span>
         </div>
 
@@ -1124,7 +1101,7 @@
           </div>
           <!-- 4 botones compactos en fila -->
           <div class="pos-action-bar">
-            <button class="pos-action-btn pos-btn-finalize" id="btnFinalizarVenta" onclick="abrirModalFinalizarVenta()">✅ Finalizar <kbd>F2</kbd></button>
+            <button class="pos-action-btn pos-btn-finalize" id="btnFinalizarVenta" onclick="abrirModalFinalizarVenta()">Finalizar <kbd>F2</kbd></button>
             <button class="pos-action-btn pos-btn-print"   id="btnImprimirTicket" onclick="imprimirTicketThermal()" title="Imprimir" disabled>🖨️</button>
             <button class="pos-action-btn pos-btn-pedido"  id="btnGenerarPedido"  onclick="abrirModalPedidoAdmin()" title="Pedido">📦</button>
             <button class="pos-action-btn pos-btn-clear"   id="btnVaciarTicket"   onclick="vaciarTicketPOS()"       title="Vaciar">🗑️</button>
@@ -1137,7 +1114,7 @@
     <div class="shortcuts-help-backdrop" id="shortcutsHelpBackdrop" onclick="cerrarShortcutsHelp(event)">
       <div class="shortcuts-help-modal">
         <div class="shortcuts-help-header">
-          <h6>⌨️ Atajos de teclado</h6>
+          <h6>Atajos de teclado</h6>
           <button onclick="toggleShortcutsHelp()">✕</button>
         </div>
         <div class="shortcuts-help-body">
@@ -1214,7 +1191,7 @@
       <div><h1>Cierre de caja</h1><div class="sub">Reconciliación diaria — compará lo esperado contra lo contado</div></div>
       <div style="display:flex; gap:8px;">
         <button class="btn btn-outline-secondary btn-sm" onclick="cargarResumenCierreCaja(document.getElementById('ccFechaSelector')?.value, true)">↻ Recalcular</button>
-        <button class="btn btn-outline-primary btn-sm" onclick="imprimirCierreCaja()">🖨️ Imprimir Cierre</button>
+        <button class="btn btn-outline-primary btn-sm" onclick="imprimirCierreCaja()">Imprimir Cierre</button>
       </div>
     </div>
 
@@ -1330,7 +1307,7 @@
       </div>
 
       <div class="mt-3 d-flex justify-content-end">
-        <button class="btn btn-success" id="btnGuardarCierreCaja" onclick="guardarCierreCajaForm()">💾 Guardar Cierre de Caja</button>
+        <button class="btn btn-success" id="btnGuardarCierreCaja" onclick="guardarCierreCajaForm()">Guardar Cierre de Caja</button>
       </div>
     </div>
 
@@ -1378,14 +1355,14 @@
     <div class="card p-3 mb-3">
       <div class="mc-form-row">
         <div class="mc-tipo-toggle" id="mcTipoToggle">
-          <button type="button" class="mc-tipo-btn active" data-tipo="INGRESO" onclick="elegirTipoMovimientoCaja(this,'INGRESO')">⬆️ Ingreso</button>
-          <button type="button" class="mc-tipo-btn" data-tipo="EGRESO" onclick="elegirTipoMovimientoCaja(this,'EGRESO')">⬇️ Egreso</button>
+          <button type="button" class="mc-tipo-btn active" data-tipo="INGRESO" onclick="elegirTipoMovimientoCaja(this,'INGRESO')">Ingreso</button>
+          <button type="button" class="mc-tipo-btn" data-tipo="EGRESO" onclick="elegirTipoMovimientoCaja(this,'EGRESO')">Egreso</button>
         </div>
         <input type="number" class="form-control" id="mcMonto" placeholder="Monto" min="0" step="1" style="max-width:130px;">
         <select class="form-select" id="mcFormaPago" style="max-width:145px;">
-          <option value="EFECTIVO">💵 Efectivo</option>
-          <option value="TRANSFERENCIA">📲 Transferencia</option>
-          <option value="TARJETA">💳 Tarjeta</option>
+          <option value="EFECTIVO">Efectivo</option>
+          <option value="TRANSFERENCIA">Transferencia</option>
+          <option value="TARJETA">Tarjeta</option>
         </select>
         <input type="text" class="form-control" id="mcMotivo" placeholder="Motivo (ej: Retiro para el banco...)">
         <button class="btn btn-success" id="btnGuardarMovimientoCaja" onclick="guardarMovimientoCajaForm()">+ Registrar</button>
@@ -1431,9 +1408,9 @@
 
     <!-- Pestañas -->
     <div class="rep-tabs" id="repTabs" role="tablist">
-      <button type="button" class="rep-tab active" data-tab="ventas" onclick="mostrarTabReportes('ventas')">📈 Ventas</button>
-      <button type="button" class="rep-tab" data-tab="productos" onclick="mostrarTabReportes('productos')">🏆 Productos</button>
-      <button type="button" class="rep-tab" data-tab="compras" onclick="mostrarTabReportes('compras')">📦 Compras y reposición</button>
+      <button type="button" class="rep-tab active" data-tab="ventas" onclick="mostrarTabReportes('ventas')">Ventas</button>
+      <button type="button" class="rep-tab" data-tab="productos" onclick="mostrarTabReportes('productos')">Productos</button>
+      <button type="button" class="rep-tab" data-tab="compras" onclick="mostrarTabReportes('compras')">Compras y reposición</button>
     </div>
     <style>
       .rep-tabs { display:flex; gap:4px; border-bottom:1px solid var(--slate-200); margin-bottom:14px; overflow-x:auto; }
@@ -1449,23 +1426,23 @@
       <!-- Resumen general fijo (no usa el filtro de fecha, es histórico/del mes) -->
       <div class="card p-3 mb-3">
         <div class="row g-3">
-          <div class="col-6 col-md-4"><div class="card p-3 metric-card"><div class="metric-icon bg-tint-green">💰</div><h6>Ventas Totales</h6><h2 id="ventasTotales">$0</h2></div></div>
-          <div class="col-6 col-md-4"><div class="card p-3 metric-card"><div class="metric-icon bg-tint-blue">📦</div><h6>Total Pedidos</h6><h2 id="totalPedidos">0</h2></div></div>
-          <div class="col-6 col-md-4"><div class="card p-3 metric-card"><div class="metric-icon bg-tint-green">💵</div><h6>Ticket Promedio</h6><h2 id="ticketPromedio">$0</h2></div></div>
+          <div class="col-6 col-md-4"><div class="card p-3 metric-card"><h6>Ventas Totales</h6><h2 id="ventasTotales">$0</h2></div></div>
+          <div class="col-6 col-md-4"><div class="card p-3 metric-card"><h6>Total Pedidos</h6><h2 id="totalPedidos">0</h2></div></div>
+          <div class="col-6 col-md-4"><div class="card p-3 metric-card"><h6>Ticket Promedio</h6><h2 id="ticketPromedio">$0</h2></div></div>
         </div>
       </div>
 
       <!-- REPORTE 1: Ventas por período -->
       <div class="card p-3 mb-3" id="repVentasPeriodo">
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
-          <h6 class="mb-0">📈 Ventas por período</h6>
+          <h6 class="mb-0">Ventas por período</h6>
           <div class="d-flex align-items-center gap-2">
           <select class="form-select form-select-sm" style="width:auto;" onchange="cambiarLimiteReporte('ventasPeriodo', this.value)">
             <option value="10" selected>Últimos 10</option>
             <option value="20">Últimos 20</option>
             <option value="all">Todos</option>
           </select>
-          <button class="btn btn-outline-secondary btn-sm" onclick="exportarReportePDF('repVentasPeriodo','Ventas por periodo')">⬇️ Exportar PDF</button>
+          <button class="btn btn-outline-secondary btn-sm" onclick="exportarReportePDF('repVentasPeriodo','Ventas por periodo')">Exportar PDF</button>
         </div>
         </div>
         <div class="row g-2 mb-3" id="repVentasPeriodoResumen"></div>
@@ -1480,14 +1457,14 @@
       <!-- REPORTE 3: Ventas por categoría -->
       <div class="card p-3 mb-3" id="repCategorias">
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
-          <h6 class="mb-0">🗂️ Ventas por categoría</h6>
+          <h6 class="mb-0">Ventas por categoría</h6>
           <div class="d-flex align-items-center gap-2">
           <select class="form-select form-select-sm" style="width:auto;" onchange="cambiarLimiteReporte('categorias', this.value)">
             <option value="10" selected>Últimos 10</option>
             <option value="20">Últimos 20</option>
             <option value="all">Todos</option>
           </select>
-          <button class="btn btn-outline-secondary btn-sm" onclick="exportarReportePDF('repCategorias','Ventas por categoria')">⬇️ Exportar PDF</button>
+          <button class="btn btn-outline-secondary btn-sm" onclick="exportarReportePDF('repCategorias','Ventas por categoria')">Exportar PDF</button>
         </div>
         </div>
         <div class="table-responsive">
@@ -1501,14 +1478,14 @@
       <!-- REPORTE 4: Formas de pago -->
       <div class="card p-3 mb-3" id="repFormasPago">
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
-          <h6 class="mb-0">💳 Formas de pago</h6>
+          <h6 class="mb-0">Formas de pago</h6>
           <div class="d-flex align-items-center gap-2">
           <select class="form-select form-select-sm" style="width:auto;" onchange="cambiarLimiteReporte('formasPago', this.value)">
             <option value="10" selected>Últimos 10</option>
             <option value="20">Últimos 20</option>
             <option value="all">Todos</option>
           </select>
-          <button class="btn btn-outline-secondary btn-sm" onclick="exportarReportePDF('repFormasPago','Formas de pago')">⬇️ Exportar PDF</button>
+          <button class="btn btn-outline-secondary btn-sm" onclick="exportarReportePDF('repFormasPago','Formas de pago')">Exportar PDF</button>
         </div>
         </div>
         <div class="table-responsive">
@@ -1522,14 +1499,14 @@
       <!-- REPORTE 5: Historial de cierres de caja -->
       <div class="card p-3 mb-3" id="repCierres">
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
-          <h6 class="mb-0">🗒️ Historial de cierres de caja</h6>
+          <h6 class="mb-0">Historial de cierres de caja</h6>
           <div class="d-flex align-items-center gap-2">
           <select class="form-select form-select-sm" style="width:auto;" onchange="cambiarLimiteReporte('cierres', this.value)">
             <option value="10" selected>Últimos 10</option>
             <option value="20">Últimos 20</option>
             <option value="all">Todos</option>
           </select>
-          <button class="btn btn-outline-secondary btn-sm" onclick="exportarReportePDF('repCierres','Cierres de caja')">⬇️ Exportar PDF</button>
+          <button class="btn btn-outline-secondary btn-sm" onclick="exportarReportePDF('repCierres','Cierres de caja')">Exportar PDF</button>
         </div>
         </div>
         <div class="table-responsive">
@@ -1543,14 +1520,14 @@
       <!-- REPORTE 6: Clientes que más compran -->
       <div class="card p-3 mb-3" id="repClientes">
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
-          <h6 class="mb-0">👥 Clientes que más compran</h6>
+          <h6 class="mb-0">Clientes que más compran</h6>
           <div class="d-flex align-items-center gap-2">
           <select class="form-select form-select-sm" style="width:auto;" onchange="cambiarLimiteReporte('clientes', this.value)">
             <option value="10" selected>Últimos 10</option>
             <option value="20">Últimos 20</option>
             <option value="all">Todos</option>
           </select>
-          <button class="btn btn-outline-secondary btn-sm" onclick="exportarReportePDF('repClientes','Clientes')">⬇️ Exportar PDF</button>
+          <button class="btn btn-outline-secondary btn-sm" onclick="exportarReportePDF('repClientes','Clientes')">Exportar PDF</button>
         </div>
         </div>
         <div class="table-responsive">
@@ -1568,14 +1545,14 @@
       <div class="card p-3 mb-3" id="repProductos">
         <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
           <div>
-            <h6 class="mb-0">🏆 Productos más vendidos</h6>
+            <h6 class="mb-0">Productos más vendidos</h6>
             <div id="repProductosPeriodo" class="text-muted" style="font-size:12px; margin-top:2px;"></div>
           </div>
           <div class="d-flex align-items-center gap-2 flex-wrap">
             <span id="repProductosEstado" class="text-muted" style="font-size:11.5px;"></span>
             <button class="btn btn-outline-secondary btn-sm" onclick="cargarReporteProductos(true)" title="Volver a leer los datos de la planilla">↻</button>
-            <button class="btn btn-outline-secondary btn-sm" onclick="exportarReporteProductosCSV()">⬇️ Excel (CSV)</button>
-            <button class="btn btn-outline-secondary btn-sm" onclick="exportarReporteProductosPDF()">⬇️ PDF</button>
+            <button class="btn btn-outline-secondary btn-sm" onclick="exportarReporteProductosCSV()">Excel (CSV)</button>
+            <button class="btn btn-outline-secondary btn-sm" onclick="exportarReporteProductosPDF()">PDF</button>
           </div>
         </div>
 
@@ -1583,7 +1560,7 @@
 
         <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
           <input type="text" id="repProductosBuscador" class="form-control form-control-sm" style="flex:1 1 220px; min-width:180px;"
-                 placeholder="🔍 Buscar en todo el catálogo: nombre, código, alias, categoría..."
+                 placeholder="Buscar en todo el catálogo: nombre, código, alias, categoría..."
                  oninput="filtrarReporteProductos(this.value)" autocomplete="off">
           <select id="repProductosCategoria" class="form-select form-select-sm" style="width:auto; max-width:200px;" onchange="renderReporteProductos()">
             <option value="">Todas las categorías</option>
@@ -1708,28 +1685,24 @@
       <div class="row g-3 mb-3">
         <div class="col-6 col-md-3">
           <div class="card p-3 metric-card rc-kpi-clicable" style="border-left-color:var(--red-500);" onclick="_rcFiltrarDesdeKpi('sinstock')" title="Ver estos productos en la tabla">
-            <div class="metric-icon bg-tint-red">🚫</div>
             <h6>Sin stock, con demanda</h6>
             <h2 id="rcKpiSinStock">0</h2>
           </div>
         </div>
         <div class="col-6 col-md-3">
           <div class="card p-3 metric-card rc-kpi-clicable" style="border-left-color:#d97706;" onclick="_rcFiltrarDesdeKpi('critico')" title="Ver estos productos en la tabla">
-            <div class="metric-icon" style="background:#fef3e2;color:#b45309;">⏳</div>
             <h6>Cobertura &lt; 7 días</h6>
             <h2 id="rcKpiCritico">0</h2>
           </div>
         </div>
         <div class="col-6 col-md-3">
           <div class="card p-3 metric-card" style="border-left-color:var(--blue-500);">
-            <div class="metric-icon bg-tint-blue">💵</div>
             <h6>Ticket promedio</h6>
             <h2 id="rcKpiTicket">$0</h2>
           </div>
         </div>
         <div class="col-6 col-md-3">
           <div class="card p-3 metric-card" style="border-left-color:var(--green-500);">
-            <div class="metric-icon bg-tint-green">🛒</div>
             <h6>Presupuesto sugerido</h6>
             <h2 id="rcKpiPresupuesto">$0</h2>
           </div>
@@ -1739,8 +1712,8 @@
       <!-- Semáforo de reposición — lo primero: es la parte accionable del reporte -->
       <div class="card p-3 mb-3">
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
-          <h6 class="mb-0">🚦 Qué reponer</h6>
-          <button class="btn btn-outline-secondary btn-sm" onclick="exportarReportePDF('rcSemaforoCard','Reporte de compras')">⬇️ Exportar PDF</button>
+          <h6 class="mb-0">Qué reponer</h6>
+          <button class="btn btn-outline-secondary btn-sm" onclick="exportarReportePDF('rcSemaforoCard','Reporte de compras')">Exportar PDF</button>
         </div>
         <div class="d-flex flex-wrap gap-2 align-items-end mb-2">
           <div>
@@ -1752,7 +1725,7 @@
             <label class="form-label" style="font-size:12px; margin-bottom:2px;">Estado</label>
             <select id="rcFiltroEstado" class="form-select form-select-sm" style="max-width:180px;" onchange="_rcAplicarFiltrosTabla()">
               <option value="todos">Todos</option>
-              <option value="sinstock">🚫 Sin stock</option>
+              <option value="sinstock">Sin stock</option>
               <option value="critico">🔴 Crítico</option>
               <option value="atencion">🟡 Atención</option>
               <option value="ok">🟢 OK</option>
@@ -1783,7 +1756,7 @@
             <span style="font-size:13px;" id="rcListaCompraInfo">0 productos seleccionados</span>
             <div class="d-flex gap-2 flex-wrap">
               <button class="btn btn-outline-secondary btn-sm" onclick="_rcVaciarSeleccion()">Vaciar selección</button>
-              <button class="btn btn-primary btn-sm" onclick="_rcCopiarListaCompra()">📋 Copiar lista de compra</button>
+              <button class="btn btn-primary btn-sm" onclick="_rcCopiarListaCompra()">Copiar lista de compra</button>
             </div>
           </div>
         </div>
@@ -1813,20 +1786,20 @@
       <!-- Gráficos y tendencias — colapsado por defecto: es contexto, no lo que hay que decidir hoy -->
       <details class="card p-3 mb-3" id="rcGraficosDetails">
         <summary style="cursor:pointer; font-weight:600; list-style:none; display:flex; align-items:center; gap:6px;" onclick="setTimeout(_rcRedibujarSiEstaAbierto, 0)">
-          <span class="rc-summary-caret">▸</span> 📊 Ver gráficos y tendencias
+          <span class="rc-summary-caret">▸</span> Ver gráficos y tendencias
         </summary>
 
         <div class="row g-3 mb-3 mt-1">
           <div class="col-12 col-lg-7">
             <div class="card p-3" style="height:100%;">
-              <h6 class="mb-1">🏆 Top productos — vendidos vs. stock actual</h6>
+              <h6 class="mb-1">Top productos — vendidos vs. stock actual</h6>
               <div class="text-muted mb-2" style="font-size:12px;">Barra celeste larga + barra gris corta = urgente reponer</div>
               <canvas id="rcChartTop" height="260"></canvas>
             </div>
           </div>
           <div class="col-12 col-lg-5">
             <div class="card p-3" style="height:100%;">
-              <h6 class="mb-1">🥯 Ventas por categoría</h6>
+              <h6 class="mb-1">Ventas por categoría</h6>
               <div class="text-muted mb-2" style="font-size:12px;">Para priorizar el rubro donde invertir el presupuesto</div>
               <canvas id="rcChartDonut" height="260"></canvas>
             </div>
@@ -1835,7 +1808,7 @@
 
         <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-1">
           <div>
-            <h6 class="mb-1">📈 Tendencia de ventas por categoría</h6>
+            <h6 class="mb-1">Tendencia de ventas por categoría</h6>
             <div class="text-muted" style="font-size:12px;">Cada categoría con su propia línea (sin apilar) — así una categoría chica se ve chata y una grande se ve alta, sin engaños de escala. Solo se muestran las más importantes; el resto se agrupa en "Otras"</div>
           </div>
           <select id="rcTendenciaAgrupacion" class="form-select form-select-sm" style="max-width:150px;" onchange="_rcRedibujarTendencia()">
@@ -1859,9 +1832,9 @@
 
     <div class="card p-3 mb-3">
       <div class="d-flex flex-wrap gap-3" style="font-size:13px;">
-        <div><strong>👑 Admin:</strong> acceso a todo el panel, incluida esta pantalla.</div>
-        <div><strong>🏪 Vendedor:</strong> Punto de Venta, Pedidos web, Caja (historial, movimientos y cierre) y Clientes.</div>
-        <div><strong>📦 Depósito:</strong> Productos, Ingreso de mercadería, Proveedores y Reportes de compras.</div>
+        <div><strong>Admin:</strong> acceso a todo el panel, incluida esta pantalla.</div>
+        <div><strong>Vendedor:</strong> Punto de Venta, Pedidos web, Caja (historial, movimientos y cierre) y Clientes.</div>
+        <div><strong>Depósito:</strong> Productos, Ingreso de mercadería, Proveedores y Reportes de compras.</div>
       </div>
     </div>
 
@@ -1876,7 +1849,7 @@
 
     <div class="mt-3"></div>
     <div class="card p-3 mt-3">
-        <h6 style="margin-bottom:14px;">🔑 Acceso al panel</h6>
+        <h6 style="margin-bottom:14px;">Acceso al panel</h6>
         <p class="text-muted" style="font-size:12.5px; margin-top:-8px; margin-bottom:14px;">
           Usuario y contraseña para entrar al panel admin. Por seguridad, necesitás escribir la contraseña actual para poder cambiarlos.
         </p>
@@ -1898,12 +1871,12 @@
         </div>
 
         <div class="d-flex justify-content-end mt-3">
-          <button class="btn btn-success" id="btnGuardarCredenciales" onclick="guardarCredencialesForm()">💾 Cambiar acceso</button>
+          <button class="btn btn-success" id="btnGuardarCredenciales" onclick="guardarCredencialesForm()">Cambiar acceso</button>
         </div>
       </div>
 
     <div class="card p-3 mt-3">
-        <h6 style="margin-bottom:14px;">📦 Acceso a Gestión de Stock</h6>
+        <h6 style="margin-bottom:14px;">Acceso a Gestión de Stock</h6>
         <p class="text-muted" style="font-size:12.5px; margin-top:-8px; margin-bottom:14px;">
           Contraseña propia para <code>stock.html</code> — a propósito distinta de la del panel completo, para poder dársela a alguien de depósito sin darle acceso a ventas, clientes ni el resto de la configuración. Para cambiarla necesitás tu contraseña del panel admin (no la de stock vieja).
         </p>
@@ -1919,7 +1892,7 @@
         </div>
 
         <div class="d-flex justify-content-end mt-3">
-          <button class="btn btn-success" id="btnGuardarPasswordStock" onclick="guardarPasswordStockForm()">💾 Cambiar contraseña de stock</button>
+          <button class="btn btn-success" id="btnGuardarPasswordStock" onclick="guardarPasswordStockForm()">Cambiar contraseña de stock</button>
         </div>
       </div>
   </div>
@@ -1949,9 +1922,9 @@
           <div class="col-8">
             <label class="form-label">Rol *</label>
             <select class="form-select" id="umRol">
-              <option value="admin">👑 Admin — acceso total</option>
-              <option value="vendedor">🏪 Vendedor — ventas y clientes</option>
-              <option value="deposito">📦 Depósito — productos y stock</option>
+              <option value="admin">Admin — acceso total</option>
+              <option value="vendedor">Vendedor — ventas y clientes</option>
+              <option value="deposito">Depósito — productos y stock</option>
             </select>
           </div>
           <div class="col-4 d-flex align-items-end">
@@ -1964,7 +1937,7 @@
       </div>
       <div class="product-modal-actions">
         <button class="btn btn-outline-secondary" onclick="cerrarModalUsuario()">Cancelar</button>
-        <button class="btn btn-success" id="btnGuardarUsuario" onclick="guardarUsuarioForm()">💾 Guardar Usuario</button>
+        <button class="btn btn-success" id="btnGuardarUsuario" onclick="guardarUsuarioForm()">Guardar Usuario</button>
       </div>
     </div>
   </div>
@@ -1981,7 +1954,7 @@
 
     <div class="card p-3 mb-3 cup-reporte">
       <div class="cup-reporte-head">
-        <h6 class="mb-0">📊 Resultados de los cupones</h6>
+        <h6 class="mb-0">Resultados de los cupones</h6>
         <div class="cup-reporte-fechas">
           <label>Desde <input type="date" class="form-control form-control-sm" id="cupRepDesde" onchange="cargarReporteCupones()"></label>
           <label>Hasta <input type="date" class="form-control form-control-sm" id="cupRepHasta" onchange="cargarReporteCupones()"></label>
@@ -2013,25 +1986,25 @@
     </div>
 
     <div class="cfg-tabs" id="cfgTabsNav">
-      <button type="button" class="cfg-tab-btn active" data-cfg-tab="negocio" onclick="mostrarConfigTab('negocio', this)" title="Datos del negocio, ticket y moneda"><span class="ic">🏪</span> Negocio</button>
-      <button type="button" class="cfg-tab-btn" data-cfg-tab="catalogo" onclick="mostrarConfigTab('catalogo', this)" title="Cómo se ve la página pública"><span class="ic">🌐</span> Catálogo web</button>
-      <button type="button" class="cfg-tab-btn" data-cfg-tab="pedidos" onclick="mostrarConfigTab('pedidos', this)" title="Reglas y datos de los pedidos del catálogo"><span class="ic">📦</span> Pedidos</button>
-      <button type="button" class="cfg-tab-btn" data-cfg-tab="cobros" onclick="mostrarConfigTab('cobros', this)" title="Medios de cobro"><span class="ic">💳</span> Cobros</button>
-      <button type="button" class="cfg-tab-btn" data-cfg-tab="equipo" onclick="mostrarConfigTab('equipo', this)" title="Solo afecta a esta caja"><span class="ic">🖥️</span> Esta computadora</button>
-      <button type="button" class="cfg-tab-btn" data-cfg-tab="sistema" onclick="mostrarConfigTab('sistema', this)" title="Licencia, conexión y carpeta de imágenes"><span class="ic">🔧</span> Sistema</button>
+      <button type="button" class="cfg-tab-btn active" data-cfg-tab="negocio" onclick="mostrarConfigTab('negocio', this)" title="Datos del negocio, ticket y moneda">Negocio</button>
+      <button type="button" class="cfg-tab-btn" data-cfg-tab="catalogo" onclick="mostrarConfigTab('catalogo', this)" title="Cómo se ve la página pública">Catálogo web</button>
+      <button type="button" class="cfg-tab-btn" data-cfg-tab="pedidos" onclick="mostrarConfigTab('pedidos', this)" title="Reglas y datos de los pedidos del catálogo">Pedidos</button>
+      <button type="button" class="cfg-tab-btn" data-cfg-tab="cobros" onclick="mostrarConfigTab('cobros', this)" title="Medios de cobro">Cobros</button>
+      <button type="button" class="cfg-tab-btn" data-cfg-tab="equipo" onclick="mostrarConfigTab('equipo', this)" title="Solo afecta a esta caja">Esta computadora</button>
+      <button type="button" class="cfg-tab-btn" data-cfg-tab="sistema" onclick="mostrarConfigTab('sistema', this)" title="Licencia, conexión y carpeta de imágenes">Sistema</button>
     </div>
 
     <!-- ===== PESTAÑA: NEGOCIO — Datos del negocio, ticket y moneda ===== -->
     <div class="cfg-tab-pane active" id="cfgTab-negocio">
 
       <div class="card p-3 mt-3">
-        <h6 style="margin-bottom:6px;">🌐 Datos generales, ícono y SEO</h6>
+        <h6 style="margin-bottom:6px;">Datos generales, ícono y SEO</h6>
         <p class="text-muted" style="font-size:13px;">Se usan al compartir el link del catálogo (WhatsApp, Facebook, X) y para buscadores como Google.</p>
 
         <div class="mb-3">
           <span class="form-label d-block">URL del catálogo online</span>
           <div class="form-text" style="font-size:11.5px;">
-            Ese dato se edita en la pestaña <strong>Catálogo web → "📱 Catálogo online (para los QR de precio)"</strong> — se usa tanto para los QR como para el SEO/redes, no hace falta repetirlo acá.
+            Ese dato se edita en la pestaña <strong>Catálogo web → "Catálogo online (para los QR de precio)"</strong> — se usa tanto para los QR como para el SEO/redes, no hace falta repetirlo acá.
           </div>
         </div>
 
@@ -2067,12 +2040,12 @@
         </div>
 
         <div class="d-flex justify-content-end mt-3">
-          <button class="btn btn-success" onclick="guardarAparienciaForm()">💾 Guardar</button>
+          <button class="btn btn-success" onclick="guardarAparienciaForm()">Guardar</button>
         </div>
       </div>
 
       <div class="card p-3 mb-3">
-        <h6 style="margin-bottom:14px;">🧾 Encabezado del ticket (impresora térmica)</h6>
+        <h6 style="margin-bottom:14px;">Encabezado del ticket (impresora térmica)</h6>
 
         <div class="mb-3">
           <label class="form-label">Nombre del local *</label>
@@ -2105,11 +2078,36 @@
           <input type="text" class="form-control" id="cfgPie" placeholder="Ej: ¡Gracias por su compra!">
         </div>
 
+        <div class="mb-3">
+          <label class="form-label">Zona horaria del negocio <span class="text-muted" style="font-size:11px;">(para "hoy", cierres de caja, reportes y las horas que se muestran)</span></label>
+          <select class="form-select" id="cfgZonaHoraria" onchange="_mostrarHoraZona()">
+            <optgroup label="Argentina">
+              <option value="America/Argentina/Buenos_Aires">Buenos Aires, CABA y la mayoría de las provincias (UTC−3)</option>
+              <option value="America/Argentina/Cordoba">Córdoba (UTC−3)</option>
+              <option value="America/Argentina/Mendoza">Mendoza (UTC−3)</option>
+              <option value="America/Argentina/Salta">Salta (UTC−3)</option>
+              <option value="America/Argentina/Ushuaia">Ushuaia (UTC−3)</option>
+            </optgroup>
+            <optgroup label="Otros países">
+              <option value="America/Montevideo">Uruguay (UTC−3)</option>
+              <option value="America/Asuncion">Paraguay</option>
+              <option value="America/Santiago">Chile</option>
+              <option value="America/La_Paz">Bolivia (UTC−4)</option>
+              <option value="America/Lima">Perú (UTC−5)</option>
+              <option value="America/Bogota">Colombia (UTC−5)</option>
+              <option value="America/Mexico_City">México (UTC−6)</option>
+              <option value="America/Sao_Paulo">Brasil — São Paulo (UTC−3)</option>
+              <option value="Europe/Madrid">España</option>
+            </optgroup>
+          </select>
+          <div class="form-text" id="cfgZonaHorariaHora"></div>
+        </div>
+
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-3">
-          <button class="btn btn-outline-secondary btn-sm" onclick="restablecerConfigNegocio()">↺ Restablecer valores</button>
+          <button class="btn btn-outline-secondary btn-sm" onclick="restablecerConfigNegocio()">Restablecer valores</button>
           <div class="d-flex gap-2">
-            <button class="btn btn-outline-primary" onclick="vistaPreviaTicketConfig()">👁️ Vista previa</button>
-            <button class="btn btn-success" id="btnGuardarConfigNegocio" onclick="guardarConfigNegocioForm()">💾 Guardar</button>
+            <button class="btn btn-outline-primary" onclick="vistaPreviaTicketConfig()">Vista previa</button>
+            <button class="btn btn-success" id="btnGuardarConfigNegocio" onclick="guardarConfigNegocioForm()">Guardar</button>
           </div>
         </div>
 
@@ -2120,7 +2118,7 @@
       </div>
 
       <div class="card p-3 mb-3">
-        <h6 style="margin-bottom:6px;">💵 Dólar de referencia (tipo de cambio)</h6>
+        <h6 style="margin-bottom:6px;">Dólar de referencia (tipo de cambio)</h6>
         <p class="text-muted" style="font-size:12.5px; margin-top:-2px; margin-bottom:14px;">
           Qué cotización se trae sola como tipo de cambio en Ingreso de Productos (se usa el valor de <b>venta</b> del día). Igual lo podés editar en cada ingreso.
         </p>
@@ -2136,7 +2134,7 @@
           <div class="form-text" id="cfgDolarHoy" style="font-size:12px;"></div>
         </div>
         <div class="d-flex justify-content-end">
-          <button class="btn btn-success" id="btnGuardarDolarTipo" onclick="guardarDolarTipoForm()">💾 Guardar dólar de referencia</button>
+          <button class="btn btn-success" id="btnGuardarDolarTipo" onclick="guardarDolarTipoForm()">Guardar dólar de referencia</button>
         </div>
       </div>
 
@@ -2158,7 +2156,7 @@
         </div>
 
         <div class="d-flex justify-content-end mt-3">
-          <button class="btn btn-success" id="btnGuardarSidebar" onclick="guardarSidebarForm()">💾 Guardar</button>
+          <button class="btn btn-success" id="btnGuardarSidebar" onclick="guardarSidebarForm()">Guardar</button>
         </div>
       </div>
 
@@ -2170,7 +2168,7 @@
       <div class="card p-3 mt-3" id="cardTemporada">
         <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
           <div>
-            <h6 style="margin-bottom:2px;">🎉 Tema de temporada</h6>
+            <h6 style="margin-bottom:2px;">Tema de temporada</h6>
             <p class="text-muted mb-0" style="font-size:13px;">Cambia el catálogo para una fecha especial: colores, adornos, fondo, animación, cartel arriba de todo e ícono en los productos. Los colores también se aplican a este panel mientras el tema está activo.</p>
           </div>
           <span class="temp-estado" id="tempEstado"></span>
@@ -2207,13 +2205,13 @@
         </div>
 
         <div class="d-flex flex-wrap gap-2 justify-content-end mt-3">
-          <button type="button" class="btn btn-outline-secondary" onclick="vistaPreviaTemporada()">👁️ Ver en el catálogo</button>
-          <button type="button" class="btn btn-success" id="btnGuardarTemporada" onclick="guardarTemporada()">💾 Guardar tema</button>
+          <button type="button" class="btn btn-outline-secondary" onclick="vistaPreviaTemporada()">Ver en el catálogo</button>
+          <button type="button" class="btn btn-success" id="btnGuardarTemporada" onclick="guardarTemporada()">Guardar tema</button>
         </div>
       </div>
 
       <div class="card p-3 mt-3">
-        <h6 style="margin-bottom:14px;">🎨 Apariencia del catálogo web</h6>
+        <h6 style="margin-bottom:14px;">Apariencia del catálogo web</h6>
 
         <div class="mb-3">
           <label class="form-label">Texto del encabezado (navbar) <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
@@ -2224,7 +2222,7 @@
         <div class="mb-3">
           <label class="form-label">Ícono del encabezado <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
           <input type="text" class="form-control" id="cfgNavbarIcono" maxlength="4" style="max-width:120px;" placeholder="🏬">
-          <div class="form-text" style="font-size:11.5px;">Pegá cualquier emoji (🏬 🧸 🎁 📚...). Evitá un carrito o una bolsa — ya hay un botón de carrito al lado, y usar el mismo tipo de ícono para las dos cosas confunde al cliente.</div>
+          <div class="form-text" style="font-size:11.5px;">Pegá cualquier emoji (..). Evitá un carrito o una bolsa — ya hay un botón de carrito al lado, y usar el mismo tipo de ícono para las dos cosas confunde al cliente.</div>
         </div>
 
         <div class="mb-3">
@@ -2251,7 +2249,7 @@
 
           <div class="banner-preview-wrap">
             <div class="banner-preview-item">
-              <div class="banner-preview-label">💻 Vista en escritorio</div>
+              <div class="banner-preview-label">Vista en escritorio</div>
               <div class="banner-mock banner-mock--desktop" id="bannerMockDesktop">
                 <div class="banner-mock-overlay"></div>
                 <div class="banner-mock-text">
@@ -2261,7 +2259,7 @@
               </div>
             </div>
             <div class="banner-preview-item banner-preview-item--mobile">
-              <div class="banner-preview-label">📱 Vista en celular</div>
+              <div class="banner-preview-label">Vista en celular</div>
               <div class="banner-mock banner-mock--mobile" id="bannerMockMobile">
                 <div class="banner-mock-overlay"></div>
                 <div class="banner-mock-text">
@@ -2307,28 +2305,28 @@
         </div>
 
         <div class="d-flex justify-content-end mt-3">
-          <button class="btn btn-success" id="btnGuardarApariencia" onclick="guardarAparienciaForm()">💾 Guardar apariencia</button>
+          <button class="btn btn-success" id="btnGuardarApariencia" onclick="guardarAparienciaForm()">Guardar apariencia</button>
         </div>
       </div>
 
       <div class="card p-3 mt-3">
-        <h6 style="margin-bottom:6px;">📢 Banner superior (mensajes rotativos)</h6>
+        <h6 style="margin-bottom:6px;">Banner superior (mensajes rotativos)</h6>
         <p class="text-muted" style="font-size:12.5px; margin-top:-4px; margin-bottom:14px;">
           Una franja verde arriba de todo el catálogo, que va rotando solo entre los mensajes que escribas acá. Escribí un mensaje por línea — si dejás solo uno, queda fijo sin rotar.
         </p>
 
         <div class="mb-3">
-          <textarea class="form-control" id="cfgBannerTopMensajes" rows="4" placeholder="🚚 Envíos a todo el país&#10;✅ Stock actualizado&#10;💳 Aceptamos todos los medios de pago"></textarea>
+          <textarea class="form-control" id="cfgBannerTopMensajes" rows="4" placeholder="Envíos a todo el país&#10;Stock actualizado&#10;Aceptamos todos los medios de pago"></textarea>
           <div class="form-text" style="font-size:11.5px;">Un mensaje por renglón. Vaciá el campo entero para ocultar la franja por completo.</div>
         </div>
 
         <div class="d-flex justify-content-end mt-3">
-          <button class="btn btn-success" id="btnGuardarBannerTop" onclick="guardarBannerTopForm()">💾 Guardar</button>
+          <button class="btn btn-success" id="btnGuardarBannerTop" onclick="guardarBannerTopForm()">Guardar</button>
         </div>
       </div>
 
       <div class="card p-3 mt-3">
-        <h6 style="margin-bottom:14px;">🏷️ Beneficios del catálogo (debajo del banner)</h6>
+        <h6 style="margin-bottom:14px;">Beneficios del catálogo (debajo del banner)</h6>
         <p class="text-muted" style="font-size:12.5px; margin-top:-8px; margin-bottom:14px;">
           Estos son los 6 carteles cortos que aparecen debajo del banner del catálogo. El que dejes vacío, simplemente no se muestra.
         </p>
@@ -2363,11 +2361,11 @@
         <div class="row g-2 mb-3">
           <div class="col-6">
             <label class="form-label">Texto libre 1 <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
-            <input type="text" class="form-control" id="cfgBeneficioTexto1" placeholder="Ej: ✅ Stock actualizado">
+            <input type="text" class="form-control" id="cfgBeneficioTexto1" placeholder="Ej: Stock actualizado">
           </div>
           <div class="col-6">
             <label class="form-label">Texto libre 2 <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
-            <input type="text" class="form-control" id="cfgBeneficioTexto2" placeholder="Ej: 🚚 Envíos a todo el país">
+            <input type="text" class="form-control" id="cfgBeneficioTexto2" placeholder="Ej: Envíos a todo el país">
           </div>
         </div>
 
@@ -2377,12 +2375,12 @@
         </div>
 
         <div class="d-flex justify-content-end mt-3">
-          <button class="btn btn-success" id="btnGuardarBeneficios" onclick="guardarBeneficiosForm()">💾 Guardar beneficios</button>
+          <button class="btn btn-success" id="btnGuardarBeneficios" onclick="guardarBeneficiosForm()">Guardar beneficios</button>
         </div>
       </div>
 
       <div class="card p-3 mt-3">
-        <h6 style="margin-bottom:6px;">🎯 Popup promocional (catálogo web)</h6>
+        <h6 style="margin-bottom:6px;">Popup promocional (catálogo web)</h6>
         <p class="text-muted" style="font-size:13px;">Imagen que aparece al entrar al catálogo. Dejá el campo vacío o desactivá para que no aparezca.</p>
         <div class="mb-2 d-flex align-items-center gap-3">
           <div class="form-check form-switch mb-0">
@@ -2396,12 +2394,12 @@
           <div class="form-check form-check-inline mb-0">
             <input class="form-check-input" type="radio" name="cfgPopupTipo" id="cfgPopupTipoImagen" value="imagen" checked
               onchange="onCambiarTipoPopup()">
-            <label class="form-check-label" for="cfgPopupTipoImagen">🖼️ Imagen</label>
+            <label class="form-check-label" for="cfgPopupTipoImagen">Imagen</label>
           </div>
           <div class="form-check form-check-inline mb-0">
             <input class="form-check-input" type="radio" name="cfgPopupTipo" id="cfgPopupTipoVideo" value="video"
               onchange="onCambiarTipoPopup()">
-            <label class="form-check-label" for="cfgPopupTipoVideo">🎬 Video</label>
+            <label class="form-check-label" for="cfgPopupTipoVideo">Video</label>
           </div>
         </div>
 
@@ -2412,7 +2410,7 @@
           </div>
           <div class="pm-image-actions">
             <label class="btn btn-outline-secondary btn-sm pm-image-btn" style="cursor:pointer;">
-              📁 Elegir imagen
+              Elegir imagen
               <input type="file" id="cfgPopupImagenFile" accept="image/*" style="display:none"
                 onchange="onSeleccionarImagenPopup(event)">
             </label>
@@ -2438,12 +2436,12 @@
         </div>
 
         <div class="mt-2">
-          <button class="btn btn-success btn-sm" onclick="guardarPopupPromoForm()">💾 Guardar popup</button>
+          <button class="btn btn-success btn-sm" onclick="guardarPopupPromoForm()">Guardar popup</button>
         </div>
       </div>
 
       <div class="card p-3 mt-3">
-        <h6 style="margin-bottom:6px;">🦶 Pie de página del catálogo</h6>
+        <h6 style="margin-bottom:6px;">Pie de página del catálogo</h6>
 
         <div class="mb-3">
           <label class="form-label">Título de la primera columna</label>
@@ -2467,12 +2465,12 @@
         </div>
 
         <div class="d-flex justify-content-end mt-3">
-          <button class="btn btn-success" onclick="guardarAparienciaForm()">💾 Guardar</button>
+          <button class="btn btn-success" onclick="guardarAparienciaForm()">Guardar</button>
         </div>
       </div>
 
       <div class="card p-3 mb-3">
-        <h6 style="margin-bottom:14px;">📱 Catálogo online (para los QR de precio)</h6>
+        <h6 style="margin-bottom:14px;">Catálogo online (para los QR de precio)</h6>
         <p class="text-muted" style="font-size:12.5px; margin-top:-8px; margin-bottom:14px;">
           La URL donde está publicado tu catálogo online. Se usa para armar el link de los códigos QR que generás desde Productos — al escanearlos, abren una página chica con el nombre y precio actualizado de ese producto. También se usa para el SEO y las redes sociales, más abajo.
         </p>
@@ -2483,7 +2481,7 @@
         </div>
 
         <div class="d-flex justify-content-end mt-3">
-          <button class="btn btn-success" id="btnGuardarUrlCatalogo" onclick="guardarUrlCatalogoForm()">💾 Guardar</button>
+          <button class="btn btn-success" id="btnGuardarUrlCatalogo" onclick="guardarUrlCatalogoForm()">Guardar</button>
         </div>
       </div>
 
@@ -2493,7 +2491,7 @@
     <div class="cfg-tab-pane" id="cfgTab-pedidos">
 
       <div class="card p-3 mt-3">
-        <h6 style="margin-bottom:6px;">🛒 Pedido mínimo</h6>
+        <h6 style="margin-bottom:6px;">Pedido mínimo</h6>
         <p class="text-muted" style="font-size:12.5px; margin-top:-2px; margin-bottom:14px;">
           El cliente no puede enviar el pedido si el total no llega a este monto. Se aplica al instante en el catálogo.
         </p>
@@ -2502,12 +2500,12 @@
           <input type="number" class="form-control" id="cfgPedidoMinimo" min="0" step="1000" placeholder="Ej: 100000">
         </div>
         <div class="d-flex justify-content-end">
-          <button class="btn btn-success" id="btnGuardarPedidoMinimo" onclick="guardarPedidoMinimoForm()">💾 Guardar pedido mínimo</button>
+          <button class="btn btn-success" id="btnGuardarPedidoMinimo" onclick="guardarPedidoMinimoForm()">Guardar pedido mínimo</button>
         </div>
       </div>
 
       <div class="card p-3 mt-3">
-        <h6 style="margin-bottom:6px;">🚫 Transportes que no trabajamos</h6>
+        <h6 style="margin-bottom:6px;">Transportes que no trabajamos</h6>
         <p class="text-muted" style="font-size:12.5px; margin-top:-4px; margin-bottom:14px;">
           Escribí acá los nombres de las empresas de transporte con las que NO trabajás (una por línea). El catálogo web no va a dejar que el cliente escriba ninguno de esos nombres en el campo "Transporte" del carrito — ni parecido, ni con mayúsculas o acentos distintos. Dejalo vacío si no querés restringir ninguna.
         </p>
@@ -2518,12 +2516,12 @@
         </div>
 
         <div class="d-flex justify-content-end mt-3">
-          <button class="btn btn-success" id="btnGuardarTransportesNoDisponibles" onclick="guardarTransportesNoDisponiblesForm()">💾 Guardar</button>
+          <button class="btn btn-success" id="btnGuardarTransportesNoDisponibles" onclick="guardarTransportesNoDisponiblesForm()">Guardar</button>
         </div>
       </div>
 
       <div class="card p-3 mb-3">
-        <h6 style="margin-bottom:6px;">🏦 Datos bancarios</h6>
+        <h6 style="margin-bottom:6px;">Datos bancarios</h6>
         <p class="text-muted" style="font-size:12.5px; margin-top:-4px; margin-bottom:14px;">
           Se incluyen en el mensaje de WhatsApp que se manda al cliente cuando un pedido queda en estado "Nuevo".
         </p>
@@ -2539,12 +2537,12 @@
         </div>
 
         <div class="d-flex justify-content-end mt-2">
-          <button class="btn btn-success" onclick="guardarConfigNegocioForm()">💾 Guardar</button>
+          <button class="btn btn-success" onclick="guardarConfigNegocioForm()">Guardar</button>
         </div>
       </div>
 
       <div class="card p-3 mt-3">
-        <h6 style="margin-bottom:14px;">📄 PDF de pedidos</h6>
+        <h6 style="margin-bottom:14px;">PDF de pedidos</h6>
         <p class="text-muted" style="font-size:12.5px; margin-top:-8px; margin-bottom:14px;">
           Cada pedido genera un PDF con el detalle del cliente y los productos. El título y el WhatsApp del encabezado usan el <strong>nombre del local</strong> y el <strong>WhatsApp</strong> que configuraste en la pestaña Negocio (Encabezado del ticket) — los textos de abajo son específicos de este PDF.
         </p>
@@ -2576,7 +2574,7 @@
         </div>
 
         <div class="d-flex justify-content-end mt-3">
-          <button class="btn btn-success" id="btnGuardarDrivePedidos" onclick="guardarDrivePedidosForm()">💾 Guardar</button>
+          <button class="btn btn-success" id="btnGuardarDrivePedidos" onclick="guardarDrivePedidosForm()">Guardar</button>
         </div>
       </div>
 
@@ -2587,7 +2585,7 @@
 
       <!-- Tarjeta Mercado Pago — solo visible en Electron -->
       <div class="card p-3 mt-3" id="cardMercadoPago" style="display:none;">
-        <h6 style="margin-bottom:6px;">📲 Mercado Pago — Cobro con QR</h6>
+        <h6 style="margin-bottom:6px;">Mercado Pago — Cobro con QR</h6>
         <p class="text-muted" style="font-size:13px; margin-bottom:14px;">
           Opcional. Si lo configurás, el botón "Transferencia" del POS muestra un QR de Mercado Pago y confirma el cobro automáticamente cuando se acredita.
         </p>
@@ -2639,10 +2637,10 @@
           <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-3">
             <button class="btn btn-outline-danger btn-sm" id="btnQuitarMercadoPago" onclick="quitarConfigMercadoPago()" style="display:none;">Quitar configuración</button>
             <div class="d-flex gap-2">
-              <button class="btn btn-outline-secondary btn-sm" onclick="probarCredencialesMercadoPagoBtn()">🧪 Probar conexión</button>
-              <button class="btn btn-outline-primary btn-sm" onclick="abrirModalPantallaCobro()" title="Una página para el celular o la tablet que mira el cliente: muestra el QR de cobro y avisa cuando entra el pago.">📱 Pantalla de cobro en el celular</button>
-              <button class="btn btn-outline-secondary btn-sm" onclick="abrirModalQRDePrueba()" title="Abre el modal de cobro con un QR falso, sin llamar a Mercado Pago — sirve para probar botones/comportamiento del modal (ej. Cancelar) sin necesidad de tener MP configurado.">🧪 QR de prueba</button>
-              <button class="btn btn-success btn-sm" id="btnGuardarMercadoPago" onclick="guardarConfigMercadoPagoForm()">💾 Guardar y configurar</button>
+              <button class="btn btn-outline-secondary btn-sm" onclick="probarCredencialesMercadoPagoBtn()">Probar conexión</button>
+              <button class="btn btn-outline-primary btn-sm" onclick="abrirModalPantallaCobro()" title="Una página para el celular o la tablet que mira el cliente: muestra el QR de cobro y avisa cuando entra el pago.">Pantalla de cobro en el celular</button>
+              <button class="btn btn-outline-secondary btn-sm" onclick="abrirModalQRDePrueba()" title="Abre el modal de cobro con un QR falso, sin llamar a Mercado Pago — sirve para probar botones/comportamiento del modal (ej. Cancelar) sin necesidad de tener MP configurado.">QR de prueba</button>
+              <button class="btn btn-success btn-sm" id="btnGuardarMercadoPago" onclick="guardarConfigMercadoPagoForm()">Guardar y configurar</button>
             </div>
           </div>
         </div>
@@ -2654,13 +2652,13 @@
     <div class="cfg-tab-pane" id="cfgTab-equipo">
 
       <div class="card p-3 mb-3">
-        <h6 style="margin-bottom:4px;">🖥️ Estilo del panel en esta computadora</h6>
+        <h6 style="margin-bottom:4px;">Estilo del panel en esta computadora</h6>
         <p class="text-muted" style="font-size:13px;margin-bottom:14px;">Cambia cómo se ve el panel solo en esta caja (cada una puede elegir el suyo). El color del negocio se sigue eligiendo en Catálogo Web → Color del sitio.</p>
         <div class="estilos-grid" id="selectorEstilosPanel" role="group" aria-label="Estilo del panel"></div>
       </div>
 
       <div class="card p-3 mb-3">
-        <h6 style="margin-bottom:4px;">🔔 Aviso de pedidos web nuevos</h6>
+        <h6 style="margin-bottom:4px;">Aviso de pedidos web nuevos</h6>
         <p class="text-muted" style="font-size:13px;margin-bottom:10px;">Cuando entra un pedido del catálogo, esta computadora avisa (revisa cada 30 segundos) y "Pedidos web" del menú muestra cuántos hay sin mirar.</p>
         <div class="form-check form-switch mb-1">
           <input class="form-check-input" type="checkbox" id="cfgAvisoPedSonido" onchange="guardarPrefAvisoPedidos('sonido', this.checked)">
@@ -2678,7 +2676,7 @@
 
       <!-- Tarjeta impresora — solo visible en Electron (pos-offline.js la muestra) -->
       <div class="card p-3 mb-3" id="cardImpresoraPOS" style="display:none;">
-        <h6 style="margin-bottom:6px;">🖨️ Impresora para tickets</h6>
+        <h6 style="margin-bottom:6px;">Impresora para tickets</h6>
         <p class="text-muted" style="font-size:12.5px; margin-top:-4px; margin-bottom:14px;">
           Seleccioná la impresora de tickets para que imprima sin mostrar el diálogo del sistema.
         </p>
@@ -2687,32 +2685,30 @@
             <option value="">Cargando impresoras...</option>
           </select>
           <button class="btn btn-outline-secondary btn-sm" onclick="cargarListaImpresoras()">↻</button>
-          <button class="btn btn-success btn-sm" onclick="guardarImpresoraSeleccionada()">💾 Guardar</button>
+          <button class="btn btn-success btn-sm" onclick="guardarImpresoraSeleccionada()">Guardar</button>
         </div>
         <div id="cfgImpresoraActual" class="text-muted mt-2" style="font-size:12px;"></div>
       </div>
 
       <div class="card p-3 mt-3" id="usbPrintCard">
-        <h6 style="margin-bottom:6px;">🔌 Impresión directa por USB</h6>
+        <h6 style="margin-bottom:6px;">Impresión directa por USB</h6>
         <p class="text-muted" style="font-size:13px; margin-bottom:14px;">
           Conectá la impresora térmica una sola vez para imprimir sin el cartel de "Imprimir" de Chrome. Solo funciona en Chrome o Edge, en esta misma computadora.
         </p>
 
         <div id="usbPrintUnsupported" class="usb-print-status warn" style="display:none;">
-          <span class="ic">⚠️</span>
-          Este navegador no soporta impresión directa (Web Serial). Vas a seguir usando el cartel de impresión normal — funciona igual, solo con un paso más.
+                    Este navegador no soporta impresión directa (Web Serial). Vas a seguir usando el cartel de impresión normal — funciona igual, solo con un paso más.
         </div>
 
         <div id="usbPrintSupported" style="display:none;">
           <div class="usb-print-status" id="usbPrintStatus">
-            <span class="ic">🔌</span>
-            <span id="usbPrintStatusText">Impresora no conectada</span>
+                        <span id="usbPrintStatusText">Impresora no conectada</span>
           </div>
 
           <div class="d-flex gap-2 flex-wrap mt-2">
-            <button class="btn btn-outline-primary btn-sm" id="btnConectarImpresora" onclick="conectarImpresoraUSB()">🔌 Conectar impresora</button>
+            <button class="btn btn-outline-primary btn-sm" id="btnConectarImpresora" onclick="conectarImpresoraUSB()">Conectar impresora</button>
             <button class="btn btn-outline-secondary btn-sm" id="btnDesconectarImpresora" onclick="desconectarImpresoraUSB()" style="display:none;">Desconectar</button>
-            <button class="btn btn-outline-secondary btn-sm" id="btnProbarImpresora" onclick="probarImpresoraUSB()" style="display:none;">🧪 Imprimir prueba</button>
+            <button class="btn btn-outline-secondary btn-sm" id="btnProbarImpresora" onclick="probarImpresoraUSB()" style="display:none;">Imprimir prueba</button>
           </div>
 
           <div class="pm-switches mt-3">
@@ -2726,7 +2722,7 @@
 
       <!-- Tarjeta red local multicaja — solo visible en Electron -->
       <div class="card p-3 mt-3" id="cardMultiCajaRed" style="display:none;">
-        <h6 style="margin-bottom:6px;">🌐 Red local (multi-caja)</h6>
+        <h6 style="margin-bottom:6px;">Red local (multi-caja)</h6>
         <p class="text-muted" style="font-size:12.5px; margin-top:-4px; margin-bottom:10px;">
           Configurá este equipo como servidor o cliente en una red local.
         </p>
@@ -2742,8 +2738,23 @@
           <label class="form-label">Nombre de esta caja</label>
           <input type="text" class="form-control" id="cfgNombreCaja" placeholder="Ej: Caja 1, Caja Mostrador">
         </div>
+        <!-- Caja servidor: muestra el código de emparejamiento -->
+        <div id="bloqueCodigoServidor" class="mb-2" style="display:none;">
+          <label class="form-label">Código de emparejamiento</label>
+          <div class="d-flex align-items-center gap-2 flex-wrap">
+            <code id="codigoRedServidor" class="codigo-red">····-····</code>
+            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="regenerarCodigoRed()">Generar uno nuevo</button>
+          </div>
+          <div class="form-text">Escribilo una sola vez en cada caja cliente (Configuración → Red local). Sin este código ningún equipo puede mandarle datos a esta caja.</div>
+        </div>
+        <!-- Caja cliente: se escribe el código una sola vez -->
+        <div id="bloqueCodigoCliente" class="mb-2" style="display:none;">
+          <label class="form-label">Código de emparejamiento <span class="text-muted" style="font-size:11px;">(lo muestra la caja servidor)</span></label>
+          <input type="text" class="form-control" id="cfgCodigoRed" placeholder="Ej: K7QX-4M2P" maxlength="9" autocomplete="off" style="text-transform:uppercase; font-family:var(--font-mono); letter-spacing:1px;">
+          <div class="form-text" id="cfgCodigoRedAyuda"></div>
+        </div>
         <div id="estadoRedLocal" class="text-muted mb-2" style="font-size:12px;"></div>
-        <button class="btn btn-success btn-sm" onclick="guardarConfigRed()">💾 Guardar configuración de red</button>
+        <button class="btn btn-success btn-sm" onclick="guardarConfigRed()">Guardar configuración de red</button>
       </div>
 
     </div>
@@ -2752,30 +2763,30 @@
     <div class="cfg-tab-pane" id="cfgTab-sistema">
 
       <div class="card p-3 mb-3">
-        <h6 style="margin-bottom:4px;">🐞 Informar un problema</h6>
+        <h6 style="margin-bottom:4px;">Informar un problema</h6>
         <p class="text-muted" style="font-size:13px;margin-bottom:10px;">Si algo no funciona como debería, contalo acá: le llega por correo a soporte junto con los datos técnicos para encontrar la causa. Los errores inesperados del sistema también se avisan solos.</p>
-        <div><button type="button" class="btn btn-outline-secondary btn-sm" onclick="abrirInformeProblema()">🐞 Informar un problema</button></div>
+        <div><button type="button" class="btn btn-outline-secondary btn-sm" onclick="abrirInformeProblema()">Informar un problema</button></div>
       </div>
 
       <div class="card p-3 mb-3" id="cardVentasResumidas">
-        <h6 style="margin-bottom:4px;">🗂️ Historial de ventas en la planilla</h6>
+        <h6 style="margin-bottom:4px;">Historial de ventas en la planilla</h6>
         <p class="text-muted" style="font-size:13px;margin-bottom:10px;">Para que la planilla no crezca sin fin, se guarda el detalle de cada venta solo de los últimos meses. Lo anterior se resume por día (total por forma de pago y unidades por producto): <b>los reportes no cambian</b>, solo deja de verse cada ticket viejo por separado. Antes de resumir, el detalle completo se guarda en Drive (carpeta "Respaldo de ventas"). Se hace solo una vez por mes; con el botón se hace ahora.</p>
         <div id="ventasResumidasEstado" class="ventas-resumidas-estado text-muted" style="font-size:13px;">Cargando…</div>
         <div class="d-flex flex-wrap gap-2 mt-2">
           <button type="button" class="btn btn-outline-secondary btn-sm" onclick="cargarEstadoVentasResumidas()">↻ Actualizar</button>
-          <button type="button" class="btn btn-outline-primary btn-sm" id="btnResumirVentas" onclick="resumirVentasViejasClick()" disabled>📦 Resumir ventas viejas ahora</button>
+          <button type="button" class="btn btn-outline-primary btn-sm" id="btnResumirVentas" onclick="resumirVentasViejasClick()" disabled>Resumir ventas viejas ahora</button>
         </div>
       </div>
 
       <!-- ===== LICENCIA ===== -->
       <div class="card p-3 mb-3" id="cardLicencia">
         <div class="d-flex align-items-center gap-2" style="margin-bottom:12px;">
-          <h6 style="margin:0;">🔑 Licencia</h6>
+          <h6 style="margin:0;">Licencia</h6>
           <span id="licenciaBadge" class="licencia-badge">…</span>
         </div>
         <div id="licenciaEstadoBox">Cargando estado de la licencia...</div>
         <div class="d-flex flex-wrap gap-2 mt-3" id="licenciaAcciones">
-          <button class="btn btn-outline-secondary btn-sm" id="btnVerificarLicencia" onclick="validarLicenciaAhoraBtn()">🔄 Verificar ahora</button>
+          <button class="btn btn-outline-secondary btn-sm" id="btnVerificarLicencia" onclick="validarLicenciaAhoraBtn()">↻ Verificar ahora</button>
           <button class="btn btn-outline-secondary btn-sm" id="btnCambiarLicencia" onclick="cambiarLicencia()">Cambiar licencia…</button>
           <button class="btn btn-outline-danger btn-sm" id="btnQuitarLicencia" onclick="quitarLicenciaDeEstaPC()">Quitar de esta PC</button>
         </div>
@@ -2792,7 +2803,7 @@
 
       <!-- Tarjeta API URL — solo visible en Electron -->
       <div class="card p-3 mt-3" id="cardConexionNegocio" style="display:none;">
-        <h6 style="margin-bottom:6px;">🔗 Conexión con tu Google Sheets</h6>
+        <h6 style="margin-bottom:6px;">Conexión con tu Google Sheets</h6>
         <p class="text-muted" style="font-size:12.5px; margin-top:-4px; margin-bottom:10px;">
           URL de la API que conecta el VeekPOS con tu planilla de Google Sheets.
         </p>
@@ -2802,11 +2813,11 @@
             placeholder="https://script.google.com/macros/s/.../exec">
         </div>
         <div id="conexionNegocioUrlActual" class="text-muted mb-2" style="font-size:12px;"></div>
-        <button class="btn btn-success btn-sm" onclick="guardarApiUrlDesdeConfig()">💾 Guardar URL</button>
+        <button class="btn btn-success btn-sm" onclick="guardarApiUrlDesdeConfig()">Guardar URL</button>
       </div>
 
       <div class="card p-3 mb-3">
-        <h6 style="margin-bottom:14px;">🖼️ Imágenes de productos</h6>
+        <h6 style="margin-bottom:14px;">Imágenes de productos</h6>
         <p class="text-muted" style="font-size:12.5px; margin-top:-8px; margin-bottom:14px;">
           Las fotos que subís desde "Nuevo Producto" se guardan en esta carpeta de tu Google Drive. Pegá el link de la carpeta (o solo el ID) — tiene que ser una carpeta de la misma cuenta de Google donde está la planilla.
         </p>
@@ -2822,7 +2833,7 @@
         </div>
 
         <div class="d-flex justify-content-end mt-3">
-          <button class="btn btn-success" id="btnGuardarDriveProductos" onclick="guardarDriveProductosForm()">💾 Guardar</button>
+          <button class="btn btn-success" id="btnGuardarDriveProductos" onclick="guardarDriveProductosForm()">Guardar</button>
         </div>
       </div>
 
@@ -2835,14 +2846,14 @@
   <div id="instalador" class="seccion">
     <div class="page-header">
       <div>
-        <h1>🛠️ Instalador</h1>
+        <h1>Instalador</h1>
         <div class="sub">Generá el código y los archivos para una nueva instalación</div>
       </div>
     </div>
 
     <!-- Paso 1: Datos del cliente -->
     <div class="card p-4 mb-3">
-      <h6 class="mb-3">📋 Paso 1 — Datos del cliente</h6>
+      <h6 class="mb-3">Paso 1 — Datos del cliente</h6>
       <div class="row g-3">
         <div class="col-md-6">
           <label class="form-label">Nombre de la empresa *</label>
@@ -2882,7 +2893,7 @@
 
     <!-- Paso 2: Generar Code.gs -->
     <div class="card p-4 mb-3">
-      <h6 class="mb-1">📄 Paso 2 — Generar Code.gs</h6>
+      <h6 class="mb-1">Paso 2 — Generar Code.gs</h6>
       <p class="text-muted mb-3" style="font-size:13px;">
         Descargá el archivo Code.gs con los datos del cliente ya insertados.
         Luego creá un proyecto en <a href="https://script.google.com" target="_blank">script.google.com</a>,
@@ -2898,23 +2909,23 @@
         6. Copiá la URL y pegala en el campo API URL de arriba
       </div>
       <button class="btn btn-primary" onclick="generarCodeGs()">
-        📥 Descargar Code.gs generado
+        Descargar Code.gs generado
       </button>
     </div>
 
     <!-- Paso 3: Generar config.json -->
     <div class="card p-4 mb-3">
-      <h6 class="mb-1">📦 Paso 3 — Generar archivos del cliente</h6>
+      <h6 class="mb-1">Paso 3 — Generar archivos del cliente</h6>
       <p class="text-muted mb-3" style="font-size:13px;">
         Generá el <code>config.json</code> con los datos del cliente, o el
         <strong>ZIP completo del catálogo web</strong> listo para subir al hosting.
       </p>
       <div class="d-flex gap-2 flex-wrap">
         <button class="btn btn-outline-secondary" onclick="generarConfigJson()">
-          ⚙️ Solo config.json
+          Solo config.json
         </button>
         <button class="btn btn-success" onclick="generarCatalogoZip()">
-          🌐 Descargar Catálogo Web (.zip)
+          Descargar Catálogo Web (.zip)
         </button>
       </div>
       <div id="instStatus" class="mt-3"></div>
@@ -2922,13 +2933,13 @@
 
     <!-- Paso 4: Verificar conexión -->
     <div class="card p-4 mb-3">
-      <h6 class="mb-1">✅ Paso 4 — Verificar conexión y crear las hojas</h6>
+      <h6 class="mb-1">Paso 4 — Verificar conexión y crear las hojas</h6>
       <p class="text-muted mb-3" style="font-size:13px;">
         Una vez publicado el Code.gs y pegada la API URL de arriba, tocá el botón — prueba que la conexión funcione y, de paso, crea en la planilla todas las hojas que el sistema necesita (si ya existían, no las toca).
       </p>
       <div class="d-flex gap-3 align-items-center flex-wrap">
         <button class="btn btn-outline-success" onclick="verificarConexionInstalador()">
-          🔌 Probar conexión y crear hojas
+          Probar conexión y crear hojas
         </button>
         <span id="instConexionStatus" style="font-size:13px;"></span>
       </div>
@@ -2936,7 +2947,7 @@
 
     <!-- Paso 5: Activar el panel -->
     <div class="card p-4">
-      <h6 class="mb-1">🔐 Paso 5 — Activar el panel para este negocio</h6>
+      <h6 class="mb-1">Paso 5 — Activar el panel para este negocio</h6>
       <p class="text-muted mb-3" style="font-size:13px;">
         Con la conexión verificada, descargá el <code>config.json</code> del Paso 3 (con la API URL ya cargada) y colocalo en la raíz de esta instalación, al lado de la carpeta <code>admin/</code>. Al recargar esta página, el panel va a reconocer que ya está configurado y va a pedir usuario y contraseña por primera vez — usá <strong>admin</strong> / <strong>Jireh2026</strong> (después la podés cambiar desde Configuración → Acceso al panel).
       </p>
@@ -2949,7 +2960,7 @@
 <div class="product-modal-backdrop" id="modalEliminarMovBackdrop">
   <div class="product-modal" style="max-width:400px;">
     <div class="product-modal-header">
-      <h6>🗑️ Eliminar movimiento</h6>
+      <h6>Eliminar movimiento</h6>
       <button onclick="cerrarModalEliminarMov()">✕</button>
     </div>
     <div class="product-modal-body">
@@ -2967,7 +2978,7 @@
 <div class="product-modal-backdrop" id="modalEdicionRapidaPOSBackdrop">
   <div class="product-modal" style="max-width:360px;">
     <div class="product-modal-header">
-      <h6>✏️ Editar rápido</h6>
+      <h6>Editar rápido</h6>
       <button onclick="cerrarEdicionRapidaPOS()">✕</button>
     </div>
     <div class="product-modal-body">
@@ -3001,12 +3012,12 @@
 <div class="product-modal-backdrop" id="modalEliminarProdBackdrop">
   <div class="product-modal" style="max-width:400px;">
     <div class="product-modal-header">
-      <h6>🗑️ Eliminar producto</h6>
+      <h6>Eliminar producto</h6>
       <button onclick="cerrarModalEliminarProd()">✕</button>
     </div>
     <div class="product-modal-body">
       <p id="modalEliminarProdTexto" style="font-size:13.5px; color:var(--slate-700);">
-        ¿Mover este producto a la papelera? Lo vas a poder restaurar desde Productos → 🗑️ Papelera.
+        ¿Mover este producto a la papelera? Lo vas a poder restaurar desde Productos → Papelera.
       </p>
     </div>
     <div class="product-modal-actions">
@@ -3023,7 +3034,7 @@
 <div class="product-modal-backdrop" id="informeModalBackdrop" onclick="if(event.target===this)cerrarInformeProblema()">
   <div class="product-modal" style="width:min(560px, 94vw);" role="dialog" aria-labelledby="informeTitulo">
     <div class="product-modal-header">
-      <h6 id="informeTitulo">🐞 Informar un problema</h6>
+      <h6 id="informeTitulo">Informar un problema</h6>
       <button onclick="cerrarInformeProblema()" aria-label="Cerrar">✕</button>
     </div>
     <div class="product-modal-body">
@@ -3065,7 +3076,7 @@
 <div class="product-modal-backdrop" id="cuponRepModalBackdrop" onclick="if(event.target===this)cerrarReporteCupon()">
   <div class="product-modal" style="width:min(760px, 96vw);">
     <div class="product-modal-header">
-      <h6 id="cuponRepTitulo">📊 Pedidos con el cupón</h6>
+      <h6 id="cuponRepTitulo">Pedidos con el cupón</h6>
       <button onclick="cerrarReporteCupon()">✕</button>
     </div>
     <div class="product-modal-body">
@@ -3083,7 +3094,7 @@
 <div class="product-modal-backdrop" id="cuponModalBackdrop">
   <div class="product-modal" style="width:min(520px, 94vw);">
     <div class="product-modal-header">
-      <h6 id="cuponModalTitulo">🎟️ Nuevo cupón</h6>
+      <h6 id="cuponModalTitulo">Nuevo cupón</h6>
       <button onclick="cerrarModalCupon()">✕</button>
     </div>
     <div class="product-modal-body">
@@ -3142,7 +3153,7 @@
     </div>
     <div class="product-modal-actions">
       <button class="btn btn-outline-secondary" onclick="cerrarModalCupon()">Cancelar</button>
-      <button class="btn btn-success" id="btnGuardarCupon" onclick="guardarCuponForm()">💾 Guardar cupón</button>
+      <button class="btn btn-success" id="btnGuardarCupon" onclick="guardarCuponForm()">Guardar cupón</button>
     </div>
   </div>
 </div>
@@ -3180,7 +3191,7 @@
     <div class="product-modal-actions">
       <span id="ocEstado" class="oc-estado">Sin cambios</span>
       <button class="btn btn-outline-secondary" onclick="cerrarOrdenCatalogo()">Cerrar</button>
-      <button class="btn btn-primary" id="btnGuardarOrdenCatalogo" onclick="guardarOrdenCatalogo()" disabled>💾 Guardar orden</button>
+      <button class="btn btn-primary" id="btnGuardarOrdenCatalogo" onclick="guardarOrdenCatalogo()" disabled>Guardar orden</button>
     </div>
   </div>
 </div>
@@ -3188,12 +3199,12 @@
 <div class="product-modal-backdrop" id="papeleraProductosModalBackdrop">
   <div class="product-modal" style="width:min(640px, 94vw);">
     <div class="product-modal-header">
-      <h6>🗑️ Papelera de productos <span id="papeleraContador" style="font-size:12px; color:var(--slate-500); font-weight:400;"></span></h6>
+      <h6>Papelera de productos <span id="papeleraContador" style="font-size:12px; color:var(--slate-500); font-weight:400;"></span></h6>
       <button onclick="cerrarPapeleraProductos()">✕</button>
     </div>
     <div class="product-modal-body">
       <div class="d-flex gap-2 mb-2">
-        <input type="text" class="form-control form-control-sm" id="papeleraBuscar" placeholder="🔍 Buscar por nombre, código o categoría..." oninput="renderPapeleraProductos()" autocomplete="off">
+        <input type="text" class="form-control form-control-sm" id="papeleraBuscar" placeholder="Buscar por nombre, código o categoría..." oninput="renderPapeleraProductos()" autocomplete="off">
         <button type="button" class="btn btn-outline-secondary btn-sm" onclick="cargarPapeleraProductos()" title="Recargar">↻</button>
       </div>
       <div style="font-size:11.5px; color:var(--slate-500); margin-bottom:6px;">
@@ -3233,7 +3244,7 @@
 <div class="scan-modal-backdrop" id="scanModalBackdrop">
   <div class="scan-modal">
     <div class="scan-modal-header">
-      <h6>📷 Escanear con cámara</h6>
+      <h6>Escanear con cámara</h6>
       <button onclick="cerrarCamaraScan()">✕</button>
     </div>
     <div class="scan-video-wrap" id="scanVideoWrap">
@@ -3247,7 +3258,7 @@
 <!-- ===== MODAL QR MERCADO PAGO ===== -->
 <div class="receipt-backdrop" id="mpQrBackdrop">
   <div class="receipt-modal" style="max-width:360px;">
-    <h4 style="margin-bottom:4px;">📲 Cobrar con Mercado Pago</h4>
+    <h4 style="margin-bottom:4px;">Cobrar con Mercado Pago</h4>
     <div class="text-muted" style="font-size:13px; margin-bottom:14px;" id="mpQrMontoLabel">$0</div>
     <div id="mpQrEsperando">
       <img id="mpQrImagen" src="" alt="QR de cobro" style="width:240px; height:240px; display:block; margin:0 auto 14px; border-radius:12px; border:1px solid var(--slate-200);">
@@ -3359,7 +3370,7 @@
       <div class="mt-3">
         <label class="pm-switch">
           <input type="checkbox" id="pmVentaPorCaja" onchange="toggleVentaPorCaja()">
-          <span>📦 También se vende por caja/bulto cerrado, a otro precio</span>
+          <span>También se vende por caja/bulto cerrado, a otro precio</span>
         </label>
         <div id="pmCajaWrap" class="row g-2 mt-1" style="display:none;">
           <div class="col-12">
@@ -3398,7 +3409,7 @@
 
     <div class="product-modal-actions">
       <button class="btn btn-outline-secondary" onclick="cerrarModalProducto()">Cancelar</button>
-      <button class="btn btn-success" id="btnGuardarProducto" onclick="guardarProductoForm()">💾 Guardar Producto</button>
+      <button class="btn btn-success" id="btnGuardarProducto" onclick="guardarProductoForm()">Guardar Producto</button>
     </div>
   </div>
 </div>
@@ -3407,7 +3418,7 @@
 <div class="product-modal-backdrop" id="cropImagenModalBackdrop">
   <div class="product-modal" style="max-width:400px; width:92vw;">
     <div class="product-modal-header">
-      <h6>✂️ Recortar foto del producto</h6>
+      <h6>Recortar foto del producto</h6>
       <button onclick="cancelarRecorteImagenProducto()">✕</button>
     </div>
 
@@ -3417,7 +3428,7 @@
       </div>
 
       <div style="width:100%; max-width:280px;">
-        <label class="form-label" style="font-size:12px; margin-bottom:2px;">🔍 Zoom</label>
+        <label class="form-label" style="font-size:12px; margin-bottom:2px;">Zoom</label>
         <input type="range" class="form-range" id="cropZoomSlider" min="0" max="100" value="0">
       </div>
 
@@ -3428,7 +3439,7 @@
 
     <div class="product-modal-actions">
       <button class="btn btn-outline-secondary" onclick="cancelarRecorteImagenProducto()">Cancelar</button>
-      <button class="btn btn-success" onclick="confirmarRecorteImagenProducto()">✅ Usar esta foto</button>
+      <button class="btn btn-success" onclick="confirmarRecorteImagenProducto()">Usar esta foto</button>
     </div>
   </div>
 </div>
@@ -3437,7 +3448,7 @@
 <div class="product-modal-backdrop" id="cropBannerModalBackdrop">
   <div class="product-modal" style="max-width:520px; width:94vw;">
     <div class="product-modal-header">
-      <h6>✂️ Recortar imagen del banner</h6>
+      <h6>Recortar imagen del banner</h6>
       <button onclick="cancelarRecorteBanner()">✕</button>
     </div>
 
@@ -3447,7 +3458,7 @@
       </div>
 
       <div style="width:100%; max-width:280px;">
-        <label class="form-label" style="font-size:12px; margin-bottom:2px;">🔍 Zoom</label>
+        <label class="form-label" style="font-size:12px; margin-bottom:2px;">Zoom</label>
         <input type="range" class="form-range" id="cropBannerZoomSlider" min="0" max="100" value="0">
       </div>
 
@@ -3458,7 +3469,7 @@
 
     <div class="product-modal-actions">
       <button class="btn btn-outline-secondary" onclick="cancelarRecorteBanner()">Cancelar</button>
-      <button class="btn btn-success" onclick="confirmarRecorteBanner()">✅ Usar esta imagen</button>
+      <button class="btn btn-success" onclick="confirmarRecorteBanner()">Usar esta imagen</button>
     </div>
   </div>
 </div>
@@ -3467,7 +3478,7 @@
 <div class="product-modal-backdrop" id="stockModalBackdrop">
   <div class="product-modal stock-modal">
     <div class="product-modal-header">
-      <h6>📦 Agregar Stock</h6>
+      <h6>Agregar Stock</h6>
       <button onclick="cerrarModalStock()">✕</button>
     </div>
 
@@ -3497,7 +3508,7 @@
 
     <div class="product-modal-actions">
       <button class="btn btn-outline-secondary" onclick="cerrarModalStock()">Cancelar</button>
-      <button class="btn btn-success" id="btnConfirmarStock" onclick="confirmarAgregarStock()">📦 Sumar al stock</button>
+      <button class="btn btn-success" id="btnConfirmarStock" onclick="confirmarAgregarStock()">Sumar al stock</button>
     </div>
   </div>
 </div>
@@ -3506,7 +3517,7 @@
 <div class="product-modal-backdrop" id="pedidoAdminModalBackdrop">
   <div class="product-modal pedido-admin-modal">
     <div class="product-modal-header">
-      <h6>📦 Generar Pedido</h6>
+      <h6>Generar Pedido</h6>
       <button onclick="cerrarModalPedidoAdmin()">✕</button>
     </div>
 
@@ -3573,8 +3584,7 @@
 
       <div class="mb-2" id="paMonedaWrap" style="display:none;">
         <div class="config-preview-hint mb-2" style="background:var(--green-50); color:var(--green-600); border-color:var(--green-600);">
-          <span class="ic">💳</span>
-          Este cliente es a crédito — elegí en qué moneda queda este pedido.
+                    Este cliente es a crédito — elegí en qué moneda queda este pedido.
         </div>
         <label class="form-label">Moneda del pedido</label>
         <select class="form-select" id="paMoneda" onchange="actualizarVisibilidadTipoCambioPedidoAdmin()">
@@ -3616,7 +3626,7 @@
 
     <div class="product-modal-actions">
       <button class="btn btn-outline-secondary" onclick="cerrarModalPedidoAdmin()">Cancelar</button>
-      <button class="btn btn-success" id="btnConfirmarPedidoAdmin" onclick="confirmarPedidoAdmin()">📦 Crear Pedido</button>
+      <button class="btn btn-success" id="btnConfirmarPedidoAdmin" onclick="confirmarPedidoAdmin()">Crear Pedido</button>
     </div>
   </div>
 </div>
@@ -3625,7 +3635,7 @@
 <div class="product-modal-backdrop" id="etiquetasModalBackdrop">
   <div class="product-modal etiquetas-modal">
     <div class="product-modal-header">
-      <h6>🏷️ Generar Etiquetas</h6>
+      <h6>Generar Etiquetas</h6>
       <button onclick="cerrarModalEtiquetas()">✕</button>
     </div>
 
@@ -3634,7 +3644,7 @@
         <div class="etq-opciones" oninput="actualizarPreviewEtiquetas()" onchange="actualizarPreviewEtiquetas()">
 
           <div class="etq-grupo">
-            <div class="etq-grupo-tit">📐 Tamaño</div>
+            <div class="etq-grupo-tit">Tamaño</div>
             <label class="form-label">Papel</label>
             <select class="form-select form-select-sm" id="etqPapel">
               <optgroup label="Hoja (impresora común)">
@@ -3673,7 +3683,7 @@
           </div>
 
           <div class="etq-grupo">
-            <div class="etq-grupo-tit">🧩 Qué lleva</div>
+            <div class="etq-grupo-tit">Qué lleva</div>
             <div class="etq-checks">
               <label><input type="checkbox" id="etqVerNegocio"> Nombre del negocio</label>
               <label><input type="checkbox" id="etqVerNombre" checked> Nombre del producto</label>
@@ -3689,7 +3699,7 @@
           </div>
 
           <div class="etq-grupo">
-            <div class="etq-grupo-tit">🎨 Estilo</div>
+            <div class="etq-grupo-tit">Estilo</div>
             <div class="row g-2">
               <div class="col-6"><label class="form-label">Tamaño del precio</label>
                 <select class="form-select form-select-sm" id="etqTamPrecio">
@@ -3719,7 +3729,7 @@
 
         <div class="etq-vista">
           <div class="etq-vista-cab">
-            <div class="etq-grupo-tit mb-0">👁️ Vista previa</div>
+            <div class="etq-grupo-tit mb-0">Vista previa</div>
             <div class="etq-modo" role="group" aria-label="Tipo de vista previa">
               <button type="button" class="activo" data-modo="hoja" onclick="cambiarModoPreviewEtiquetas('hoja')">Hoja completa</button>
               <button type="button" data-modo="real" onclick="cambiarModoPreviewEtiquetas('real')">Tamaño real</button>
@@ -3739,7 +3749,7 @@
     <div class="product-modal-actions">
       <span class="text-muted me-auto" style="font-size:12px;">La configuración se recuerda en esta computadora.</span>
       <button class="btn btn-outline-secondary" onclick="cerrarModalEtiquetas()">Cancelar</button>
-      <button class="btn btn-success" id="btnImprimirEtiquetas" onclick="imprimirEtiquetas()">🖨️ Generar e Imprimir</button>
+      <button class="btn btn-success" id="btnImprimirEtiquetas" onclick="imprimirEtiquetas()">Generar e Imprimir</button>
     </div>
   </div>
 </div>
@@ -3748,7 +3758,7 @@
 <div class="product-modal-backdrop" id="pantallaCobroModalBackdrop">
   <div class="product-modal" style="width:min(460px,96vw)">
     <div class="product-modal-header">
-      <h6>📱 Pantalla de cobro en el celular</h6>
+      <h6>Pantalla de cobro en el celular</h6>
       <button onclick="cerrarModalPantallaCobro()">✕</button>
     </div>
     <div class="product-modal-body" style="text-align:center">
@@ -3770,7 +3780,7 @@
 <div class="product-modal-backdrop" id="qrModalBackdrop">
   <div class="product-modal etiquetas-modal">
     <div class="product-modal-header">
-      <h6>📱 Generar QR de Precio</h6>
+      <h6>Generar QR de Precio</h6>
       <button onclick="cerrarModalQR()">✕</button>
     </div>
 
@@ -3801,7 +3811,7 @@
 
     <div class="product-modal-actions">
       <button class="btn btn-outline-secondary" onclick="cerrarModalQR()">Cancelar</button>
-      <button class="btn btn-success" id="btnImprimirQR" onclick="imprimirQR()">🖨️ Generar e Imprimir</button>
+      <button class="btn btn-success" id="btnImprimirQR" onclick="imprimirQR()">Generar e Imprimir</button>
     </div>
   </div>
 </div>
@@ -3810,7 +3820,7 @@
 <div class="product-modal-backdrop" id="qrOfflineModalBackdrop">
   <div class="product-modal etiquetas-modal">
     <div class="product-modal-header">
-      <h6>📦 Generar QR de Identificación</h6>
+      <h6>Generar QR de Identificación</h6>
       <button onclick="cerrarModalQROffline()">✕</button>
     </div>
 
@@ -3841,7 +3851,7 @@
 
     <div class="product-modal-actions">
       <button class="btn btn-outline-secondary" onclick="cerrarModalQROffline()">Cancelar</button>
-      <button class="btn btn-success" id="btnImprimirQROffline" onclick="imprimirQROffline()">🖨️ Generar e Imprimir</button>
+      <button class="btn btn-success" id="btnImprimirQROffline" onclick="imprimirQROffline()">Generar e Imprimir</button>
     </div>
   </div>
 </div>
@@ -3891,7 +3901,7 @@
     </div>
     <div class="product-modal-actions">
       <button class="btn btn-outline-secondary" onclick="cerrarModalNuevoCliente()">Cancelar</button>
-      <button class="btn btn-success" id="btnGuardarNuevoCliente" onclick="guardarNuevoCliente()">💾 Guardar</button>
+      <button class="btn btn-success" id="btnGuardarNuevoCliente" onclick="guardarNuevoCliente()">Guardar</button>
     </div>
   </div>
 </div>
@@ -3991,7 +4001,7 @@
             <input type="text" class="form-control form-control-sm" id="pagoObservaciones" placeholder="opcional">
           </div>
           <div class="col-md-3 d-flex align-items-end">
-            <button class="btn btn-success btn-sm w-100" id="btnRegistrarPago" onclick="registrarPagoCreditoForm()">💾 Registrar pago</button>
+            <button class="btn btn-success btn-sm w-100" id="btnRegistrarPago" onclick="registrarPagoCreditoForm()">Registrar pago</button>
           </div>
         </div>
       </div>
@@ -4025,7 +4035,7 @@
 
     </div>
     <div class="product-modal-actions">
-      <button class="btn btn-outline-secondary" onclick="imprimirInformeCliente()">🖨️ Imprimir informe</button>
+      <button class="btn btn-outline-secondary" onclick="imprimirInformeCliente()">Imprimir informe</button>
       <button class="btn btn-outline-secondary" onclick="cerrarModalDetalleCliente()">Cerrar</button>
     </div>
   </div>
@@ -4036,7 +4046,7 @@
 <div class="product-modal-backdrop" id="deudaExtraModalBackdrop">
   <div class="product-modal" style="max-width:460px;">
     <div class="product-modal-header">
-      <h6>➕ Agregar deuda — <span id="deudaExtraModalNombre"></span></h6>
+      <h6>Agregar deuda — <span id="deudaExtraModalNombre"></span></h6>
       <button onclick="cerrarModalDeudaExtra()">✕</button>
     </div>
     <div class="product-modal-body">
@@ -4060,7 +4070,7 @@
     </div>
     <div class="product-modal-actions">
       <button class="btn btn-outline-secondary" onclick="cerrarModalDeudaExtra()">Cancelar</button>
-      <button class="btn btn-warning" id="btnRegistrarDeudaExtra" onclick="registrarDeudaExtraForm()">💾 Registrar deuda</button>
+      <button class="btn btn-warning" id="btnRegistrarDeudaExtra" onclick="registrarDeudaExtraForm()">Registrar deuda</button>
     </div>
   </div>
 </div>
@@ -4080,8 +4090,8 @@
       <button class="btn btn-outline-secondary" onclick="cerrarModalDetallePedido()">Cerrar</button>
       <button class="btn btn-outline-secondary" id="btnImprimirEtiquetaDetalle" onclick="imprimirEtiquetaDesdeDetalle()">Imprimir Rotulo</button>
       <button class="btn btn-outline-secondary" id="btnImprimirRemitoDetalle" onclick="abrirRemitoDesdeDetalle()">Imprimir remito</button>
-      <button class="btn btn-outline-primary" id="btnEditarClientePedido" style="display:none;" onclick="activarEdicionClientePedido()">👤 Editar cliente</button>
-      <button class="btn btn-outline-primary" id="btnEditarItemsPedido" style="display:none;" onclick="activarEdicionItemsPedido()">✏️ Editar ítems</button>
+      <button class="btn btn-outline-primary" id="btnEditarClientePedido" style="display:none;" onclick="activarEdicionClientePedido()">Editar cliente</button>
+      <button class="btn btn-outline-primary" id="btnEditarItemsPedido" style="display:none;" onclick="activarEdicionItemsPedido()">Editar ítems</button>
       <button class="btn btn-success" onclick="imprimirNotaPedidoA4()">Imprimir pedido (A4)</button>
     </div>
   </div>
@@ -4099,14 +4109,14 @@
 <div class="product-modal-backdrop" id="etiquetaManualModalBackdrop">
   <div class="product-modal" style="max-width:460px;">
     <div class="product-modal-header">
-      <h6>🏷️ Etiqueta de envío manual</h6>
+      <h6>Etiqueta de envío manual</h6>
       <button onclick="cerrarModalEtiquetaManual()">✕</button>
     </div>
     <div class="product-modal-body">
       <div class="mb-2" style="position:relative;">
         <label class="form-label">Buscar cliente <span class="text-muted" style="font-size:11px;">(o cargá uno nuevo abajo)</span></label>
         <div class="d-flex gap-2">
-          <input type="text" class="form-control" id="etqManualBuscarCliente" placeholder="🔍 Nombre, DNI/CUIT o teléfono..." autocomplete="off"
+          <input type="text" class="form-control" id="etqManualBuscarCliente" placeholder="Nombre, DNI/CUIT o teléfono..." autocomplete="off"
             oninput="etqManualFiltrarClientes()" onfocus="etqManualFiltrarClientes()" onblur="etqManualOcultarResultados()" onkeydown="etqManualTeclaBuscar(event)">
           <button type="button" class="btn btn-outline-secondary" style="white-space:nowrap;" title="Limpiar y cargar un destinatario nuevo" onclick="etqManualLimpiarCliente()">✕ Nuevo</button>
         </div>
@@ -4162,7 +4172,7 @@
     </div>
     <div class="product-modal-actions">
       <button class="btn btn-outline-secondary" onclick="cerrarModalEtiquetaManual()">Cancelar</button>
-      <button class="btn btn-success" onclick="generarEtiquetaManual()">🖨️ Generar e imprimir</button>
+      <button class="btn btn-success" onclick="generarEtiquetaManual()">Generar e imprimir</button>
     </div>
   </div>
 </div>
@@ -4172,7 +4182,7 @@
 <div class="product-modal-backdrop" id="modalAnulacionBackdrop">
   <div class="product-modal" style="max-width:420px;">
     <div class="product-modal-header">
-      <h6>🗑️ Anular venta <span id="motivoAnulacionVentaId" style="font-family:monospace;font-size:12px;color:var(--slate-500);"></span></h6>
+      <h6>Anular venta <span id="motivoAnulacionVentaId" style="font-family:monospace;font-size:12px;color:var(--slate-500);"></span></h6>
       <button onclick="cerrarModalAnulacion()">✕</button>
     </div>
     <div class="product-modal-body">
@@ -4200,17 +4210,17 @@
 <div class="product-modal-backdrop" id="modalFinalizarVentaBackdrop">
   <div class="product-modal" style="width:min(420px,94vw);">
     <div class="product-modal-header">
-      <h6>✅ Finalizar venta — <span id="mfvTotal" style="font-family:monospace;color:var(--green-600);">$0</span></h6>
+      <h6>Finalizar venta — <span id="mfvTotal" style="font-family:monospace;color:var(--green-600);">$0</span></h6>
       <button onclick="cerrarModalFinalizarVenta()">✕</button>
     </div>
     <div class="product-modal-body" style="display:flex;flex-direction:column;gap:14px;">
 
       <!-- Descuento / Recargo -->
       <div>
-        <div class="mfv-label">🏷️ Descuento o recargo (opcional)</div>
+        <div class="mfv-label">Descuento o recargo (opcional)</div>
         <div class="discount-mode-row">
-          <button class="discount-mode-btn active" id="mfvModoDescuento" data-modo="DESCUENTO" onclick="mfvElegirModo(this,'DESCUENTO')">➖ Descuento</button>
-          <button class="discount-mode-btn"        id="mfvModoRecargo"  data-modo="RECARGO"   onclick="mfvElegirModo(this,'RECARGO')">➕ Recargo</button>
+          <button class="discount-mode-btn active" id="mfvModoDescuento" data-modo="DESCUENTO" onclick="mfvElegirModo(this,'DESCUENTO')">Descuento</button>
+          <button class="discount-mode-btn"        id="mfvModoRecargo"  data-modo="RECARGO"   onclick="mfvElegirModo(this,'RECARGO')">Recargo</button>
         </div>
         <div style="display:flex;gap:6px;align-items:center;">
           <button class="discount-type-btn active" id="mfvTipoPct" data-tipo="PORCENTAJE" onclick="mfvElegirTipo(this,'PORCENTAJE')">%</button>
@@ -4224,11 +4234,11 @@
 
       <!-- Forma de pago -->
       <div>
-        <div class="mfv-label">💳 Forma de pago</div>
+        <div class="mfv-label">Forma de pago</div>
         <div class="pay-methods" id="mfvPayMethods" style="gap:6px;">
-          <button class="pay-method-btn active" data-val="EFECTIVO"      onclick="mfvElegirPago(this,'EFECTIVO')">      <span class="ic">💵</span>Efectivo</button>
-          <button class="pay-method-btn"        data-val="TRANSFERENCIA" onclick="mfvElegirPago(this,'TRANSFERENCIA')"><span class="ic">📲</span>Transfer.</button>
-          <button class="pay-method-btn"        data-val="TARJETA"       onclick="mfvElegirPago(this,'TARJETA')">       <span class="ic">💳</span>Tarjeta</button>
+          <button class="pay-method-btn active" data-val="EFECTIVO"      onclick="mfvElegirPago(this,'EFECTIVO')">      Efectivo</button>
+          <button class="pay-method-btn"        data-val="TRANSFERENCIA" onclick="mfvElegirPago(this,'TRANSFERENCIA')">Transfer.</button>
+          <button class="pay-method-btn"        data-val="TARJETA"       onclick="mfvElegirPago(this,'TARJETA')">       Tarjeta</button>
         </div>
       </div>
 
@@ -4238,16 +4248,16 @@
            al alias, sin escanear nada), no había forma de simplemente
            registrar la venta. -->
       <div id="mfvQrWrap" style="display:none;">
-        <div class="mfv-label">📲 ¿Cómo se cobra la transferencia?</div>
+        <div class="mfv-label">¿Cómo se cobra la transferencia?</div>
         <div class="discount-mode-row">
-          <button type="button" class="discount-mode-btn" id="mfvQrNo" data-modo="NO" onclick="mfvElegirGenerarQR(false)">✅ Ya me transfirió</button>
-          <button type="button" class="discount-mode-btn" id="mfvQrSi" data-modo="SI" onclick="mfvElegirGenerarQR(true)">🔲 Generar QR</button>
+          <button type="button" class="discount-mode-btn" id="mfvQrNo" data-modo="NO" onclick="mfvElegirGenerarQR(false)">Ya me transfirió</button>
+          <button type="button" class="discount-mode-btn" id="mfvQrSi" data-modo="SI" onclick="mfvElegirGenerarQR(true)">Generar QR</button>
         </div>
       </div>
 
       <!-- Recibido / Cambio — solo efectivo -->
       <div id="mfvRecibidoWrap">
-        <div class="mfv-label">💵 Efectivo recibido</div>
+        <div class="mfv-label">Efectivo recibido</div>
         <div style="display:flex;gap:8px;align-items:center;">
           <input type="number" id="mfvRecibido" class="recibido-input" style="flex:1;" min="0" placeholder="0" oninput="mfvCalcularCambio()" autofocus>
           <div style="flex:1;">
@@ -4260,7 +4270,7 @@
     </div>
     <div class="product-modal-actions">
       <button class="btn btn-outline-secondary" onclick="cerrarModalFinalizarVenta()">Cancelar</button>
-      <button class="btn btn-success fw-bold" id="btnConfirmarVenta" onclick="confirmarFinalizarVenta()">✅ Confirmar venta</button>
+      <button class="btn btn-success fw-bold" id="btnConfirmarVenta" onclick="confirmarFinalizarVenta()">Confirmar venta</button>
     </div>
   </div>
 </div>
@@ -4280,7 +4290,7 @@
 <!-- ===== MODAL: REVISAR LO LEÍDO POR OCR (foto de lista de proveedor) ===== -->
 <div class="product-modal-backdrop" id="ocrModalBackdrop">
   <div class="product-modal" style="max-width:980px; width:96vw;">
-    <div class="product-modal-header"><h6 id="ocrModalTitulo">📷 Revisá lo que leyó la foto</h6><button onclick="ocrCerrar()">✕</button></div>
+    <div class="product-modal-header"><h6 id="ocrModalTitulo">Revisá lo que leyó la foto</h6><button onclick="ocrCerrar()">✕</button></div>
     <div class="product-modal-body" style="max-height:72vh; overflow:auto;">
 
       <!-- ===== Panel de PRUEBA: solo se ve con "Modo prueba" tildado. No escribe nada en la boleta ni en la base de datos ===== -->
@@ -4300,8 +4310,8 @@
         <label class="form-label mb-1">Resultado esperado <span class="text-muted fw-normal">(una línea por producto: <code>nombre ; cantidad ; costo</code> — o <code>código ; nombre ; cantidad ; costo</code> — o pegá la línea tal cual está en la lista)</span></label>
         <textarea id="ocrEsperado" class="form-control" rows="5" style="font-family:monospace; font-size:12px;" placeholder="Coca Cola 500ml ; 12 ; 1250,50&#10;Yerba Playadito 1kg ; 10 ; 4200"></textarea>
         <div class="d-flex gap-2 flex-wrap mt-2">
-          <button class="btn btn-primary btn-sm" onclick="ocrCompararConEsperado()">⚖️ Comparar con lo esperado</button>
-          <button class="btn btn-outline-secondary btn-sm" onclick="ocrCopiarResultadoPrueba()">📋 Copiar resultado (JSON)</button>
+          <button class="btn btn-primary btn-sm" onclick="ocrCompararConEsperado()">Comparar con lo esperado</button>
+          <button class="btn btn-outline-secondary btn-sm" onclick="ocrCopiarResultadoPrueba()">Copiar resultado (JSON)</button>
         </div>
         <div id="ocrComparacion" class="mt-2"></div>
         <hr>
@@ -4335,7 +4345,7 @@
     </div>
     <div class="product-modal-actions">
       <button class="btn btn-outline-secondary" onclick="ocrCerrar()">Cancelar</button>
-      <button class="btn btn-success" id="ocrBtnAgregar" onclick="ocrAgregarABoleta()">➕ Agregar a la boleta</button>
+      <button class="btn btn-success" id="ocrBtnAgregar" onclick="ocrAgregarABoleta()">Agregar a la boleta</button>
     </div>
   </div>
 </div>
@@ -4356,7 +4366,7 @@
 </style>
 <div id="dolarBurbuja" title="Cotización del dólar (venta). Tocá para minimizar">
   <div class="db-card" onclick="dolarBurbujaAlternar()">
-    <div class="db-tit"><span>💵 Dólar venta</span><span id="dbHora"></span></div>
+    <div class="db-tit"><span>Dólar venta</span><span id="dbHora"></span></div>
     <div id="dbFilas"></div>
   </div>
 </div>

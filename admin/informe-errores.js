@@ -4,7 +4,7 @@
      JavaScript, promesas rechazadas, console.error y llamadas al
      servidor que fallaron) y los últimos PASOS de la persona (secciones,
      botones, teclas F, avisos de error que vio), para adjuntarlos.
-   - "🐞 Informar un problema": la persona cuenta qué pasó y se manda
+   - "Informar un problema": la persona cuenta qué pasó y se manda
      por correo a soporte (backend: action=reportarError). Puede adjuntar
      una captura de pantalla (opcional, desmarcada por defecto).
    - En la app de escritorio se agrega el estado de la cola de
@@ -16,7 +16,7 @@
 // Versión del panel: va en cada informe para saber si ese navegador o
 // esa caja tiene el panel al día. Se sube junto con VERSION_BACKEND y
 // desktop/package.json (la prueba del backend avisa si no coinciden).
-const VERSION_PANEL = "1.9.9";
+const VERSION_PANEL = "2.0.0";
 
 (function () {
   const MAX_REGISTRO = 30;
@@ -356,7 +356,7 @@ const VERSION_PANEL = "1.9.9";
       }
       cerrarInformeProblema();
       capturaLista = null;
-      if (typeof toast === "function") toast("✅ Informe enviado a soporte. ¡Gracias!", "success");
+      if (typeof toast === "function") toast("Informe enviado a soporte. ¡Gracias!", "success");
     } catch (e) {
       estado.textContent = "No se pudo enviar: " + (e.message || "error de conexión") + ". Probá de nuevo en un rato.";
       estado.className = "informe-estado error";

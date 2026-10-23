@@ -361,10 +361,7 @@
             <div id="consultaForm">
               <div class="mb-3">
                 <label class="form-label fw-semibold" style="font-size:13.5px;">Número de pedido</label>
-                <div class="input-group">
-                  <span class="input-group-text fw-bold" style="background:#e9ecef;letter-spacing:.04em;">PED-</span>
-                  <input type="text" class="form-control" id="consultaPedidoId" placeholder="Ej: 1782779081593-t0g59m" inputmode="text">
-                </div>
+                <input type="text" class="form-control" id="consultaPedidoId" placeholder="Ej: 1024" inputmode="text" autocomplete="off">
               </div>
               <div class="mb-3">
                 <label class="form-label fw-semibold" style="font-size:13.5px;">Tu DNI o CUIT</label>
@@ -474,6 +471,31 @@
 
     <!-- MODAL CARRITO -->
 
+    <!-- Pedido recibido: confirmación con número, resumen y siguiente paso -->
+    <div class="modal fade" id="pedidoRecibidoModal" tabindex="-1" aria-labelledby="pedidoRecibidoTitulo">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content pedido-recibido">
+                <div class="modal-body">
+                    <div class="pr-check" aria-hidden="true">✓</div>
+                    <h4 id="pedidoRecibidoTitulo">¡Recibimos tu pedido!</h4>
+                    <p class="pr-numero">Pedido N° <b id="prNumero"></b></p>
+                    <div class="pr-resumen">
+                        <div><span>Productos</span><b id="prItems"></b></div>
+                        <div class="d-none" id="prCuponFila"><span>Cupón</span><b id="prCupon"></b></div>
+                        <div class="pr-total"><span>Total</span><b id="prTotal"></b></div>
+                    </div>
+                    <p class="pr-texto">Tu pedido ya quedó registrado. Envianos el detalle por WhatsApp para coordinar el pago y el envío.</p>
+                    <a id="prWhatsapp" class="btn btn-success w-100 pr-boton" href="#" rel="noopener">Enviar por WhatsApp</a>
+                    <div class="pr-secundarios">
+                        <button type="button" class="btn btn-link" id="prVerEstado">Ver el estado del pedido</button>
+                        <button type="button" class="btn btn-link" data-bs-dismiss="modal">Seguir comprando</button>
+                    </div>
+                    <p class="pr-nota">Guardá el número: con él y tu DNI podés consultar el estado cuando quieras.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="modal fade" id="cartModal" tabindex="-1">
 
         <div class="modal-dialog modal-dialog-scrollable modal-cart-desktop">
@@ -499,6 +521,8 @@
                     <!-- Columna izquierda: productos -->
                     <div class="cart-col-productos">
 
+                        <!-- Ajustes por stock: quedan a la vista (antes eran avisos que desaparecían solos) -->
+                        <div id="cart-avisos" class="cart-avisos d-none" role="status" aria-live="polite"></div>
                         <div id="cart-items"></div>
 
                         <div id="cart-empty" class="cart-empty d-none">
@@ -512,6 +536,7 @@
                     <div class="cart-col-datos">
 
                         <p class="form-section-label">Datos para el pedido</p>
+                        <div id="cart-form-error-datos" class="cart-form-error cart-form-error-datos d-none" role="alert"></div>
 
                         <input
                             type="text"
@@ -567,6 +592,10 @@
                             id="clienteDni"
                             class="form-control mb-2"
                             placeholder="DNI o CUIT *">
+                        <div class="recordar-datos">
+                            <label><input type="checkbox" id="recordarDatos" checked> Recordar mis datos en este dispositivo</label>
+                            <button type="button" class="btn-olvidar-datos d-none" id="btnOlvidarDatos" onclick="olvidarDatosCliente()">Borrar mis datos</button>
+                        </div>
 
                         <!-- Cupón de descuento -->
                         <div class="cupon-box" id="cupon-box">
@@ -614,6 +643,11 @@
                         <span>Total<small id="cart-footer-nota"></small></span>
                         <b>$<span id="cart-total-footer">0</span></b>
                     </div>
+
+                    <!-- Lo que falta para enviar: acá abajo, sin tapar el formulario -->
+
+                    <div id="cart-form-error" class="cart-form-error d-none" role="alert"></div>
+
 
                     <button
                         type="button"

@@ -14,6 +14,42 @@
 // cliente por error (ver comentario más abajo, cerca de DOMContentLoaded).
 let API_URL = "";
 
+/* ===================================================================
+   ZONA HORARIA DEL NEGOCIO (Configuración → Negocio)
+   Todas las fechas y horas que muestra el panel, y el "hoy" de los
+   cálculos, usan la zona del negocio y no la de la computadora (si la
+   PC tiene mal la zona, antes las horas salían corridas). Además, varios
+   "hoy" se calculaban en UTC: después de las 21 h ya era "mañana".
+=================================================================== */
+const ZONA_HORARIA_DEFECTO = "America/Argentina/Buenos_Aires";
+let _zonaHorariaPanel = (() => { try { return localStorage.getItem("vpos_zona_horaria") || ZONA_HORARIA_DEFECTO; } catch (e) { return ZONA_HORARIA_DEFECTO; } })();
+function _zonaNegocio() { return _zonaHorariaPanel; }
+function _fijarZonaNegocio(z) {
+  if (!z) return;
+  try { new Intl.DateTimeFormat("es-AR", { timeZone: z }); } catch (e) { return; }
+  _zonaHorariaPanel = z;
+  try { localStorage.setItem("vpos_zona_horaria", z); } catch (e) {}
+}
+/** "yyyy-mm-dd" de una fecha, en la zona del negocio */
+function _fechaISOEnZona(fecha) {
+  const d = fecha instanceof Date ? fecha : new Date(fecha);
+  if (isNaN(d)) return "";
+  try { return new Intl.DateTimeFormat("en-CA", { timeZone: _zonaNegocio(), year: "numeric", month: "2-digit", day: "2-digit" }).format(d); }
+  catch (e) { return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
+}
+(function () {
+  // toLocaleString / toLocaleDateString / toLocaleTimeString de fechas: si no
+  // piden una zona, usan la del negocio.
+  ["toLocaleString", "toLocaleDateString", "toLocaleTimeString"].forEach(m => {
+    const original = Date.prototype[m];
+    Date.prototype[m] = function (locales, opciones) {
+      if (opciones && opciones.timeZone) return original.call(this, locales, opciones);
+      try { return original.call(this, locales, Object.assign({}, opciones || {}, { timeZone: _zonaHorariaPanel })); }
+      catch (e) { return original.call(this, locales, opciones); }
+    };
+  });
+})();
+
 /**
  * Reemplazo de fetch() para las llamadas al backend, con timeout
  * automático y reintentos seguros — pensado para conexiones
@@ -270,7 +306,7 @@ function _abrirPedidosDesdeAviso() {
 function avisarPedidosNuevos(nuevos, cantidad) {
   const ultimo = nuevos[0] || {};
   const monto = ultimo.total ? " · $" + Number(ultimo.total).toLocaleString("es-AR") : "";
-  const titulo = cantidad === 1 ? "🛒 Pedido web nuevo" : `🛒 ${cantidad} pedidos web nuevos`;
+  const titulo = cantidad === 1 ? "Pedido web nuevo" : `🛒 ${cantidad} pedidos web nuevos`;
   const cuerpo = cantidad === 1
     ? `${ultimo.cliente || "Cliente"}${monto} (${ultimo.id || ""})`
     : `El último: ${ultimo.cliente || "cliente"}${monto}`;
@@ -553,6 +589,7 @@ async function cargarConfigNegocioDesdeBackend() {
     const data = await response.json();
     if (data.success && data.config) {
       configNegocioCache = { ...CONFIG_NEGOCIO_DEFAULT, ...data.config };
+      if (configNegocioCache.zonaHoraria) _fijarZonaNegocio(configNegocioCache.zonaHoraria);
       aplicarSidebarBrand(configNegocioCache);
       aplicarTemaAdmin(configNegocioCache);
     }
@@ -582,6 +619,13 @@ async function cargarConfigNegocioForm() {
   setVal("cfgTelefono1", cfg.telefono1);
   setVal("cfgTelefono2", cfg.telefono2);
   setVal("cfgPie", cfg.pie);
+  const selZona = document.getElementById("cfgZonaHoraria");
+  if (selZona) {
+    const z = cfg.zonaHoraria || _zonaNegocio();
+    if (![...selZona.options].some(o => o.value === z)) selZona.add(new Option(z, z));
+    selZona.value = z;
+    _mostrarHoraZona();
+  }
 
   cargarAparienciaForm(cfg);
   cargarBeneficiosForm(cfg);
@@ -595,6 +639,14 @@ async function cargarConfigNegocioForm() {
   cargarUrlCatalogoForm(cfg);
 
   if (form) form.placeholder = "Ej: Mi Negocio";
+}
+
+/** Muestra la hora actual en la zona elegida, para comprobar que es la correcta */
+function _mostrarHoraZona() {
+  const sel = document.getElementById("cfgZonaHoraria"), out = document.getElementById("cfgZonaHorariaHora");
+  if (!sel || !out) return;
+  try { out.textContent = "Ahora en esa zona: " + new Date().toLocaleString("es-AR", { timeZone: sel.value, weekday: "long", hour: "2-digit", minute: "2-digit" }); }
+  catch (e) { out.textContent = ""; }
 }
 
 /** Reads the form fields and saves them to the backend (hoja CONFIGURACION) */
@@ -614,6 +666,8 @@ async function guardarConfigNegocioForm() {
     telefono2: document.getElementById("cfgTelefono2").value.trim(),
     pie:       document.getElementById("cfgPie").value.trim()
   };
+  const selZona = document.getElementById("cfgZonaHoraria");
+  if (selZona && selZona.value) cfg.zonaHoraria = selZona.value;
 
   const cbuEl = document.getElementById("cfgCbuTransferencia");
   const titularEl = document.getElementById("cfgNombreTitularCbu");
@@ -634,7 +688,8 @@ async function guardarConfigNegocioForm() {
       return;
     }
 
-    configNegocioCache = { ...cfg };
+    configNegocioCache = { ...configNegocioCache, ...cfg }; // antes se reemplazaba entera y se perdía el resto (URL del catálogo, etc.)
+    if (cfg.zonaHoraria) _fijarZonaNegocio(cfg.zonaHoraria);
     toast("Configuración guardada", "success");
 
   } catch (error) {
@@ -1132,7 +1187,7 @@ function cargarTemporadaForm(cfg) {
   document.getElementById("tempDesde").value = tc.desde || "";
   document.getElementById("tempHasta").value = tc.hasta || "";
   document.getElementById("tempCartel").value = tc.cartel || "";
-  document.getElementById("tempCartel").placeholder = _temporadaElegida && T.TEMPORADAS[_temporadaElegida] ? T.TEMPORADAS[_temporadaElegida].cartel : "Ej: 🎄 ¡Felices fiestas!";
+  document.getElementById("tempCartel").placeholder = _temporadaElegida && T.TEMPORADAS[_temporadaElegida] ? T.TEMPORADAS[_temporadaElegida].cartel : "Ej: ¡Felices fiestas!";
   document.getElementById("tempAnimacion").checked = tc.animacion !== false;
   document.getElementById("tempColores").checked = tc.colores !== false;
   actualizarEstadoTemporada();
@@ -1151,7 +1206,7 @@ function elegirTemporada(id) {
   const cartel = document.getElementById("tempCartel");
   const sugeridoAnterior = anterior && T.TEMPORADAS[anterior] ? T.TEMPORADAS[anterior].cartel : "";
   if (cartel && (!cartel.value.trim() || cartel.value.trim() === sugeridoAnterior)) cartel.value = id ? T.TEMPORADAS[id].cartel : "";
-  if (cartel) cartel.placeholder = id ? T.TEMPORADAS[id].cartel : "Ej: 🎄 ¡Felices fiestas!";
+  if (cartel) cartel.placeholder = id ? T.TEMPORADAS[id].cartel : "Ej: ¡Felices fiestas!";
   actualizarEstadoTemporada();
   previsualizarColoresTemporadaPanel();
 }
@@ -1830,7 +1885,7 @@ function suscribirseATransferenciasMP() {
   window.veekpos.onTransferenciaRecibida((t) => {
     const monto = "$" + Number(t.monto).toLocaleString("es-AR");
     const quien = t.pagador ? ` de ${t.pagador}` : "";
-    toast(`💸 Transferencia recibida: ${monto}${quien}`, "success");
+    toast(`Transferencia recibida: ${monto}${quien}`, "success");
     sonarBeepTransferencia();
   });
 }
@@ -1930,7 +1985,7 @@ function marcarActualizacionEnVivo(fallo) {
     return;
   }
   badge.classList.remove("ps-badge-error");
-  badge.innerHTML = `📊 En vivo · ${hora}`;
+  badge.innerHTML = `En vivo · ${hora}`;
   badge.classList.remove("pulse");
   void badge.offsetWidth;
   badge.classList.add("pulse");
@@ -2003,10 +2058,10 @@ async function cargarVentasPOSHistorial() {
   if (desdeInput && !desdeInput.value) {
     const hace30 = new Date();
     hace30.setDate(hace30.getDate() - 30);
-    desdeInput.value = hace30.toISOString().slice(0, 10);
+    desdeInput.value = _fechaISOEnZona(hace30);
   }
   if (hastaInput && !hastaInput.value) {
-    hastaInput.value = new Date().toISOString().slice(0, 10);
+    hastaInput.value = _hoyISO();
   }
 
   const cacheKey = "ventasPOS_" + (desdeInput?.value || "") + "_" + (hastaInput?.value || "");
@@ -2081,10 +2136,10 @@ function renderVentasPOSHistorial(lista) {
         <td class="money" style="${anulada ? 'text-decoration:line-through;' : ''}">$${total}</td>
         <td>${esResumen ? `<span class="text-muted" style="font-size:12px;" title="Las ventas de hace más de 6 meses se guardan resumidas por día (el detalle completo quedó en Drive → Respaldo de ventas)">📦 ${escapeHtml(String(v.OBSERVACIONES || "Resumen del día"))}</span>` : `
           <button class="btn btn-sm btn-outline-secondary"
-            onclick="imprimirVentaDesdeData(_ventasMapPOS['${escapeJsAttr(_vid)}'])" title="Reimprimir">🖨️ Reimprimir</button>
+            onclick="imprimirVentaDesdeData(_ventasMapPOS['${escapeJsAttr(_vid)}'])" title="Reimprimir">Reimprimir</button>
           <button class="btn btn-sm btn-outline-danger ms-1"
             onclick="eliminarVentaPOS(_ventasMapPOS['${escapeJsAttr(_vid)}'])"
-            ${anulada ? 'disabled title="Ya anulada"' : 'title="Anular"'}>🗑️ Anular</button>`}
+            ${anulada ? 'disabled title="Ya anulada"' : 'title="Anular"'}>Anular</button>`}
         </td>`;
       frag.appendChild(tr);
     }
@@ -2270,6 +2325,26 @@ function irAMasVendidos() {
   mostrarSeccion("reportes");
 }
 
+/**
+ * El POS ocupa exactamente el alto de la ventana (escritorio/laptop): se
+ * mide dónde empieza y se le da el resto. Así ninguna parte queda abajo
+ * del borde en ninguna pantalla, y la página no scrollea; solo la grilla
+ * de productos (y la lista del ticket si es muy larga).
+ */
+function ajustarAltoPOS() {
+  const pos = document.getElementById("pos");
+  const wrap = pos && pos.querySelector(".pos-wrap");
+  if (!wrap) return;
+  if (window.innerWidth <= 768 || pos.style.display === "none") { wrap.style.height = ""; wrap.style.maxHeight = ""; return; }
+  const content = document.querySelector(".content");
+  const abajo = content ? parseFloat(getComputedStyle(content).paddingBottom) || 0 : 0;
+  const arriba = wrap.getBoundingClientRect().top + window.scrollY;
+  const alto = Math.max(440, Math.floor(window.innerHeight - arriba - abajo));
+  wrap.style.height = alto + "px";
+  wrap.style.maxHeight = alto + "px";
+}
+window.addEventListener("resize", () => { if (document.body.classList.contains("en-pos")) ajustarAltoPOS(); });
+
 function mostrarSeccion(id) {
   // "Reportes de Compras" ahora es la pestaña "Compras y reposición" de Reportes
   if (id === "reportesCompras") { _repTabActiva = "compras"; id = "reportes"; }
@@ -2282,6 +2357,8 @@ function mostrarSeccion(id) {
 
   const seccion = document.getElementById(id);
   if (seccion) seccion.style.display = "block";
+  document.body.classList.toggle("en-pos", id === "pos");
+  if (id === "pos") { requestAnimationFrame(ajustarAltoPOS); setTimeout(ajustarAltoPOS, 250); }
 
   // Sync sidebar links
   document.querySelectorAll("#navLinks a").forEach(a => {
@@ -2384,7 +2461,7 @@ function mostrarSeccion(id) {
     if (selector && !selector.value) {
       const ayer = new Date();
       ayer.setDate(ayer.getDate() - 1);
-      selector.value = ayer.toISOString().slice(0, 10);
+      selector.value = _fechaISOEnZona(ayer);
     }
     cargarResumenCierreCaja(selector ? selector.value : null);
   }
@@ -2400,20 +2477,20 @@ function mostrarSeccion(id) {
 
 /* ===================================================================
    BOTONES "↻ ACTUALIZAR": respuesta visible al tocarlos
-   Para todos los botones que empiezan con ↻ (o 🔄): el ícono gira y
+   Para todos los botones que empiezan con ↻ (o): el ícono gira y
    dice "Actualizando…" mientras haya pedidos al servidor en curso;
    al terminar muestra "✓ Actualizado" (o "Sin conexión") un momento.
 =================================================================== */
 function _esBotonActualizar(btn) {
   if (!btn || btn.tagName !== "BUTTON" || btn.dataset.sinAnimacion !== undefined) return false;
-  return /^\s*(↻|🔄)/.test(btn.textContent || "");
+  return /^\s*↻/.test(btn.textContent || "");
 }
 
 function _animarBotonActualizar(btn) {
   if (btn.classList.contains("btn-actualizando")) return;
   const original = btn.innerHTML;
   const anchoOriginal = btn.offsetWidth;
-  const soloIcono = (btn.textContent || "").replace(/↻|🔄/g, "").trim() === "";
+  const soloIcono = (btn.textContent || "").replace(/↻/g, "").trim() === "";
   const fallosAntes = _redEnCurso.fallos;
   const inicio = Date.now();
   let vioPedido = false, quietoDesde = 0;
@@ -2485,7 +2562,7 @@ async function cargarEstadoVentasResumidas() {
     const num = n => Number(n || 0).toLocaleString("es-AR");
     const lineas = [];
     if (d.desactivado) {
-      lineas.push("⏸ Desactivado (MESES_DETALLE_VENTAS = 0 en code.gs): se guarda todo el detalle.");
+      lineas.push("Desactivado (MESES_DETALLE_VENTAS = 0 en code.gs): se guarda todo el detalle.");
     } else {
       lineas.push(`Se guarda el detalle de los últimos <b>${d.meses} meses</b> (desde el ${escapeHtml(_fechaDMA(d.conservaDesde))}).`);
     }
@@ -2536,10 +2613,10 @@ function resumirVentasViejasClick() {
     } catch (e) {
       toast("No se pudo resumir: " + (e && e.name === "AbortError" ? "tardó demasiado (puede que haya terminado igual; tocá Actualizar)" : "error de conexión"), "error");
     } finally {
-      if (btn) btn.textContent = "📦 Resumir ventas viejas ahora";
+      if (btn) btn.textContent = "Resumir ventas viejas ahora";
       cargarEstadoVentasResumidas();
     }
-  }, "📦 Resumir ventas viejas");
+  }, "Resumir ventas viejas");
 }
 
 /* ===================== PEDIDOS ===================== */
@@ -2701,7 +2778,7 @@ async function registrarVentaCobrada(venta) {
     // Se guarda en la cola local con el mismo clienteVentaId: el
     // backend lo reconoce y nunca la duplica al reintentar.
     encolarVentaPendiente(venta);
-    toast("📴 Sin conexión — la venta se guardó localmente y se subirá sola al reconectar", "error");
+    toast("Sin conexión — la venta se guardó localmente y se subirá sola al reconectar", "error");
     return null;
   }
 }
@@ -2898,7 +2975,7 @@ function eliminarPedidosCancelados() {
   confirmarAccion(
     "¿Eliminar todos los pedidos cancelados? Se van a borrar de forma permanente, junto con el detalle de sus productos. Esta acción no se puede deshacer.",
     _eliminarPedidosCanceladosConfirmado,
-    "🗑️ Eliminar pedidos cancelados"
+    "Eliminar pedidos cancelados"
   );
 }
 
@@ -3279,7 +3356,7 @@ async function abrirDetallePedido(pedidoId) {
     const btnImprimir = document.querySelector("#pedidoDetalleModalBackdrop .btn-success");
     if (btnImprimir) {
       if (pedido.PDF_URL) {
-        btnImprimir.textContent = "📄 Ver PDF del pedido";
+        btnImprimir.textContent = "Ver PDF del pedido";
         btnImprimir.onclick = () => window.open(pedido.PDF_URL, "_blank");
       } else {
         btnImprimir.textContent = "Imprimir pedido (A4)";
@@ -3369,7 +3446,7 @@ function activarEdicionClientePedido() {
 
   document.getElementById("pedidoDetalleBody").innerHTML = `
     <div class="config-preview-hint mb-3">
-      <span class="ic">👤</span> Editando los datos del cliente del pedido <strong>${escapeHtml(p.PEDIDO_ID)}</strong>.
+      Editando los datos del cliente del pedido <strong>${escapeHtml(p.PEDIDO_ID)}</strong>.
       Los cambios también se guardan en <strong>Clientes</strong>.
     </div>
     <div class="row g-2 mb-2">
@@ -3392,7 +3469,7 @@ function activarEdicionClientePedido() {
     </div>
     <div class="d-flex gap-2 justify-content-end mt-3">
       <button type="button" class="btn btn-outline-secondary btn-sm" onclick="cancelarEdicionClientePedido()">Cancelar</button>
-      <button type="button" class="btn btn-primary btn-sm" id="btnGuardarClientePedido" onclick="guardarEdicionClientePedido()">💾 Guardar cambios</button>
+      <button type="button" class="btn btn-primary btn-sm" id="btnGuardarClientePedido" onclick="guardarEdicionClientePedido()">Guardar cambios</button>
     </div>`;
 
   setTimeout(() => document.getElementById("edCliNombre")?.focus(), 50);
@@ -3444,7 +3521,7 @@ async function guardarEdicionClientePedido() {
         msg = "El backend todavía no tiene esta función: agregá PapeleraYClientes.gs en Apps Script y publicá una nueva versión (ver LEEME).";
       }
       toast(msg, "error");
-      if (btn) { btn.disabled = false; btn.textContent = "💾 Guardar cambios"; }
+      if (btn) { btn.disabled = false; btn.textContent = "Guardar cambios"; }
       return;
     }
 
@@ -3463,7 +3540,7 @@ async function guardarEdicionClientePedido() {
   } catch (error) {
     console.error("Error al editar cliente del pedido:", error);
     toast("Error de conexión — revisá tu internet e intentá de nuevo", "error");
-    if (btn) { btn.disabled = false; btn.textContent = "💾 Guardar cambios"; }
+    if (btn) { btn.disabled = false; btn.textContent = "Guardar cambios"; }
   }
 }
 
@@ -3516,7 +3593,7 @@ function renderEdicionItemsPedido() {
 
   document.getElementById("pedidoDetalleBody").innerHTML = `
     <div class="config-preview-hint mb-3">
-      <span class="ic">✏️</span> Editando ítems del pedido <strong>${escapeHtml(pedido.PEDIDO_ID)}</strong> — solo se puede mientras está en NUEVO.
+      Editando ítems del pedido <strong>${escapeHtml(pedido.PEDIDO_ID)}</strong> — solo se puede mientras está en NUEVO.
     </div>
     <table style="width:100%; border-collapse:collapse; font-size:13px;">
       <thead>
@@ -3533,7 +3610,7 @@ function renderEdicionItemsPedido() {
 
     <div class="mt-3 mb-2" style="position:relative;">
       <div class="d-flex gap-2 align-items-center">
-        <input type="text" id="edicionPedidoBuscarProducto" class="form-control form-control-sm" placeholder="🔍 Código o nombre del producto a agregar..."
+        <input type="text" id="edicionPedidoBuscarProducto" class="form-control form-control-sm" placeholder="Código o nombre del producto a agregar..."
           autocomplete="off" oninput="_edicionPedidoActualizarResultados()" onkeydown="if(event.key==='Enter'){event.preventDefault(); _edicionPedidoAgregarProducto();}">
         <button type="button" class="btn btn-outline-primary btn-sm" style="white-space:nowrap;" onclick="_edicionPedidoAgregarProducto()">+ Agregar</button>
       </div>
@@ -3573,7 +3650,7 @@ function renderEdicionItemsPedido() {
 
     <div class="d-flex justify-content-end gap-2 mt-3">
       <button type="button" class="btn btn-outline-secondary btn-sm" onclick="cancelarEdicionItemsPedido()">Cancelar</button>
-      <button type="button" class="btn btn-success btn-sm" id="btnGuardarEdicionItemsPedido" onclick="guardarEdicionItemsPedido()">💾 Guardar cambios</button>
+      <button type="button" class="btn btn-success btn-sm" id="btnGuardarEdicionItemsPedido" onclick="guardarEdicionItemsPedido()">Guardar cambios</button>
     </div>`;
 }
 
@@ -4518,7 +4595,7 @@ function renderPedidos(listaOriginal) {
       const numeroWAConFallback = numeroWA || (soloDigitos ? "54" + soloDigitos.replace(/^0+/, "") : null);
       const esNumeroDudoso = !numeroWA && !!numeroWAConFallback;
       const btnWA = (estadosConWA.includes(p.ESTADO) && numeroWAConFallback && mensajeWA)
-        ? `<a href="https://wa.me/${numeroWAConFallback}?text=${encodeURIComponent(mensajeWA)}" target="_blank" class="btn btn-success btn-sm" title="${esNumeroDudoso ? "Verificá el teléfono antes de mandar — el formato no se reconoció con seguridad" : "Notificar por WhatsApp"}">📲 WhatsApp${esNumeroDudoso ? " ⚠️" : ""}</a>`
+        ? `<a href="https://wa.me/${numeroWAConFallback}?text=${encodeURIComponent(mensajeWA)}" target="_blank" class="btn btn-success btn-sm" title="${esNumeroDudoso ? "Verificá el teléfono antes de mandar — el formato no se reconoció con seguridad" : "Notificar por WhatsApp"}">WhatsApp${esNumeroDudoso ? " ⚠️" : ""}</a>`
         : "";
       const badgeCobrado = estaCobrado
         ? `<span class="pedido-cobrado-badge">✓ Cobrado <span class="pedido-cobrado-forma">${formaPagoActual}</span></span>` : "";
@@ -4531,15 +4608,15 @@ function renderPedidos(listaOriginal) {
            </div>`
         : `<div class="pedido-pago-btns" data-pedido="${p.PEDIDO_ID}">
              <span style="font-size:11px;font-weight:600;color:var(--slate-500);">Cobrar con:</span>
-             <button class="pedido-pago-btn" onclick="aplicarCobroPedido('${p.PEDIDO_ID}', true, 'EFECTIVO', this)">💵 Efectivo</button>
-             <button class="pedido-pago-btn" onclick="aplicarCobroPedido('${p.PEDIDO_ID}', true, 'TRANSFERENCIA', this)">📲 Transfer.</button>
-             <button class="pedido-pago-btn" onclick="aplicarCobroPedido('${p.PEDIDO_ID}', true, 'TARJETA', this)">💳 Tarjeta</button>
+             <button class="pedido-pago-btn" onclick="aplicarCobroPedido('${p.PEDIDO_ID}', true, 'EFECTIVO', this)">Efectivo</button>
+             <button class="pedido-pago-btn" onclick="aplicarCobroPedido('${p.PEDIDO_ID}', true, 'TRANSFERENCIA', this)">Transfer.</button>
+             <button class="pedido-pago-btn" onclick="aplicarCobroPedido('${p.PEDIDO_ID}', true, 'TARJETA', this)">Tarjeta</button>
            </div>`;
       const tmp = document.createElement("div");
       tmp.innerHTML = `<div class="pedido-card estado-${claseEstado}${_pedidosEnProceso.has(p.PEDIDO_ID) ? " pedido-procesando" : ""}" data-pedido-card="${escapeHtml(p.PEDIDO_ID)}">
         <div class="pedido-card-top">
           <div>
-            <div class="pedido-card-id">${escapeHtml(p.PEDIDO_ID)}${p._antiguo ? ' <span class="pedido-antiguo-badge" title="Pedido de hace más de 30 días: no está en la lista general, apareció por la búsqueda">🗄️ Anterior</span>' : ""}</div>
+            <div class="pedido-card-id">${escapeHtml(p.PEDIDO_ID)}${p._antiguo ? ' <span class="pedido-antiguo-badge" title="Pedido de hace más de 30 días: no está en la lista general, apareció por la búsqueda">Anterior</span>' : ""}</div>
             <div class="pedido-card-cliente">${escapeHtml(p.CLIENTE || p.NOMBRE || "")}${p.EMPRESA ? ` <span style="font-weight:500;color:var(--slate-500);font-size:13px;">· 🚚 ${escapeHtml(p.EMPRESA)}</span>` : ""}</div>
             ${p.DIRECCION ? `<div class="pedido-card-dir">📍 ${escapeHtml(p.DIRECCION)}${p.LOCALIDAD ? ", " + escapeHtml(p.LOCALIDAD) : ""}</div>` : ""}
             <div class="pedido-card-fecha">📅 ${new Date(p.FECHA).toLocaleDateString("es-AR", {day:"2-digit", month:"2-digit", year:"numeric"})}</div>
@@ -4553,9 +4630,9 @@ function renderPedidos(listaOriginal) {
         <div class="pedido-card-controls">
           <select class="form-select form-select-sm" style="max-width:160px;" data-estado-previo="${escapeHtml(p.ESTADO)}" onchange="cambiarEstado('${p.PEDIDO_ID}',this.value,this)">
             <option value="NUEVO"      ${p.ESTADO==="NUEVO"?"selected":""}>🆕 Nuevo</option>
-            <option value="PREPARANDO" ${p.ESTADO==="PREPARANDO"?"selected":""}>⚙️ Preparando</option>
-            <option value="ENVIADO"    ${p.ESTADO==="ENVIADO"?"selected":""}>📦 Enviado</option>
-            <option value="CANCELADO"  ${p.ESTADO==="CANCELADO"?"selected":""}>❌ Cancelado</option>
+            <option value="PREPARANDO" ${p.ESTADO==="PREPARANDO"?"selected":""}>Preparando</option>
+            <option value="ENVIADO"    ${p.ESTADO==="ENVIADO"?"selected":""}>Enviado</option>
+            <option value="CANCELADO"  ${p.ESTADO==="CANCELADO"?"selected":""}>Cancelado</option>
           </select>
           ${btnWA}
           ${selectCobrado}
@@ -5026,7 +5103,7 @@ async function guardarOrdenCatalogo() {
   const codigos = [];
   _oc.cats.forEach(c => codigos.push(..._oc.porCat[c]));
   const ok = await guardarNuevoOrdenProductos(codigos);
-  btn.textContent = "💾 Guardar orden";
+  btn.textContent = "Guardar orden";
   if (!ok) { btn.disabled = false; return; }
   _oc.sucio = false;
   const est = document.getElementById("ocEstado");
@@ -5161,7 +5238,7 @@ function editarProducto(codigo) {
   // Ver guardarProductoForm en pos-offline.js.
   window._pmStockOriginal = Number(p.STOCK || 0);
 
-  document.getElementById("productModalTitle").textContent = "✏️ Editar Producto";
+  document.getElementById("productModalTitle").textContent = "Editar Producto";
   document.getElementById("pmCodigoOriginal").value = p.CODIGO;
   document.getElementById("pmCodigo").value = p.CODIGO;
   document.getElementById("pmNombre").value = p.PRODUCTO || "";
@@ -6281,7 +6358,7 @@ function eliminarProducto(codigo) {
 
   const backdrop = document.getElementById("modalEliminarProdBackdrop");
   const texto = document.getElementById("modalEliminarProdTexto");
-  if (texto) texto.textContent = `¿Mover el producto "${codigo}" a la papelera? Lo vas a poder restaurar desde Productos → 🗑️ Papelera.`;
+  if (texto) texto.textContent = `¿Mover el producto "${codigo}" a la papelera? Lo vas a poder restaurar desde Productos → Papelera.`;
   if (backdrop) backdrop.classList.add("show");
 }
 
@@ -6388,7 +6465,7 @@ function renderPapeleraProductos() {
     : _papeleraProductos;
 
   if (_papeleraProductos.length === 0) {
-    cont.innerHTML = `<div class="text-center text-muted py-5" style="font-size:13.5px;">🗑️ La papelera está vacía</div>`;
+    cont.innerHTML = `<div class="text-center text-muted py-5" style="font-size:13.5px;">La papelera está vacía</div>`;
     return;
   }
   if (lista.length === 0) {
@@ -6408,7 +6485,7 @@ function renderPapeleraProductos() {
         </div>
         <div style="font-size:11px; color:var(--slate-400);">Eliminado ${escapeHtml(p.FECHA_ELIMINADO || "")}${p.USUARIO ? " por " + escapeHtml(p.USUARIO) : ""}</div>
       </div>
-      <button type="button" class="btn btn-outline-success btn-sm" style="white-space:nowrap;" onclick="restaurarProductoPapelera('${escapeJsAttr(p.PAPELERA_ID)}', this)">↩️ Restaurar</button>
+      <button type="button" class="btn btn-outline-success btn-sm" style="white-space:nowrap;" onclick="restaurarProductoPapelera('${escapeJsAttr(p.PAPELERA_ID)}', this)">Restaurar</button>
       ${esVendedor ? "" : `<button type="button" class="btn btn-outline-danger btn-sm" title="Borrar definitivamente" onclick="eliminarDefinitivoPapelera('${escapeJsAttr(p.PAPELERA_ID)}', '${escapeJsAttr(p.PRODUCTO || p.CODIGO)}')">✕</button>`}
     </div>`).join("");
 }
@@ -6419,7 +6496,7 @@ async function restaurarProductoPapelera(papeleraId, btn) {
     const data = await _postPapelera({ action: "restaurarProductoPapelera", papeleraId });
     if (!data || !data.success) {
       toast((data && data.message) || "No se pudo restaurar el producto", "error");
-      if (btn) { btn.disabled = false; btn.textContent = "↩️ Restaurar"; }
+      if (btn) { btn.disabled = false; btn.textContent = "Restaurar"; }
       return;
     }
     toast(`Producto "${data.producto || data.codigo}" restaurado`, "success");
@@ -6429,7 +6506,7 @@ async function restaurarProductoPapelera(papeleraId, btn) {
   } catch (error) {
     console.error("Error al restaurar producto:", error);
     toast("Error de conexión al restaurar el producto", "error");
-    if (btn) { btn.disabled = false; btn.textContent = "↩️ Restaurar"; }
+    if (btn) { btn.disabled = false; btn.textContent = "Restaurar"; }
   }
 }
 
@@ -6461,7 +6538,7 @@ function eliminarDefinitivoPapelera(papeleraId, nombre) {
         toast("Error de conexión", "error");
       }
     },
-    "🗑️ Borrar definitivamente"
+    "Borrar definitivamente"
   );
 }
 
@@ -6481,7 +6558,7 @@ function vaciarPapeleraProductos() {
         toast("Error de conexión", "error");
       }
     },
-    "🗑️ Vaciar papelera"
+    "Vaciar papelera"
   );
 }
 
@@ -6698,7 +6775,7 @@ function abrirModalEditarCliente(clienteId) {
   if (!cliente) { toast("No se encontró el cliente", "error"); return; }
 
   document.getElementById("clClienteIdEditando").value = clienteId;
-  document.getElementById("clienteModalTitulo").textContent = "✏️ Editar Cliente";
+  document.getElementById("clienteModalTitulo").textContent = "Editar Cliente";
   document.getElementById("clACreditoWrap").style.display = "block";
   document.getElementById("clNombre").value = cliente.NOMBRE || "";
   document.getElementById("clAlias").value = cliente.ALIAS || "";
@@ -6859,7 +6936,7 @@ async function abrirModalDetalleCliente(clienteId) {
   document.getElementById("pagoTipoCambio").value = "";
   document.getElementById("pagoTipoCambioWrap").style.display = "none";
   const btnPago = document.getElementById("btnRegistrarPago");
-  if (btnPago) { btnPago.disabled = false; btnPago.textContent = "💾 Registrar pago"; }
+  if (btnPago) { btnPago.disabled = false; btnPago.textContent = "Registrar pago"; }
   detalleClienteIdActual = clienteId;
 
   try {
@@ -6979,7 +7056,7 @@ function abrirModalDeudaExtraDirecto(clienteId, nombre) {
   document.getElementById("deudaExtraModalMoneda").value = "ARS";
   document.getElementById("deudaExtraModalConcepto").value = "";
   const btnDeuda = document.getElementById("btnRegistrarDeudaExtra");
-  if (btnDeuda) { btnDeuda.disabled = false; btnDeuda.textContent = "💾 Registrar deuda"; }
+  if (btnDeuda) { btnDeuda.disabled = false; btnDeuda.textContent = "Registrar deuda"; }
   document.getElementById("deudaExtraModalBackdrop").classList.add("show");
   setTimeout(() => document.getElementById("deudaExtraModalMonto").focus(), 100);
 }
@@ -7017,7 +7094,7 @@ async function registrarDeudaExtraForm() {
     const data = await response.json();
     if (!data.success) {
       toast(data.message || "No se pudo registrar la deuda", "error");
-      if (btn) { btn.disabled = false; btn.textContent = "💾 Registrar deuda"; }
+      if (btn) { btn.disabled = false; btn.textContent = "Registrar deuda"; }
       return;
     }
     toast("Deuda registrada correctamente", "success");
@@ -7027,7 +7104,7 @@ async function registrarDeudaExtraForm() {
   } catch (error) {
     console.error("Error al registrar deuda extra:", error);
     toast("Error de conexión al registrar la deuda", "error");
-    if (btn) { btn.disabled = false; btn.textContent = "💾 Registrar deuda"; }
+    if (btn) { btn.disabled = false; btn.textContent = "Registrar deuda"; }
   }
 }
 
@@ -7084,14 +7161,14 @@ async function registrarPagoCreditoForm() {
 
     if (!data.success) {
       toast(data.message || "No se pudo registrar el pago", "error");
-      if (btn) { btn.disabled = false; btn.textContent = "💾 Registrar pago"; }
+      if (btn) { btn.disabled = false; btn.textContent = "Registrar pago"; }
       return;
     }
 
     toast("Pago registrado", "success");
     // Invalidar caché para que cierre de caja, movimientos y la lista
     // de clientes (saldo actualizado) muestren datos frescos
-    const hoy = new Date().toISOString().slice(0, 10);
+    const hoy = _hoyISO();
     try { localStorage.removeItem("vpos_cache_movimientos_" + hoy); } catch(e) {}
     try { localStorage.removeItem("vpos_cache_cierre_" + hoy); } catch(e) {}
     try { localStorage.removeItem("vpos_cache_cierre_ayer"); } catch(e) {}
@@ -7102,7 +7179,7 @@ async function registrarPagoCreditoForm() {
   } catch (error) {
     console.error("Error al registrar el pago:", error);
     toast("Error de conexión al registrar el pago", "error");
-    if (btn) { btn.disabled = false; btn.textContent = "💾 Registrar pago"; }
+    if (btn) { btn.disabled = false; btn.textContent = "Registrar pago"; }
   }
 }
 
@@ -7336,7 +7413,7 @@ async function cargarStockBajo() {
     let html = "";
     const filtrados = productos.filter(p => { const s = Number(p.STOCK || 0); return s > 0 && s <= 5; });
     if (filtrados.length === 0) {
-      html = `<tr><td colspan="3" class="text-center text-muted py-4">Sin productos con stock bajo 🎉</td></tr>`;
+      html = `<tr><td colspan="3" class="text-center text-muted py-4">Sin productos con stock bajo</td></tr>`;
     }
     filtrados.forEach(p => {
       html += `<tr><td class="mono">${escapeHtml(p.CODIGO)}</td><td>${escapeHtml(p.PRODUCTO)}</td><td>${p.STOCK}</td></tr>`;
@@ -7359,7 +7436,7 @@ async function cargarAgotados() {
     let html = "";
     const filtrados = productos.filter(p => Number(p.STOCK || 0) === 0);
     if (filtrados.length === 0) {
-      html = `<tr><td colspan="3" class="text-center text-muted py-4">No hay productos agotados 🎉</td></tr>`;
+      html = `<tr><td colspan="3" class="text-center text-muted py-4">No hay productos agotados</td></tr>`;
     }
     filtrados.forEach(p => {
       html += `<tr><td class="mono">${escapeHtml(p.CODIGO)}</td><td>${escapeHtml(p.PRODUCTO)}</td><td>0</td></tr>`;
@@ -7654,7 +7731,7 @@ function _armarTileProductoHTML(p, dataIdxAttr, esPineado) {
       role="button"
       tabindex="0"
       ${dataIdxAttr}>
-      ${esPineado ? `<span class="tile-pinned-badge">📌 Último</span>` : ""}
+      ${esPineado ? `<span class="tile-pinned-badge">Último</span>` : ""}
       <div class="tile-photo">
         ${imagenUrl
           ? `<img src="${escapeHtml(imagenUrl)}" alt="" loading="lazy" onerror="this.parentElement.innerHTML='🛒';">`
@@ -7670,7 +7747,7 @@ function _armarTileProductoHTML(p, dataIdxAttr, esPineado) {
         ${stockBadge}
       </div>
       ${obtenerRolActual() === "vendedor" ? "" : `<button type="button" class="tile-edit" title="Editar precio y stock" onclick="event.stopPropagation(); abrirEdicionRapidaPOS('${escapeJsAttr(p.CODIGO)}');">✏️</button>`}
-      ${Number(p.UNIDADES_POR_CAJA) > 0 ? `<button type="button" class="tile-caja" title="Agregar 1 caja (${p.UNIDADES_POR_CAJA} uds) a $${Number(p.PRECIO_CAJA || 0).toLocaleString("es-AR")}" onclick="event.stopPropagation(); agregarCajaAlTicket(productosPOS.find(x => String(x.CODIGO)==='${escapeJsAttr(p.CODIGO)}'));">📦x${p.UNIDADES_POR_CAJA}</button>` : ""}
+      ${Number(p.UNIDADES_POR_CAJA) > 0 ? `<button type="button" class="tile-caja" title="Agregar 1 caja (${p.UNIDADES_POR_CAJA} uds) a $${Number(p.PRECIO_CAJA || 0).toLocaleString("es-AR")}" onclick="event.stopPropagation(); agregarCajaAlTicket(productosPOS.find(x => String(x.CODIGO)==='${escapeJsAttr(p.CODIGO)}'));">x${p.UNIDADES_POR_CAJA}</button>` : ""}
       <span class="tile-add">+</span>
     </div>`;
 }
@@ -8370,7 +8447,7 @@ function abrirModalFinalizarVenta() {
   document.getElementById("mfvCambio").classList.remove("negativo");
 
   document.getElementById("btnConfirmarVenta").disabled = false;
-  document.getElementById("btnConfirmarVenta").textContent = "✅ Confirmar venta";
+  document.getElementById("btnConfirmarVenta").textContent = "Confirmar venta";
   document.getElementById("modalFinalizarVentaBackdrop").classList.add("show");
   setTimeout(() => {
     const el = mfvFormaPago === "EFECTIVO"
@@ -8633,7 +8710,7 @@ async function confirmarFinalizarVenta() {
     toast("Error al finalizar la venta", "error");
   } finally {
     _ventaEnProceso = false;
-    if (btnConfirmar) { btnConfirmar.disabled = false; btnConfirmar.textContent = "✅ Confirmar venta"; }
+    if (btnConfirmar) { btnConfirmar.disabled = false; btnConfirmar.textContent = "Confirmar venta"; }
   }
 }
 
@@ -10662,7 +10739,7 @@ async function cargarHistorialCierres() {
     lista.forEach(c => {
       const fecha = formatearFechaCierre(
         c.FECHA instanceof Date
-          ? c.FECHA.toISOString().slice(0, 10)
+          ? _fechaISOEnZona(c.FECHA)
           : String(c.FECHA).slice(0, 10)
       );
       const totalDif = Number(c.TOTAL_DIFERENCIA || 0);
@@ -11492,7 +11569,7 @@ function _repDibujarGraficoDias() {
     serieBase.forEach((d, i) => {
       const f = new Date(d.fecha + "T12:00:00");
       const lunes = new Date(f); lunes.setDate(f.getDate() - ((f.getDay() + 6) % 7));
-      const clave = lunes.toISOString().slice(0, 10);
+      const clave = _fechaISOEnZona(lunes);
       const ult = semanas[semanas.length - 1];
       if (ult && ult.clave === clave) ult.valor += valores[i];
       else semanas.push({ clave, valor: valores[i] });
@@ -12109,7 +12186,7 @@ function _rcAgruparPorSemana(dias) {
     const offsetHastaLunes = diaSemana === 0 ? 6 : diaSemana - 1;
     const lunes = new Date(fecha);
     lunes.setDate(fecha.getDate() - offsetHastaLunes);
-    const clave = lunes.toISOString().slice(0, 10);
+    const clave = _fechaISOEnZona(lunes);
 
     if (!semanas[clave]) { semanas[clave] = {}; ordenPrimeraFecha[clave] = clave; }
     Object.entries(d.valores || {}).forEach(([cat, val]) => {
@@ -12292,7 +12369,7 @@ function _rcAplicarFiltrosTabla() {
   // Sin stock se marca oscuro para distinguirlo de un rojo "crítico" pero
   // todavía con algo de stock — son dos urgencias distintas de un vistazo.
   const estadoInfo = {
-    sinstock: { clase:"bg-dark",    texto:"🚫 Sin stock" },
+    sinstock: { clase:"bg-dark",    texto:"Sin stock" },
     critico:  { clase:"bg-danger",  texto:"🔴 Crítico" },
     atencion: { clase:"bg-warning text-dark", texto:"🟡 Atención" },
     ok:       { clase:"bg-success", texto:"🟢 OK" },
@@ -12468,13 +12545,13 @@ async function cargarMovimientosCajaHoy() {
   // Leer fecha del selector — default hoy
   const selector = document.getElementById("mcFechaSelector");
   if (selector && !selector.value) {
-    const hoy = new Date().toISOString().slice(0, 10);
+    const hoy = _hoyISO();
     selector.value = hoy;
   }
-  const fecha = selector ? selector.value : new Date().toISOString().slice(0, 10);
+  const fecha = selector ? selector.value : _hoyISO();
 
   // Actualizar labels de resumen con la fecha seleccionada
-  const fechaLabel = fecha === new Date().toISOString().slice(0, 10)
+  const fechaLabel = fecha === _hoyISO()
     ? "hoy"
     : new Date(fecha + "T12:00:00").toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" });
   const li = document.getElementById("mcLabelIngresos");
@@ -12554,7 +12631,7 @@ function renderTablaMovimientosCaja(lista) {
     html += `
     <tr>
       <td>${hora}</td>
-      <td><span class="mc-tag ${esIngreso ? "mc-ingreso" : "mc-egreso"}">${esIngreso ? "⬆️ Ingreso" : "⬇️ Egreso"}</span></td>
+      <td><span class="mc-tag ${esIngreso ? "mc-ingreso" : "mc-egreso"}">${esIngreso ? "Ingreso" : "Egreso"}</span></td>
       <td>${escapeHtml(m.MOTIVO || "—")}</td>
       <td><span style="font-size:12.5px;">${fpIcon} ${fpLabel}</span></td>
       <td class="money" style="color:${esIngreso ? "var(--green-600)" : "var(--red-500)"};">
@@ -12608,7 +12685,7 @@ async function eliminarMovimientoCajaForm(movimientoId) {
     }
 
     toast("Movimiento eliminado", "success");
-    const fechaMov = document.getElementById("mcFechaSelector")?.value || new Date().toISOString().slice(0, 10);
+    const fechaMov = document.getElementById("mcFechaSelector")?.value || _hoyISO();
     try { localStorage.removeItem("vpos_cache_movimientos_v2_" + fechaMov); } catch(e) {}
     try { localStorage.removeItem("vpos_cache_movimientos_" + fechaMov); } catch(e) {} // limpieza de clave vieja
     try { localStorage.removeItem("vpos_cache_cierre_" + fechaMov); } catch(e) {}
@@ -12658,7 +12735,7 @@ async function guardarMovimientoCajaForm() {
     document.getElementById("mcMotivo").value = "";
 
     // Invalidar caché para que el cierre de caja muestre datos frescos
-    const fecha = document.getElementById("mcFechaSelector")?.value || new Date().toISOString().slice(0, 10);
+    const fecha = document.getElementById("mcFechaSelector")?.value || _hoyISO();
     try { localStorage.removeItem("vpos_cache_movimientos_" + fecha); } catch(e) {}
     try { localStorage.removeItem("vpos_cache_cierre_" + fecha); } catch(e) {}
     try { localStorage.removeItem("vpos_cache_cierre_ayer"); } catch(e) {}
@@ -12834,7 +12911,7 @@ function aplicarCambioLote(cambios) {
       if (btn) { btn.innerHTML = textoOriginal; }
       actualizarSeleccionEtiquetas();
     }
-  }, "✏️ Cambiar productos seleccionados");
+  }, "Cambiar productos seleccionados");
 }
 
 /** Compatibilidad: lo llamaba el botón viejo "Hacer visibles". */
@@ -13573,14 +13650,62 @@ async function aplicarEstadoLicencia() {
   if (estadoLicenciaActual.modoLimitado) {
     if (banner) {
       banner.style.display = "flex";
-      if (bannerTexto) bannerTexto.textContent = "⚠️ " + (estadoLicenciaActual.motivo || "Licencia no vigente") + " — no se pueden registrar ventas ni editar productos.";
+      banner.className = "license-limited-banner";
+      if (bannerTexto) bannerTexto.textContent = (estadoLicenciaActual.motivo || "Licencia no vigente") + " — no se pueden registrar ventas ni editar productos.";
     }
   } else {
-    if (banner) banner.style.display = "none";
+    _mostrarAvisoVencimientoLicencia(banner, bannerTexto);
   }
   actualizarBloqueosPorLicencia();
   const configVisible = document.getElementById("configuracion")?.style.display === "block";
   if (configVisible) mostrarEstadoLicenciaEnConfig();
+}
+
+/**
+ * Avisos de vencimiento (la licencia sigue funcionando):
+ *  - 15 días antes: franja ámbar (se puede posponer hasta mañana) y un aviso al llegar a ese punto.
+ *  - 3 días antes y durante los 5 días de gracia: franja naranja siempre visible y aviso al llegar.
+ */
+function _mostrarAvisoVencimientoLicencia(banner, bannerTexto) {
+  const e = estadoLicenciaActual || {};
+  const aviso = e.aviso;
+  if (!banner) return;
+  if (!aviso) { banner.style.display = "none"; return; }
+  const fecha = (() => { const d = _fechaLicencia(e.fechaVencimiento); return d ? d.toLocaleDateString("es-AR", { day: "numeric", month: "long" }) : ""; })();
+  const dias = Number(e.diasParaVencer);
+  let texto, hito;
+  if (aviso.nivel === "gracia") {
+    const q = aviso.diasGraciaRestantes;
+    texto = `La licencia venció el ${fecha}. Estás en los días de gracia: ${q === 0 ? "hoy es el último día" : "quedan " + (q + 1) + " días (contando hoy)"}. Después no se van a poder registrar ventas. Renovala cuanto antes.`;
+    hito = "gracia";
+  } else {
+    const cuando = dias <= 0 ? "hoy (último día)" : dias === 1 ? `mañana, el ${fecha}` : `en ${dias} días, el ${fecha}`;
+    texto = `La licencia vence ${cuando}. Renovala para no interrumpir las ventas.`;
+    hito = aviso.nivel === "urgente" ? "3" : "15";
+  }
+  const claveHoy = "vpos_lic_posponer_" + _hoyISO();
+  let pospuesto = false;
+  try { pospuesto = aviso.nivel === "previo" && localStorage.getItem(claveHoy) === "1"; } catch (err) {}
+  banner.className = "license-limited-banner aviso-" + aviso.nivel;
+  banner.style.display = pospuesto ? "none" : "flex";
+  if (bannerTexto) bannerTexto.textContent = texto;
+  let btn = banner.querySelector(".lic-posponer");
+  if (aviso.nivel === "previo") {
+    if (!btn) {
+      btn = document.createElement("button");
+      btn.type = "button"; btn.className = "lic-posponer"; btn.textContent = "Recordármelo mañana";
+      btn.onclick = () => { try { localStorage.setItem(claveHoy, "1"); } catch (err) {} banner.style.display = "none"; };
+      banner.appendChild(btn);
+    }
+  } else if (btn) btn.remove();
+  // Aviso al cruzar cada punto (15 días, 3 días, gracia): una sola vez por vencimiento
+  const claveHito = "vpos_lic_hito_" + hito + "_" + (e.fechaVencimiento || "");
+  let yaAvisado = false;
+  try { yaAvisado = localStorage.getItem(claveHito) === "1"; } catch (err) {}
+  if (!yaAvisado) {
+    try { localStorage.setItem(claveHito, "1"); } catch (err) {}
+    setTimeout(() => confirmarAccion(texto, () => {}, "Aviso de licencia"), 800);
+  }
 }
 
 function actualizarBloqueosPorLicencia() {
@@ -13758,7 +13883,7 @@ function quitarLicenciaDeEstaPC() {
         toast("No se pudo quitar la licencia", "error");
       }
     },
-    "🔑 Quitar licencia de esta PC"
+    "Quitar licencia de esta PC"
   );
 }
 
@@ -13775,7 +13900,7 @@ function instObtenerDatos() {
     whatsapp:      (document.getElementById("instWhatsapp")?.value || "").trim(),
     direccion:     (document.getElementById("instDireccion")?.value || "").trim(),
     moneda:        (document.getElementById("instMoneda")?.value || "ARS"),
-    fecha:         new Date().toISOString().slice(0, 10),
+    fecha:         _hoyISO(),
     version:       "1.0"
   };
 }
@@ -13987,13 +14112,13 @@ async function verificarConexionInstalador() {
     const data = await res.json();
 
     if (data.success) {
-      if (status) status.innerHTML = `<span class="text-success">✅ Conexión exitosa — ${data.message}</span>`;
+      if (status) status.innerHTML = `<span class="text-success">Conexión exitosa — ${data.message}</span>`;
       toast("Conexión verificada y hojas listas", "success");
     } else {
       if (status) status.innerHTML = `<span class="text-warning">⚠️ La API respondió pero algo falló: ${data.message || "revisá el Code.gs publicado"}</span>`;
     }
   } catch (err) {
-    if (status) status.innerHTML = `<span class="text-danger">❌ No se pudo conectar: ${err.message}</span>`;
+    if (status) status.innerHTML = `<span class="text-danger">No se pudo conectar: ${err.message}</span>`;
     toast("Error de conexión: " + err.message, "error");
   }
 }
@@ -14161,6 +14286,40 @@ async function activarLicencia() {
 function actualizarVisibilidadCampoNombreCaja(rol) {
   const campo = document.getElementById("campoNombreCaja");
   if (campo) campo.style.display = rol === "servidor" ? "block" : "none";
+  const srv = document.getElementById("bloqueCodigoServidor"), cli = document.getElementById("bloqueCodigoCliente");
+  if (srv) srv.style.display = rol === "servidor" ? "block" : "none";
+  if (cli) cli.style.display = rol === "cliente" ? "block" : "none";
+}
+
+/** Muestra el código (en el servidor) o si ya está cargado (en un cliente) */
+async function cargarCodigoRed() {
+  const bridge = window.veekpos || window.posOffline;
+  if (!bridge || typeof bridge.obtenerCodigoRed !== "function") return;
+  try {
+    const r = await bridge.obtenerCodigoRed();
+    if (r.rol === "servidor") {
+      const el = document.getElementById("codigoRedServidor");
+      if (el) el.textContent = r.codigo || "";
+    } else {
+      const ayuda = document.getElementById("cfgCodigoRedAyuda");
+      if (ayuda) ayuda.textContent = r.configurado
+        ? "Ya hay un código guardado en esta caja (" + r.parcial + "). Escribí uno solo si cambió en la caja servidor."
+        : "Todavía no se cargó: sin el código esta caja no puede conectarse a la caja servidor.";
+    }
+  } catch (e) {}
+}
+
+/** Caja servidor: genera un código nuevo (las demás cajas tienen que cargarlo de nuevo) */
+function regenerarCodigoRed() {
+  confirmarAccion("Se va a generar un código nuevo. Las demás cajas van a dejar de conectarse hasta que les escribas el código nuevo. ¿Seguir?", async () => {
+    const bridge = window.veekpos || window.posOffline;
+    try {
+      const r = await bridge.regenerarCodigoRed();
+      if (!r.success) { toast(r.message || "No se pudo generar el código", "error"); return; }
+      document.getElementById("codigoRedServidor").textContent = r.codigo;
+      toast("Código nuevo generado: escribilo en cada caja cliente", "success");
+    } catch (e) { toast("No se pudo generar el código", "error"); }
+  }, "Código de emparejamiento");
 }
 
 /** Carga el estado actual de la config de red al abrir la tarjeta — rol guardado, nombre de caja, y a quién está viendo (servidor propio o servidor encontrado) */
@@ -14175,6 +14334,7 @@ async function cargarConfigRedForm() {
     document.getElementById("cfgRolRed").value = rol || "";
     document.getElementById("cfgNombreCaja").value = nombreCaja || "";
     actualizarVisibilidadCampoNombreCaja(rol || "");
+    cargarCodigoRed();
 
     if (!estadoEl) return;
 
@@ -14186,7 +14346,13 @@ async function cargarConfigRedForm() {
 
     } else if (rol === "cliente") {
       const estado = await bridge.obtenerEstadoConexionRed();
-      if (estado.conectado) {
+      if (estado.conectado && estado.sinCodigo) {
+        estadoEl.textContent = "🔴 Se encontró la caja servidor, pero falta el código de emparejamiento: escribilo arriba y guardá.";
+      } else if (estado.conectado && estado.bloqueado) {
+        estadoEl.textContent = "🔴 La caja servidor bloqueó esta caja unos minutos por intentos con un código incorrecto. Revisá el código y esperá.";
+      } else if (estado.conectado && !estado.codigoOk) {
+        estadoEl.textContent = "🔴 La caja servidor rechazó el código de emparejamiento: revisá que sea el que muestra la caja servidor.";
+      } else if (estado.conectado) {
         estadoEl.textContent = "🟢 Conectada al servidor correctamente.";
       } else if (estado.servidorConocido) {
         estadoEl.textContent = "🟡 Se encontró un servidor en la red, pero no responde ahora mismo.";
@@ -14226,8 +14392,14 @@ async function guardarConfigRed() {
     return;
   }
 
+  const codigo = (document.getElementById("cfgCodigoRed")?.value || "").trim();
   try {
     await bridge.fijarRolRed(rol, nombreCaja);
+    if (rol === "cliente" && codigo && typeof bridge.fijarCodigoRed === "function") {
+      const r = await bridge.fijarCodigoRed(codigo);
+      if (!r.success) { toast(r.message || "El código no es válido", "error"); return; }
+      document.getElementById("cfgCodigoRed").value = "";
+    }
     toast("Configuración de red guardada", "success");
     await cargarConfigRedForm();
   } catch (error) {
@@ -14404,7 +14576,7 @@ function abrirModalQRDePrueba() {
     bridge.mostrarQrDePruebaEnPantalla(svgFalso, 0).catch(() => {});
   }
 
-  toast("🧪 Modal de prueba — este QR no cobra nada de verdad", "info");
+  toast("Modal de prueba — este QR no cobra nada de verdad", "info");
 }
 
 async function iniciarCobroMercadoPago(total) {
@@ -14958,8 +15130,7 @@ let detalleBoletaDatosActual = null;
 let detalleBoletaAbiertoDesdeProveedor = false;
 
 function _hoyISO() {
-  const d = new Date();
-  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  return _fechaISOEnZona(new Date());
 }
 
 /** Refleja en pantalla si ya hay una boleta con este proveedor/fecha/N° (se le sumarían los ítems) o si es una boleta nueva */
@@ -15202,7 +15373,7 @@ function vaciarCarritoBoleta() {
   confirmarAccion(
     "¿Vaciar todos los productos cargados en esta boleta?",
     () => { ipCarritoBoleta = []; renderCarritoBoleta(); },
-    "🗑️ Vaciar boleta"
+    "Vaciar boleta"
   );
 }
 
@@ -15686,7 +15857,7 @@ function ocrConfigurarModalSegunModo(prueba) {
   tcPrellenarCampo("ocrTc");     // si la moneda de la revisión ya estaba en dólares, trae el tipo de cambio del día
   document.getElementById("ocrPanelPrueba").style.display = prueba ? "" : "none";
   document.getElementById("ocrBtnAgregar").style.display = prueba ? "none" : "";
-  document.getElementById("ocrModalTitulo").textContent = prueba ? "🧪 Prueba de lectura (no se guarda nada)" : "📷 Revisá lo que leyó la foto";
+  document.getElementById("ocrModalTitulo").textContent = prueba ? "Prueba de lectura (no se guarda nada)" : "Revisá lo que leyó la foto";
   document.getElementById("ocrDetalleTexto").open = !!prueba;
   document.getElementById("ocrComparacion").innerHTML = "";
 }
@@ -16329,7 +16500,7 @@ async function abrirModalDetalleBoleta(boletaId) {
   const selMoneda = document.getElementById("pagoProveedorMoneda");
   if (selMoneda) selMoneda.value = "ARS";
   const btnPago = document.getElementById("btnRegistrarPagoProveedor");
-  if (btnPago) { btnPago.disabled = false; btnPago.textContent = "💾 Pagar"; }
+  if (btnPago) { btnPago.disabled = false; btnPago.textContent = "Pagar"; }
   boletaProveedorIdActual = boletaId;
 
   try {
@@ -16593,7 +16764,7 @@ async function registrarPagoProveedorForm() {
 
     if (!data.success) {
       toast(data.message || "No se pudo registrar el pago", "error");
-      if (btn) { btn.disabled = false; btn.textContent = "💾 Pagar"; }
+      if (btn) { btn.disabled = false; btn.textContent = "Pagar"; }
       return;
     }
 
@@ -16605,7 +16776,7 @@ async function registrarPagoProveedorForm() {
   } catch (error) {
     console.error("Error al registrar el pago a proveedor:", error);
     toast("Error de conexión al registrar el pago", "error");
-    if (btn) { btn.disabled = false; btn.textContent = "💾 Pagar"; }
+    if (btn) { btn.disabled = false; btn.textContent = "Pagar"; }
   }
 }
 
@@ -16688,7 +16859,7 @@ function renderTablaProveedores(lista) {
           <div class="pedido-card-cliente">${escapeHtml(p.PROVEEDOR)}</div>
           <div class="pedido-card-dir" style="margin-top:4px; display:flex; flex-wrap:wrap; gap:10px;">
             ${p.PROVEEDOR_CONTACTO ? `<span>📞 ${escapeHtml(p.PROVEEDOR_CONTACTO)}</span>` : ""}
-            ${p.ULTIMA_FECHA ? `<span>🗓️ Última boleta: ${escapeHtml(p.ULTIMA_FECHA)}</span>` : ""}
+            ${p.ULTIMA_FECHA ? `<span>Última boleta: ${escapeHtml(p.ULTIMA_FECHA)}</span>` : ""}
           </div>
         </div>
         <div class="text-end" style="flex-shrink:0;">
@@ -16784,7 +16955,7 @@ function cerrarModalBoletasProveedor() {
 =================================================================== */
 
 /* ===================== AYUDA DE ATAJOS DEL POS =====================
-   F1 o "?" abren el mismo panel que el botón "⌨️ Atajos" del POS. */
+   F1 o "?" abren el mismo panel que el botón "Atajos" del POS. */
 
 function mostrarAyudaAtajosPOS() {
   const fondo = document.getElementById("shortcutsHelpBackdrop");
@@ -16957,7 +17128,7 @@ async function cargarUsuarios() {
       return;
     }
 
-    const etiquetaRol = { admin: "👑 Admin", vendedor: "🏪 Vendedor", deposito: "📦 Depósito" };
+    const etiquetaRol = { admin: "Admin", vendedor: "Vendedor", deposito: "Depósito" };
 
     tbody.innerHTML = usuariosGlobal.map(u => `
       <tr>
@@ -16994,7 +17165,7 @@ function abrirModalEditarUsuario(usuarioId) {
   const u = usuariosGlobal.find(x => String(x.USUARIO_ID) === String(usuarioId));
   if (!u) { toast("No se encontró el usuario", "error"); return; }
 
-  document.getElementById("usuarioModalTitle").textContent = "✏️ Editar Usuario";
+  document.getElementById("usuarioModalTitle").textContent = "Editar Usuario";
   document.getElementById("umUsuarioId").value = u.USUARIO_ID;
   document.getElementById("umNombre").value = u.NOMBRE || "";
   document.getElementById("umUsername").value = u.USERNAME || "";
@@ -17072,7 +17243,7 @@ function eliminarUsuarioClick(usuarioId, nombre) {
         toast("Error de conexión al eliminar el usuario", "error");
       }
     },
-    "🗑️ Eliminar usuario"
+    "Eliminar usuario"
   );
 }
 
@@ -17234,7 +17405,7 @@ function abrirReporteCupon(codigo) {
   const r = reporteCuponesGlobal && (reporteCuponesGlobal.cupones || []).find(x => x.codigo === codigo);
   const desde = document.getElementById("cupRepDesde")?.value, hasta = document.getElementById("cupRepHasta")?.value;
   const rango = desde || hasta ? ` · ${desde ? "desde " + _fechaCorta(desde) : ""} ${hasta ? "hasta " + _fechaCorta(hasta) : ""}` : "";
-  document.getElementById("cuponRepTitulo").textContent = "📊 Cupón " + codigo + rango;
+  document.getElementById("cuponRepTitulo").textContent = "Cupón " + codigo + rango;
   const kpis = document.getElementById("cuponRepKpis");
   const tbody = document.getElementById("cuponRepTabla");
   if (!r || !r.usos) {
@@ -17282,7 +17453,7 @@ function _textoVigenciaCupon(c) {
 function abrirModalCupon(codigo) {
   const c = codigo ? cuponesGlobal.find(x => x.codigo === codigo) : null;
   const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v ?? ""; };
-  document.getElementById("cuponModalTitulo").textContent = c ? "🎟️ Editar cupón " + c.codigo : "🎟️ Nuevo cupón";
+  document.getElementById("cuponModalTitulo").textContent = c ? "Editar cupón " + c.codigo : "Nuevo cupón";
   set("cupCodigoOriginal", c ? c.codigo : "");
   set("cupCodigo", c ? c.codigo : "");
   set("cupTipo", c ? c.tipo : "PORCENTAJE");
@@ -17354,7 +17525,7 @@ async function guardarCuponForm() {
   } catch (e) {
     toast("Error de conexión al guardar el cupón", "error");
   } finally {
-    btn.disabled = false; btn.textContent = "💾 Guardar cupón";
+    btn.disabled = false; btn.textContent = "Guardar cupón";
   }
 }
 
@@ -17376,7 +17547,7 @@ async function eliminarCuponClick(codigo) {
   const c = cuponesGlobal.find(x => x.codigo === codigo);
   const extra = c && c.usos > 0 ? ` Ya se usó ${c.usos} ${c.usos === 1 ? "vez" : "veces"}; los pedidos que lo usaron no cambian.` : "";
   // Modal propio (no confirm() nativo: en Electron deja el teclado sin foco)
-  confirmarAccion(`¿Eliminar el cupón ${codigo}?${extra}`, () => _eliminarCuponConfirmado(codigo), "🗑️ Eliminar cupón");
+  confirmarAccion(`¿Eliminar el cupón ${codigo}?${extra}`, () => _eliminarCuponConfirmado(codigo), "Eliminar cupón");
 }
 
 async function _eliminarCuponConfirmado(codigo) {

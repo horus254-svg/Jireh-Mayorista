@@ -739,14 +739,20 @@ html,body{
 
 /* ===================== POS SCREEN ===================== */
 
+/* Escritorio y laptop: el POS ocupa justo el alto de la pantalla (el alto
+   exacto lo pone ajustarAltoPOS() en admin.js; este calc es el respaldo).
+   Solo hacen scroll la grilla de productos y, si hay muchas líneas, la
+   lista del ticket — buscador, categorías y Finalizar siempre a la vista. */
 .pos-wrap{
   display:grid;
-  grid-template-columns:minmax(0, 680px) 380px;
-  gap:18px;
+  grid-template-columns:minmax(0, 1fr) clamp(290px, 28vw, 440px);
+  gap:16px;
   align-items:stretch;
-  height:calc(100vh - 110px);
-  max-height:calc(100vh - 110px);
+  height:calc(100vh - 140px);
+  max-height:calc(100vh - 140px);
 }
+body.en-pos .content{ padding-bottom:14px; }
+body.en-pos #pos .page-header{ margin-bottom:14px; }
 
 .pos-left{
   display:flex; flex-direction:column;
@@ -1591,13 +1597,11 @@ tr.fila-arrastrable{ cursor:default; }
 
 /* Tablet */
 @media(max-width:1100px){
-  .pos-wrap{
-    grid-template-columns:1fr;
-    height:auto; max-height:none;
-  }
-  .pos-left{ height:auto; max-height:none; overflow:visible; }
-  .ticket-panel{ height:520px; }
-  .pos-grid-wrap{ flex:none; height:380px; max-height:380px; }
+  /* Laptops chicas: se mantienen las dos columnas (antes el ticket bajaba
+     abajo de los productos y había que scrollear para tocar Finalizar) */
+  .pos-wrap{ gap:12px; }
+  .pos-left{ gap:10px; }
+  .scan-result-panel{ padding-top:8px !important; padding-bottom:8px !important; }
 }
 
 /* Mobile */
@@ -2427,6 +2431,11 @@ kbd{
   padding:10px 18px;
 }
 .license-limited-banner .ic{ font-size:15px; }
+.codigo-red{ font-size:20px; font-weight:700; letter-spacing:2px; background:var(--slate-100,#f1f5f9); color:var(--navy-900,#0f172a); padding:6px 12px; border-radius:8px; }
+.license-limited-banner.aviso-previo{ background:#fef3c7; color:#78350f; border-bottom:1px solid #fcd34d; }
+.license-limited-banner.aviso-urgente,
+.license-limited-banner.aviso-gracia{ background:#ea580c; color:#fff; }
+.license-limited-banner .lic-posponer{ margin-left:auto; background:transparent; border:1px solid currentColor; color:inherit; border-radius:6px; padding:3px 10px; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap; }
 
 /* ---- Reporte de Compras: acordeón de gráficos + KPIs clicables ---- */
 #rcGraficosDetails summary{ outline:none; }
