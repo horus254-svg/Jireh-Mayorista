@@ -2104,8 +2104,13 @@ function renderVentasPOSHistorial(lista) {
   const CHUNK = 60;
   let idx = 0;
   tbody.innerHTML = "";
+  // Si llega otro render (ej. la copia guardada y enseguida la fresca), los
+  // pedazos que quedaban del anterior no se agregan: antes se mezclaban y
+  // la tabla mostraba ventas repetidas.
+  const turno = (renderVentasPOSHistorial._turno = (renderVentasPOSHistorial._turno || 0) + 1);
 
   const renderChunk = () => {
+    if (turno !== renderVentasPOSHistorial._turno) return;
     const frag = document.createDocumentFragment();
     const fin = Math.min(idx + CHUNK, lista.length);
     for (; idx < fin; idx++) {
@@ -2139,7 +2144,7 @@ function renderVentasPOSHistorial(lista) {
             onclick="imprimirVentaDesdeData(_ventasMapPOS['${escapeJsAttr(_vid)}'])" title="Reimprimir">Reimprimir</button>
           <button class="btn btn-sm btn-outline-danger ms-1"
             onclick="eliminarVentaPOS(_ventasMapPOS['${escapeJsAttr(_vid)}'])"
-            ${anulada ? 'disabled title="Ya anulada"' : 'title="Anular"'}>Anular</button>`}
+            ${anulada ? 'disabled title="Ya anulada"' : 'title="Anular"'}>Anular</button>${window.ArcaUI ? ArcaUI.celdaVenta(v, anulada) : ""}`}
         </td>`;
       frag.appendChild(tr);
     }
@@ -2219,6 +2224,7 @@ async function confirmarAnulacionVenta() {
     }
 
     toast("Venta anulada — sigue en el historial pero ya no cuenta en caja", "success");
+    if (window.ArcaUI) ArcaUI.trasAnulacion(venta, motivo); // nota de crédito si estaba facturada
     cerrarModalAnulacion();
     cargarVentasPOSHistorial();
     productosPOS = [];
@@ -3414,6 +3420,7 @@ async function abrirDetallePedido(pedidoId) {
           </tr>
         </tfoot>
       </table>`;
+    if (window.ArcaUI) ArcaUI.enDetallePedido(pedido, detalle); // factura del pedido (facturacion-arca.js)
 
   } catch (error) {
     console.error("Error al abrir detalle de pedido:", error);
@@ -5204,6 +5211,7 @@ function nuevoProducto() {
   document.getElementById("pmNombre").value = "";
   document.getElementById("pmCategoria").value = "";
   document.getElementById("pmAlias").value = "";
+  { const al = document.getElementById("pmAlicuotaIva"); if (al) al.value = ""; }
   document.getElementById("pmPrecio").value = "";
   document.getElementById("pmStock").value = "";
   document.getElementById("pmImagen").value = "";
@@ -5248,6 +5256,7 @@ function editarProducto(codigo) {
   document.getElementById("pmNombre").value = p.PRODUCTO || "";
   document.getElementById("pmCategoria").value = p.CATEGORIA || "";
   document.getElementById("pmAlias").value = p.ALIAS || "";
+  { const al = document.getElementById("pmAlicuotaIva"); if (al) al.value = String(p.ALICUOTA_IVA === undefined || p.ALICUOTA_IVA === null ? "" : p.ALICUOTA_IVA); }
   document.getElementById("pmPrecio").value = Number(p.PRECIO || 0);
   document.getElementById("pmStock").value = Number(p.STOCK || 0);
   document.getElementById("pmImagen").value = p.IMAGEN || "";
@@ -6323,6 +6332,9 @@ async function guardarProductoForm() {
       PRECIO_CAJA: precioCaja || 0
     });
     if (esEdicion) params.set("codigoOriginal", codigoOriginal);
+    // Alícuota de IVA: solo si el campo está a la vista (facturación de RI);
+    // si no, no se manda y el backend conserva la que tenía.
+    if (_alicuotaIvaFormulario() !== null) params.set("ALICUOTA_IVA", _alicuotaIvaFormulario());
 
     const response = await fetchAPI(API_URL + "?" + params.toString());
     const data = await response.json();
@@ -8454,6 +8466,7 @@ function abrirModalFinalizarVenta() {
 
   document.getElementById("btnConfirmarVenta").disabled = false;
   document.getElementById("btnConfirmarVenta").textContent = "Confirmar venta";
+  if (window.ArcaUI) ArcaUI.alAbrirModalVenta(); // "Facturar" (facturacion-arca.js)
   document.getElementById("modalFinalizarVentaBackdrop").classList.add("show");
   setTimeout(() => {
     const el = mfvFormaPago === "EFECTIVO"
@@ -8616,6 +8629,12 @@ async function confirmarFinalizarVenta() {
   if (inputRec) inputRec.value = recibido || "";
   if (recibido) calcularCambio();
 
+  // Factura electrónica: si faltan datos del cliente, el modal sigue abierto
+  if (window.ArcaUI) {
+    const subtotalArca = ticketPOS.reduce((acc, item) => acc + (item.PRECIO * item.cantidad), 0);
+    if (!ArcaUI.capturarModal(calcularDescuentoPOS(subtotalArca).total)) return;
+  }
+
   cerrarModalFinalizarVenta();
 
   // Subtotal/total (con descuento o recargo ya aplicado) — se calcula ACÁ,
@@ -8668,6 +8687,7 @@ async function confirmarFinalizarVenta() {
 
   // Mostrar recibo y limpiar ticket INMEDIATAMENTE
   mostrarRecibo(ventaIdTemp, itemsSnapshot, total, subtotal, montoDescuento, recibido);
+  if (window.ArcaUI) ArcaUI.trasVenta({ ref: clienteVentaId, items: itemsSnapshot, total, fecha: fechaVenta });
   ticketPOS = [];
   limpiarPineadoPOS();
   resetearDescuentoPOS();
@@ -8726,6 +8746,13 @@ async function finalizarVentaPOS() {
 }
 
 /* ---- generar pedido desde el POS (no es una venta, no descuenta stock) ---- */
+
+/** Valor del campo "Alícuota de IVA" del formulario de producto, o null si no está a la vista */
+function _alicuotaIvaFormulario() {
+  const wrap = document.getElementById("pmAlicuotaWrap"), sel = document.getElementById("pmAlicuotaIva");
+  if (!wrap || !sel || wrap.style.display === "none") return null;
+  return sel.value;
+}
 
 /** Opens the "Generar Pedido" modal, pre-filling the current ticket total */
 function abrirModalPedidoAdmin() {
@@ -9034,8 +9061,9 @@ function nuevaVentaPOS() {
  * @param {Object}  [descuento] — { monto, etiqueta } opcional, si la venta tuvo descuento
  * @param {Object}  [cfgOverride] — config del negocio a usar en vez de la guardada (solo para vista previa)
  */
-function buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, cfgOverride, cambioData) {
+function buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, cfgOverride, cambioData, fiscal) {
   const cfg = cfgOverride || obtenerConfigNegocio();
+  if (!(fiscal && window.ArcaUI)) fiscal = null; // factura electrónica (facturacion-arca.js)
 
   const fechaStr = (fecha || new Date()).toLocaleString("es-AR", {
     day:"2-digit", month:"2-digit", year:"numeric",
@@ -9080,6 +9108,8 @@ function buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, cf
       <td><strong>TOTAL</strong></td>
       <td style="text-align:right;"><strong>$${Number(total).toLocaleString("es-AR")}</strong></td>
     </tr>`;
+  // Factura A: líneas sin IVA y el IVA discriminado (el descuento ya va repartido en las líneas)
+  if (fiscal && fiscal.clase === "A") { rows = ArcaUI.htmlFilasA(fiscal); filasTotales = ArcaUI.htmlTotalesA(fiscal); }
 
   // Recibido y cambio — solo si se ingresó un monto recibido
   if (cambioData && cambioData.recibido > 0) {
@@ -9116,18 +9146,21 @@ function buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, cf
   }
   pie += `<div class="th-footer" style="margin-top:1mm;">${escapeHtml(cfg.nombre)} &bull; Sistema POS</div>`;
 
+  if (fiscal) encabezado += `<hr class="th-sep-solid">` + ArcaUI.htmlEncabezado(fiscal);
+
   return `
     <div class="thermal-receipt">
       ${encabezado}
       <hr class="th-sep-solid">
       <div>Fecha: ${fechaStr}</div>
-      <div>Venta: #${escapeHtml(String(ventaId || "—"))}</div>
-      <div>Pago: ${escapeHtml(String(formaPago || "—"))}</div>
+      <div>${fiscal ? "Comprobante" : "Venta"}: #${escapeHtml(String(ventaId || "—"))}</div>
+      ${formaPago || !fiscal ? `<div>Pago: ${escapeHtml(String(formaPago || "—"))}</div>` : ""}
       <hr class="th-sep">
       <table>
         <tbody>${rows}</tbody>
         ${filasTotales}
       </table>
+      ${fiscal ? ArcaUI.htmlPie(fiscal) : ""}
       <hr class="th-sep">
       ${pie}
       <br><br>
@@ -9200,9 +9233,10 @@ const ESCPOS = {
 };
 
 /** Builds the raw byte buffer (Uint8Array) for a sale ticket, mirroring buildThermalHTML */
-function buildThermalESCPOS(ventaId, items, total, formaPago, fecha, descuento, cfgOverride) {
+function buildThermalESCPOS(ventaId, items, total, formaPago, fecha, descuento, cfgOverride, fiscal) {
   const cfg = cfgOverride || obtenerConfigNegocio();
   const b = new EscPosBuilder();
+  if (!(fiscal && window.ArcaUI)) fiscal = null; // factura electrónica (facturacion-arca.js)
 
   const fechaStr = (fecha || new Date()).toLocaleString("es-AR", {
     day:"2-digit", month:"2-digit", year:"numeric",
@@ -9216,16 +9250,18 @@ function buildThermalESCPOS(ventaId, items, total, formaPago, fecha, descuento, 
   if (cfg.direccion) { b.center(); b.bold(); b.text(cfg.direccion); b.feed(1); b.boldOff(); }
   const telefonos = [cfg.telefono1, cfg.telefono2].filter(Boolean).join(" / ");
   if (telefonos) { b.center(); b.bold(); b.text("Tel: " + telefonos); b.feed(1); b.boldOff(); }
+  if (fiscal) { b.left(); b.sepSolid(); ArcaUI.escposEncabezado(b, fiscal); }
 
   b.left();
   b.sepSolid();
   b.bold();
   b.text("Fecha: " + fechaStr); b.feed(1);
-  b.text("Venta: #" + String(ventaId || "—")); b.feed(1);
-  b.text("Pago: " + String(formaPago || "—")); b.feed(1);
+  b.text((fiscal ? "Comprobante" : "Venta") + ": #" + String(ventaId || "—")); b.feed(1);
+  if (formaPago || !fiscal) { b.text("Pago: " + String(formaPago || "—")); b.feed(1); }
   b.sep();
 
   let subtotal = 0;
+  if (fiscal && fiscal.clase === "A") { ArcaUI.escposFilasA(b, fiscal); ArcaUI.escposTotalesA(b, fiscal); items = []; descuento = null; }
   items.forEach(item => {
     const sub = item.PRECIO * item.cantidad;
     subtotal += sub;
@@ -9249,6 +9285,7 @@ function buildThermalESCPOS(ventaId, items, total, formaPago, fecha, descuento, 
   b.doubleH();
   b.row("TOTAL", "$" + money(total));
   b.normal();
+  if (fiscal) ArcaUI.escposPie(b, fiscal);
   b.sep();
 
   b.bold();
@@ -9601,11 +9638,13 @@ function imprimirTicketThermal() {
 }
 
 /** Print after a completed sale (from receipt modal) */
-function imprimirUltimoRecibo() {
+async function imprimirUltimoRecibo() {
   if (!ultimaVentaImprimible) { toast("No hay venta para imprimir", "error"); return; }
   const u = ultimaVentaImprimible;
+  // Con factura electrónica, el ticket sale con los datos fiscales (CAE y QR)
+  const fiscal = window.ArcaUI ? await ArcaUI.facturaParaImprimir(u) : null;
   _ejecutarImpresion(u.ventaId, u.items, u.total, u.formaPago, u.fecha,
-    u.descuento !== 0 ? { monto: u.descuento, etiqueta: u.descuentoEtiqueta } : null);
+    u.descuento !== 0 ? { monto: u.descuento, etiqueta: u.descuentoEtiqueta } : null, fiscal);
 }
 
 /** Print a sale from the dashboard recent-sales table or the Ventas POS history */
@@ -9670,10 +9709,11 @@ function imprimirVentaDesdeData(ventaObj) {
  * ticket. Ajustando el alto al contenido real, el driver corta apenas
  * termina de imprimir lo que hay.
  */
-function estimarAltoTicketVentaMicrones(items, descuento, cambioData, cfg) {
+function estimarAltoTicketVentaMicrones(items, descuento, cambioData, cfg, fiscal) {
   const cfgReal = cfg || obtenerConfigNegocio();
 
-  let lineas = 6; // nombre del negocio, separador, fecha, N° de venta, forma de pago, separador
+  let lineas = 6;
+  if (fiscal && window.ArcaUI) lineas += ArcaUI.lineasExtra(fiscal); // datos fiscales + QR // nombre del negocio, separador, fecha, N° de venta, forma de pago, separador
   if (cfgReal.subtitulo) lineas++;
   if (cfgReal.direccion) lineas++;
   if (cfgReal.telefono1 || cfgReal.telefono2) lineas++;
@@ -9690,7 +9730,7 @@ function estimarAltoTicketVentaMicrones(items, descuento, cambioData, cfg) {
   const MARGEN_MM = 12;      // margen de seguridad: feed final, espaciados entre bloques, etc.
 
   const altoMm = Math.max(40, lineas * ALTO_LINEA_MM + MARGEN_MM); // nunca menos de 40mm (ticket mínimo)
-  return Math.round(Math.min(altoMm, 297) * 1000); // nunca más que el tope anterior (297mm) — red de seguridad
+  return Math.round(Math.min(altoMm, fiscal ? 600 : 297) * 1000); // nunca más que el tope anterior (297mm) — red de seguridad
 }
 
 /**
@@ -9730,7 +9770,7 @@ async function resolverNombreImpresoraParaRaw(bridge) {
   return _nombreImpresoraPorDefectoCache;
 }
 
-function _ejecutarImpresion(ventaId, items, total, formaPago, fecha, descuento) {
+function _ejecutarImpresion(ventaId, items, total, formaPago, fecha, descuento, fiscal) {
   const cambioData = obtenerDatosCambio();
 
   const btn = document.getElementById("btnImprimirTicket");
@@ -9749,14 +9789,14 @@ function _ejecutarImpresion(ventaId, items, total, formaPago, fecha, descuento) 
     }
   };
 
-  const altoEstimadoMicrones = estimarAltoTicketVentaMicrones(items, descuento, cambioData);
+  const altoEstimadoMicrones = estimarAltoTicketVentaMicrones(items, descuento, cambioData, null, fiscal);
 
   if (usbPrintHabilitado() && puertoImpresoraUSB) {
-    const bytes = buildThermalESCPOS(ventaId, items, total, formaPago, fecha, descuento);
+    const bytes = buildThermalESCPOS(ventaId, items, total, formaPago, fecha, descuento, null, fiscal);
     enviarBytesAImpresoraUSB(bytes)
       .catch(error => {
         console.error("Error al imprimir por USB:", error);
-        return _imprimirConDialogo(buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, null, cambioData), altoEstimadoMicrones);
+        return _imprimirConDialogo(buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, null, cambioData, fiscal), altoEstimadoMicrones);
       })
       .finally(liberar);
     return;
@@ -9779,10 +9819,10 @@ function _ejecutarImpresion(ventaId, items, total, formaPago, fecha, descuento) 
         if (!nombreImpresora) {
           // No hay ninguna impresora configurada NI predeterminada en
           // Windows que se pueda usar — ni vale la pena intentar RAW.
-          return _imprimirConDialogo(buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, null, cambioData), altoEstimadoMicrones);
+          return _imprimirConDialogo(buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, null, cambioData, fiscal), altoEstimadoMicrones);
         }
 
-        const bytesRaw = buildThermalESCPOS(ventaId, items, total, formaPago, fecha, descuento);
+        const bytesRaw = buildThermalESCPOS(ventaId, items, total, formaPago, fecha, descuento, null, fiscal);
         const tAntesDeInvocar = performance.now();
         return bridge.imprimirDirectoRaw({ deviceName: nombreImpresora, bytes: bytesRaw })
           .then(resultado => {
@@ -9796,18 +9836,18 @@ function _ejecutarImpresion(ventaId, items, total, formaPago, fecha, descuento) 
             );
             if (resultado && resultado.success) return;
             console.warn("Impresión RAW no disponible o falló, se usa el camino anterior:", resultado && resultado.errorType);
-            return _imprimirConDialogo(buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, null, cambioData), altoEstimadoMicrones);
+            return _imprimirConDialogo(buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, null, cambioData, fiscal), altoEstimadoMicrones);
           });
       })
       .catch(error => {
         console.error("Error al imprimir RAW:", error);
-        return _imprimirConDialogo(buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, null, cambioData), altoEstimadoMicrones);
+        return _imprimirConDialogo(buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, null, cambioData, fiscal), altoEstimadoMicrones);
       })
       .finally(liberar);
     return;
   }
 
-  _imprimirConDialogo(buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, null, cambioData), altoEstimadoMicrones)
+  _imprimirConDialogo(buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, null, cambioData, fiscal), altoEstimadoMicrones)
     .finally(liberar);
 }
 
@@ -14732,6 +14772,7 @@ async function consultarCobroMercadoPagoPolling() {
         };
 
         mostrarRecibo(ventaId, itemsSnapshot, total, subtotal, subtotal - total, recibido);
+        if (window.ArcaUI) ArcaUI.trasVenta({ ref: clienteVentaIdMP, items: itemsSnapshot, total, fecha: new Date() });
 
         // Limpiar ticket y actualizar UI
         ticketPOS = [];

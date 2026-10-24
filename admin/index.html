@@ -1990,6 +1990,7 @@
       <button type="button" class="cfg-tab-btn" data-cfg-tab="catalogo" onclick="mostrarConfigTab('catalogo', this)" title="Cómo se ve la página pública">Catálogo web</button>
       <button type="button" class="cfg-tab-btn" data-cfg-tab="pedidos" onclick="mostrarConfigTab('pedidos', this)" title="Reglas y datos de los pedidos del catálogo">Pedidos</button>
       <button type="button" class="cfg-tab-btn" data-cfg-tab="cobros" onclick="mostrarConfigTab('cobros', this)" title="Medios de cobro">Cobros</button>
+      <button type="button" class="cfg-tab-btn" data-cfg-tab="facturacion" onclick="mostrarConfigTab('facturacion', this)" title="Factura electrónica con ARCA (opcional)">Facturación</button>
       <button type="button" class="cfg-tab-btn" data-cfg-tab="equipo" onclick="mostrarConfigTab('equipo', this)" title="Solo afecta a esta caja">Esta computadora</button>
       <button type="button" class="cfg-tab-btn" data-cfg-tab="sistema" onclick="mostrarConfigTab('sistema', this)" title="Licencia, conexión y carpeta de imágenes">Sistema</button>
     </div>
@@ -2646,6 +2647,112 @@
         </div>
       </div>
 
+    </div>
+
+    <!-- ===== PESTAÑA: FACTURACIÓN ELECTRÓNICA (ARCA) — solo app de escritorio ===== -->
+    <div class="cfg-tab-pane" id="cfgTab-facturacion">
+      <div class="card p-3 mt-3" id="cardFacturacionArca" style="display:none;">
+        <h6 style="margin-bottom:6px;">Factura electrónica (ARCA)</h6>
+        <p class="text-muted" style="font-size:13px; margin-bottom:12px;">
+          Opcional. Con esto activado, el POS puede emitir la factura de cada venta (A, B o C según tu condición y la del cliente), con CAE y QR de ARCA. Sin internet, las facturas quedan en cola y se emiten solas al volver.
+        </p>
+        <div id="arcaEstadoBox" class="config-preview-hint mb-3">Cargando estado...</div>
+
+        <div id="arcaFormularioWrap" style="display:none;">
+          <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" id="arcaActiva">
+            <label class="form-check-label fw-semibold" for="arcaActiva">Facturación electrónica activada</label>
+          </div>
+
+          <div class="row g-2">
+            <div class="col-md-6">
+              <label class="form-label">CUIT del negocio</label>
+              <input type="text" class="form-control" id="arcaCuit" inputmode="numeric" placeholder="20-12345678-9">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Condición frente al IVA</label>
+              <select class="form-select" id="arcaCondicion">
+                <option value="MONOTRIBUTO">Monotributo (Factura C)</option>
+                <option value="RI">Responsable Inscripto (Factura A y B)</option>
+              </select>
+            </div>
+            <div class="col-md-8">
+              <label class="form-label">Razón social <span class="text-muted" style="font-size:11px;">(como figura en ARCA)</span></label>
+              <input type="text" class="form-control" id="arcaRazonSocial">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Punto de venta</label>
+              <input type="number" class="form-control" id="arcaPtoVta" min="1" max="99998" placeholder="Ej: 3">
+            </div>
+            <div class="col-12">
+              <label class="form-label">Domicilio comercial</label>
+              <input type="text" class="form-control" id="arcaDomicilio" placeholder="Calle, número, localidad">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Ingresos Brutos <span class="text-muted" style="font-size:11px;">(Nº o "Exento")</span></label>
+              <input type="text" class="form-control" id="arcaIibb">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Inicio de actividades</label>
+              <input type="date" class="form-control" id="arcaInicioActividades">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Qué vendés</label>
+              <select class="form-select" id="arcaConcepto">
+                <option value="1">Productos</option>
+                <option value="2">Servicios</option>
+                <option value="3">Productos y servicios</option>
+              </select>
+            </div>
+            <div class="col-md-6" id="arcaAlicuotaWrap">
+              <label class="form-label">Alícuota de IVA habitual</label>
+              <select class="form-select" id="arcaAlicuotaDefault">
+                <option value="21">21%</option>
+                <option value="10.5">10,5%</option>
+                <option value="27">27%</option>
+                <option value="5">5%</option>
+                <option value="2.5">2,5%</option>
+                <option value="0">0%</option>
+              </select>
+              <div class="form-text" style="font-size:11px;">Los productos con otra alícuota se marcan en su ficha (campo "Alícuota de IVA").</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Ambiente</label>
+              <select class="form-select" id="arcaAmbiente">
+                <option value="homologacion">Pruebas (homologación) — sin validez fiscal</option>
+                <option value="produccion">Producción — facturas reales</option>
+              </select>
+            </div>
+            <div class="col-md-6 d-flex align-items-end">
+              <div class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" id="arcaFacturarPorDefecto">
+                <label class="form-check-label" for="arcaFacturarPorDefecto">En el POS, "Facturar" viene marcado</label>
+              </div>
+            </div>
+          </div>
+
+          <hr>
+          <div class="mfv-label" style="margin-bottom:6px;">Certificado de ARCA</div>
+          <div id="arcaCertificadoBox" class="text-muted" style="font-size:13px; margin-bottom:10px;">Sin certificado.</div>
+          <div class="d-flex flex-wrap gap-2 mb-2">
+            <button class="btn btn-outline-primary btn-sm" onclick="ArcaUI.generarPedidoCertificado()">1. Generar pedido de certificado (.csr)</button>
+            <label class="btn btn-outline-primary btn-sm mb-0">
+              2. Cargar certificado (.crt)
+              <input type="file" id="arcaArchivoCert" accept=".crt,.pem,.cer,.txt" style="display:none;" onchange="ArcaUI.cargarCertificado(this)">
+            </label>
+            <button class="btn btn-link btn-sm" onclick="ArcaUI.mostrarAyudaCertificado()">¿Cómo se saca el certificado?</button>
+          </div>
+
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-3">
+            <button class="btn btn-outline-secondary btn-sm" onclick="ArcaUI.abrirComprobantes()">Ver comprobantes</button>
+            <div class="d-flex gap-2">
+              <button class="btn btn-outline-secondary btn-sm" onclick="ArcaUI.probarConexion()">Probar conexión</button>
+              <button class="btn btn-success btn-sm" onclick="ArcaUI.guardarConfig()">Guardar</button>
+            </div>
+          </div>
+          <div id="arcaPruebaResultado" class="mt-2" style="font-size:13px;"></div>
+        </div>
+      </div>
     </div>
 
     <!-- ===== PESTAÑA: ESTA COMPUTADORA — Solo afecta a esta caja ===== -->
@@ -3329,6 +3436,20 @@
         <label class="form-label">Alias / palabras clave <span class="text-muted" style="font-size:11px;">(opcional, para buscar más rápido en el POS)</span></label>
         <input type="text" class="form-control" id="pmAlias" placeholder="Ej: coca, cocacola, gaseosa negra">
         <div class="form-text" style="font-size:11px;">Separados por coma. No se muestran al cliente ni reemplazan el nombre — solo ayudan a encontrar el producto al escribir en el buscador del POS.</div>
+      </div>
+
+      <!-- Solo con facturación ARCA activa como Responsable Inscripto (ver facturacion-arca.js) -->
+      <div class="mt-2" id="pmAlicuotaWrap" style="display:none;">
+        <label class="form-label">Alícuota de IVA <span class="text-muted" style="font-size:11px;">(para la factura; el precio sigue siendo final)</span></label>
+        <select class="form-select" id="pmAlicuotaIva">
+          <option value="">La de siempre (Configuración → Facturación)</option>
+          <option value="21">21%</option>
+          <option value="10.5">10,5%</option>
+          <option value="27">27%</option>
+          <option value="5">5%</option>
+          <option value="2.5">2,5%</option>
+          <option value="0">0% (gravado a tasa cero)</option>
+        </select>
       </div>
 
       <div class="mt-2">
@@ -4389,6 +4510,7 @@
 <script src="informe-errores.js"></script>
 <script src="veek-auth.js"></script>
 <script src="admin.js"></script>
+<script src="facturacion-arca.js"></script>
 <script>
 function logout(){
   sessionStorage.removeItem("admin");

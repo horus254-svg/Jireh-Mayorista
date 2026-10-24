@@ -1280,6 +1280,7 @@ tr.fila-arrastrable{ cursor:default; }
 .discount-mode-btn.active[data-modo="RECARGO"]{ background:var(--green-600); border-color:var(--green-600); color:#fff; }
 .discount-mode-btn.active[data-modo="NO"]{ background:var(--green-600); border-color:var(--green-600); color:#fff; }
 .discount-mode-btn.active[data-modo="SI"]{ background:var(--navy-900); border-color:var(--navy-900); color:#fff; }
+.discount-mode-btn.active[data-modo="SIN"]{ background:var(--slate-500); border-color:var(--slate-500); color:#fff; }
 
 .discount-type-row{ display:flex; gap:5px; align-items:center; }
 .discount-type-btn{
@@ -1586,6 +1587,9 @@ tr.fila-arrastrable{ cursor:default; }
   word-wrap:break-word; overflow-wrap:break-word; white-space:normal;
 }
 .thermal-receipt table td:last-child{ text-align:right; white-space:nowrap; width:1%; }
+/* Nombre del producto (fila de ancho completo): a la izquierda y en varias
+   líneas si es largo — con nowrap un nombre largo se salía del papel */
+.thermal-receipt table td[colspan]{ text-align:left; white-space:normal; width:auto; }
 .thermal-receipt .th-total-row td{
   font-weight:bold; font-size:10.5pt; border-top:1px solid #000; padding-top:1.5mm;
 }
