@@ -3111,6 +3111,7 @@ async function _leerRespuestaJSON(response) {
 }
 
 async function cambiarEstado(pedidoId, estado, el) {
+  pedidoId = String(pedidoId); // los números nuevos (1001…) pueden llegar como número
   if (_pedidosEnProceso.has(pedidoId)) return;
   _pedidosEnProceso.add(pedidoId);
   _marcarPedidoProcesando(pedidoId, el, "Guardando…");
@@ -3190,6 +3191,7 @@ async function cambiarFormaPagoPedido(pedidoId, formaPago) {
 const _pedidosEnProceso = new Set(); // evita doble cobro del mismo pedido
 
 async function aplicarCobroPedido(pedidoId, cobrado, formaPago, el) {
+  pedidoId = String(pedidoId); // los números nuevos (1001…) pueden llegar como número
   if (_pedidosEnProceso.has(pedidoId)) return; // ya procesando
   _pedidosEnProceso.add(pedidoId);
   _marcarPedidoProcesando(pedidoId, el, cobrado ? "Cobrando…" : "Desmarcando…");
@@ -3256,7 +3258,8 @@ function _claveBusquedaPedidos() {
 
 /** Pedido por número, en la lista general o entre los viejos encontrados. */
 function _pedidoLocalPorId(pedidoId) {
-  return pedidosGlobal.find(x => x.PEDIDO_ID === pedidoId) || (_pedidosAntiguos.lista || []).find(x => x.PEDIDO_ID === pedidoId);
+  const id = String(pedidoId);
+  return pedidosGlobal.find(x => String(x.PEDIDO_ID) === id) || (_pedidosAntiguos.lista || []).find(x => String(x.PEDIDO_ID) === id);
 }
 
 function programarBusquedaPedidosAntiguos(inmediata) {
@@ -3341,6 +3344,7 @@ const ESTADO_ICONO_PEDIDO = { NUEVO: "🆕", PREPARANDO: "⚙️", ENVIADO: "�
 let pedidoDetalleActual = null;
 
 async function abrirDetallePedido(pedidoId) {
+  pedidoId = String(pedidoId);
   document.getElementById("pedidoDetalleBody").innerHTML = `<div class="text-center text-muted py-4">Cargando...</div>`;
   document.getElementById("pedidoDetalleModalBackdrop").classList.add("show");
 
@@ -4613,7 +4617,7 @@ function renderPedidos(listaOriginal) {
              <button class="pedido-pago-btn" onclick="aplicarCobroPedido('${p.PEDIDO_ID}', true, 'TARJETA', this)">Tarjeta</button>
            </div>`;
       const tmp = document.createElement("div");
-      tmp.innerHTML = `<div class="pedido-card estado-${claseEstado}${_pedidosEnProceso.has(p.PEDIDO_ID) ? " pedido-procesando" : ""}" data-pedido-card="${escapeHtml(p.PEDIDO_ID)}">
+      tmp.innerHTML = `<div class="pedido-card estado-${claseEstado}${_pedidosEnProceso.has(String(p.PEDIDO_ID)) ? " pedido-procesando" : ""}" data-pedido-card="${escapeHtml(p.PEDIDO_ID)}">
         <div class="pedido-card-top">
           <div>
             <div class="pedido-card-id">${escapeHtml(p.PEDIDO_ID)}${p._antiguo ? ' <span class="pedido-antiguo-badge" title="Pedido de hace más de 30 días: no está en la lista general, apareció por la búsqueda">Anterior</span>' : ""}</div>
@@ -7302,7 +7306,9 @@ function imprimirInformeCliente() {
  * con JsBarcode (ya cargado en el panel).
  */
 function imprimirEtiquetaEnvio(datos) {
-  const { pedidoId, cliente, telefono, direccion, localidad, provincia, codigoPostal, dni, transporte } = datos;
+  const { cliente, telefono, direccion, localidad, provincia, codigoPostal, dni, transporte } = datos;
+  // Los números nuevos (1001…) pueden llegar como número: siempre como texto
+  const pedidoId = String(datos.pedidoId ?? "");
 
   const cpStr = codigoPostal ? `  CP:${codigoPostal}` : "";
   const localidadStr = [localidad, cpStr].filter(Boolean).join("").trim();
@@ -14323,18 +14329,21 @@ function regenerarCodigoRed() {
 }
 
 /** Carga el estado actual de la config de red al abrir la tarjeta — rol guardado, nombre de caja, y a quién está viendo (servidor propio o servidor encontrado) */
-async function cargarConfigRedForm() {
+async function cargarConfigRedForm(soloEstado) {
   const bridge = window.veekpos || window.posOffline;
   if (!bridge) return;
+  if (!soloEstado) seguirEstadoRed(false);
 
   const estadoEl = document.getElementById("estadoRedLocal");
 
   try {
     const { rol, nombreCaja } = await bridge.obtenerRolRed();
-    document.getElementById("cfgRolRed").value = rol || "";
-    document.getElementById("cfgNombreCaja").value = nombreCaja || "";
-    actualizarVisibilidadCampoNombreCaja(rol || "");
-    cargarCodigoRed();
+    if (!soloEstado) {
+      document.getElementById("cfgRolRed").value = rol || "";
+      document.getElementById("cfgNombreCaja").value = nombreCaja || "";
+      actualizarVisibilidadCampoNombreCaja(rol || "");
+      cargarCodigoRed();
+    }
 
     if (!estadoEl) return;
 
@@ -14357,7 +14366,7 @@ async function cargarConfigRedForm() {
       } else if (estado.servidorConocido) {
         estadoEl.textContent = "🟡 Se encontró un servidor en la red, pero no responde ahora mismo.";
       } else {
-        estadoEl.textContent = "🟡 Buscando el servidor en la red local...";
+        estadoEl.textContent = "🟡 Buscando el servidor en la red local… (la caja servidor tiene que estar prendida, con VeekPOS abierto y en la misma red)";
       }
 
     } else {
@@ -14377,6 +14386,30 @@ async function cargarConfigRedForm() {
   } catch (error) {
     if (estadoEl) estadoEl.textContent = "No se pudo cargar el estado de la red.";
   }
+}
+
+/**
+ * Estado de la conexión en vivo: después de guardar se revisa cada 1 s
+ * (hasta 20 s o hasta que conecte), y mientras la tarjeta de red esté a la
+ * vista, cada 4 s. Antes se miraba una sola vez justo al guardar — cuando
+ * todavía no había dado tiempo a encontrar el servidor — y quedaba
+ * "Buscando…" hasta salir y volver a entrar a Configuración.
+ */
+let _relojEstadoRed = null;
+function seguirEstadoRed(rapido) {
+  clearTimeout(_relojEstadoRed);
+  const inicio = Date.now();
+  const ciclo = async () => {
+    const card = document.getElementById("cardMultiCajaRed");
+    const visible = card && card.offsetParent !== null && document.getElementById("configuracion")?.style.display === "block";
+    if (!visible) return;
+    await cargarConfigRedForm(true);
+    const txt = document.getElementById("estadoRedLocal")?.textContent || "";
+    const conectado = /Conectada al servidor/.test(txt);
+    const enRapido = rapido && !conectado && Date.now() - inicio < 20000;
+    _relojEstadoRed = setTimeout(ciclo, enRapido ? 1000 : 4000);
+  };
+  _relojEstadoRed = setTimeout(ciclo, rapido ? 700 : 4000);
 }
 
 /** Guarda el rol de red elegido (botón "Guardar configuración de red") */
@@ -14402,6 +14435,7 @@ async function guardarConfigRed() {
     }
     toast("Configuración de red guardada", "success");
     await cargarConfigRedForm();
+    seguirEstadoRed(true);
   } catch (error) {
     toast("No se pudo guardar la configuración de red", "error");
   }
