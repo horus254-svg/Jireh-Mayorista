@@ -744,7 +744,7 @@
     const bruto = items.reduce((a, i) => a + i.PRECIO * i.cantidad, 0);
     const dif = Math.round((bruto - Number(f.total)) * 100) / 100;
     const ajuste = Math.abs(dif) >= 0.01 ? { monto: dif, etiqueta: "" } : null;
-    _ejecutarImpresion(f.numero, items, Number(f.total), formaPago || "", fechaDeComprobante(f), ajuste, f);
+    _ejecutarImpresion(f.numero, items, Number(f.total), formaPago || "", fechaDeComprobante(f), ajuste, f, null);
   }
 
   function fechaDeComprobante(f) {
@@ -895,7 +895,6 @@
       0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30                 // imprimir
     ];
   }
-  function lineasExtra(f) { return f ? 22 + (f.clase === "A" ? (f.lineas || []).length + (f.ivas || []).length : 0) + (f.qrUrl ? 8 : 0) : 0; }
 
   /* ------------------------------------------------------------------
      Comprobantes (listado)
@@ -980,7 +979,7 @@
     alAbrirModalVenta, elegirFacturar, capturarModal, trasVenta, facturaParaImprimir,
     celdaVenta, facturarVentaHistorial, enDetallePedido, notaCreditoPedido, trasAnulacion, imprimirPorRef, imprimirComprobante,
     // impresión (los usan buildThermalHTML / buildThermalESCPOS)
-    htmlEncabezado, htmlFilasA, htmlTotalesA, htmlPie, escposEncabezado, escposFilasA, escposTotalesA, escposPie, lineasExtra,
+    htmlEncabezado, htmlFilasA, htmlTotalesA, htmlPie, escposEncabezado, escposFilasA, escposTotalesA, escposPie,
     _cache: cache
   };
 

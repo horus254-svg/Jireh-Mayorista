@@ -8682,7 +8682,8 @@ async function confirmarFinalizarVenta() {
     descuento: montoDescuento,
     descuentoEtiqueta: etiquetaDescuento,
     formaPago: formaPagoPOS,
-    fecha: fechaVenta
+    fecha: fechaVenta,
+    recibido: formaPagoPOS === "EFECTIVO" ? recibido : 0 // para "Recibido / Cambio" en el ticket
   };
 
   // Mostrar recibo y limpiar ticket INMEDIATAMENTE
@@ -9061,6 +9062,43 @@ function nuevaVentaPOS() {
  * @param {Object}  [descuento] — { monto, etiqueta } opcional, si la venta tuvo descuento
  * @param {Object}  [cfgOverride] — config del negocio a usar en vez de la guardada (solo para vista previa)
  */
+/* ---- Formato común de los tickets (venta y cierre, pantalla y térmica) ---- */
+
+/** "$1.250" si es entero, "$1.250,50" si tiene centavos (antes salía "$1.250,5") */
+function plataTicket(n) {
+  const v = Math.round((Number(n) || 0) * 100) / 100;
+  return (v < 0 ? "-" : "") + "$" + money(Math.abs(v));
+}
+function cantidadTicket(n) {
+  const v = Number(n) || 0;
+  return Number.isInteger(v) ? String(v) : v.toLocaleString("es-AR", { maximumFractionDigits: 3 });
+}
+function totalArticulosTicket(items) {
+  return (items || []).reduce((a, i) => a + (Number(i.cantidad) || 0), 0);
+}
+/** El ticket común no es una factura (y el previo ni siquiera es comprobante de pago) */
+function leyendaTicketVenta(ventaId) {
+  return String(ventaId) === "PREVIO" ? "TICKET PREVIO - NO ES COMPROBANTE DE PAGO" : "DOCUMENTO NO VÁLIDO COMO FACTURA";
+}
+/** Diferencia de caja: el importe con signo ("-$500", "+$500", "$0")… */
+function diferenciaTicket(d) {
+  const v = Math.round((Number(d) || 0) * 100) / 100;
+  if (!v) return "$0";
+  return (v < 0 ? "-" : "+") + plataTicket(Math.abs(v));
+}
+/** …y la palabra que la explica, en la etiqueta: "Faltante", "Sobrante" o "Diferencia" */
+function etiquetaDiferencia(d, prefijo) {
+  const v = Math.round((Number(d) || 0) * 100) / 100;
+  const palabra = v < 0 ? "Faltante" : v > 0 ? "Sobrante" : "Diferencia";
+  return prefijo ? prefijo + " " + palabra.toUpperCase() : palabra;
+}
+/** Cambio a devolver: el del dato si viene, si no recibido − total */
+function cambioTicket(cambioData, total) {
+  if (!cambioData || !(Number(cambioData.recibido) > 0)) return null;
+  const cambio = cambioData.cambio !== undefined ? Number(cambioData.cambio) : Number(cambioData.recibido) - Number(total);
+  return { recibido: Number(cambioData.recibido), cambio: Math.max(0, cambio) };
+}
+
 function buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, cfgOverride, cambioData, fiscal) {
   const cfg = cfgOverride || obtenerConfigNegocio();
   if (!(fiscal && window.ArcaUI)) fiscal = null; // factura electrónica (facturacion-arca.js)
@@ -9075,14 +9113,14 @@ function buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, cf
   items.forEach(item => {
     const sub = item.PRECIO * item.cantidad;
     subtotal += sub;
-    const unitStr = `${item.cantidad} x $${Number(item.PRECIO).toLocaleString("es-AR")}`;
+    const unitStr = `${cantidadTicket(item.cantidad)} x ${plataTicket(item.PRECIO)}`;
     rows += `
       <tr>
         <td colspan="2" style="padding-bottom:0;">${escapeHtml(item.PRODUCTO)}</td>
       </tr>
       <tr>
         <td>${unitStr}</td>
-        <td style="text-align:right;">$${sub.toLocaleString("es-AR")}</td>
+        <td style="text-align:right;">${plataTicket(sub)}</td>
       </tr>`;
   });
 
@@ -9096,31 +9134,38 @@ function buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, cf
     filasTotales += `
       <tr>
         <td>Subtotal</td>
-        <td style="text-align:right;">$${subtotal.toLocaleString("es-AR")}</td>
+        <td style="text-align:right;">${plataTicket(subtotal)}</td>
       </tr>
       <tr>
         <td>${etiquetaFila}${descuento.etiqueta ? " (" + escapeHtml(descuento.etiqueta) + ")" : ""}</td>
-        <td style="text-align:right;">${signoFila}$${Math.round(Math.abs(descuento.monto)).toLocaleString("es-AR")}</td>
+        <td style="text-align:right;">${signoFila}${plataTicket(Math.abs(descuento.monto))}</td>
       </tr>`;
   }
   filasTotales += `
     <tr class="th-total-row">
       <td><strong>TOTAL</strong></td>
-      <td style="text-align:right;"><strong>$${Number(total).toLocaleString("es-AR")}</strong></td>
+      <td style="text-align:right;"><strong>${plataTicket(total)}</strong></td>
     </tr>`;
   // Factura A: líneas sin IVA y el IVA discriminado (el descuento ya va repartido en las líneas)
   if (fiscal && fiscal.clase === "A") { rows = ArcaUI.htmlFilasA(fiscal); filasTotales = ArcaUI.htmlTotalesA(fiscal); }
+  // Cantidad de artículos (útil en ventas por mayor)
+  filasTotales = `
+    <tr>
+      <td>Artículos</td>
+      <td style="text-align:right;">${cantidadTicket(totalArticulosTicket(items))}</td>
+    </tr>` + filasTotales;
 
   // Recibido y cambio — solo si se ingresó un monto recibido
-  if (cambioData && cambioData.recibido > 0) {
+  const cambioInfo = cambioTicket(cambioData, total);
+  if (cambioInfo) {
     filasTotales += `
     <tr>
       <td>Recibido</td>
-      <td style="text-align:right;">$${Number(cambioData.recibido).toLocaleString("es-AR")}</td>
+      <td style="text-align:right;">${plataTicket(cambioInfo.recibido)}</td>
     </tr>
     <tr>
       <td><strong>Cambio</strong></td>
-      <td style="text-align:right;"><strong>${cambioData.cambioTexto}</strong></td>
+      <td style="text-align:right;"><strong>${plataTicket(cambioInfo.cambio)}</strong></td>
     </tr>`;
   }
 
@@ -9139,8 +9184,9 @@ function buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, cf
     encabezado += `<div style="margin-bottom:2mm;"></div>`;
   }
 
-  // Pie de página
+  // Pie de página (el texto se configura en Configuración → Negocio → Pie de página)
   let pie = "";
+  if (!fiscal) pie += `<div class="th-center" style="font-size:8.5pt;margin-bottom:1.5mm;">${leyendaTicketVenta(ventaId)}</div>`;
   if (cfg.pie) {
     pie += `<div class="th-footer">${escapeHtml(cfg.pie)}</div>`;
   }
@@ -9233,7 +9279,7 @@ const ESCPOS = {
 };
 
 /** Builds the raw byte buffer (Uint8Array) for a sale ticket, mirroring buildThermalHTML */
-function buildThermalESCPOS(ventaId, items, total, formaPago, fecha, descuento, cfgOverride, fiscal) {
+function buildThermalESCPOS(ventaId, items, total, formaPago, fecha, descuento, cfgOverride, fiscal, cambioData) {
   const cfg = cfgOverride || obtenerConfigNegocio();
   const b = new EscPosBuilder();
   if (!(fiscal && window.ArcaUI)) fiscal = null; // factura electrónica (facturacion-arca.js)
@@ -9260,6 +9306,7 @@ function buildThermalESCPOS(ventaId, items, total, formaPago, fecha, descuento, 
   if (formaPago || !fiscal) { b.text("Pago: " + String(formaPago || "—")); b.feed(1); }
   b.sep();
 
+  const articulos = totalArticulosTicket(items);
   let subtotal = 0;
   if (fiscal && fiscal.clase === "A") { ArcaUI.escposFilasA(b, fiscal); ArcaUI.escposTotalesA(b, fiscal); items = []; descuento = null; }
   items.forEach(item => {
@@ -9267,28 +9314,35 @@ function buildThermalESCPOS(ventaId, items, total, formaPago, fecha, descuento, 
     subtotal += sub;
     b.bold();
     b.text(item.PRODUCTO); b.feed(1);
-    b.row(`${item.cantidad} x $${money(item.PRECIO)}`, "$" + money(sub));
+    b.row(`${cantidadTicket(item.cantidad)} x ${plataTicket(item.PRECIO)}`, plataTicket(sub));
   });
 
+  b.sep();
+  b.row("Articulos", cantidadTicket(articulos));
   const tieneDescuento = descuento && Number(descuento.monto) !== 0;
   if (tieneDescuento) {
     const esRecargoESC = Number(descuento.monto) < 0;
-    b.sep();
-    b.row("Subtotal", "$" + money(subtotal));
+    b.row("Subtotal", plataTicket(subtotal));
     const palabraAjuste = esRecargoESC ? "Recargo" : "Descuento";
     const etiquetaDesc = descuento.etiqueta ? `${palabraAjuste} (${descuento.etiqueta})` : palabraAjuste;
     const signoESC = esRecargoESC ? "+" : "-";
-    b.row(etiquetaDesc, signoESC + "$" + money(Math.abs(descuento.monto)));
+    b.row(etiquetaDesc, signoESC + plataTicket(Math.abs(descuento.monto)));
   }
 
   b.sepSolid();
   b.doubleH();
-  b.row("TOTAL", "$" + money(total));
+  b.row("TOTAL", plataTicket(total));
   b.normal();
+  const cambioInfo = cambioTicket(cambioData, total);
+  if (cambioInfo) {
+    b.row("Recibido", plataTicket(cambioInfo.recibido));
+    b.bold(); b.row("Cambio", plataTicket(cambioInfo.cambio)); b.boldOff();
+  }
   if (fiscal) ArcaUI.escposPie(b, fiscal);
   b.sep();
 
   b.bold();
+  if (!fiscal) { b.center(); b.text(leyendaTicketVenta(ventaId)); b.feed(1); }
   if (cfg.pie) { b.center(); b.text(cfg.pie); b.feed(1); }
   b.center(); b.text(cfg.nombre + " - Sistema POS"); b.feed(1);
   b.boldOff();
@@ -9299,80 +9353,75 @@ function buildThermalESCPOS(ventaId, items, total, formaPago, fecha, descuento, 
   return b.build();
 }
 
-/** Builds the raw byte buffer for a cierre de caja receipt, mirroring buildThermalCierreHTML */
+/**
+ * Alto del papel (en micrones) para la impresión por diálogo, calculado a
+ * partir de los renglones REALES del ticket: se cuentan en los mismos bytes
+ * ESC/POS (que ya parten las líneas largas), así un nombre de producto que
+ * ocupa dos o tres renglones también suma. Antes se suponían 2 renglones
+ * por producto, y el cierre de caja pedía siempre 29,7 cm de papel.
+ */
+function altoTicketDesdeEscPos(bytes, extraMm, mmPorRenglon) {
+  let lineas = 0, ultimoFeed = 0;
+  for (let i = 0; i < bytes.length; i++) {
+    const x = bytes[i], y = bytes[i + 1];
+    if (x === 0x1D && y === 0x56) break;                                   // corte
+    if (x === 0x1D && y === 0x28 && bytes[i + 2] === 0x6B) { i += 4 + bytes[i + 3] + bytes[i + 4] * 256; continue; } // QR
+    if (x === 0x1B && y === 0x64) { lineas += bytes[i + 2]; ultimoFeed = bytes[i + 2]; i += 2; continue; } // avance
+    if (x === 0x1B && y === 0x40) { i += 1; continue; }                    // inicializar
+    if (x === 0x1B || x === 0x1D) { i += 2; continue; }                    // formato (3 bytes)
+    if (x === 0x0A) { lineas++; ultimoFeed = 0; }                          // renglón partido
+  }
+  lineas -= ultimoFeed; // el avance antes del corte no ocupa papel en el diálogo
+  // 9 pt con interlineado + el espacio de las filas de tabla, medido contra
+  // tickets reales renderizados (el cierre es casi todo filas de tabla: más alto)
+  const altoMm = Math.max(40, lineas * (mmPorRenglon || 5.6) + 14 + (extraMm || 0));
+  return Math.round(Math.min(altoMm, 1200) * 1000);
+}
+
+/** Bytes ESC/POS del cierre de caja (mismo contenido que buildThermalCierreHTML) */
 function buildThermalCierreESCPOS(resumen) {
   const cfg = obtenerConfigNegocio();
   const b = new EscPosBuilder();
-
-  const fechaStr = formatearFechaCierre(resumen.fecha);
-  const horaStr = new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
-
-  function filaMetodo(etiqueta, m) {
-    const signo = m.diferencia > 0 ? "+" : "";
-    b.bold();
-    b.text(etiqueta); b.feed(1);
-    b.row("Esperado", "$" + money(m.esperado));
-    b.row("Contado", "$" + money(m.contado));
-    b.row("Diferencia", signo + "$" + money(Math.round(m.diferencia)));
-  }
+  const d = datosTicketCierre(resumen);
 
   b.init();
   b.center(); b.big(); b.text(cfg.nombre); b.feed(1);
   b.normal();
-  b.center(); b.bold(); b.text("Cierre de Caja"); b.feed(1); b.boldOff();
-  if (cfg.direccion) { b.center(); b.bold(); b.text(cfg.direccion); b.feed(1); b.boldOff(); }
+  b.center(); b.bold(); b.doubleH(); b.text(d.titulo); b.feed(1); b.normal(); b.boldOff();
+  if (cfg.direccion) { b.center(); b.text(cfg.direccion); b.feed(1); }
   const telefonos = [cfg.telefono1, cfg.telefono2].filter(Boolean).join(" / ");
-  if (telefonos) { b.center(); b.bold(); b.text("Tel: " + telefonos); b.feed(1); b.boldOff(); }
+  if (telefonos) { b.center(); b.text("Tel: " + telefonos); b.feed(1); }
 
   b.left();
   b.sepSolid();
-  b.bold();
-  b.text("Fecha: " + fechaStr); b.feed(1);
-  b.text("Hora impresión: " + horaStr); b.feed(1);
-  b.text("Cierre: #" + String(resumen.cierreId || "—")); b.feed(1);
-  b.text("Vendedor: " + String(resumen.vendedor || "—")); b.feed(1);
+  d.datos.forEach(([k, v]) => b.row(k, v));
   b.sep();
+  b.bold(); b.row("Ventas del dia (" + d.cantidadVentas + ")", plataTicket(d.totalVentas)); b.boldOff();
+  if (d.cantidadAnuladas) b.row("Anuladas (no suman)", String(d.cantidadAnuladas));
 
-  b.bold(); b.text("VENTAS DEL DÍA"); b.feed(1); b.boldOff();
-  b.row("Total ventas", "$" + money(resumen.totalVentas));
-  b.row("  Efectivo", "$" + money(resumen.ventasEfectivo));
-  b.row("  Transferencia", "$" + money(resumen.ventasTransferencia));
-  b.row("  Tarjeta", "$" + money(resumen.ventasTarjeta));
-
-  const egresos = resumen.egresosPorFormaPago || { EFECTIVO: 0, TRANSFERENCIA: 0, TARJETA: 0 };
-  const filasEgresos = [
-    ["  Efectivo", egresos.EFECTIVO],
-    ["  Transferencia", egresos.TRANSFERENCIA],
-    ["  Tarjeta", egresos.TARJETA]
-  ].filter(([, monto]) => Number(monto) > 0);
-
-  if (filasEgresos.length) {
-    b.feed(1);
-    b.bold(); b.text("EGRESOS DEL DÍA"); b.feed(1); b.boldOff();
-    filasEgresos.forEach(([etiqueta, monto]) => b.row(etiqueta, "-$" + money(monto)));
-  }
-  b.sep();
-
-  filaMetodo("EFECTIVO", resumen.efectivo); b.feed(1);
-  filaMetodo("TRANSFERENCIA", resumen.transferencia); b.feed(1);
-  filaMetodo("TARJETA", resumen.tarjeta);
+  d.metodos.forEach(m => {
+    b.sep();
+    b.bold(); b.text(m.nombre); b.feed(1); b.boldOff();
+    m.lineas.forEach(([k, v]) => b.row("  " + k, v));
+    b.bold(); b.row("  Esperado", plataTicket(m.esperado)); b.boldOff();
+    b.row("  " + m.etiquetaContado, plataTicket(m.contado));
+    b.row("  " + etiquetaDiferencia(m.diferencia), diferenciaTicket(m.diferencia));
+  });
 
   b.sepSolid();
-  const signoTotal = resumen.total.diferencia > 0 ? "+" : "";
-  b.row("TOTAL ESPERADO", "$" + money(resumen.total.esperado));
-  b.row("TOTAL CONTADO", "$" + money(resumen.total.contado));
-  b.row("DIFERENCIA", signoTotal + "$" + money(Math.round(resumen.total.diferencia)));
+  b.bold();
+  b.row("TOTAL ESPERADO", plataTicket(d.total.esperado));
+  b.row("TOTAL CONTADO", plataTicket(d.total.contado));
+  b.row(etiquetaDiferencia(d.total.diferencia).toUpperCase(), diferenciaTicket(d.total.diferencia));
+  b.boldOff();
   b.sep();
 
   if (resumen.observaciones) {
-    b.bold();
     b.text("Obs: " + resumen.observaciones); b.feed(1);
     b.sep();
   }
-
-  b.bold();
-  b.text("Cierre generado por " + cfg.nombre + " POS"); b.feed(1);
-  b.boldOff();
+  if (d.esPrevio) { b.center(); b.bold(); b.text("Cierre no guardado: solo para revisar"); b.feed(1); b.boldOff(); }
+  b.center(); b.text("Cierre generado por " + cfg.nombre + " POS"); b.feed(1);
 
   b.feed(6); // margen generoso antes del corte -- con 3 el guillotine cortaba muy cerca de la ultima linea y dejaba texto fantasma del ticket anterior en el siguiente
   b.cut();
@@ -9380,8 +9429,32 @@ function buildThermalCierreESCPOS(resumen) {
   return b.build();
 }
 
+/** Número con separador de miles; con centavos solo si los tiene ("1.250" / "1.250,50") */
 function money(n) {
-  return Number(n || 0).toLocaleString("es-AR");
+  const v = Math.round((Number(n) || 0) * 100) / 100;
+  const dec = Number.isInteger(v) ? 0 : 2;
+  return v.toLocaleString("es-AR", { minimumFractionDigits: dec, maximumFractionDigits: dec });
+}
+
+/** Parte un texto en renglones de `ancho` caracteres, sin cortar palabras (salvo que una sola no entre) */
+function partirRenglonesTicket(texto, ancho) {
+  const salida = [];
+  String(texto).split("\n").forEach(parrafo => {
+    let linea = "";
+    parrafo.split(/ +/).forEach(palabra => {
+      while (palabra.length > ancho) {
+        if (linea) { salida.push(linea); linea = ""; }
+        salida.push(palabra.slice(0, ancho));
+        palabra = palabra.slice(ancho);
+      }
+      if (!palabra) return;
+      if (!linea) linea = palabra;
+      else if ((linea + " " + palabra).length <= ancho) linea += " " + palabra;
+      else { salida.push(linea); linea = palabra; }
+    });
+    salida.push(linea);
+  });
+  return salida;
 }
 
 /**
@@ -9402,16 +9475,17 @@ function normalizarParaImpresoraTermica(str) {
 class EscPosBuilder {
   constructor() {
     this.bytes = [];
+    this.ancho = ANCHO_TICKET_USB; // columnas disponibles con la letra actual
   }
   push(arr) { this.bytes.push(...arr); }
-  init()    { this.push(ESCPOS.INIT); }
+  init()    { this.push(ESCPOS.INIT); this.ancho = ANCHO_TICKET_USB; }
   center()  { this.push(ESCPOS.ALIGN_CENTER); }
   left()    { this.push(ESCPOS.ALIGN_LEFT); }
   bold()    { this.push(ESCPOS.BOLD_ON); }
   boldOff() { this.push(ESCPOS.BOLD_OFF); }
-  normal()  { this.push(ESCPOS.SIZE_NORMAL); }
-  doubleH() { this.push(ESCPOS.SIZE_DOUBLE_H); }
-  big()     { this.push(ESCPOS.SIZE_BIG); }
+  normal()  { this.push(ESCPOS.SIZE_NORMAL); this.ancho = ANCHO_TICKET_USB; }
+  doubleH() { this.push(ESCPOS.SIZE_DOUBLE_H); this.ancho = ANCHO_TICKET_USB; }
+  big()     { this.push(ESCPOS.SIZE_BIG); this.ancho = Math.floor(ANCHO_TICKET_USB / 2); } // doble ancho: la mitad de columnas
   cut()     { this.push(ESCPOS.CUT); }
   feed(n)   { this.push(ESCPOS.FEED(n)); }
 
@@ -9439,9 +9513,16 @@ class EscPosBuilder {
    * impresora, así que esto funciona en cualquier modelo.
    */
   text(str) {
+    // Lo que no entra en el ancho del papel pasa al renglón siguiente entre
+    // palabras (antes la impresora lo cortaba donde caía, a mitad de palabra)
     const limpio = normalizarParaImpresoraTermica(String(str));
+    // Si entra, va tal cual (respeta los espacios de alineación de row())
+    const renglones = limpio.length <= this.ancho && limpio.indexOf("\n") === -1 ? [limpio] : partirRenglonesTicket(limpio, this.ancho);
     const bytes = [];
-    for (let i = 0; i < limpio.length; i++) bytes.push(limpio.charCodeAt(i) & 0xFF);
+    renglones.forEach((r, k) => {
+      if (k > 0) bytes.push(0x0A);
+      for (let i = 0; i < r.length; i++) bytes.push(r.charCodeAt(i) & 0xFF);
+    });
     this.push(bytes);
   }
 
@@ -9461,10 +9542,19 @@ class EscPosBuilder {
 
   /** Prints a left label and a right-aligned value on the same 42-col line (wraps the label if too long) */
   row(left, right) {
-    const rightStr = String(right);
+    const rightStr = normalizarParaImpresoraTermica(String(right));
     const maxLeft = ANCHO_TICKET_USB - rightStr.length - 1;
-    let leftStr = String(left);
-    if (leftStr.length > maxLeft) leftStr = leftStr.slice(0, Math.max(0, maxLeft));
+    const leftStr = normalizarParaImpresoraTermica(String(left));
+    if (leftStr.length > maxLeft) {
+      // Etiqueta larga: va entera (en uno o más renglones) y el importe en el último, a la derecha
+      const renglones = partirRenglonesTicket(leftStr, ANCHO_TICKET_USB);
+      const ultimo = renglones.pop();
+      if (renglones.length) { this.text(renglones.join("\n")); this.feed(1); }
+      if (ultimo.length <= maxLeft) { this.text(ultimo + " ".repeat(Math.max(1, ANCHO_TICKET_USB - ultimo.length - rightStr.length)) + rightStr); this.feed(1); return; }
+      this.text(ultimo); this.feed(1);
+      this.text(" ".repeat(Math.max(0, ANCHO_TICKET_USB - rightStr.length)) + rightStr); this.feed(1);
+      return;
+    }
     const spaces = Math.max(1, ANCHO_TICKET_USB - leftStr.length - rightStr.length);
     this.text(leftStr + " ".repeat(spaces) + rightStr);
     this.feed(1);
@@ -9644,7 +9734,8 @@ async function imprimirUltimoRecibo() {
   // Con factura electrónica, el ticket sale con los datos fiscales (CAE y QR)
   const fiscal = window.ArcaUI ? await ArcaUI.facturaParaImprimir(u) : null;
   _ejecutarImpresion(u.ventaId, u.items, u.total, u.formaPago, u.fecha,
-    u.descuento !== 0 ? { monto: u.descuento, etiqueta: u.descuentoEtiqueta } : null, fiscal);
+    u.descuento !== 0 ? { monto: u.descuento, etiqueta: u.descuentoEtiqueta } : null, fiscal,
+    u.recibido > 0 ? { recibido: u.recibido } : null);
 }
 
 /** Print a sale from the dashboard recent-sales table or the Ventas POS history */
@@ -9675,6 +9766,8 @@ function imprimirVentaDesdeData(ventaObj) {
   let descuentoInfo = null;
   if (diferencia > 0.5 && /descuento/i.test(obs)) {
     descuentoInfo = { monto: diferencia, etiqueta: obs.replace(/^Descuento:\s*/i, "") };
+  } else if (diferencia < -0.5 && /recargo/i.test(obs)) {
+    descuentoInfo = { monto: diferencia, etiqueta: obs.replace(/^Recargo:\s*/i, "") }; // monto negativo = recargo
   }
 
   _ejecutarImpresion(
@@ -9683,55 +9776,12 @@ function imprimirVentaDesdeData(ventaObj) {
     totalGuardado,
     ventaObj.FORMA_PAGO || ventaObj.PAGO || "—",
     ventaObj.FECHA ? new Date(ventaObj.FECHA) : new Date(),
-    descuentoInfo
+    descuentoInfo,
+    null,
+    null // reimpresión: no se sabe cuánto entregó el cliente (antes tomaba lo escrito en el POS en ese momento)
   );
 }
 
-/**
- * Estima el alto real del ticket (en micrones) a partir de la
- * cantidad de líneas que va a tener el contenido, en vez de usar
- * siempre un alto fijo de 297mm (largo A4) para cualquier venta.
- *
- * Por qué no se mide el DOM: ya se probó (ver nota en
- * _imprimirConDialogo) y resultó frágil, porque el frame de
- * impresión está oculto y "mostrarlo" para medir su scrollHeight es
- * poco confiable. Esta función en cambio calcula el alto a partir de
- * los mismos datos con los que se arma el HTML (buildThermalHTML) —
- * sin tocar el DOM, así que es determinística.
- *
- * Por qué importa para la velocidad: con impresión silenciosa
- * (bridge.imprimirSilencioso), el alto de página que se le pasa al
- * driver de la impresora es el alto de "hoja" que Windows va a
- * intentar imprimir. Con un ticket de 3 productos pero alto fijo de
- * 297mm, el driver puede alimentar papel de más (o demorar el corte)
- * hasta completar esa altura, aunque el contenido real termine mucho
- * antes — eso es lo que hace sentir lenta la salida física del
- * ticket. Ajustando el alto al contenido real, el driver corta apenas
- * termina de imprimir lo que hay.
- */
-function estimarAltoTicketVentaMicrones(items, descuento, cambioData, cfg, fiscal) {
-  const cfgReal = cfg || obtenerConfigNegocio();
-
-  let lineas = 6;
-  if (fiscal && window.ArcaUI) lineas += ArcaUI.lineasExtra(fiscal); // datos fiscales + QR // nombre del negocio, separador, fecha, N° de venta, forma de pago, separador
-  if (cfgReal.subtitulo) lineas++;
-  if (cfgReal.direccion) lineas++;
-  if (cfgReal.telefono1 || cfgReal.telefono2) lineas++;
-
-  lineas += (items ? items.length : 0) * 2; // cada producto ocupa 2 líneas: nombre, y cantidad x precio
-  if (descuento && Number(descuento.monto) !== 0) lineas += 2; // fila de "Subtotal" + fila de descuento/recargo
-  lineas += 1; // fila de TOTAL
-  if (cambioData && cambioData.recibido > 0) lineas += 2; // Recibido + Cambio
-
-  lineas += 2; // separador final + primera línea del pie
-  if (cfgReal.pie) lineas++;
-
-  const ALTO_LINEA_MM = 4.6; // alto aproximado de una línea a 80mm, fuente ~9-10pt
-  const MARGEN_MM = 12;      // margen de seguridad: feed final, espaciados entre bloques, etc.
-
-  const altoMm = Math.max(40, lineas * ALTO_LINEA_MM + MARGEN_MM); // nunca menos de 40mm (ticket mínimo)
-  return Math.round(Math.min(altoMm, fiscal ? 600 : 297) * 1000); // nunca más que el tope anterior (297mm) — red de seguridad
-}
 
 /**
  * Resuelve qué impresora usar para el camino RAW: el nombre guardado
@@ -9770,8 +9820,12 @@ async function resolverNombreImpresoraParaRaw(bridge) {
   return _nombreImpresoraPorDefectoCache;
 }
 
-function _ejecutarImpresion(ventaId, items, total, formaPago, fecha, descuento, fiscal) {
-  const cambioData = obtenerDatosCambio();
+function _ejecutarImpresion(ventaId, items, total, formaPago, fecha, descuento, fiscal, cambioData) {
+  // Sin cambioData explícito (ticket previo, antes de cobrar) se toma lo que
+  // está escrito en el POS. Después de la venta esos campos ya se limpiaron:
+  // por eso el recibo y las reimpresiones pasan el suyo (o null).
+  if (cambioData === undefined) cambioData = obtenerDatosCambio();
+  if (!(fiscal && window.ArcaUI)) fiscal = null;
 
   const btn = document.getElementById("btnImprimirTicket");
   const textoOriginalBtn = btn ? btn.innerHTML : null;
@@ -9789,66 +9843,50 @@ function _ejecutarImpresion(ventaId, items, total, formaPago, fecha, descuento, 
     }
   };
 
-  const altoEstimadoMicrones = estimarAltoTicketVentaMicrones(items, descuento, cambioData, null, fiscal);
+  const bytes = buildThermalESCPOS(ventaId, items, total, formaPago, fecha, descuento, null, fiscal, cambioData);
+  _imprimirTicketTermico({
+    html: buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, null, cambioData, fiscal),
+    bytes,
+    alto: altoTicketDesdeEscPos(bytes, fiscal && fiscal.qrUrl ? 36 : 0), // el QR fiscal mide ~32 mm
+    alTerminar: liberar
+  });
+}
+
+/**
+ * Imprime un ticket térmico por el mejor camino disponible:
+ * 1. USB directo (Web Serial), si está activado y conectado;
+ * 2. impresora de Windows en modo RAW (app de escritorio): los mismos bytes
+ *    ESC/POS, sin renderizar la página — mucho más rápido;
+ * 3. el diálogo / impresión silenciosa de siempre, con el HTML.
+ * Si un camino falla, se cae solo al siguiente.
+ */
+function _imprimirTicketTermico({ html, bytes, alto, alTerminar }) {
+  const fin = () => { if (alTerminar) alTerminar(); };
+  const porDialogo = () => _imprimirConDialogo(html, alto);
 
   if (usbPrintHabilitado() && puertoImpresoraUSB) {
-    const bytes = buildThermalESCPOS(ventaId, items, total, formaPago, fecha, descuento, null, fiscal);
-    enviarBytesAImpresoraUSB(bytes)
-      .catch(error => {
-        console.error("Error al imprimir por USB:", error);
-        return _imprimirConDialogo(buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, null, cambioData, fiscal), altoEstimadoMicrones);
-      })
-      .finally(liberar);
-    return;
+    return enviarBytesAImpresoraUSB(bytes)
+      .catch(error => { console.error("Error al imprimir por USB:", error); return porDialogo(); })
+      .finally(fin);
   }
 
-  // Impresora térmica instalada como impresora de Windows (no Web
-  // Serial): si el bridge de Electron soporta impresión RAW, se
-  // prueba primero — son los mismos bytes ESC/POS que ya arma
-  // buildThermalESCPOS para el camino USB de arriba, pero escritos
-  // directo en la cola de la impresora en vez de por puerto serie.
-  // Es mucho más rápido que el camino de abajo (que renderiza la
-  // página completa en Chromium antes de imprimir) porque no pasa por
-  // ese renderizado. Si no está disponible (paquete nativo no
-  // instalado en esta PC) o falla, se cae solo al camino de siempre.
   const bridge = window.veekpos || window.posOffline;
-
   if (bridge && typeof bridge.imprimirDirectoRaw === "function") {
-    resolverNombreImpresoraParaRaw(bridge)
+    return resolverNombreImpresoraParaRaw(bridge)
       .then(nombreImpresora => {
-        if (!nombreImpresora) {
-          // No hay ninguna impresora configurada NI predeterminada en
-          // Windows que se pueda usar — ni vale la pena intentar RAW.
-          return _imprimirConDialogo(buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, null, cambioData, fiscal), altoEstimadoMicrones);
-        }
-
-        const bytesRaw = buildThermalESCPOS(ventaId, items, total, formaPago, fecha, descuento, null, fiscal);
-        const tAntesDeInvocar = performance.now();
-        return bridge.imprimirDirectoRaw({ deviceName: nombreImpresora, bytes: bytesRaw })
-          .then(resultado => {
-            const totalIpcMs = Math.round(performance.now() - tAntesDeInvocar);
-            // DIAGNÓSTICO TEMPORAL — se puede borrar una vez identificado el
-            // cuello de botella real. totalIpcMs es el tiempo completo desde
-            // que se invoca hasta que responde (incluye ida y vuelta del IPC);
-            // los otros tres vienen de adentro del proceso de Electron/PowerShell.
-            console.log(
-              `[impresión RAW] impresora: "${nombreImpresora}" — total IPC: ${totalIpcMs}ms — tiempo en el proceso persistente: ${resultado?.timings?.totalMs ?? "?"}ms`
-            );
-            if (resultado && resultado.success) return;
-            console.warn("Impresión RAW no disponible o falló, se usa el camino anterior:", resultado && resultado.errorType);
-            return _imprimirConDialogo(buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, null, cambioData, fiscal), altoEstimadoMicrones);
-          });
+        // Sin impresora configurada ni predeterminada en Windows, ni vale la pena intentar RAW
+        if (!nombreImpresora) return porDialogo();
+        return bridge.imprimirDirectoRaw({ deviceName: nombreImpresora, bytes }).then(resultado => {
+          if (resultado && resultado.success) return;
+          console.warn("Impresión RAW no disponible o falló, se usa el camino anterior:", resultado && resultado.errorType);
+          return porDialogo();
+        });
       })
-      .catch(error => {
-        console.error("Error al imprimir RAW:", error);
-        return _imprimirConDialogo(buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, null, cambioData, fiscal), altoEstimadoMicrones);
-      })
-      .finally(liberar);
-    return;
+      .catch(error => { console.error("Error al imprimir RAW:", error); return porDialogo(); })
+      .finally(fin);
   }
 
-  _imprimirConDialogo(buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, null, cambioData, fiscal), altoEstimadoMicrones)
-    .finally(liberar);
+  return Promise.resolve(porDialogo()).finally(fin);
 }
 
 /** Falls back to the regular browser print dialog (used when USB printing is off, unsupported, or fails) */
@@ -9883,7 +9921,7 @@ async function _imprimirConDialogo(html, altoMicronesEstimado) {
   // manipulación de estilos resultó nada confiable en la práctica.
   //
   // Esto es distinto: no se mide el DOM, se ESTIMA a partir de los
-  // datos del ticket (estimarAltoTicketVentaMicrones, calculado en
+  // datos del ticket (altoTicketDesdeEscPos, calculado en
   // _ejecutarImpresion antes de armar el HTML) — determinístico, sin
   // tocar estilos ni depender de timing de renderizado. Si por lo que
   // sea no llega un estimado (ej. ticket de cierre de caja, que no lo
@@ -9940,124 +9978,86 @@ async function _imprimirConDialogo(html, altoMicronesEstimado) {
  *                               efectivo:{esperado,contado,diferencia},
  *                               transferencia:{...}, tarjeta:{...}, total:{...} }
  */
+/**
+ * Contenido del ticket de cierre, igual para pantalla y térmica. Cada forma
+ * de pago se arma de modo que las líneas SUMEN el esperado: ventas + cobros a
+ * clientes + ingresos de caja − egresos de caja (antes el ticket mostraba solo
+ * ventas y egresos, y el esperado no se podía reconstruir).
+ */
+function datosTicketCierre(resumen) {
+  const ahora = new Date();
+  const datos = [["Fecha", formatearFechaCierre(resumen.fecha)],
+    ["Impreso", ahora.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" }) + " " + ahora.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false })]];
+  if (resumen.cierreId) datos.push(["Cierre", "#" + resumen.cierreId]);
+  datos.push(["Responsable", String(resumen.vendedor || "—")]);
+  const nombres = { EFECTIVO: "EFECTIVO", TRANSFERENCIA: "TRANSFERENCIA", TARJETA: "TARJETA" };
+  const metodos = (resumen.metodos || []).map(m => {
+    const lineas = [["Ventas", plataTicket(m.ventas)]];
+    if (m.cobros) lineas.push(["Cobros a clientes", plataTicket(m.cobros)]);
+    if (m.ingresos) lineas.push(["Ingresos de caja", plataTicket(m.ingresos)]);
+    if (m.egresos) lineas.push(["Egresos de caja", "-" + plataTicket(m.egresos)]);
+    return {
+      nombre: nombres[m.clave] || m.clave, lineas,
+      esperado: m.esperado, contado: m.contado, diferencia: m.diferencia,
+      // Transferencias y tarjetas no se cuentan: se verifican contra el banco/posnet
+      etiquetaContado: m.clave === "EFECTIVO" ? "Contado" : "Verificado"
+    };
+  });
+  return {
+    titulo: resumen.esPrevio ? "PRE-CIERRE (NO GUARDADO)" : "CIERRE DE CAJA",
+    esPrevio: !!resumen.esPrevio, datos, metodos, total: resumen.total,
+    cantidadVentas: Number(resumen.cantidadVentas) || 0,
+    cantidadAnuladas: Number(resumen.cantidadAnuladas) || 0,
+    totalVentas: Number(resumen.totalVentas) || 0
+  };
+}
+
 function buildThermalCierreHTML(resumen) {
   const cfg = obtenerConfigNegocio();
+  const d = datosTicketCierre(resumen);
+  // table-layout:fixed toma los anchos de la primera fila: sin esto la columna
+  // de importes quedaba casi en cero y los montos se cortaban
+  const COLS_CIERRE = `<colgroup><col><col style="width:40%;"></colgroup>`;
+  const fila = (k, v, fuerte) => `<tr><td>${fuerte ? "<strong>" : ""}${escapeHtml(k)}${fuerte ? "</strong>" : ""}</td><td style="text-align:right;">${fuerte ? "<strong>" : ""}${escapeHtml(v)}${fuerte ? "</strong>" : ""}</td></tr>`;
 
-  const fechaStr = formatearFechaCierre(resumen.fecha);
-  const horaStr = new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
-
-  function filaMetodo(etiqueta, m) {
-    const signo = m.diferencia > 0 ? "+" : "";
-    return `
-      <tr>
-        <td colspan="2" style="padding-top:2mm;"><strong>${etiqueta}</strong></td>
-      </tr>
-      <tr>
-        <td>Esperado</td>
-        <td style="text-align:right;">$${Number(m.esperado).toLocaleString("es-AR")}</td>
-      </tr>
-      <tr>
-        <td>Contado</td>
-        <td style="text-align:right;">$${Number(m.contado).toLocaleString("es-AR")}</td>
-      </tr>
-      <tr>
-        <td>Diferencia</td>
-        <td style="text-align:right;">${signo}$${Math.round(m.diferencia).toLocaleString("es-AR")}</td>
-      </tr>`;
-  }
-
-  const signoTotal = resumen.total.diferencia > 0 ? "+" : "";
-
-  const fmt = n => "$" + Number(n || 0).toLocaleString("es-AR");
-
-  // Egresos del día, desglosados por forma de pago (solo se muestran
-  // los que tuvieron movimiento para no ensuciar el ticket).
-  const egresos = resumen.egresosPorFormaPago || { EFECTIVO: 0, TRANSFERENCIA: 0, TARJETA: 0 };
-  const filasEgresos = [
-    ["Efectivo", egresos.EFECTIVO],
-    ["Transferencia", egresos.TRANSFERENCIA],
-    ["Tarjeta", egresos.TARJETA]
-  ].filter(([, monto]) => Number(monto) > 0);
-
-  const bloqueVentasYEgresos = `
-    <table>
-      <tbody>
-        <tr>
-          <td colspan="2" style="padding-top:1mm;"><strong>VENTAS DEL DÍA</strong></td>
-        </tr>
-        <tr>
-          <td>Total ventas</td>
-          <td style="text-align:right;">${fmt(resumen.totalVentas)}</td>
-        </tr>
-        <tr>
-          <td>&nbsp;&nbsp;Efectivo</td>
-          <td style="text-align:right;">${fmt(resumen.ventasEfectivo)}</td>
-        </tr>
-        <tr>
-          <td>&nbsp;&nbsp;Transferencia</td>
-          <td style="text-align:right;">${fmt(resumen.ventasTransferencia)}</td>
-        </tr>
-        <tr>
-          <td>&nbsp;&nbsp;Tarjeta</td>
-          <td style="text-align:right;">${fmt(resumen.ventasTarjeta)}</td>
-        </tr>
-        ${filasEgresos.length ? `
-        <tr>
-          <td colspan="2" style="padding-top:2mm;"><strong>EGRESOS DEL DÍA</strong></td>
-        </tr>
-        ${filasEgresos.map(([etiqueta, monto]) => `
-        <tr>
-          <td>&nbsp;&nbsp;${etiqueta}</td>
-          <td style="text-align:right;">−${fmt(monto)}</td>
-        </tr>`).join("")}` : ""}
-      </tbody>
-    </table>
-    <hr class="th-sep">`;
-
-  // Encabezado: nombre del local + dirección + teléfono(s) (sin subtítulo, este ticket no es de venta)
+  // Encabezado: mismo tamaño de letra que el ticket de venta (antes la
+  // dirección y los teléfonos salían más grandes que el nombre del negocio)
   let encabezado = `<div class="th-center th-big">${escapeHtml(cfg.nombre)}</div>`;
-  encabezado += `<div class="th-center" style="font-size:13pt;font-weight:bold;">Cierre de Caja</div>`;
-  if (cfg.direccion) {
-    encabezado += `<div class="th-center" style="font-size:13pt;font-weight:bold;">${escapeHtml(cfg.direccion)}</div>`;
-  }
+  encabezado += `<div class="th-center" style="font-size:10.5pt;font-weight:bold;margin-top:0.5mm;">${escapeHtml(d.titulo)}</div>`;
+  if (cfg.direccion) encabezado += `<div class="th-center" style="font-size:9pt;font-weight:bold;">${escapeHtml(cfg.direccion)}</div>`;
   const telefonos = [cfg.telefono1, cfg.telefono2].filter(Boolean).join(" · ");
-  if (telefonos) {
-    encabezado += `<div class="th-center" style="font-size:13pt;font-weight:bold;margin-bottom:2mm;">Tel: ${escapeHtml(telefonos)}</div>`;
-  } else {
-    encabezado += `<div style="margin-bottom:2mm;"></div>`;
-  }
+  if (telefonos) encabezado += `<div class="th-center" style="font-size:9pt;font-weight:bold;">Tel: ${escapeHtml(telefonos)}</div>`;
+
+  const bloquesMetodos = d.metodos.map(m => `
+      <hr class="th-sep">
+      <div><strong>${escapeHtml(m.nombre)}</strong></div>
+      <table>${COLS_CIERRE}<tbody>
+        ${m.lineas.map(([k, v]) => fila("  " + k, v)).join("").replace(/<td>  /g, "<td>&nbsp;&nbsp;")}
+        ${fila("Esperado", plataTicket(m.esperado), true)}
+        ${fila(m.etiquetaContado, plataTicket(m.contado))}
+        ${fila(etiquetaDiferencia(m.diferencia), diferenciaTicket(m.diferencia))}
+      </tbody></table>`).join("");
 
   return `
     <div class="thermal-receipt">
       ${encabezado}
       <hr class="th-sep-solid">
-      <div>Fecha: ${escapeHtml(fechaStr)}</div>
-      <div>Hora impresión: ${escapeHtml(horaStr)}</div>
-      <div>Cierre: #${escapeHtml(String(resumen.cierreId || "—"))}</div>
-      <div>Vendedor: ${escapeHtml(String(resumen.vendedor || "—"))}</div>
+      <table>${COLS_CIERRE}<tbody>${d.datos.map(([k, v]) => fila(k, v)).join("")}</tbody></table>
       <hr class="th-sep">
-      ${bloqueVentasYEgresos}
-      <table>
-        <tbody>
-          ${filaMetodo("EFECTIVO", resumen.efectivo)}
-          ${filaMetodo("TRANSFERENCIA", resumen.transferencia)}
-          ${filaMetodo("TARJETA", resumen.tarjeta)}
-        </tbody>
-        <tr class="th-total-row">
-          <td><strong>TOTAL ESPERADO</strong></td>
-          <td style="text-align:right;"><strong>$${Number(resumen.total.esperado).toLocaleString("es-AR")}</strong></td>
-        </tr>
-        <tr>
-          <td><strong>TOTAL CONTADO</strong></td>
-          <td style="text-align:right;"><strong>$${Number(resumen.total.contado).toLocaleString("es-AR")}</strong></td>
-        </tr>
-        <tr>
-          <td><strong>DIFERENCIA</strong></td>
-          <td style="text-align:right;"><strong>${signoTotal}$${Math.round(resumen.total.diferencia).toLocaleString("es-AR")}</strong></td>
-        </tr>
-      </table>
+      <table>${COLS_CIERRE}<tbody>
+        ${fila("Ventas del día (" + d.cantidadVentas + ")", plataTicket(d.totalVentas), true)}
+        ${d.cantidadAnuladas ? fila("Anuladas (no suman)", String(d.cantidadAnuladas)) : ""}
+      </tbody></table>
+      ${bloquesMetodos}
+      <hr class="th-sep-solid">
+      <table>${COLS_CIERRE}<tbody>
+        ${fila("TOTAL ESPERADO", plataTicket(d.total.esperado), true)}
+        ${fila("TOTAL CONTADO", plataTicket(d.total.contado), true)}
+        ${fila(etiquetaDiferencia(d.total.diferencia).toUpperCase(), diferenciaTicket(d.total.diferencia), true)}
+      </tbody></table>
       <hr class="th-sep">
-      ${resumen.observaciones ? `<div style="font-size:13pt;font-weight:bold;">Obs: ${escapeHtml(resumen.observaciones)}</div><hr class="th-sep">` : ""}
+      ${resumen.observaciones ? `<div>Obs: ${escapeHtml(resumen.observaciones)}</div><hr class="th-sep">` : ""}
+      ${d.esPrevio ? `<div class="th-center">Cierre no guardado: solo para revisar</div>` : ""}
       <div class="th-footer">Cierre generado por ${escapeHtml(cfg.nombre)} POS</div>
       <br><br>
     </div>`;
@@ -10075,65 +10075,51 @@ function imprimirCierreCaja() {
     return;
   }
 
-  const esp = cierreCajaResumenActual.esperado;
-
-  const efectivoContado      = Number(document.getElementById("ccEfectivoContado").value || 0);
-  const transferenciaContado = Number(document.getElementById("ccTransferenciaContado").value || 0);
-  const tarjetaContado       = Number(document.getElementById("ccTarjetaContado").value || 0);
-  const observaciones        = document.getElementById("ccObservaciones").value || "";
-
-  const efectivo = {
-    esperado: esp.EFECTIVO,
-    contado: efectivoContado,
-    diferencia: efectivoContado - esp.EFECTIVO
+  const r = cierreCajaResumenActual;
+  const esp = r.esperado || {};
+  const mov = r.movimientosCaja || {};
+  const pc = r.pagosClientes || {};
+  const ingresos = mov.ingresosPorFormaPago || {};
+  const egresos = mov.egresosPorFormaPago || {};
+  const ventas = { EFECTIVO: r.ventasEfectivo, TRANSFERENCIA: r.ventasTransferencia, TARJETA: r.ventasTarjeta };
+  const contados = {
+    EFECTIVO:      Number(document.getElementById("ccEfectivoContado").value || 0),
+    TRANSFERENCIA: Number(document.getElementById("ccTransferenciaContado").value || 0),
+    TARJETA:       Number(document.getElementById("ccTarjetaContado").value || 0)
   };
-  const transferencia = {
-    esperado: esp.TRANSFERENCIA,
-    contado: transferenciaContado,
-    diferencia: transferenciaContado - esp.TRANSFERENCIA
-  };
-  const tarjeta = {
-    esperado: esp.TARJETA,
-    contado: tarjetaContado,
-    diferencia: tarjetaContado - esp.TARJETA
-  };
+  const observaciones = document.getElementById("ccObservaciones").value || "";
 
-  const totalEsperado = efectivo.esperado + transferencia.esperado + tarjeta.esperado;
-  const totalContado  = efectivo.contado  + transferencia.contado  + tarjeta.contado;
+  const metodos = ["EFECTIVO", "TRANSFERENCIA", "TARJETA"].map(k => {
+    const esperado = Number(esp[k]) || 0;
+    return {
+      clave: k,
+      ventas: Number(ventas[k]) || 0, cobros: Number(pc[k]) || 0,
+      ingresos: Number(ingresos[k]) || 0, egresos: Number(egresos[k]) || 0,
+      esperado, contado: contados[k], diferencia: contados[k] - esperado
+    };
+  });
+  const totalEsperado = metodos.reduce((a, m) => a + m.esperado, 0);
+  const totalContado  = metodos.reduce((a, m) => a + m.contado, 0);
 
-  const mov = cierreCajaResumenActual.movimientosCaja || {};
-
+  const existente = r.cierreExistente;
   const resumen = {
-    fecha: cierreCajaResumenActual.fecha,
-    cierreId: (cierreCajaResumenActual.cierreExistente && cierreCajaResumenActual.cierreExistente.CIERRE_ID) || "PREVIO",
-    vendedor: (cierreCajaResumenActual.cierreExistente && cierreCajaResumenActual.cierreExistente.VENDEDOR) || "ADMIN",
+    fecha: r.fecha,
+    cierreId: existente && existente.CIERRE_ID ? existente.CIERRE_ID : "",
+    esPrevio: !existente,
+    // Antes, sin cierre guardado, salía "ADMIN" aunque hubiera entrado otra persona
+    vendedor: (existente && existente.VENDEDOR) || sessionStorage.getItem("nombreUsuario") || sessionStorage.getItem("usuarioLogueado") || "—",
     observaciones,
-    efectivo,
-    transferencia,
-    tarjeta,
-    total: {
-      esperado: totalEsperado,
-      contado: totalContado,
-      diferencia: totalContado - totalEsperado
-    },
-    // Datos para el bloque de "Ventas del día" / "Egresos del día" del ticket
-    totalVentas: cierreCajaResumenActual.totalVentas,
-    ventasEfectivo: cierreCajaResumenActual.ventasEfectivo,
-    ventasTransferencia: cierreCajaResumenActual.ventasTransferencia,
-    ventasTarjeta: cierreCajaResumenActual.ventasTarjeta,
-    egresosPorFormaPago: mov.egresosPorFormaPago
+    cantidadVentas: r.cantidadVentas,
+    cantidadAnuladas: r.cantidadAnuladas,
+    totalVentas: r.totalVentas,
+    metodos,
+    total: { esperado: totalEsperado, contado: totalContado, diferencia: totalContado - totalEsperado }
   };
 
-  if (usbPrintHabilitado() && puertoImpresoraUSB) {
-    const bytes = buildThermalCierreESCPOS(resumen);
-    enviarBytesAImpresoraUSB(bytes).catch(error => {
-      console.error("Error al imprimir cierre por USB:", error);
-      _imprimirConDialogo(buildThermalCierreHTML(resumen));
-    });
-    return;
-  }
-
-  _imprimirConDialogo(buildThermalCierreHTML(resumen));
+  // Mismo camino que el ticket de venta: USB → impresora de Windows directa → diálogo
+  // (antes el cierre no usaba la impresión directa y por diálogo pedía 29,7 cm de papel)
+  const bytes = buildThermalCierreESCPOS(resumen);
+  _imprimirTicketTermico({ html: buildThermalCierreHTML(resumen), bytes, alto: altoTicketDesdeEscPos(bytes, 0, 6.3) });
 }
 
 /* ===================================================================
@@ -14768,7 +14754,7 @@ async function consultarCobroMercadoPagoPolling() {
           ventaId, items: itemsSnapshot, total, subtotal,
           descuento: subtotal - total,
           descuentoEtiqueta: etiquetaDescuento,
-          formaPago: "TRANSFERENCIA", fecha: new Date()
+          formaPago: "TRANSFERENCIA", fecha: new Date(), recibido: 0
         };
 
         mostrarRecibo(ventaId, itemsSnapshot, total, subtotal, subtotal - total, recibido);
