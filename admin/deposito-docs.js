@@ -249,14 +249,16 @@ function abrirCotizacionDesdePOS() {
   const subtotal = ticketPOS.reduce((a, i) => a + i.PRECIO * i.cantidad, 0);
   const { montoDescuento } = calcularDescuentoPOS(subtotal);
   const tc = dolarDelDeposito();
+  // en dólares si el depósito está mostrando los precios en dólares
+  const enUsd = typeof depVistaUsd === "function" && depVistaUsd();
   abrirEditorCotizacion({
     desdePOS: true,
-    moneda: "ARS",
+    moneda: enUsd ? "USD" : "ARS",
     tipoCambio: tc,
     cliente: depCotizacionEnCurso ? depCotizacionEnCurso.cliente : {},
     clienteId: depCotizacionEnCurso ? depCotizacionEnCurso.clienteId : "",
-    items: ticketPOS.map(i => ({ codigo: String(i.CODIGO || ""), producto: i.PRODUCTO, cantidad: i.cantidad, precio: Math.round(Number(i.PRECIO) || 0), precioArs: Number(i.PRECIO) || 0 })),
-    descuento: montoDescuento > 0 ? Math.round(montoDescuento) : 0,
+    items: ticketPOS.map(i => ({ codigo: String(i.CODIGO || ""), producto: i.PRODUCTO, cantidad: i.cantidad, precio: depPrecioEnMoneda(i, enUsd ? "USD" : "ARS", tc) })),
+    descuento: montoDescuento > 0 ? (enUsd ? Math.round(montoDescuento / tc * 100) / 100 : Math.round(montoDescuento)) : 0,
     observaciones: ""
   });
 }
@@ -281,7 +283,7 @@ function abrirEditorCotizacion(datos) {
   depCotEditor = {
     cotizacionId: datos.cotizacionId || "",
     desdePOS: !!datos.desdePOS,
-    moneda: datos.moneda === "USD" ? "USD" : "ARS",
+    moneda: (datos.moneda || (typeof depVistaUsd === "function" && depVistaUsd() ? "USD" : "ARS")) === "USD" ? "USD" : "ARS",
     tipoCambio: Number(datos.tipoCambio) || dolarDelDeposito() || 0,
     clienteId: datos.clienteId || "",
     cliente: { ...(datos.cliente || {}) },

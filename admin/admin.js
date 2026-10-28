@@ -5003,7 +5003,7 @@ function renderTablaProductos(lista) {
         <td class="mono">${escapeHtml(p.CODIGO)}</td>
         <td>${escapeHtml(p.PRODUCTO)}</td>
         <td>${escapeHtml(p.CATEGORIA || "—")}</td>
-        <td class="money">$${Number(p.PRECIO || 0).toLocaleString("es-AR")}</td>
+        <td class="money">${typeof depPrecioVista === "function" ? depPrecioVista(p.PRECIO, p, true) : "$" + Number(p.PRECIO || 0).toLocaleString("es-AR")}</td>
         <td>${stockBadge}</td>
         <td><span class="badge ${publicado ? "bg-success" : "bg-secondary"}">${publicado ? "Publicado" : "Oculto"}</span>${String(p.DESTACADO || "").trim().toUpperCase() === "SI" ? ' <span class="marca-prod" title="Destacado">⭐</span>' : ""}${String(p.OFERTA || "").trim().toUpperCase() === "SI" ? ' <span class="marca-prod" title="En oferta">🔥</span>' : ""}</td>
         <td class="celda-acciones-producto">
@@ -7994,7 +7994,7 @@ function _armarTileProductoHTML(p, dataIdxAttr, esPineado) {
         ${cat ? `<span class="tile-cat">${cat}</span>` : ""}
       </div>
       <div class="tile-right">
-        <span class="tile-price">$${Number(p.PRECIO || 0).toLocaleString("es-AR")}</span>
+        <span class="tile-price">${typeof depPrecioVista === "function" ? depPrecioVista(p.PRECIO, p, true) : "$" + Number(p.PRECIO || 0).toLocaleString("es-AR")}</span>
         ${stockBadge}
       </div>
       ${obtenerRolActual() === "vendedor" ? "" : `<button type="button" class="tile-edit" title="Editar precio y stock" onclick="event.stopPropagation(); abrirEdicionRapidaPOS('${escapeJsAttr(p.CODIGO)}');">✏️</button>`}
@@ -8416,7 +8416,7 @@ function renderTicketPOS() {
       <div class="ticket-row" data-codigo="${escapeHtml(item.CODIGO)}">
         <div class="ti-info">
           <div class="ti-name">${escapeHtml(item.PRODUCTO)}</div>
-          <div class="ti-price">$${item.PRECIO.toLocaleString("es-AR")} c/u</div>
+          <div class="ti-price">${typeof depPrecioVista === "function" ? depPrecioVista(item.PRECIO, item, false) : "$" + item.PRECIO.toLocaleString("es-AR")} c/u</div>
         </div>
         <div class="ti-qty">
           <input
@@ -8467,6 +8467,7 @@ function renderTicketPOS() {
 
   const totalEl = document.getElementById("totalPOS");
   if (totalEl) totalEl.innerText = total.toLocaleString("es-AR");
+  if (typeof depTotalesTicketUsd === "function") depTotalesTicketUsd(ticketPOS, total);
 
   const countEl = document.getElementById("ticketCount");
   if (countEl) countEl.innerText = ticketPOS.length;
@@ -8813,6 +8814,7 @@ function mfvActualizarDescuento() {
   const total = esRecargo ? subtotal + monto : subtotal - monto;
 
   document.getElementById("mfvTotal").textContent = "$" + total.toLocaleString("es-AR");
+  if (typeof depMfvTituloUsd === "function") depMfvTituloUsd(total);
   const info = document.getElementById("mfvDescuentoInfo");
   if (monto > 0) {
     info.style.display = "block";
@@ -9149,6 +9151,8 @@ async function chequearClienteCreditoPedidoAdmin() {
     if (!data.esCredito) {
       document.getElementById("paTipoCambioWrap").style.display = "none";
     } else {
+      // Depósito mostrando en dólares: el pedido a crédito se propone en dólares (se puede cambiar)
+      if (typeof depVistaUsd === "function" && depVistaUsd()) document.getElementById("paMoneda").value = "USD";
       actualizarVisibilidadTipoCambioPedidoAdmin();
     }
   } catch (error) {
@@ -15678,6 +15682,7 @@ async function generarCodigoIngresoAutomatico() {
 }
 
 function cancelarIngresoProducto() {
+  if (_ipItemEditando) { ipCarritoBoleta.push(_ipItemEditando); _ipItemEditando = null; renderCarritoBoleta(); }
   document.getElementById("ipFormularioWrap").style.display = "none";
   document.getElementById("ipCodigoScan").value = "";
   document.getElementById("ipPrecio").value = "";
@@ -15753,6 +15758,7 @@ function agregarItemABoleta() {
     esNuevo: ipProductoActualEsNuevo
   });
 
+  _ipItemEditando = null;
   renderCarritoBoleta();
   toast("Agregado a la boleta", "success");
   cancelarIngresoProducto();
@@ -15790,12 +15796,40 @@ function renderCarritoBoleta() {
         <td class="money">${precioIngresoTexto}</td>
         <td class="money">${precioVentaTexto}</td>
         <td class="money">$${subtotalARS.toLocaleString("es-AR")}</td>
-        <td><button class="btn btn-outline-danger btn-sm" onclick="quitarItemCarrito(${idx})">✕</button></td>
+        <td style="white-space:nowrap;"><button class="btn btn-outline-primary btn-sm" onclick="editarItemCarrito(${idx})" title="Revisar / corregir">✏️</button>
+          <button class="btn btn-outline-danger btn-sm ms-1" onclick="quitarItemCarrito(${idx})">✕</button></td>
       </tr>`;
   }).join("");
 
   if (totalEl) totalEl.textContent = "$" + total.toLocaleString("es-AR");
 }
+
+/** Vuelve a abrir un renglón de la boleta en el formulario (costo, moneda, precio de venta, cantidad...) para corregirlo */
+function editarItemCarrito(idx) {
+  const it = ipCarritoBoleta[idx];
+  if (!it) return;
+  if (_ipItemEditando) { ipCarritoBoleta.push(_ipItemEditando); }  // otro que se estaba corrigiendo vuelve como estaba
+  ipCarritoBoleta.splice(ipCarritoBoleta.indexOf(it), 1);
+  _ipItemEditando = it;
+  renderCarritoBoleta();
+  document.getElementById("ipCodigoScan").value = it.codigo || "";
+  buscarProductoParaIngreso();
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v === null || v === undefined ? "" : v; };
+  if (ipProductoActualEsNuevo) set("ipNombre", it.producto);
+  set("ipCategoria", it.categoria || "");
+  set("ipMoneda", it.moneda === "USD" ? "USD" : "ARS");
+  onCambioMonedaIngreso();
+  set("ipPrecio", it.precio || "");
+  if (it.moneda === "USD") set("ipTipoCambio", it.tipoCambio || "");
+  set("ipPrecioVenta", it.precioVenta);
+  set("ipCantidad", it.cantidad);
+  const est = document.getElementById("ipEstadoBusqueda");
+  if (est) { est.textContent = "Corregí lo que haga falta y tocá “Agregar a la boleta” (si cancelás, queda como estaba)"; est.style.color = "var(--navy-700, #1e3a8a)"; }
+  const form = document.getElementById("ipFormularioWrap");
+  if (form && form.scrollIntoView) form.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+let _ipItemEditando = null; // renglón sacado de la boleta para corregirlo (vuelve si se cancela)
 
 function quitarItemCarrito(idx) {
   ipCarritoBoleta.splice(idx, 1);
@@ -16824,6 +16858,7 @@ function _payloadBoletaIngreso(cab) {
 /** Deja el formulario de boleta vacío después de guardarla (online u offline) */
 function _limpiarBoletaIngreso() {
   _ipClaveBoleta = null;
+  _ipItemEditando = null;
   ipCarritoBoleta = [];
   renderCarritoBoleta();
   document.getElementById("ipbOrigen").value = "PROVEEDOR";

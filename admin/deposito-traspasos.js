@@ -65,7 +65,7 @@ function depRenderSeccionDeposito() {
         </div>
         <div class="table-responsive mt-2">
           <table class="table table-sm align-middle mb-0" style="font-size:13.5px;">
-            <thead><tr><th>Producto</th><th class="text-end" style="width:110px;">Stock depósito</th><th style="width:110px;">Cantidad</th><th style="width:36px;"></th></tr></thead>
+            <thead><tr><th>Producto</th><th style="width:150px;">Código en el local</th><th class="text-end" style="width:110px;">Stock depósito</th><th style="width:110px;">Cantidad</th><th style="width:36px;"></th></tr></thead>
             <tbody id="trasItems"></tbody>
           </table>
         </div>
@@ -99,7 +99,7 @@ function depTrasProductos() {
 function depTrasLlenarBuscador() {
   const dl = document.getElementById("trasProductosLista");
   if (!dl) return;
-  dl.innerHTML = depTrasProductos().slice(0, 5000).map(p => `<option value="${depEsc(p.CODIGO)} — ${depEsc(p.PRODUCTO)}"></option>`).join("");
+  dl.innerHTML = depTrasProductos().slice(0, 5000).map(p => `<option value="${depEsc(p.CODIGO)} — ${depEsc(p.PRODUCTO)}${p.CODIGO_LOCAL ? " (local: " + depEsc(p.CODIGO_LOCAL) + ")" : ""}"></option>`).join("");
 }
 
 function depTrasAgregar(input, cantidad) {
@@ -107,12 +107,13 @@ function depTrasAgregar(input, cantidad) {
   if (!texto) return;
   const codigo = texto.split(" — ")[0].trim();
   const lista = depTrasProductos();
-  const p = lista.find(x => String(x.CODIGO) === codigo) || lista.find(x => String(x.CODIGO_CAJA || "") === codigo);
+  const p = lista.find(x => String(x.CODIGO) === codigo) || lista.find(x => String(x.CODIGO_CAJA || "") === codigo)
+    || lista.find(x => String(x.CODIGO_LOCAL || "").trim() !== "" && String(x.CODIGO_LOCAL).trim() === codigo); // también con el código del local
   if (!p) { toast("No se encontró el producto " + codigo, "error"); input.select(); return; }
   const cant = cantidad || (String(p.CODIGO_CAJA || "") === codigo && Number(p.UNIDADES_POR_CAJA) > 0 ? Number(p.UNIDADES_POR_CAJA) : 1);
   const ya = depTraspasoArmado.find(i => i.codigo === String(p.CODIGO));
   if (ya) ya.cantidad += cant;
-  else depTraspasoArmado.push({ codigo: String(p.CODIGO), producto: p.PRODUCTO, cantidad: cant, stock: Number(p.STOCK) || 0 });
+  else depTraspasoArmado.push({ codigo: String(p.CODIGO), producto: p.PRODUCTO, cantidad: cant, stock: Number(p.STOCK) || 0, codigoLocal: String(p.CODIGO_LOCAL || "") });
   input.value = "";
   depTrasRenderArmado();
   input.focus();
@@ -123,10 +124,11 @@ function depTrasRenderArmado() {
   if (!tb) return;
   tb.innerHTML = depTraspasoArmado.length ? depTraspasoArmado.map((i, n) => `<tr>
     <td>${depEsc(i.producto)}<div class="text-muted mono" style="font-size:11px;">${depEsc(i.codigo)}</div></td>
+    <td><input class="form-control form-control-sm mono" value="${depEsc(i.codigoLocal || "")}" placeholder="igual" title="Código de este producto en el local (vacío = el mismo). Se recuerda." oninput="depTrasCodigoLocal(${n}, this.value)"></td>
     <td class="text-end ${i.cantidad > i.stock ? "text-danger fw-bold" : "text-muted"}">${depCant(i.stock)}</td>
     <td><input type="number" min="0" step="any" class="form-control form-control-sm" value="${i.cantidad}" oninput="depTrasCantidad(${n}, this.value)"></td>
     <td><button class="btn btn-sm btn-link text-danger p-0" onclick="depTrasQuitar(${n})" title="Quitar">✕</button></td>
-  </tr>`).join("") : `<tr><td colspan="4" class="text-center text-muted py-3">Escaneá o buscá los productos que van al local (o armalos en el POS y tocá 🚚)</td></tr>`;
+  </tr>`).join("") : `<tr><td colspan="5" class="text-center text-muted py-3">Escaneá o buscá los productos que van al local (o armalos en el POS y tocá 🚚)</td></tr>`;
   depTrasResumen();
 }
 function depTrasResumen() {
@@ -137,6 +139,7 @@ function depTrasResumen() {
   }
 }
 function depTrasCantidad(n, v) { if (depTraspasoArmado[n]) depTraspasoArmado[n].cantidad = Math.max(0, Number(v) || 0); depTrasResumen(); }
+function depTrasCodigoLocal(n, v) { if (depTraspasoArmado[n]) depTraspasoArmado[n].codigoLocal = String(v || "").trim(); }
 function depTrasQuitar(n) { depTraspasoArmado.splice(n, 1); depTrasRenderArmado(); }
 function depTrasVaciar() { depTraspasoArmado = []; depTrasRenderArmado(); }
 
@@ -146,7 +149,7 @@ function traspasoDesdePOS() {
   ticketPOS.forEach(i => {
     const ya = depTraspasoArmado.find(x => x.codigo === String(i.CODIGO));
     if (ya) ya.cantidad += Number(i.cantidad) || 0;
-    else depTraspasoArmado.push({ codigo: String(i.CODIGO), producto: i.PRODUCTO, cantidad: Number(i.cantidad) || 0, stock: Number(i.STOCK) || 0 });
+    else depTraspasoArmado.push({ codigo: String(i.CODIGO), producto: i.PRODUCTO, cantidad: Number(i.cantidad) || 0, stock: Number(i.STOCK) || 0, codigoLocal: String(i.CODIGO_LOCAL || "") });
   });
   // el stock que muestra el ticket ya está descontado en pantalla: se toma el del catálogo
   depTraspasoArmado.forEach(i => { const p = depTrasProductos().find(x => String(x.CODIGO) === i.codigo); if (p) i.stock = Number(p.STOCK) || 0; });
@@ -158,7 +161,7 @@ function traspasoDesdePOS() {
 }
 
 function depTrasEnviar() {
-  const items = depTraspasoArmado.filter(i => i.cantidad > 0).map(i => ({ codigo: i.codigo, producto: i.producto, cantidad: i.cantidad }));
+  const items = depTraspasoArmado.filter(i => i.cantidad > 0).map(i => ({ codigo: i.codigo, producto: i.producto, cantidad: i.cantidad, codigoLocal: i.codigoLocal || "" }));
   if (!items.length) { toast("El traspaso no tiene productos", "error"); return; }
   const unidades = items.reduce((a, i) => a + i.cantidad, 0);
   const faltan = depTraspasoArmado.filter(i => i.cantidad > i.stock);
@@ -239,8 +242,8 @@ function htmlRemitoTraspaso(t) {
   const copia = (etq) => `<div class="copia ${mediaHoja ? "media-hoja" : ""}">
     <div class="etiqueta-copia">${etq}</div>
     ${depCabeceraA4("REMITO DE TRASPASO", t.traspasoId, ["Fecha: <b>" + depFechaCorta(t.fecha) + "</b>", "Del <b>depósito</b> al <b>local</b>", t.usuario ? "Armó: " + depEsc(t.usuario) : ""].filter(Boolean))}
-    <table class="items"><thead><tr><th style="width:26mm;">Código</th><th>Producto</th><th class="cen" style="width:22mm;">Cantidad</th><th class="cen" style="width:24mm;">Llegó</th></tr></thead>
-    <tbody>${items.map(i => `<tr><td class="mono">${depEsc(i.codigo)}</td><td>${depEsc(i.producto)}</td><td class="cen"><b>${depCant(i.cantidad)}</b></td><td></td></tr>`).join("")}</tbody></table>
+    <table class="items"><thead><tr><th style="width:24mm;">Cód. depósito</th><th style="width:22mm;">Cód. local</th><th>Producto</th><th class="cen" style="width:20mm;">Cantidad</th><th class="cen" style="width:20mm;">Llegó</th></tr></thead>
+    <tbody>${items.map(i => `<tr><td class="mono">${depEsc(i.codigo)}</td><td class="mono">${depEsc(i.codigoLocalSugerido || i.codigoLocal || "—")}</td><td>${depEsc(i.producto)}</td><td class="cen"><b>${depCant(i.cantidad)}</b></td><td></td></tr>`).join("")}</tbody></table>
     <table class="totales"><tr class="total"><td>UNIDADES</td><td class="der">${depCant(t.unidades)}</td></tr></table>
     ${t.observaciones ? `<div class="nota"><b>Observaciones:</b> ${depEsc(t.observaciones)}</div>` : ""}
     <div class="firmas"><div>Entregó (depósito)</div><div>Transportó</div><div>Recibió (local)</div></div>
@@ -276,6 +279,10 @@ async function depCargarTraspasosLocal() {
   const caja = document.getElementById("trasEnCamino");
   const tb = document.getElementById("trasRecibidos");
   if (!caja) return;
+  // para elegir el producto del local al recibir hace falta su lista (con los ocultos)
+  if (!depProductosDelLocal().length || (typeof productosAdminGlobal !== "undefined" && !productosAdminGlobal.length)) {
+    try { if (typeof cargarProductos === "function") await cargarProductos(); } catch (e) {}
+  }
   try {
     const r = await depPost("traspasosDelDeposito", {}, { timeoutMs: 30000 });
     if (!r.success) throw new Error(r.message || "error");
@@ -289,7 +296,7 @@ async function depCargarTraspasosLocal() {
           <button class="btn btn-sm btn-success fw-bold" onclick="depAbrirRecepcion('${depEsc(t.traspasoId)}')">Recibir</button></div>
         </div>
         <div class="text-muted mt-1" style="font-size:12.5px;">${t.items.slice(0, 6).map(i => `${depEsc(i.producto)} ×${depCant(i.cantidad)}`).join(" · ")}${t.items.length > 6 ? " · …" : ""}</div>
-        ${sinProducto.length ? `<div class="text-danger mt-1" style="font-size:12px;">⚠️ ${sinProducto.length} producto(s) no existen en el local (${sinProducto.map(i => depEsc(i.codigo)).join(", ")}): crealos con el mismo código antes de recibir, o quedan afuera.</div>` : ""}
+        ${sinProducto.length ? `<div class="text-danger mt-1" style="font-size:12px;">⚠️ ${sinProducto.length} producto(s) sin su código del local (${sinProducto.map(i => depEsc(i.producto)).join(", ")}): al recibir, elegí qué producto del local es cada uno (queda recordado para la próxima).</div>` : ""}
       </div>`;
     }).join("") : `<div class="card p-3 text-muted">No hay traspasos en camino.</div>`;
     tb.innerHTML = (r.recibidos || []).length ? r.recibidos.map(t => `<tr>
@@ -310,16 +317,20 @@ function depAbrirRecepcion(id) {
     <p class="text-muted" style="font-size:13px;">Contá lo que llegó. Si algo no coincide, corregí la cantidad: la diferencia queda anotada acá y en el depósito.</p>
     <div class="table-responsive" style="max-height:50vh;overflow:auto;">
       <table class="table table-sm align-middle mb-0" style="font-size:13px;">
-        <thead><tr><th>Producto</th><th class="text-end" style="width:90px;">Mandaron</th><th style="width:110px;">Llegó</th></tr></thead>
-        <tbody>${t.items.map((i, n) => `<tr class="${i.existeEnLocal ? "" : "table-warning"}">
-          <td>${depEsc(i.producto)}<div class="text-muted mono" style="font-size:11px;">${depEsc(i.codigo)}${i.existeEnLocal ? "" : " · no existe en el local (no se suma)"}</div></td>
+        <thead><tr><th>Producto (depósito)</th><th style="width:230px;">Producto en el local</th><th class="text-end" style="width:80px;">Mandaron</th><th style="width:96px;">Llegó</th></tr></thead>
+        <tbody>${t.items.map((i, n) => `<tr>
+          <td>${depEsc(i.producto)}<div class="text-muted mono" style="font-size:11px;">${depEsc(i.codigo)}</div></td>
+          <td><input class="form-control form-control-sm" list="recProductosLocal" data-cl="${n}" value="${depEsc(i.codigoLocalSugerido || "")}" placeholder="Código o nombre del local" oninput="depRecepcionResumen()" onchange="depRecepcionNormalizar(this)">
+            <div class="mono" style="font-size:11px;" id="recCl${n}"></div></td>
           <td class="text-end">${depCant(i.cantidad)}</td>
           <td><input type="number" min="0" step="any" class="form-control form-control-sm" data-rec="${n}" value="${i.cantidad}" oninput="depRecepcionResumen()"></td></tr>`).join("")}</tbody>
       </table>
     </div>
+    <datalist id="recProductosLocal">${depProductosDelLocal().slice(0, 5000).map(p => `<option value="${depEsc(p.CODIGO)} — ${depEsc(p.PRODUCTO)}"></option>`).join("")}</datalist>
     <div class="mt-2" id="recResumen" style="font-size:13px;"></div>
   `, `<button type="button" class="btn btn-outline-secondary" data-cerrar>Cancelar</button>
-      <button type="button" class="btn btn-success fw-bold" id="btnConfirmarRecepcion" onclick="depConfirmarRecepcion('${depEsc(id)}')">Confirmar recepción</button>`, 640);
+      <button type="button" class="${depEsAdmin() ? "btn btn-outline-success" : "btn btn-success fw-bold"}" id="btnConfirmarRecepcion" onclick="depConfirmarRecepcion('${depEsc(id)}')">Confirmar recepción</button>
+      ${depPuedeIngresar() ? `<button type="button" class="btn btn-primary fw-bold" id="btnRecepcionIngreso" onclick="depTraspasoAIngreso('${depEsc(id)}')" title="Pasa a Ingreso de mercadería para revisar costo, precio de venta y datos antes de sumar el stock">Revisar precios e ingresar →</button>` : ""}`, 760);
   bd.dataset.fijo = "1";
   bd.dataset.traspaso = id;
   depRecepcionResumen();
@@ -329,7 +340,8 @@ function depRecepcionLeer() {
   const id = (document.getElementById("modalRecepcionTraspaso") || {}).dataset?.traspaso;
   const t = _trasDelDeposito && _trasDelDeposito.enCamino.find(x => x.traspasoId === id);
   if (!t) return null;
-  const recibidos = t.items.map((i, n) => ({ codigo: i.codigo, cantidad: Math.max(0, Number((document.querySelector(`#modalRecepcionTraspaso [data-rec="${n}"]`) || {}).value) || 0) }));
+  const recibidos = t.items.map((i, n) => ({ codigo: i.codigo, cantidad: Math.max(0, Number((document.querySelector(`#modalRecepcionTraspaso [data-rec="${n}"]`) || {}).value) || 0),
+    codigoLocal: String((document.querySelector(`#modalRecepcionTraspaso [data-cl="${n}"]`) || {}).value || "").split(" — ")[0].trim() }));
   return { t, recibidos };
 }
 
@@ -339,9 +351,35 @@ function depRecepcionResumen() {
   if (!d || !el) return;
   const dif = d.t.items.filter((i, n) => d.recibidos[n].cantidad !== Number(i.cantidad));
   const total = d.recibidos.reduce((a, r) => a + r.cantidad, 0);
+  // cada renglón: ¿el código elegido existe en el local?
+  let sinProducto = 0;
+  d.recibidos.forEach((r, n) => {
+    const p = depProductoLocal(r.codigoLocal);
+    const el2 = document.getElementById("recCl" + n);
+    if (!p && r.cantidad > 0) sinProducto++;
+    if (el2) el2.innerHTML = p ? `<span class="text-success">✓ ${depEsc(p.PRODUCTO)}</span>` : (r.codigoLocal ? `<span class="text-danger">no existe en el local</span>` : `<span class="text-danger">elegí el producto del local</span>`);
+  });
+  const btn = document.getElementById("btnConfirmarRecepcion");
+  if (btn) btn.textContent = sinProducto ? `Confirmar (${sinProducto} sin producto quedan afuera)` : "Confirmar recepción";
   el.innerHTML = dif.length
     ? `<span class="text-danger fw-bold">${dif.length} diferencia(s)</span> · llegan ${depCant(total)} de ${depCant(d.t.unidades)} unidades`
     : `<span class="text-success fw-bold">Llegó todo</span> · ${depCant(total)} unidades`;
+}
+
+/** Productos del local para elegir al recibir (incluye los ocultos del catálogo) */
+function depProductosDelLocal() {
+  const admin = typeof productosAdminGlobal !== "undefined" ? productosAdminGlobal : [];
+  return (admin && admin.length ? admin : (typeof productosPOS !== "undefined" ? productosPOS : [])) || [];
+}
+function depProductoLocal(codigo) {
+  const c = String(codigo || "").trim().toUpperCase();
+  if (!c) return null;
+  return depProductosDelLocal().find(p => String(p.CODIGO).trim().toUpperCase() === c) || null;
+}
+/** Si eligió de la lista ("CÓDIGO — Nombre"), queda solo el código */
+function depRecepcionNormalizar(input) {
+  input.value = String(input.value || "").split(" — ")[0].trim();
+  depRecepcionResumen();
 }
 
 async function depConfirmarRecepcion(id) {
@@ -459,4 +497,143 @@ window.addEventListener("load", () => depCuandoPanelListo(() => {
     window.depAplicarConfig._tras = true;
   }
   setTimeout(depAplicarMenuTraspasos, 3000);
+}));
+
+
+/* =================== LOCAL: recibir revisando precios (Ingreso de mercadería) ===================
+   "Revisar precios e ingresar" pasa lo que llegó a la sección Ingreso de
+   mercadería como una boleta de origen DEPÓSITO (sin deuda): cada renglón
+   con su costo (el precio del depósito), el precio de venta actual del
+   local, la categoría y la cantidad que llegó. Se corrige igual que
+   cualquier ingreso (✏️ en cada renglón) y al tocar "Guardar boleta" el
+   depósito marca el traspaso como recibido y el local guarda la boleta:
+   stock, costos y precios de venta en un solo paso. */
+
+let depTraspasoEnIngreso = null; // { id, recibidos }
+
+function depPuedeIngresar() {
+  return !esModoDeposito() && (typeof obtenerRolActual !== "function" || obtenerRolActual() !== "vendedor");
+}
+
+function depTraspasoAIngreso(id) {
+  const d = depRecepcionLeer();
+  if (!d) return;
+  const t = d.t;
+  const faltan = d.recibidos.filter(r => r.cantidad > 0 && !depProductoLocal(r.codigoLocal) && !String(r.codigoLocal || "").trim());
+  const seguir = () => {
+    const tcDia = (typeof ingresoTC !== "undefined" && ingresoTC && ingresoTC.valor > 0) ? Number(ingresoTC.valor) : 0;
+    ipCarritoBoleta = [];
+    d.recibidos.forEach((r, n) => {
+      const it = t.items[n];
+      if (!(r.cantidad > 0)) return;
+      const codigo = String(r.codigoLocal || "").trim() || it.codigo;
+      const p = depProductoLocal(codigo);
+      const enUsd = Number(it.precioUsd) > 0;
+      const tc = enUsd ? (Number(it.dolar) || tcDia) : null;
+      const precio = enUsd ? Number(it.precioUsd) : (Number(it.precio) || 0);
+      ipCarritoBoleta.push({
+        codigo, producto: p ? p.PRODUCTO : it.producto, categoria: p ? (p.CATEGORIA || "") : (it.categoria || ""),
+        moneda: enUsd ? "USD" : "ARS", precio, tipoCambio: tc, precioARS: enUsd ? Math.round(precio * (tc || 0) * 100) / 100 : precio,
+        precioVenta: p ? Number(p.PRECIO) || null : null,
+        cantidad: r.cantidad, esNuevo: !p
+      });
+    });
+    depTraspasoEnIngreso = { id, recibidos: d.recibidos };
+    const m = document.getElementById("modalRecepcionTraspaso"); if (m) m.classList.remove("show");
+    mostrarSeccion("ingresoProductos");
+    const set = (i, v) => { const el = document.getElementById(i); if (el) el.value = v; };
+    set("ipbOrigen", "DEPOSITO"); if (typeof onCambioOrigenBoleta === "function") onCambioOrigenBoleta();
+    set("ipbProveedor", (_trasDelDeposito && _trasDelDeposito.deposito) || "Depósito");
+    set("ipbNumeroBoleta", id);
+    set("ipbObservaciones", "Traspaso " + id + " desde el depósito" + (t.observaciones ? " · " + t.observaciones : ""));
+    if (typeof _hoyISO === "function") set("ipbFecha", _hoyISO());
+    if (typeof renderCarritoBoleta === "function") renderCarritoBoleta();
+    depPintarAvisoTraspasoIngreso();
+    const sinCosto = ipCarritoBoleta.filter(i => !(i.precio > 0)).length;
+    toast(`${id}: revisá costo y precio de venta de cada renglón (✏️) y tocá “Guardar boleta”` + (sinCosto ? `. ${sinCosto} renglón(es) sin costo` : ""), sinCosto ? "error" : "success");
+  };
+  if (faltan.length) confirmarAccion(`${faltan.length} producto(s) no tienen producto del local elegido: se van a crear como productos nuevos con el código del depósito. ¿Seguir?`, seguir, "Productos nuevos");
+  else seguir();
+}
+
+function depPintarAvisoTraspasoIngreso() {
+  const sec = document.getElementById("ingresoProductos");
+  let el = document.getElementById("depAvisoTraspasoIngreso");
+  if (!depTraspasoEnIngreso) { if (el) el.remove(); return; }
+  if (!sec) return;
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "depAvisoTraspasoIngreso";
+    el.className = "card p-3 mb-3";
+    el.style.cssText = "border-left:4px solid #0f766e;background:#f0fdfa;";
+    const cab = sec.querySelector(".page-header");
+    if (cab) cab.after(el); else sec.prepend(el);
+  }
+  el.innerHTML = `<div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
+    <div><b>🚚 Recibiendo el traspaso ${depEsc(depTraspasoEnIngreso.id)} del depósito.</b>
+      <div style="font-size:13px;">Revisá el costo, el precio de venta y la categoría de cada renglón con ✏️. Al tocar <b>Guardar boleta</b> el depósito lo da por recibido y se suma el stock. No genera deuda.</div></div>
+    <button class="btn btn-outline-secondary btn-sm" onclick="depCancelarTraspasoIngreso()">Cancelar (no recibir todavía)</button></div>`;
+}
+
+function depCancelarTraspasoIngreso() {
+  confirmarAccion("¿Dejar de recibir este traspaso ahora? Sigue en camino y lo podés recibir después.", () => {
+    depTraspasoEnIngreso = null;
+    if (typeof _limpiarBoletaIngreso === "function") _limpiarBoletaIngreso();
+    depPintarAvisoTraspasoIngreso();
+  }, "Cancelar recepción");
+}
+
+/** "Guardar boleta" con un traspaso cargado: confirma en el depósito y guarda la boleta en un solo pedido al backend */
+async function depGuardarBoletaTraspaso() {
+  const tr = depTraspasoEnIngreso;
+  if (!ipCarritoBoleta.length) { toast("La boleta no tiene productos", "error"); return; }
+  if (typeof _ipItemEditando !== "undefined" && _ipItemEditando) { toast("Terminá de corregir el renglón abierto (Agregar a la boleta) o cancelalo", "error"); return; }
+  const sinCosto = ipCarritoBoleta.filter(i => !(Number(i.precio) > 0));
+  if (sinCosto.length) { toast(`Falta el costo de: ${sinCosto.map(i => i.producto).join(", ")}`, "error"); return; }
+  const val = (id) => String((document.getElementById(id) || {}).value || "").trim();
+  const payload = _payloadBoletaIngreso({ proveedor: val("ipbProveedor") || "Depósito", proveedorContacto: val("ipbProveedorContacto"),
+    numeroBoleta: tr.id, observaciones: val("ipbObservaciones"), fecha: val("ipbFecha") || _hoyISO(), origen: "DEPOSITO", sinDeuda: true });
+  // lo que llegó = lo que quedó en la boleta (por si se corrigieron cantidades o códigos en el ingreso)
+  const porCodigoLocal = {};
+  ipCarritoBoleta.forEach(i => { porCodigoLocal[String(i.codigo)] = (porCodigoLocal[String(i.codigo)] || 0) + Number(i.cantidad); });
+  const recibidos = tr.recibidos.map(r => {
+    const cl = String(r.codigoLocal || "").trim() || r.codigo;
+    const cant = Object.prototype.hasOwnProperty.call(porCodigoLocal, cl) ? porCodigoLocal[cl] : 0;
+    delete porCodigoLocal[cl];
+    return { codigo: r.codigo, codigoLocal: cl, cantidad: cant };
+  });
+  const btn = document.getElementById("btnGuardarBoleta");
+  const txt = btn ? btn.innerHTML : "";
+  if (btn) { btn.disabled = true; btn.innerHTML = "Recibiendo..."; }
+  try {
+    const r = await depPost("recibirTraspaso", { traspasoId: tr.id, recibidos, ingreso: payload, usuarioNombre: sessionStorage.getItem("nombreUsuario") || "" }, { timeoutMs: 60000 });
+    if (!r.success) {
+      toast(r.message || "No se pudo recibir el traspaso", "error");
+      if (r.yaProcesado && !r.traspaso) { depTraspasoEnIngreso = null; depPintarAvisoTraspasoIngreso(); }
+      return;
+    }
+    toast(`${tr.id} recibido: stock y precios actualizados` + (r.traspaso && r.traspaso.estado === "RECIBIDO_CON_DIFERENCIAS" ? " (con diferencias, anotadas en el depósito)" : ""), "success");
+    depTraspasoEnIngreso = null;
+    depPintarAvisoTraspasoIngreso();
+    try { localStorage.removeItem("vpos_cache_productosAdmin"); } catch (e) {}
+    _limpiarBoletaIngreso();
+    if (typeof cargarProductos === "function") await cargarProductos();
+    if (typeof cargarHistorialIngresos === "function") await cargarHistorialIngresos();
+    if (typeof window.refrescarCatalogoPOS === "function") window.refrescarCatalogoPOS();
+  } catch (e) {
+    toast("Sin conexión: " + e.message + ". Probá de nuevo: nunca se suma dos veces.", "error");
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = txt; }
+  }
+}
+
+window.addEventListener("load", () => depCuandoPanelListo(() => {
+  const orig = window.guardarBoletaCompleta;
+  if (typeof orig !== "function" || orig._tras) return;
+  const envuelta = function () {
+    if (depTraspasoEnIngreso && String((document.getElementById("ipbNumeroBoleta") || {}).value || "").trim() === depTraspasoEnIngreso.id) return depGuardarBoletaTraspaso();
+    return orig.apply(this, arguments);
+  };
+  envuelta._tras = true;
+  window.guardarBoletaCompleta = envuelta;
 }));

@@ -97,7 +97,7 @@ function depFichaNuevaCotizacion() {
   abrirEditorCotizacion({
     clienteId: c.CLIENTE_ID,
     cliente: { nombre: c.NOMBRE, direccion: c.DIRECCION, localidad: c.LOCALIDAD, provincia: c.PROVINCIA, telefono: c.TELEFONO, cuit: c.DNI, email: c.EMAIL, empresa: c.EMPRESA },
-    moneda: "ARS", items: []
+    items: []
   });
 }
 

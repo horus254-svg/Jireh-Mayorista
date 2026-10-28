@@ -95,6 +95,7 @@ async function depDolarRefrescar() {
 /** Refleja el dólar en el widget y en los campos "Tipo de cambio" */
 function depDolarAplicar() {
   if (typeof dolarBurbujaRender === "function") dolarBurbujaRender();
+  if (typeof depRepintarPrecios === "function" && esModoDeposito()) depRepintarPrecios();
   depDolarTarjetaConfig();
   if (!esModoDeposito() || !(dolarDelDeposito() > 0)) return;
   // El tipo de cambio del ingreso de mercadería sale del dólar del depósito
@@ -217,6 +218,8 @@ function depPmPrepararUsd(codigo) {
   document.getElementById("pmPrecioUsd").value = usd;
   document.getElementById("pmPrecioCajaUsd").value = cajaUsd;
   window._depPmUsdAntes = { usd: Number(usd) || 0, caja: Number(cajaUsd) || 0 };
+  const cl = document.getElementById("pmCodigoLocal");
+  if (cl) { cl.value = p && p.CODIGO_LOCAL ? String(p.CODIGO_LOCAL) : ""; window._depPmCodigoLocalAntes = cl.value; }
   depPmUsdCambio();
 }
 
@@ -272,9 +275,12 @@ function depInstalarEnFormularioProducto() {
       const codigo = document.getElementById("pmCodigo").value.trim();
       const antes = window._depPmUsdAntes || { usd: 0, caja: 0 };
       if ((usd > 0 || cajaUsd > 0) && !(dolarDelDeposito() > 0)) { toast("Primero fijá el dólar del depósito (Configuración → Negocio).", "error"); return; }
+      const codigoLocal = String((document.getElementById("pmCodigoLocal") || {}).value || "").trim();
       const r = await guardarOrig.apply(this, arguments);
       const cerrado = !document.getElementById("productModalBackdrop").classList.contains("show");
-      if (!cerrado || (usd === antes.usd && cajaUsd === antes.caja)) return r;
+      if (!cerrado) return r;
+      if (codigoLocal !== (window._depPmCodigoLocalAntes || "")) depGuardarCodigoLocalConReintento(codigo, codigoLocal, 0);
+      if (usd === antes.usd && cajaUsd === antes.caja) return r;
       depGuardarUsdConReintento(codigo, usd, cajaUsd, 0);
       return r;
     };
@@ -291,6 +297,18 @@ async function depGuardarUsdConReintento(codigo, usd, cajaUsd, intento) {
   } catch (e) {
     if ((e.reintentar || /no se encontró/i.test(e.message)) && intento < 6) { setTimeout(() => depGuardarUsdConReintento(codigo, usd, cajaUsd, intento + 1), 15000); return; }
     toast("El producto se guardó, pero no su precio en dólares: " + e.message + ". Volvé a abrirlo y guardalo de nuevo.", "error");
+  }
+}
+
+/** Código del producto en el local (traspasos); como el precio en dólares, se reintenta si el producto recién se creó sin conexión */
+async function depGuardarCodigoLocalConReintento(codigo, codigoLocal, intento) {
+  try {
+    const r = await depPost("guardarCodigosLocal", { codigos: [{ codigo, codigoLocal }] });
+    if (!r.success || (r.noEncontrados && r.noEncontrados.length)) throw Object.assign(new Error(r.message || "todavía no está en el servidor"), { reintentar: true });
+    const p = depProducto(codigo); if (p) p.CODIGO_LOCAL = codigoLocal;
+  } catch (e) {
+    if (e.reintentar && intento < 6) { setTimeout(() => depGuardarCodigoLocalConReintento(codigo, codigoLocal, intento + 1), 15000); return; }
+    toast("El producto se guardó, pero no su código en el local: " + e.message, "error");
   }
 }
 
@@ -453,3 +471,95 @@ window.refrescarCatalogoPOS = function () {
     try { if (typeof actualizarCatalogoPOSManual === "function") actualizarCatalogoPOSManual(); } catch (e) {}
   }, 300);
 };
+
+/* =====================================================================
+   PRECIOS A LA VISTA EN DÓLARES (depósito)
+   En el depósito los precios se ven en dólares (preferido) y, chico,
+   en pesos. Con el botón "US$ / $" se pasa a ver en pesos (queda
+   guardado en esta PC). El ticket y el cobro siguen calculándose en
+   pesos por dentro: lo que cambia es cómo se muestran.
+===================================================================== */
+const DEP_VISTA_KEY = "veekpos_deposito_vista_moneda";
+
+function depMonedaVista() {
+  try { return localStorage.getItem(DEP_VISTA_KEY) === "ARS" ? "ARS" : "USD"; } catch (e) { return "USD"; }
+}
+
+/** true si en esta PC del depósito los precios se muestran en dólares (y hay dólar fijado) */
+function depVistaUsd() {
+  return esModoDeposito() && depMonedaVista() === "USD" && dolarDelDeposito() > 0;
+}
+
+/** Dólares de un precio en pesos: el precio en dólares exacto del producto si lo tiene y coincide */
+function depArsAUsd(ars, producto) {
+  const tc = dolarDelDeposito();
+  if (!(tc > 0)) return 0;
+  const usd = producto ? Number(producto.PRECIO_USD) || 0 : 0;
+  if (usd > 0 && Math.abs(Math.round(usd * tc) - Number(ars)) <= 1) return usd;
+  return Math.round(Number(ars) / tc * 100) / 100;
+}
+
+/** HTML del precio para la grilla, la tabla y el ticket. conPesos=true agrega los pesos abajo, en chico */
+function depPrecioVista(ars, producto, conPesos) {
+  const pesos = "$" + Number(ars || 0).toLocaleString("es-AR");
+  if (!depVistaUsd()) return pesos;
+  const usd = depUsd(depArsAUsd(ars, producto));
+  return conPesos ? `${usd}<small style="display:block;font-size:.72em;opacity:.65;font-weight:600;">${pesos}</small>` : `${usd} <span style="opacity:.6;">(${pesos})</span>`;
+}
+
+/** Total del ticket en dólares, debajo del total en pesos */
+function depTotalesTicketUsd(items, totalArs) {
+  const totalEl = document.getElementById("totalPOS");
+  if (!totalEl) return;
+  const fila = totalEl.closest(".trow");
+  let extra = document.getElementById("totalUsdPOS");
+  if (!depVistaUsd() || !items || !items.length) { if (extra) extra.remove(); return; }
+  if (!extra && fila) {
+    extra = document.createElement("div");
+    extra.id = "totalUsdPOS";
+    extra.className = "trow";
+    extra.style.cssText = "font-weight:800;font-size:1.15em;color:var(--green-700,#15803d);";
+    fila.parentNode.insertBefore(extra, fila);
+  }
+  // suma renglón por renglón (respeta los precios exactos en dólares) y aplica el mismo descuento/recargo
+  const subArs = items.reduce((a, i) => a + i.PRECIO * i.cantidad, 0);
+  const subUsd = items.reduce((a, i) => a + depArsAUsd(i.PRECIO, i) * i.cantidad, 0);
+  const usd = subArs > 0 ? Math.round(subUsd * (totalArs / subArs) * 100) / 100 : 0;
+  extra.innerHTML = `<span>Total en dólares</span><span class="money">${depUsd(usd)}</span>`;
+}
+
+/** Al lado del total del cobro: lo mismo en dólares */
+function depMfvTituloUsd(totalArs) {
+  const t = document.getElementById("mfvTotal");
+  if (!t) return;
+  let el = document.getElementById("mfvTotalUsd");
+  if (!depVistaUsd()) { if (el) el.remove(); return; }
+  if (!el) {
+    el = document.createElement("span");
+    el.id = "mfvTotalUsd";
+    el.style.cssText = "font-family:monospace;color:var(--slate-500);font-size:.85em;margin-left:6px;";
+    t.after(el);
+  }
+  const items = typeof ticketPOS !== "undefined" ? ticketPOS : [];
+  const subArs = items.reduce((a, i) => a + i.PRECIO * i.cantidad, 0);
+  const subUsd = items.reduce((a, i) => a + depArsAUsd(i.PRECIO, i) * i.cantidad, 0);
+  el.textContent = "· " + depUsd(subArs > 0 ? Math.round(subUsd * (totalArs / subArs) * 100) / 100 : totalArs / dolarDelDeposito());
+}
+
+function depAlternarMonedaVista() {
+  const nueva = depMonedaVista() === "USD" ? "ARS" : "USD";
+  try { localStorage.setItem(DEP_VISTA_KEY, nueva); } catch (e) {}
+  if (nueva === "USD" && !(dolarDelDeposito() > 0)) toast("Fijá el dólar del depósito para ver los precios en dólares", "error");
+  else toast(nueva === "USD" ? "Precios en dólares (y en pesos, en chico)" : "Precios en pesos", "success");
+  depRepintarPrecios();
+}
+
+function depRepintarPrecios() {
+  ["btnMonedaVistaPOS", "btnMonedaVistaProductos"].forEach(id => {
+    const b = document.getElementById(id);
+    if (b) b.textContent = depMonedaVista() === "USD" ? "Ver en $" : "Ver en US$";
+  });
+  try { if (typeof renderPosGrid === "function") renderPosGrid((document.getElementById("posBusqueda") || {}).value?.trim() || ""); } catch (e) {}
+  try { if (typeof renderTicketPOS === "function") renderTicketPOS(); } catch (e) {}
+  try { const sec = document.getElementById("productos"); if (sec && sec.style.display === "block" && typeof filtrarProductos === "function") filtrarProductos(); } catch (e) {}
+}
