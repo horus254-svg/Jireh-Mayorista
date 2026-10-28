@@ -2333,6 +2333,13 @@ kbd{
   background:#ea580c; color:#fff; width:42px;
 }
 .pos-btn-pedido:hover{ background:#c2410c; }
+/* Violeta — cotización (solo depósito) */
+.pos-btn-cotizar{ background:#7c3aed; color:#fff; width:42px; }
+.pos-btn-cotizar:hover{ background:#6d28d9; }
+/* Verde azulado — traspaso al local (solo depósito) */
+.pos-btn-traspaso{ background:#0f766e; color:#fff; width:42px; }
+.pos-btn-traspaso:hover{ background:#115e59; }
+body.modo-deposito .pos-action-bar{ grid-template-columns:1fr auto auto auto auto auto; }
 
 /* Rojo — vaciar */
 .pos-btn-clear{

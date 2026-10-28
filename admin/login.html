@@ -396,6 +396,93 @@ async function aplicarMarcaDesdeBackend(){
 
 resolverApiUrl().then(aplicarMarcaDesdeBackend);
 
+/* ---------- Local / depósito (solo app de escritorio) ----------------
+ * La misma PC trabaja con dos backends. La clave de siempre entra al
+ * local; la del depósito, al depósito. Cada uno tiene su carpeta de
+ * datos, así que cambiar de uno a otro reinicia la app y el ingreso se
+ * completa solo del otro lado (ver desktop/src/perfiles.js).
+ */
+const NOMBRE_PERFIL = { local: "el local", deposito: "el depósito" };
+
+function tienePerfiles(){
+  const p = puenteEscritorio();
+  return !!(p && typeof p.perfilInfo === "function");
+}
+
+function mostrarCambioDePerfil(perfil){
+  const t = document.querySelector(".login-btn-text");
+  if(t) t.textContent = "Abriendo " + (NOMBRE_PERFIL[perfil] || perfil) + "…";
+  const btn = document.getElementById("btnLogin");
+  if(btn){ btn.disabled = true; btn.classList.add("loading"); }
+}
+
+/** Deja la sesión abierta en esta página (login online exitoso) */
+async function aplicarSesion(data, usuario, password){
+  if(window.VeekAuth) VeekAuth.guardarSesion(data, !!puenteEscritorio());
+  if(data.debeCambiarPassword) sessionStorage.setItem("debeCambiarPassword", "1");
+  else sessionStorage.removeItem("debeCambiarPassword");
+  sessionStorage.removeItem("veekEntroSinServidor");
+  sessionStorage.setItem("admin", "true");
+  sessionStorage.setItem("rol", data.rol || "admin");
+  sessionStorage.setItem("nombreUsuario", data.nombre || "");
+  sessionStorage.setItem("usuarioLogueado", data.usuario || usuario);
+  sessionStorage.setItem("modoNegocio", data.modo || "");
+  if(password){
+    await guardarLoginOfflineCache(usuario, password, data);
+    if(tienePerfiles()) { try{ await puenteEscritorio().perfilRegistrarCredencial(usuario, password); }catch(e){} }
+  }
+}
+
+/** Login contra un backend dado (POST: la contraseña nunca va en la URL) */
+async function pedirLogin(url, usuario, password, ms){
+  const controlador = new AbortController();
+  const timeoutId = setTimeout(() => controlador.abort(), ms || 30000);
+  try{
+    const r = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action: "login", usuario, password, dispositivo: puenteEscritorio() ? "1" : "" }),
+      signal: controlador.signal
+    });
+    return await r.json();
+  }finally{
+    clearTimeout(timeoutId);
+  }
+}
+
+/** Pasa al otro perfil y reinicia la app; el ingreso se completa del otro lado */
+async function cambiarDePerfil(perfil, usuario, password, sesion){
+  mostrarCambioDePerfil(perfil);
+  const r = await puenteEscritorio().perfilCambiar({ perfil, usuario, password, sesion: sesion || null });
+  if(!r || !r.success){
+    mostrarErrorLogin((r && r.message) || "No se pudo abrir " + (NOMBRE_PERFIL[perfil] || perfil) + ".");
+    const btn = document.getElementById("btnLogin");
+    if(btn){ btn.disabled = false; btn.classList.remove("loading"); }
+    const t = document.querySelector(".login-btn-text"); if(t) t.textContent = "Ingresar";
+  }
+  return r;
+}
+
+/** Al abrir: si se viene del otro perfil, se completa el ingreso solo */
+(async function completarCambioDePerfil(){
+  if(!tienePerfiles()) return;
+  let pend = null;
+  try{ pend = await puenteEscritorio().perfilTomarPendiente(); }catch(e){}
+  if(!pend) return;
+  if(pend.sesion && pend.sesion.success && pend.sesion.token){
+    await aplicarSesion(pend.sesion, pend.usuario, pend.password);
+    window.location.href = "index.html";
+    return;
+  }
+  if(pend.usuario && pend.password){
+    // Sin sesión (se cambió sin internet o por la clave recordada): ingreso normal
+    document.getElementById("usuario").value = pend.usuario;
+    document.getElementById("password").value = pend.password;
+    await resolverApiUrl();
+    document.getElementById("loginForm").requestSubmit();
+  }
+})();
+
 /**
  * Login offline (solo Electron) ---------------------------------
  *
@@ -458,6 +545,7 @@ async function guardarLoginOfflineCache(usuario, password, data){
       rol: data.rol || "admin",
       nombre: data.nombre || "",
       usuario: data.usuario || usuario,
+      modo: data.modo || "",
       guardadoEn: Date.now()
     }));
   }catch(error){
@@ -499,6 +587,27 @@ function ocultarErrorLogin(){
   document.getElementById("loginError").classList.remove("show");
 }
 
+/**
+ * La clave no sirvió en este backend: si hay otro configurado (local ↔
+ * depósito), se prueba ahí. Devuelve true si se está cambiando de perfil.
+ */
+async function probarOtroPerfil(usuario, password){
+  let info;
+  try{ info = await puenteEscritorio().perfilInfo(); }catch(e){ return false; }
+  const url = info && info.urls && info.urls[info.otro];
+  if(!url) return false;
+  try{
+    const data = await pedirLogin(url, usuario, password, 30000);
+    if(data && data.success){
+      await cambiarDePerfil(info.otro, usuario, password, data);
+      return true;
+    }
+  }catch(e){
+    console.warn("No se pudo consultar el otro backend:", e);
+  }
+  return false;
+}
+
 document.getElementById("loginForm").addEventListener("submit", async function(e){
   e.preventDefault();
 
@@ -511,6 +620,13 @@ document.getElementById("loginForm").addEventListener("submit", async function(e
   if(puenteEscritorio()){
     const u = document.getElementById("usuario").value.trim();
     const p = document.getElementById("password").value;
+    // Clave que la última vez entró al otro backend (local ↔ depósito): se cambia directo
+    if(u && p && tienePerfiles()){
+      try{
+        const [info, perfilClave] = await Promise.all([puenteEscritorio().perfilInfo(), puenteEscritorio().perfilDeCredencial(u, p)]);
+        if(perfilClave && perfilClave !== info.activo){ await cambiarDePerfil(perfilClave, u, p, null); return; }
+      }catch(e){}
+    }
     if(u && p){
       const local = await intentarLoginOffline(u, p);
       const vigente = local && local.guardadoEn && (Date.now() - local.guardadoEn) < VIGENCIA_LOGIN_LOCAL_MS;
@@ -523,6 +639,7 @@ document.getElementById("loginForm").addEventListener("submit", async function(e
         sessionStorage.setItem("rol", local.rol || "admin");
         sessionStorage.setItem("nombreUsuario", local.nombre || "");
         sessionStorage.setItem("usuarioLogueado", local.usuario || u);
+        sessionStorage.setItem("modoNegocio", local.modo || "");
         window.location.href = "index.html";
         return;
       }
@@ -585,16 +702,10 @@ document.getElementById("loginForm").addEventListener("submit", async function(e
     const data = await r.json();
 
     if(data.success){
-      sessionStorage.removeItem("veekEntroSinServidor");
-      if(window.VeekAuth) VeekAuth.guardarSesion(data, !!(window.posOffline || window.veekpos));
-      if(data.debeCambiarPassword) sessionStorage.setItem("debeCambiarPassword", "1");
-      else sessionStorage.removeItem("debeCambiarPassword");
-      sessionStorage.setItem("admin", "true");
-      sessionStorage.setItem("rol", data.rol || "admin");
-      sessionStorage.setItem("nombreUsuario", data.nombre || "");
-      sessionStorage.setItem("usuarioLogueado", data.usuario || usuario);
-      await guardarLoginOfflineCache(usuario, password, data);
+      await aplicarSesion(data, usuario, password);
       window.location.href = "index.html";
+    }else if(!data.bloqueado && tienePerfiles() && await probarOtroPerfil(usuario, password)){
+      return; // la clave es del otro backend: la app se reinicia en ese perfil
     }else{
       mostrarErrorLogin(data.bloqueado ? (data.message || "Demasiados intentos. Esperá 15 minutos.") : "Usuario o contraseña incorrectos.");
       btn.disabled = false;
@@ -616,6 +727,7 @@ document.getElementById("loginForm").addEventListener("submit", async function(e
       sessionStorage.setItem("rol", cache.rol || "admin");
       sessionStorage.setItem("nombreUsuario", cache.nombre || "");
       sessionStorage.setItem("usuarioLogueado", cache.usuario || usuario);
+      sessionStorage.setItem("modoNegocio", cache.modo || "");
       window.location.href = "index.html";
       return;
     }

@@ -291,6 +291,14 @@
 
 
 
+<style>
+  /* Modo depósito: siempre a la vista que no es el local */
+  .badge-modo-deposito { margin: 4px 16px 10px; padding: 6px 10px; border-radius: 10px; background: #f59e0b; color: #1f1300;
+    font-weight: 800; font-size: 12px; letter-spacing: .12em; text-align: center; }
+  .badge-modo-deposito span { font-size: 9px; vertical-align: 2px; margin-right: 4px; }
+  body.modo-deposito::before { content: ""; position: fixed; left: 0; right: 0; top: 0; height: 4px; background: #f59e0b; z-index: 3000; pointer-events: none; }
+  body.modo-deposito .sidebar { box-shadow: inset -3px 0 0 #f59e0b; }
+</style>
 <!-- =================== SIDEBAR (desktop) =================== -->
 <div class="sidebar">
   <div class="sidebar-brand">
@@ -303,6 +311,7 @@
     <div class="nav-grupo">Vender</div>
     <a href="#" data-target="pos"              onclick="mostrarSeccion('pos')">Punto de Venta</a>
     <a href="#" data-target="pedidos"          onclick="mostrarSeccion('pedidos')">Pedidos web</a>
+    <a href="#" data-target="cotizaciones"     data-solo-deposito style="display:none;" onclick="mostrarSeccion('cotizaciones')">Cotizaciones</a>
     <a href="#" data-target="cupones"          onclick="mostrarSeccion('cupones')">Cupones</a>
 
     <div class="nav-grupo">Caja</div>
@@ -313,6 +322,7 @@
     <div class="nav-grupo">Mercadería</div>
     <a href="#" data-target="productos"        onclick="mostrarSeccion('productos')">Productos</a>
     <a href="#" data-target="ingresoProductos" onclick="mostrarSeccion('ingresoProductos')">Ingreso de mercadería</a>
+    <a href="#" data-target="traspasos"        data-traspasos style="display:none;" onclick="mostrarSeccion('traspasos')">Traspasos</a>
     <a href="#" data-target="proveedores"      onclick="mostrarSeccion('proveedores'); cargarProveedores();">Proveedores</a>
 
     <div class="nav-grupo">Clientes y números</div>
@@ -1104,6 +1114,8 @@
             <button class="pos-action-btn pos-btn-finalize" id="btnFinalizarVenta" onclick="abrirModalFinalizarVenta()">Finalizar <kbd>F2</kbd></button>
             <button class="pos-action-btn pos-btn-print"   id="btnImprimirTicket" onclick="imprimirTicketThermal()" title="Imprimir" disabled>🖨️</button>
             <button class="pos-action-btn pos-btn-pedido"  id="btnGenerarPedido"  onclick="abrirModalPedidoAdmin()" title="Pedido">📦</button>
+            <button class="pos-action-btn pos-btn-cotizar" id="btnCotizarPOS" data-solo-deposito style="display:none;" onclick="abrirCotizacionDesdePOS()" title="Cotización (A4)">📝</button>
+            <button class="pos-action-btn pos-btn-traspaso" id="btnTraspasoPOS" data-solo-deposito style="display:none;" onclick="traspasoDesdePOS()" title="Mandar al local (traspaso)">🚚</button>
             <button class="pos-action-btn pos-btn-clear"   id="btnVaciarTicket"   onclick="vaciarTicketPOS()"       title="Vaciar">🗑️</button>
           </div>
         </div>
@@ -1133,6 +1145,42 @@
   </div>
 
   <!-- ===== VENTAS POS (historial + reimpresión) ===== -->
+  <!-- ===== TRASPASOS (depósito: armar y mandar · local: recibir) — lo dibuja deposito-traspasos.js ===== -->
+  <div id="traspasos" class="seccion"></div>
+
+  <!-- ===== COTIZACIONES (depósito) ===== -->
+  <div id="cotizaciones" class="seccion">
+    <div class="page-header">
+      <div><h1>Cotizaciones</h1><div class="sub">Presupuestos impresos en A4: buscá, reimprimí, editá o pasalos al Punto de Venta para venderlos o hacer el pedido</div></div>
+      <div class="d-flex gap-2">
+        <button class="btn btn-outline-secondary" onclick="cargarCotizaciones()">↻ Actualizar</button>
+        <button class="btn btn-primary" onclick="abrirEditorCotizacion(null)">+ Nueva cotización</button>
+      </div>
+    </div>
+    <div class="card p-3 mb-3">
+      <div class="d-flex gap-2 flex-wrap align-items-center">
+        <input type="search" id="cotBuscar" class="form-control" style="max-width:340px" placeholder="Buscar por número, cliente, producto..." oninput="cotBuscarConPausa()">
+        <select id="cotEstado" class="form-select" style="max-width:200px" onchange="cargarCotizaciones()">
+          <option value="">Todos los estados</option>
+          <option value="PENDIENTE">Pendientes</option>
+          <option value="ACEPTADA">Aceptadas</option>
+          <option value="CONVERTIDA">Convertidas</option>
+          <option value="VENCIDA">Vencidas</option>
+          <option value="RECHAZADA">Rechazadas</option>
+          <option value="ANULADA">Anuladas</option>
+        </select>
+      </div>
+    </div>
+    <div class="card p-3">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0" style="font-size:13.5px;">
+          <thead><tr><th>Número</th><th>Fecha</th><th>Cliente</th><th class="text-end">Total</th><th>Vence</th><th>Estado</th><th></th></tr></thead>
+          <tbody id="tablaCotizaciones"><tr><td colspan="7" class="text-center text-muted py-4">Cargando...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <div id="ventasPOS" class="seccion">
     <div class="page-header">
       <div><h1>Historial de ventas</h1><div class="sub">Ventas de mostrador — reimprimí cualquier ticket</div></div>
@@ -1230,6 +1278,7 @@
         <div class="cc-movimientos-detalle" id="ccMovimientosDetalle" style="display:none;">
           <div class="cc-mov-line"><span>Ventas en efectivo</span><span id="ccVentasEfectivo">$0</span></div>
           <div class="cc-mov-line" id="ccPagosClientesEfectivoLinea" style="display:none;"><span>Pagos de clientes</span><span id="ccPagosClientesEfectivo">$0</span></div>
+          <div class="cc-mov-line" id="ccEfectivoDolaresLinea" style="display:none;"><span>Ventas en US$ (resto − vuelto)</span><span id="ccEfectivoDolares">$0</span></div>
           <div class="cc-mov-line cc-mov-ingreso"><span>+ Ingresos de caja</span><span id="ccMovIngresos">$0</span></div>
           <div class="cc-mov-line cc-mov-egreso"><span>− Egresos de caja</span><span id="ccMovEgresos">$0</span></div>
           <a href="#" class="cc-mov-link" onclick="mostrarSeccion('movimientosCaja'); return false;">Ver detalle de movimientos →</a>
@@ -1281,6 +1330,25 @@
           <input type="number" class="form-control form-control-sm cc-input" id="ccTarjetaContado" placeholder="0" min="0" step="1" oninput="calcularDiferenciasCierreCaja()">
         </div>
         <div class="cc-row cc-diff-row"><span>Diferencia</span><strong id="ccTarjetaDif" class="cc-dif-ok">$0</strong></div>
+      </div>
+
+      <!-- DÓLARES (solo depósito) -->
+      <div class="card p-3 cc-card" id="ccCardUsd" data-solo-deposito style="display:none;">
+        <div class="cc-card-head">
+          <span class="cc-ic">💵</span>
+          <h6>Dólares</h6>
+        </div>
+        <div class="cc-row"><span>Esperado (ventas + pagos de clientes)</span><strong id="ccUsdEsperado">US$ 0</strong></div>
+        <div class="cc-movimientos-detalle" style="display:flex;">
+          <div class="cc-mov-line"><span>Ventas cobradas en dólares</span><span id="ccUsdVentas">US$ 0</span></div>
+          <div class="cc-mov-line"><span>Pagos de clientes en dólares</span><span id="ccUsdPagos">US$ 0</span></div>
+        </div>
+        <div class="cc-row">
+          <span>Contado</span>
+          <input type="number" class="form-control form-control-sm cc-input" id="ccUsdContado" placeholder="0" min="0" step="0.01" oninput="calcularDiferenciasCierreCaja()">
+        </div>
+        <div class="cc-row cc-diff-row"><span>Diferencia</span><strong id="ccUsdDif" class="cc-dif-ok">US$ 0</strong></div>
+        <div style="font-size:11px;color:var(--slate-500);margin-top:4px;">Los dólares no suman al total en pesos.</div>
       </div>
     </div>
 
@@ -1998,6 +2066,31 @@
     <!-- ===== PESTAÑA: NEGOCIO — Datos del negocio, ticket y moneda ===== -->
     <div class="cfg-tab-pane active" id="cfgTab-negocio">
 
+      <!-- ===== DÓLAR DEL DEPÓSITO (solo depósito) ===== -->
+      <div class="card p-3 mb-3" id="cardDolarDeposito" style="display:none;border-left:4px solid #f59e0b;">
+        <h6 style="margin-bottom:4px;">Dólar del depósito</h6>
+        <p class="text-muted" style="font-size:13px;margin-bottom:8px;">Se fija a mano. Se usa en ventas, cotizaciones y pagos, y para pasar a pesos los productos con precio en dólares (se recalculan solos cada vez que lo cambiás).</p>
+        <div class="d-flex align-items-center gap-3 flex-wrap">
+          <div style="font-size:26px;font-weight:800;font-family:var(--font-mono,monospace);" id="cfgDolarDepositoValor">—</div>
+          <button type="button" class="btn btn-primary btn-sm" onclick="abrirDolarDeposito()">Cambiar dólar</button>
+        </div>
+        <div class="form-text" id="cfgDolarDepositoInfo"></div>
+      </div>
+
+      <div class="card p-3 mb-3" id="cardDocumentosA4" data-solo-deposito style="display:none;">
+        <h6 style="margin-bottom:4px;">Documentos A4 (cotizaciones, boletas de entrega, estados de cuenta)</h6>
+        <p class="text-muted" style="font-size:13px;margin-bottom:10px;">Salen en el encabezado y el pie de cada hoja, junto con el nombre, la dirección y los teléfonos de arriba.</p>
+        <div class="row g-2">
+          <div class="col-md-4"><label class="form-label">CUIT</label><input class="form-control" id="docCuit" placeholder="30-12345678-9"></div>
+          <div class="col-md-4"><label class="form-label">Condición frente al IVA</label><input class="form-control" id="docCondicionIva" placeholder="Responsable inscripto"></div>
+          <div class="col-md-4"><label class="form-label">Email</label><input class="form-control" id="docEmail" placeholder="ventas@ejemplo.com"></div>
+          <div class="col-md-4"><label class="form-label">Validez de la cotización (días)</label><input type="number" min="0" class="form-control" id="docValidez" placeholder="7"></div>
+          <div class="col-md-8"><label class="form-label">Condiciones de la cotización</label><textarea class="form-control" id="docCondiciones" rows="2" placeholder="Precios sujetos a modificación sin previo aviso. Forma de pago: contado o cuenta corriente."></textarea></div>
+          <div class="col-12"><label class="form-label">Leyenda de la boleta de entrega</label><textarea class="form-control" id="docLeyendaBoleta" rows="2" placeholder="Recibí la mercadería detallada en perfecto estado."></textarea></div>
+        </div>
+        <div class="mt-2"><button type="button" class="btn btn-primary btn-sm" onclick="guardarConfigDocumentos()">Guardar datos de documentos</button></div>
+      </div>
+
       <div class="card p-3 mt-3">
         <h6 style="margin-bottom:6px;">Datos generales, ícono y SEO</h6>
         <p class="text-muted" style="font-size:13px;">Se usan al compartir el link del catálogo (WhatsApp, Facebook, X) y para buscadores como Google.</p>
@@ -2486,6 +2579,22 @@
         </div>
       </div>
 
+      <!-- Catálogo PDF ("Descargar Catálogo PDF" de la web) — lo genera la app de escritorio -->
+      <div class="card p-3 mt-3" id="cardCatalogoPDF">
+        <h6 style="margin-bottom:4px;">Catálogo en PDF</h6>
+        <p class="text-muted" style="font-size:13px;margin-bottom:10px;">
+          Es el que descargan los clientes con "Descargar Catálogo PDF": portada con tus condiciones e índice, productos publicados con stock agrupados por categoría y "Pedir" para abrir cada uno en la web. Se arma solo una vez por día en la primera caja que se abre (cualquiera), o desde acá en cualquier caja.
+        </p>
+        <div id="catPdfEstado" class="config-preview-hint mb-2">Cargando…</div>
+        <div id="catPdfAvisoUrl" class="text-muted" style="font-size:12.5px;display:none;margin-bottom:8px;">Cargá la <b>URL del catálogo</b> (arriba) para que el PDF tenga los links "Pedir" y el QR de la portada.</div>
+        <div id="catPdfProgreso" style="font-size:13px;margin-bottom:8px;display:none;"></div>
+        <div class="d-flex flex-wrap gap-2 justify-content-end" id="catPdfBotones">
+          <a class="btn btn-outline-secondary btn-sm" id="btnCatPdfVer" target="_blank" rel="noopener" style="display:none;">Ver el publicado</a>
+          <button class="btn btn-outline-primary btn-sm" id="btnCatPdfPrevia" onclick="generarCatalogoPDFBtn(false)" style="display:none;">Vista previa</button>
+          <button class="btn btn-success btn-sm" id="btnCatPdfPublicar" onclick="generarCatalogoPDFBtn(true)" style="display:none;">Generar y publicar ahora</button>
+        </div>
+      </div>
+
     </div>
 
     <!-- ===== PESTAÑA: PEDIDOS — Reglas y datos de los pedidos del catálogo ===== -->
@@ -2883,6 +2992,46 @@
           <button type="button" class="btn btn-outline-secondary btn-sm" onclick="cargarEstadoVentasResumidas()">↻ Actualizar</button>
           <button type="button" class="btn btn-outline-primary btn-sm" id="btnResumirVentas" onclick="resumirVentasViejasClick()" disabled>Resumir ventas viejas ahora</button>
         </div>
+      </div>
+
+      <!-- ===== LOCAL Y DEPÓSITO (solo app de escritorio) ===== -->
+      <div class="card p-3 mb-3" id="cardTraspasosConfig" style="display:none;"></div>
+
+      <div class="card p-3 mb-3" id="cardPerfiles" style="display:none;">
+        <h6 style="margin-bottom:4px;">Local y depósito</h6>
+        <p class="text-muted" style="font-size:13px;margin-bottom:10px;" id="perfilActualTexto">…</p>
+        <label class="form-label" id="perfilOtroLabel" for="perfilOtroUrl">Dirección del backend del depósito</label>
+        <input type="url" class="form-control" id="perfilOtroUrl" placeholder="https://script.google.com/macros/s/.../exec">
+        <div class="form-text" style="font-size:12px;">Con esto, la misma PC entra al local o al depósito según la clave con la que se inicia sesión. Cada uno guarda sus datos por separado. Las claves del local y del depósito tienen que ser distintas.</div>
+        <div id="perfilOtroEstado" style="font-size:13px;margin-top:6px;"></div>
+        <div class="d-flex flex-wrap gap-2 mt-2">
+          <button type="button" class="btn btn-outline-secondary btn-sm" onclick="guardarUrlOtroPerfil(true)">Probar conexión</button>
+          <button type="button" class="btn btn-primary btn-sm" onclick="guardarUrlOtroPerfil(false)">Guardar</button>
+        </div>
+      </div>
+
+      <!-- ===== ACTUALIZACIONES (solo app de escritorio) ===== -->
+      <div class="card p-3 mb-3" id="cardActualizaciones" style="display:none;">
+        <div class="d-flex align-items-center gap-2" style="margin-bottom:6px;">
+          <h6 style="margin:0;">Actualizaciones</h6>
+          <span id="actBadge" class="licencia-badge">…</span>
+        </div>
+        <div class="licencia-datos" style="margin:6px 0 10px;">
+          <span class="lbl">Esta app</span><span id="actVersionApp">—</span>
+          <span class="lbl">Sistema del negocio (backend)</span><span id="actVersionBackend">—</span>
+        </div>
+        <div id="actEstado" style="font-size:13.5px;">Cargando…</div>
+        <div id="actProgreso" class="act-barra" style="display:none;"><div></div></div>
+        <div id="actNotas" class="act-notas" style="display:none;"></div>
+        <div class="d-flex flex-wrap gap-2 mt-3">
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="btnActRevisar" onclick="revisarActualizacionBtn()">↻ Buscar actualizaciones</button>
+          <button type="button" class="btn btn-primary btn-sm" id="btnActInstalar" style="display:none;" onclick="instalarActualizacionBtn()">Reiniciar y actualizar ahora</button>
+        </div>
+        <style>
+          .act-barra { height:5px; background:var(--slate-100, #eef0f3); border-radius:999px; overflow:hidden; margin-top:10px; }
+          .act-barra > div { height:100%; width:0; background:var(--indigo-600, #4f46e5); transition:width .3s; }
+          .act-notas { white-space:pre-line; font-size:12.5px; color:var(--slate-500, #64748b); background:var(--slate-50, #f8fafc); border:1px solid var(--slate-100, #eef0f3); border-radius:8px; padding:8px 10px; margin-top:10px; }
+        </style>
       </div>
 
       <!-- ===== LICENCIA ===== -->
@@ -3399,6 +3548,7 @@
     <div class="receipt-actions">
       <button class="btn btn-outline-primary" id="btnCerrarRecibo" onclick="cerrarRecibo()">Esc — Cerrar</button>
       <button class="btn btn-outline-secondary" id="btnImprimirRecibo" onclick="imprimirUltimoRecibo()">Enter — Imprimir</button>
+      <button class="btn btn-outline-secondary" id="btnBoletaRecibo" data-solo-deposito style="display:none;" onclick="abrirBoletaDesdeUltimaVenta()">Boleta de entrega (A4)</button>
       <button class="btn btn-success" onclick="nuevaVentaPOS()">Nueva venta</button>
     </div>
   </div>
@@ -3486,6 +3636,19 @@
           <label class="form-label">Stock</label>
           <input type="number" class="form-control" id="pmStock" min="0" step="1" placeholder="0">
         </div>
+      </div>
+
+      <!-- Depósito: precio en dólares (el precio en pesos se calcula con el dólar del día) -->
+      <div class="row g-2 mt-1" id="pmUsdWrap" style="display:none;">
+        <div class="col-6">
+          <label class="form-label">Precio en dólares (US$)</label>
+          <input type="number" class="form-control" id="pmPrecioUsd" min="0" step="0.01" placeholder="Vacío = en pesos" oninput="depPmUsdCambio()">
+        </div>
+        <div class="col-6" id="pmPrecioCajaUsdWrap">
+          <label class="form-label">Caja en dólares (US$)</label>
+          <input type="number" class="form-control" id="pmPrecioCajaUsd" min="0" step="0.01" placeholder="Opcional" oninput="depPmUsdCambio()">
+        </div>
+        <div class="col-12"><div class="form-text" id="pmUsdInfo" style="font-size:11.5px;"></div></div>
       </div>
 
       <div class="mt-3">
@@ -4015,6 +4178,18 @@
         <label class="form-label">Dirección <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
         <input type="text" class="form-control" id="clDireccion" placeholder="">
       </div>
+      <div class="row g-2 mb-2">
+        <div class="col-6"><label class="form-label">Localidad <span class="text-muted" style="font-size:11px;">(opcional)</span></label><input type="text" class="form-control" id="clLocalidad"></div>
+        <div class="col-6"><label class="form-label">Provincia <span class="text-muted" style="font-size:11px;">(opcional)</span></label><input type="text" class="form-control" id="clProvincia"></div>
+      </div>
+      <div class="mb-2">
+        <label class="form-label">Email <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
+        <input type="email" class="form-control" id="clEmail">
+      </div>
+      <div class="mb-2">
+        <label class="form-label">Notas <span class="text-muted" style="font-size:11px;">(horario de entrega, contacto, condiciones…)</span></label>
+        <textarea class="form-control" id="clNotas" rows="2"></textarea>
+      </div>
       <div class="form-check mt-3" id="clACreditoWrap">
         <input class="form-check-input" type="checkbox" id="clACredito">
         <label class="form-check-label" for="clACredito">Marcar como cliente a crédito</label>
@@ -4211,6 +4386,7 @@
       <button class="btn btn-outline-secondary" onclick="cerrarModalDetallePedido()">Cerrar</button>
       <button class="btn btn-outline-secondary" id="btnImprimirEtiquetaDetalle" onclick="imprimirEtiquetaDesdeDetalle()">Imprimir Rotulo</button>
       <button class="btn btn-outline-secondary" id="btnImprimirRemitoDetalle" onclick="abrirRemitoDesdeDetalle()">Imprimir remito</button>
+      <button class="btn btn-outline-secondary" id="btnBoletaEntregaPedido" data-solo-deposito style="display:none;" onclick="abrirBoletaDesdePedido()">Boleta de entrega (A4)</button>
       <button class="btn btn-outline-primary" id="btnEditarClientePedido" style="display:none;" onclick="activarEdicionClientePedido()">Editar cliente</button>
       <button class="btn btn-outline-primary" id="btnEditarItemsPedido" style="display:none;" onclick="activarEdicionItemsPedido()">Editar ítems</button>
       <button class="btn btn-success" onclick="imprimirNotaPedidoA4()">Imprimir pedido (A4)</button>
@@ -4360,7 +4536,33 @@
           <button class="pay-method-btn active" data-val="EFECTIVO"      onclick="mfvElegirPago(this,'EFECTIVO')">      Efectivo</button>
           <button class="pay-method-btn"        data-val="TRANSFERENCIA" onclick="mfvElegirPago(this,'TRANSFERENCIA')">Transfer.</button>
           <button class="pay-method-btn"        data-val="TARJETA"       onclick="mfvElegirPago(this,'TARJETA')">       Tarjeta</button>
+          <button class="pay-method-btn"        data-val="DOLARES" data-solo-deposito style="display:none;" onclick="mfvElegirPago(this,'DOLARES')">Dólares</button>
         </div>
+      </div>
+
+      <!-- Depósito: cobro en dólares (si no alcanza, el resto en pesos; si sobra, vuelto en pesos) -->
+      <div id="mfvUsdWrap" style="display:none;">
+        <div style="display:flex;gap:8px;">
+          <div style="flex:1;">
+            <div class="mfv-label">Dólar</div>
+            <input type="number" id="mfvUsdTc" class="recibido-input" min="0" step="0.01" placeholder="0" oninput="depMfvActualizar()">
+          </div>
+          <div style="flex:1;">
+            <div class="mfv-label">Total en dólares</div>
+            <div class="cambio-valor" id="mfvUsdTotal" style="color:var(--slate-800);">—</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
+          <div style="flex:1;">
+            <div class="mfv-label">Dólares recibidos</div>
+            <input type="number" id="mfvUsdRecibido" class="recibido-input" min="0" step="0.01" placeholder="0" oninput="depMfvActualizar(true)">
+          </div>
+          <div style="flex:1;">
+            <div style="font-size:10px;font-weight:700;color:var(--slate-500);text-transform:uppercase;" id="mfvUsdRestoLabel">Resto en pesos</div>
+            <div class="cambio-valor" id="mfvUsdResto">—</div>
+          </div>
+        </div>
+        <div id="mfvUsdInfo" style="font-size:11.5px;color:var(--slate-500);margin-top:6px;"></div>
       </div>
 
       <!-- Solo visible con Transferencia elegida y Mercado Pago configurado.
@@ -4483,6 +4685,13 @@
 #dolarBurbuja.min .db-card{min-width:0;padding:6px 10px;border-radius:999px;}
 #dolarBurbuja.min .db-tit{margin:0;}
 @media(max-width:768px){#dolarBurbuja{left:10px;bottom:calc(var(--bottomnav-h,64px) + 10px);}}
+#dolarBurbuja .db-fila .db-btn{border:none;background:var(--slate-100,#eef0f3);color:var(--slate-600,#475569);border-radius:6px;font-size:11px;padding:0 6px;margin-left:6px;cursor:pointer;line-height:1.7;}
+#dolarBurbuja .db-fila .db-btn:hover{background:var(--slate-200,#e2e6ed);}
+#dolarBurbuja .db-dep{font-weight:800;color:#92400e;}
+#dolarBurbuja .db-dep b{color:#92400e;}
+#dolarBurbuja .db-sub{font-size:10.5px;color:var(--slate-500,#6b7585);margin:-2px 0 2px;}
+#dolarBurbuja .db-sep{height:1px;background:var(--slate-100,#eef0f3);margin:4px 0;}
+#dolarBurbuja.min .db-sub,#dolarBurbuja.min .db-sep{display:none;}
 @media print{#dolarBurbuja{display:none !important;}}
 </style>
 <div id="dolarBurbuja" title="Cotización del dólar (venta). Tocá para minimizar">
@@ -4510,6 +4719,10 @@
 <script src="informe-errores.js"></script>
 <script src="veek-auth.js"></script>
 <script src="admin.js"></script>
+<script src="deposito.js"></script>
+<script src="deposito-docs.js"></script>
+<script src="deposito-ficha.js"></script>
+<script src="deposito-traspasos.js"></script>
 <script src="facturacion-arca.js"></script>
 <script>
 function logout(){

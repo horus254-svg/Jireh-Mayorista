@@ -454,10 +454,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   aplicarPermisosPorRol();
+  aplicarModoNegocio();
   mostrarAvisoPasswordDeFabrica();
 
   // Verificar licencia (solo en Electron con window.veekpos disponible)
   aplicarEstadoLicencia();
+  // Caja cliente: cuando aparece la caja servidor, se revisa al instante
+  if (window.veekpos && typeof window.veekpos.alEncontrarServidor === "function") window.veekpos.alEncontrarServidor(() => aplicarEstadoLicencia());
+  // Actualización automática: avisa cuando hay una versión lista o el backend quedó atrás
+  iniciarAvisosActualizacion();
 
   // Pantalla inicial: el POS (si el rol lo permite; si no, el dashboard).
   // Nada de lo que sigue bloquea el arranque: antes se esperaba a las
@@ -589,6 +594,11 @@ async function cargarConfigNegocioDesdeBackend() {
     const data = await response.json();
     if (data.success && data.config) {
       configNegocioCache = { ...CONFIG_NEGOCIO_DEFAULT, ...data.config };
+      if (data.config.modoNegocio) {
+        try { sessionStorage.setItem("modoNegocio", data.config.modoNegocio); } catch (e) {}
+        aplicarModoNegocio();
+      }
+      if (typeof depDolarDesdeConfig === "function") depDolarDesdeConfig(configNegocioCache);
       if (configNegocioCache.zonaHoraria) _fijarZonaNegocio(configNegocioCache.zonaHoraria);
       aplicarSidebarBrand(configNegocioCache);
       aplicarTemaAdmin(configNegocioCache);
@@ -2141,7 +2151,9 @@ function renderVentasPOSHistorial(lista) {
         <td class="money" style="${anulada ? 'text-decoration:line-through;' : ''}">$${total}</td>
         <td>${esResumen ? `<span class="text-muted" style="font-size:12px;" title="Las ventas de hace más de 6 meses se guardan resumidas por día (el detalle completo quedó en Drive → Respaldo de ventas)">📦 ${escapeHtml(String(v.OBSERVACIONES || "Resumen del día"))}</span>` : `
           <button class="btn btn-sm btn-outline-secondary"
-            onclick="imprimirVentaDesdeData(_ventasMapPOS['${escapeJsAttr(_vid)}'])" title="Reimprimir">Reimprimir</button>
+            onclick="imprimirVentaDesdeData(_ventasMapPOS['${escapeJsAttr(_vid)}'])" title="Reimprimir">Reimprimir</button>${typeof esModoDeposito === "function" && esModoDeposito() && !anulada ? `
+          <button class="btn btn-sm btn-outline-secondary ms-1"
+            onclick="abrirBoletaDesdeVenta(_ventasMapPOS['${escapeJsAttr(_vid)}'])" title="Boleta de entrega A4">Boleta</button>` : ""}
           <button class="btn btn-sm btn-outline-danger ms-1"
             onclick="eliminarVentaPOS(_ventasMapPOS['${escapeJsAttr(_vid)}'])"
             ${anulada ? 'disabled title="Ya anulada"' : 'title="Anular"'}>Anular</button>${window.ArcaUI ? ArcaUI.celdaVenta(v, anulada) : ""}`}
@@ -2292,6 +2304,8 @@ function mostrarConfigTab(tabId, btnEl) {
 
   try { localStorage.setItem("veekpos_cfg_tab", tabId); } catch (e) {}
   if (tabId === "sistema" && typeof cargarEstadoVentasResumidas === "function") cargarEstadoVentasResumidas();
+  if (tabId === "sistema") { cargarEstadoActualizacion(); cargarTarjetaPerfiles(); if (typeof depTarjetaTraspasosConfig === "function") depTarjetaTraspasosConfig(); }
+  if (tabId === "catalogo") cargarEstadoCatalogoPDF();
 }
 
 /**
@@ -2306,10 +2320,198 @@ function actualizarPestanasConfigVisibles() {
     const btn = document.querySelector(`.cfg-tab-btn[data-cfg-tab="${tab}"]`);
     if (!btn) return;
     const hayVisible = [...pane.children].some(c => getComputedStyle(c).display !== "none");
-    btn.style.display = hayVisible ? "" : "none";
+    btn.style.display = (hayVisible && !btn.dataset.ocultoDeposito) ? "" : "none"; // en el depósito no hay catálogo web
   });
   const activo = document.querySelector(".cfg-tab-btn.active");
   if (activo && activo.style.display === "none") mostrarConfigTab("negocio");
+}
+
+/* ===================== CATÁLOGO PDF (Configuración → Catálogo web) =====================
+   Lo arma la app de escritorio (desktop/src/catalogo-pdf.js) y lo sube al
+   backend; acá se muestra el estado y se puede generar a mano. En la
+   versión web solo se ve el estado. */
+
+/* =========================================================
+   ACTUALIZACIONES DE LA APP (Configuración → Sistema)
+   La app consulta al servidor de licencias; actualizador.js baja la
+   versión nueva de fondo y la instala al cerrarse. Acá solo se muestra.
+========================================================= */
+let _avisoActualizacionMostrado = "";
+
+function iniciarAvisosActualizacion() {
+  if (!window.veekpos || typeof window.veekpos.alCambiarActualizacion !== "function") return;
+  window.veekpos.alCambiarActualizacion((estado) => {
+    mostrarEstadoActualizacion(estado);
+    avisarActualizacionUnaVez(estado);
+  });
+}
+
+/** Un toast por versión y situación (no en cada revisión) */
+function avisarActualizacionUnaVez(estado) {
+  if (!estado || !estado.disponible) return;
+  const clave = estado.estado + "|" + estado.disponible.version;
+  if (clave === _avisoActualizacionMostrado) return;
+  if (estado.estado === "lista") {
+    _avisoActualizacionMostrado = clave;
+    toast("La versión " + estado.disponible.version + " está lista: se instala sola al cerrar la app.", "success");
+  } else if (estado.estado === "esperando-backend" && obtenerRolActual() === "admin") {
+    _avisoActualizacionMostrado = clave;
+    toast("Hay una versión nueva de VeekPOS (" + estado.disponible.version + "), pero antes hay que actualizar el sistema del negocio. Coordiná con soporte.");
+  }
+}
+
+async function cargarEstadoActualizacion() {
+  const card = document.getElementById("cardActualizaciones");
+  if (!card) return;
+  if (!window.veekpos || typeof window.veekpos.estadoActualizacion !== "function") { card.style.display = "none"; return; }
+  card.style.display = "";
+  try { mostrarEstadoActualizacion(await window.veekpos.estadoActualizacion()); }
+  catch (e) { document.getElementById("actEstado").textContent = "No se pudo leer el estado de las actualizaciones."; }
+}
+
+function mostrarEstadoActualizacion(e) {
+  const card = document.getElementById("cardActualizaciones");
+  if (!card || !e) return;
+  const disp = e.disponible || null;
+  const badge = document.getElementById("actBadge");
+  const estadoEl = document.getElementById("actEstado");
+  const progreso = document.getElementById("actProgreso");
+  const notas = document.getElementById("actNotas");
+  const btnInstalar = document.getElementById("btnActInstalar");
+
+  document.getElementById("actVersionApp").textContent = e.versionActual || "—";
+  document.getElementById("actVersionBackend").textContent = e.versionBackend
+    ? e.versionBackend + (e.backendDesactualizado && disp && disp.versionBackend ? " (hay una más nueva: " + disp.versionBackend + ")" : "")
+    : "sin dato";
+
+  const v = disp ? disp.version : "";
+  const textos = {
+    "sin-datos": ["…", "", "Todavía no se buscaron actualizaciones (se buscan solas unos minutos después de abrir la app)."],
+    "al-dia": ["Al día", "ok", "Tenés la última versión."],
+    "descargando": ["Bajando", "warn", "Bajando la versión " + v + " de fondo… Podés seguir trabajando."],
+    "lista": ["Lista", "ok", "La versión " + v + " está lista. Se instala sola la próxima vez que cierres la app (tarda alrededor de un minuto)."],
+    "esperando-backend": ["En espera", "warn", "Hay una versión nueva (" + v + "), pero necesita que el sistema del negocio esté en la " + (disp && disp.backendMinimo) + " o más nueva. Se instala sola en cuanto se actualice. Coordiná con soporte."],
+    "error": ["Error", "bad", "No se pudo bajar la actualización: " + (e.error || "error desconocido") + ". Se vuelve a intentar sola."],
+    "desactivada": ["—", "", "Las actualizaciones automáticas funcionan en la app instalada en Windows."]
+  };
+  const [txtBadge, clase, mensaje] = textos[e.estado] || textos["sin-datos"];
+  badge.textContent = txtBadge;
+  badge.className = "licencia-badge" + (clase ? " " + clase : "");
+  estadoEl.textContent = mensaje + (e.backendDesactualizado && e.estado === "al-dia" ? " Hay una actualización del sistema del negocio (" + (disp && disp.versionBackend) + "): coordiná con soporte." : "");
+
+  progreso.style.display = e.estado === "descargando" ? "" : "none";
+  progreso.firstElementChild.style.width = Math.round(e.progreso || 0) + "%";
+  const mostrarNotas = disp && disp.notas && ["descargando", "lista", "esperando-backend"].includes(e.estado);
+  notas.style.display = mostrarNotas ? "" : "none";
+  notas.textContent = mostrarNotas ? "Qué cambia en la " + v + ":\n" + disp.notas : "";
+  btnInstalar.style.display = e.estado === "lista" ? "" : "none";
+}
+
+async function revisarActualizacionBtn() {
+  const btn = document.getElementById("btnActRevisar");
+  btn.disabled = true; btn.textContent = "Buscando…";
+  try {
+    const e = await window.veekpos.revisarActualizacion();
+    mostrarEstadoActualizacion(e);
+    if (e && e.errorConsulta) toast("No se pudo consultar: " + e.errorConsulta, "error");
+    else if (e && e.estado === "al-dia") toast("Tenés la última versión.", "success");
+  } catch (err) {
+    toast("No se pudo buscar actualizaciones: " + err.message, "error");
+  } finally {
+    btn.disabled = false; btn.textContent = "↻ Buscar actualizaciones";
+  }
+}
+
+function instalarActualizacionBtn() {
+  confirmarAccion(
+    "La app se cierra, instala la versión nueva y vuelve a abrirse sola (alrededor de un minuto). Terminá la venta en curso antes de seguir.",
+    async () => {
+      const r = await window.veekpos.instalarActualizacion();
+      if (!r || !r.success) toast((r && r.message) || "No se pudo instalar", "error");
+    },
+    "Reiniciar y actualizar"
+  );
+}
+
+async function cargarEstadoCatalogoPDF() {
+  const box = document.getElementById("catPdfEstado");
+  if (!box) return;
+  const bridge = window.veekpos;
+  const enEscritorio = !!(bridge && typeof bridge.generarCatalogoPDF === "function");
+  let local = null;
+  if (enEscritorio) { try { local = await bridge.estadoLocalCatalogoPDF(); } catch (e) {} }
+
+  const ver = document.getElementById("btnCatPdfVer");
+  const previa = document.getElementById("btnCatPdfPrevia");
+  const publicar = document.getElementById("btnCatPdfPublicar");
+  const puedeGenerar = enEscritorio; // cualquier caja (principal o secundaria)
+  if (previa) previa.style.display = puedeGenerar ? "" : "none";
+  if (publicar) publicar.style.display = puedeGenerar ? "" : "none";
+  const avisoUrl = document.getElementById("catPdfAvisoUrl");
+  if (avisoUrl) avisoUrl.style.display = configNegocioCache && configNegocioCache.urlCatalogo ? "none" : "";
+
+  let info = null;
+  try { info = await (await fetchAPI(API_URL + "?action=catalogoPDFInfo")).json(); } catch (e) {}
+  const partes = [];
+  if (info && info.success) {
+    const f = info.fecha ? new Date(info.fecha) : null;
+    partes.push(`<div><b>Publicado</b>${f ? " el " + f.toLocaleDateString("es-AR") + " a las " + f.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }) : ""}${info.totalProductos ? " · " + escapeHtml(String(info.totalProductos)) + " productos" : ""}</div>`);
+    if (ver) { ver.href = info.url; ver.style.display = ""; }
+  } else {
+    partes.push(`<div>${info ? "Todavía no hay un catálogo publicado." : "No se pudo consultar el catálogo publicado (¿sin internet?)."}</div>`);
+    if (ver) ver.style.display = "none";
+  }
+  if (!enEscritorio) partes.push(`<div class="text-muted" style="font-size:12.5px;">Se genera desde la app de escritorio (cualquier caja).</div>`);
+  // Avisos de la última generación en esta caja (banner o fotos que no se pudieron bajar)
+  const av = local && local.ultimosAvisos;
+  if (av && av.avisos && av.avisos.length) {
+    partes.push(`<div style="color:var(--amber-600, #b45309);font-size:12.5px;margin-top:2px;">Última generación en esta caja (${new Date(av.fecha).toLocaleString("es-AR")}): ${av.avisos.map(escapeHtml).join(" ")}</div>`);
+  }
+  const publicadoDespues = info && info.success && info.fecha && local && local.ultimoError && new Date(info.fecha) > new Date(local.ultimoError.fecha);
+  if (local && local.ultimoError && !publicadoDespues && (!local.ultimoOk || local.ultimoError.fecha > local.ultimoOk)) {
+    partes.push(`<div style="color:var(--red-500);font-size:12.5px;margin-top:2px;">Último intento con error (${new Date(local.ultimoError.fecha).toLocaleString("es-AR")}): ${escapeHtml(local.ultimoError.message)}</div>`);
+  }
+  box.innerHTML = `<div style="width:100%;">${partes.join("")}</div>`;
+  if (local && local.generando) _mostrarProgresoCatalogoPDF({ etapa: "datos" });
+}
+
+function _mostrarProgresoCatalogoPDF(p) {
+  const el = document.getElementById("catPdfProgreso");
+  if (!el || !p) return;
+  const textos = {
+    datos: "Leyendo productos y configuración…",
+    fotos: `Preparando fotos (${p.hechas || 0} de ${p.total || 0})…`,
+    armando: "Armando las páginas…",
+    imprimiendo: `Generando el PDF${p.paginas ? " (" + p.paginas + " páginas)" : ""}…`,
+    subiendo: `Publicando (${p.hechas || 0} de ${p.total || 0})…`
+  };
+  if (p.etapa === "fin") { el.style.display = "none"; return; }
+  el.style.display = "";
+  el.textContent = textos[p.etapa] || "Generando…";
+}
+
+async function generarCatalogoPDFBtn(publicar) {
+  const bridge = window.veekpos;
+  if (!bridge || typeof bridge.generarCatalogoPDF !== "function") return;
+  const botones = ["btnCatPdfPrevia", "btnCatPdfPublicar"].map(id => document.getElementById(id)).filter(Boolean);
+  botones.forEach(b => b.disabled = true);
+  if (typeof bridge.alProgresoCatalogoPDF === "function") bridge.alProgresoCatalogoPDF(_mostrarProgresoCatalogoPDF);
+  _mostrarProgresoCatalogoPDF({ etapa: "datos" });
+  try {
+    const r = await bridge.generarCatalogoPDF(!!publicar);
+    if (!r || !r.success) { toast("No se pudo generar el catálogo: " + ((r && r.message) || "error"), "error"); return; }
+    const mb = (r.bytes / 1048576).toFixed(1).replace(".", ",");
+    toast(publicar
+      ? `Catálogo publicado: ${r.totalProductos} productos, ${r.paginas} páginas (${mb} MB)`
+      : (r.aviso || `Vista previa lista: ${r.totalProductos} productos, ${r.paginas} páginas (${mb} MB)`), r.aviso ? "error" : "success");
+    if (r.avisos && r.avisos.length) setTimeout(() => toast(r.avisos.join(" "), "error"), 600);
+  } catch (e) {
+    toast("No se pudo generar el catálogo: " + (e.message || e), "error");
+  } finally {
+    botones.forEach(b => b.disabled = false);
+    _mostrarProgresoCatalogoPDF({ etapa: "fin" });
+    cargarEstadoCatalogoPDF();
+  }
 }
 
 /** Atajos del Inicio: abre Productos ya filtrado (stock bajo, sin stock…) */
@@ -2389,6 +2591,8 @@ function mostrarSeccion(id) {
     setTimeout(() => document.getElementById("ipCodigoScan")?.focus(), 100);
   }
   if (id === "ventasPOS") cargarSiVencido("ventasPOS", cargarVentasPOSHistorial);
+  if (id === "cotizaciones" && typeof cargarCotizaciones === "function") cargarCotizaciones();
+  if (id === "traspasos" && typeof cargarTraspasos === "function") cargarTraspasos();
   if (id === "configuracion") {
     let tabInicial = "negocio";
     try { tabInicial = localStorage.getItem("veekpos_cfg_tab") || "negocio"; } catch (e) {}
@@ -2769,7 +2973,9 @@ async function registrarVentaCobrada(venta) {
           vendedor: venta.vendedor || "",
           observaciones: venta.observaciones || "",
           carrito: venta.carrito,
-          clienteVentaId: venta.clienteVentaId
+          clienteVentaId: venta.clienteVentaId,
+          montoUsd: venta.montoUsd || "",
+          tipoCambio: venta.tipoCambio || ""
         })
       },
       { timeoutMs: 15000 } // mutación: sin reintento automático propio (lo maneja la cola)
@@ -2819,7 +3025,9 @@ async function sincronizarVentasPendientes(manual) {
             observaciones: venta.observaciones || "",
             vendedor: venta.vendedor || "",
             carrito: venta.carrito,
-            clienteVentaId: venta.clienteVentaId
+            clienteVentaId: venta.clienteVentaId,
+            montoUsd: venta.montoUsd || "",
+            tipoCambio: venta.tipoCambio || ""
           })
         },
         { timeoutMs: 15000 }
@@ -6781,6 +6989,7 @@ function abrirModalNuevoCliente() {
   document.getElementById("clTelefono").value = "";
   document.getElementById("clEmpresa").value = "";
   document.getElementById("clDireccion").value = "";
+  ["clLocalidad", "clProvincia", "clEmail", "clNotas"].forEach(id => { const el = document.getElementById(id); if (el) el.value = ""; });
   document.getElementById("clACredito").checked = false;
   document.getElementById("clienteModalBackdrop").classList.add("show");
 }
@@ -6800,6 +7009,9 @@ function abrirModalEditarCliente(clienteId) {
   document.getElementById("clEmpresa").value = cliente.EMPRESA || "";
   document.getElementById("clDireccion").value = cliente.DIRECCION || "";
   document.getElementById("clACredito").checked = String(cliente.A_CREDITO || "").toUpperCase() === "SI";
+  [["clLocalidad", "LOCALIDAD"], ["clProvincia", "PROVINCIA"], ["clEmail", "EMAIL"], ["clNotas", "NOTAS"]].forEach(([id, k]) => {
+    const el = document.getElementById(id); if (el) el.value = cliente[k] || "";
+  });
   document.getElementById("clienteModalBackdrop").classList.add("show");
 }
 
@@ -6839,6 +7051,10 @@ async function guardarNuevoCliente() {
           telefono: document.getElementById("clTelefono").value.trim(),
           empresa: document.getElementById("clEmpresa").value.trim(),
           direccion: document.getElementById("clDireccion").value.trim(),
+          localidad: (document.getElementById("clLocalidad") || {}).value?.trim() ?? undefined,
+          provincia: (document.getElementById("clProvincia") || {}).value?.trim() ?? undefined,
+          email: (document.getElementById("clEmail") || {}).value?.trim() ?? undefined,
+          notas: (document.getElementById("clNotas") || {}).value?.trim() ?? undefined,
           aCredito: document.getElementById("clACredito").checked ? "SI" : "NO"
         }
       : {
@@ -6849,6 +7065,10 @@ async function guardarNuevoCliente() {
           telefono: document.getElementById("clTelefono").value.trim(),
           empresa: document.getElementById("clEmpresa").value.trim(),
           direccion: document.getElementById("clDireccion").value.trim(),
+          localidad: (document.getElementById("clLocalidad") || {}).value?.trim() ?? undefined,
+          provincia: (document.getElementById("clProvincia") || {}).value?.trim() ?? undefined,
+          email: (document.getElementById("clEmail") || {}).value?.trim() ?? undefined,
+          notas: (document.getElementById("clNotas") || {}).value?.trim() ?? undefined,
           aCredito: document.getElementById("clACredito").checked ? "SI" : "NO"
         };
 
@@ -7137,6 +7357,19 @@ function actualizarVisibilidadTipoCambioPago() {
   const monedaPago = document.getElementById("pagoMonedaPago").value;
   const prioridad = document.getElementById("pagoPrioridad").value;
   document.getElementById("pagoTipoCambioWrap").style.display = monedaPago !== prioridad ? "block" : "none";
+  _prellenarTipoCambio("pagoTipoCambio", monedaPago !== prioridad);
+}
+
+/** Tipo de cambio sugerido: en el depósito, su dólar fijado a mano; si no, el del ingreso de mercadería */
+function _dolarSugerido() {
+  if (typeof esModoDeposito === "function" && esModoDeposito() && typeof dolarDelDeposito === "function" && dolarDelDeposito() > 0) return dolarDelDeposito();
+  return (typeof ingresoTC !== "undefined" && ingresoTC && ingresoTC.valor > 0) ? ingresoTC.valor : 0;
+}
+function _prellenarTipoCambio(id, visible) {
+  const el = document.getElementById(id);
+  if (!el || !visible || el.value) return;
+  const v = _dolarSugerido();
+  if (v > 0) el.value = v;
 }
 
 async function registrarPagoCreditoForm() {
@@ -8443,8 +8676,11 @@ function abrirModalFinalizarVenta() {
 
   mfvActualizarDescuento();
 
-  // Forma de pago
+  // Forma de pago (en dólares solo en el depósito)
   mfvFormaPago = formaPagoPOS || "EFECTIVO";
+  if (mfvFormaPago === "DOLARES" && !(typeof esModoDeposito === "function" && esModoDeposito())) mfvFormaPago = "EFECTIVO";
+  const usdRecibidoEl = document.getElementById("mfvUsdRecibido");
+  if (usdRecibidoEl) { usdRecibidoEl.value = ""; delete usdRecibidoEl.dataset.tocado; }
   document.querySelectorAll("#mfvPayMethods .pay-method-btn").forEach(b => {
     b.classList.toggle("active", b.dataset.val === mfvFormaPago);
   });
@@ -8492,6 +8728,7 @@ function mfvElegirPago(btn, valor) {
   mfvMostrarRecibido();
   mfvActualizarVisibilidadQR();
   if (valor === "EFECTIVO") setTimeout(() => document.getElementById("mfvRecibido").focus(), 50);
+  if (valor === "DOLARES") setTimeout(() => { const el = document.getElementById("mfvUsdRecibido"); if (el) { el.focus(); el.select(); } }, 50);
 }
 
 /** Consulta (una sola vez por apertura del modal) si Mercado Pago está configurado y usable, sin bloquear la apertura del modal */
@@ -8532,6 +8769,9 @@ function mfvElegirGenerarQR(valor) {
 function mfvMostrarRecibido() {
   const wrap = document.getElementById("mfvRecibidoWrap");
   if (wrap) wrap.style.display = mfvFormaPago === "EFECTIVO" ? "block" : "none";
+  const usd = document.getElementById("mfvUsdWrap");
+  if (usd) usd.style.display = mfvFormaPago === "DOLARES" ? "block" : "none";
+  if (mfvFormaPago === "DOLARES" && typeof depMfvPreparar === "function") depMfvPreparar();
 }
 
 function mfvElegirTipo(btn, tipo) {
@@ -8584,6 +8824,7 @@ function mfvActualizarDescuento() {
     info.style.display = "none";
   }
   if (mfvFormaPago === "EFECTIVO") mfvCalcularCambio();
+  if (mfvFormaPago === "DOLARES" && typeof depMfvActualizar === "function") depMfvActualizar();
 }
 
 function mfvCalcularCambio() {
@@ -8619,6 +8860,14 @@ async function confirmarFinalizarVenta() {
     aplicarDescuentoPOS();
   } else {
     resetearDescuentoPOS();
+  }
+
+  // Cobro en dólares: se valida antes de cerrar el modal
+  let pagoUsd = null;
+  if (mfvFormaPago === "DOLARES") {
+    const subtotalUsd = ticketPOS.reduce((acc, item) => acc + (item.PRECIO * item.cantidad), 0);
+    pagoUsd = typeof depMfvLeerPago === "function" ? depMfvLeerPago(calcularDescuentoPOS(subtotalUsd).total) : null;
+    if (!pagoUsd || pagoUsd.error) { toast((pagoUsd && pagoUsd.error) || "Revisá el cobro en dólares", "error"); return; }
   }
 
   const btnPago = document.querySelector(`#mfvPayMethods .pay-method-btn[data-val="${mfvFormaPago}"]`);
@@ -8683,11 +8932,12 @@ async function confirmarFinalizarVenta() {
     descuentoEtiqueta: etiquetaDescuento,
     formaPago: formaPagoPOS,
     fecha: fechaVenta,
-    recibido: formaPagoPOS === "EFECTIVO" ? recibido : 0 // para "Recibido / Cambio" en el ticket
+    recibido: formaPagoPOS === "EFECTIVO" ? recibido : 0, // para "Recibido / Cambio" en el ticket
+    pagoUsd: pagoUsd || null
   };
 
   // Mostrar recibo y limpiar ticket INMEDIATAMENTE
-  mostrarRecibo(ventaIdTemp, itemsSnapshot, total, subtotal, montoDescuento, recibido);
+  mostrarRecibo(ventaIdTemp, itemsSnapshot, total, subtotal, montoDescuento, pagoUsd ? 0 : recibido, pagoUsd);
   if (window.ArcaUI) ArcaUI.trasVenta({ ref: clienteVentaId, items: itemsSnapshot, total, fecha: fechaVenta });
   ticketPOS = [];
   limpiarPineadoPOS();
@@ -8722,6 +8972,12 @@ async function confirmarFinalizarVenta() {
     observaciones: etiquetaDescuento ? (ajusteModoPOS === "RECARGO" ? "Recargo: " : "Descuento: ") + etiquetaDescuento : "",
     carrito: itemsSnapshot
   };
+  if (pagoUsd) {
+    ventaParaGuardar.montoUsd = pagoUsd.montoUsd;
+    ventaParaGuardar.tipoCambio = pagoUsd.tipoCambio;
+    const obsUsd = depTextoPagoUsd(pagoUsd);
+    ventaParaGuardar.observaciones = ventaParaGuardar.observaciones ? ventaParaGuardar.observaciones + " · " + obsUsd : obsUsd;
+  }
   const resultadoGuardado = await registrarVentaCobrada(ventaParaGuardar);
   if (resultadoGuardado && resultadoGuardado.ventaId && resultadoGuardado.ventaId !== ventaIdTemp) {
     ultimaVentaImprimible.ventaId = resultadoGuardado.ventaId;
@@ -8846,6 +9102,15 @@ function paActualizarTotalConCredito() {
   const totalFinal = totalBase + ajuste;
 
   document.getElementById("paTotal").textContent = "$" + totalFinal.toLocaleString("es-AR");
+  // Depósito, pedido en dólares: se muestra lo que va a quedar (en dólares)
+  const monedaSel = document.getElementById("paMoneda");
+  const wrapMoneda = document.getElementById("paMonedaWrap");
+  const tc = Number((document.getElementById("paTipoCambio") || {}).value) || 0;
+  if (monedaSel && monedaSel.value === "USD" && wrapMoneda && wrapMoneda.style.display !== "none" && tc > 0 &&
+      typeof esModoDeposito === "function" && esModoDeposito() && typeof depConvertirPedidoAUsd === "function") {
+    const conv = depConvertirPedidoAUsd(ticketPOS, subtotal, totalFinal, tc);
+    document.getElementById("paTotal").textContent = depUsd(conv.total) + "  ($" + totalFinal.toLocaleString("es-AR") + ")";
+  }
 
   const info = document.getElementById("paCreditoInfo");
   if (info) {
@@ -8896,6 +9161,8 @@ async function chequearClienteCreditoPedidoAdmin() {
 function actualizarVisibilidadTipoCambioPedidoAdmin() {
   const moneda = document.getElementById("paMoneda").value;
   document.getElementById("paTipoCambioWrap").style.display = moneda === "USD" ? "block" : "none";
+  _prellenarTipoCambio("paTipoCambio", moneda === "USD");
+  if (typeof paActualizarTotalConCredito === "function") paActualizarTotalConCredito();
 }
 
 async function confirmarPedidoAdmin() {
@@ -8945,16 +9212,23 @@ async function confirmarPedidoAdmin() {
     // URL. Un pedido con varios cientos de ítems arma una URL enorme
     // que Google/Apps Script rechaza (esto se sentía como "error de
     // conexión" sin serlo realmente). El body no tiene ese límite.
+    // Depósito: un pedido en dólares guarda sus precios y su total EN DÓLARES
+    // (la deuda del cliente en dólares se lleva aparte de la de pesos).
+    let carritoEnviar = ticketPOS, totalEnviar = total;
+    if (moneda === "USD" && typeof esModoDeposito === "function" && esModoDeposito() && typeof depConvertirPedidoAUsd === "function") {
+      const conv = depConvertirPedidoAUsd(ticketPOS, subtotal, total, Number(tipoCambio));
+      carritoEnviar = conv.carrito; totalEnviar = conv.total;
+    }
     const response = await fetchAPI(API_URL, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" }, // evita preflight CORS contra Apps Script
       body: JSON.stringify({
         action: "guardarPedidoAdmin",
         nombre, empresa, direccion, localidad, provincia, codigoPostal, telefono, dni,
-        total: total,
+        total: totalEnviar,
         moneda: moneda,
         tipoCambio: moneda === "USD" ? tipoCambio : "",
-        carrito: ticketPOS
+        carrito: carritoEnviar
       })
     }, { timeoutMs: 30000 }); // pedidos grandes tardan más en subir — margen extra
     const data = await response.json();
@@ -8988,7 +9262,7 @@ async function confirmarPedidoAdmin() {
 
 /* ---- receipt modal ---- */
 
-function mostrarRecibo(ventaId, items, total, subtotal, montoDescuento, recibido) {
+function mostrarRecibo(ventaId, items, total, subtotal, montoDescuento, recibido, pagoUsd) {
   document.getElementById("receiptId").innerText = "#" + (ventaId || "—");
 
   let html = "";
@@ -9029,6 +9303,16 @@ function mostrarRecibo(ventaId, items, total, subtotal, montoDescuento, recibido
     cambioWrap.style.display = cambio >= 0 ? "flex" : "none";
   } else if (cambioWrap) {
     cambioWrap.style.display = "none";
+  }
+  // Cobro en dólares: lo que entró en dólares y el resto (o vuelto) en pesos
+  if (cambioWrap && pagoUsd) {
+    const etiqueta = cambioWrap.querySelector("span");
+    if (etiqueta) etiqueta.textContent = "US$ " + Number(pagoUsd.montoUsd).toLocaleString("es-AR") + " · " + (pagoUsd.restoArs > 0 ? "resto en pesos" : "vuelto en pesos");
+    cambioEl.textContent = "$" + Math.abs(pagoUsd.restoArs > 0 ? pagoUsd.restoArs : pagoUsd.vueltoArs).toLocaleString("es-AR");
+    cambioWrap.style.display = "flex";
+  } else if (cambioWrap) {
+    const etiqueta = cambioWrap.querySelector("span");
+    if (etiqueta) etiqueta.textContent = "Cambio";
   }
 
   document.getElementById("receiptBackdrop").classList.add("show");
@@ -9091,6 +9375,14 @@ function etiquetaDiferencia(d, prefijo) {
   const v = Math.round((Number(d) || 0) * 100) / 100;
   const palabra = v < 0 ? "Faltante" : v > 0 ? "Sobrante" : "Diferencia";
   return prefijo ? prefijo + " " + palabra.toUpperCase() : palabra;
+}
+/** Líneas del ticket para un cobro en dólares: [[etiqueta, valor], …] */
+function filasLineasUsdTicket(p) {
+  const filas = [["Pago en dolares", "US$ " + Number(p.montoUsd).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })],
+                 ["Dolar", plataTicket(p.tipoCambio)]];
+  if (p.restoArs > 0) filas.push(["Resto en pesos", plataTicket(p.restoArs)]);
+  if (p.vueltoArs > 0) filas.push(["Vuelto en pesos", plataTicket(p.vueltoArs)]);
+  return filas;
 }
 /** Cambio a devolver: el del dato si viene, si no recibido − total */
 function cambioTicket(cambioData, total) {
@@ -9155,6 +9447,16 @@ function buildThermalHTML(ventaId, items, total, formaPago, fecha, descuento, cf
       <td style="text-align:right;">${cantidadTicket(totalArticulosTicket(items))}</td>
     </tr>` + filasTotales;
 
+  // Cobro en dólares (depósito)
+  if (cambioData && cambioData.usd) {
+    filasLineasUsdTicket(cambioData.usd).forEach(([a, b]) => {
+      filasTotales += `
+    <tr>
+      <td>${escapeHtml(a)}</td>
+      <td style="text-align:right;">${escapeHtml(b)}</td>
+    </tr>`;
+    });
+  }
   // Recibido y cambio — solo si se ingresó un monto recibido
   const cambioInfo = cambioTicket(cambioData, total);
   if (cambioInfo) {
@@ -9333,6 +9635,7 @@ function buildThermalESCPOS(ventaId, items, total, formaPago, fecha, descuento, 
   b.doubleH();
   b.row("TOTAL", plataTicket(total));
   b.normal();
+  if (cambioData && cambioData.usd) filasLineasUsdTicket(cambioData.usd).forEach(([a, c]) => b.row(a, c));
   const cambioInfo = cambioTicket(cambioData, total);
   if (cambioInfo) {
     b.row("Recibido", plataTicket(cambioInfo.recibido));
@@ -9735,7 +10038,7 @@ async function imprimirUltimoRecibo() {
   const fiscal = window.ArcaUI ? await ArcaUI.facturaParaImprimir(u) : null;
   _ejecutarImpresion(u.ventaId, u.items, u.total, u.formaPago, u.fecha,
     u.descuento !== 0 ? { monto: u.descuento, etiqueta: u.descuentoEtiqueta } : null, fiscal,
-    u.recibido > 0 ? { recibido: u.recibido } : null);
+    u.pagoUsd ? { usd: u.pagoUsd } : u.recibido > 0 ? { recibido: u.recibido } : null);
 }
 
 /** Print a sale from the dashboard recent-sales table or the Ventas POS history */
@@ -10645,6 +10948,26 @@ function aplicarDatosCierreCaja(data) {
       if (estadoEl) estadoEl.textContent = "";
     }
 
+    // Caja de dólares (depósito)
+    const dol = data.dolares || null;
+    const fmtUsd = (v) => "US$ " + (Number(v) || 0).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    actualizarElemento("ccUsdEsperado", fmtUsd(dol && dol.esperadoUsd));
+    actualizarElemento("ccUsdVentas", fmtUsd(dol && dol.ventasUsd));
+    actualizarElemento("ccUsdPagos", fmtUsd(dol && dol.pagosClientesUsd));
+    const lineaDolEf = document.getElementById("ccEfectivoDolaresLinea");
+    if (lineaDolEf) {
+      const v = Number(dol && dol.efectivoArs) || 0;
+      lineaDolEf.style.display = v !== 0 ? "flex" : "none";
+      actualizarElemento("ccEfectivoDolares", (v < 0 ? "−$" : "$") + Math.abs(v).toLocaleString("es-AR"));
+      if (v !== 0 && movDetalleEl) {
+        actualizarElemento("ccVentasEfectivo", "$" + Number(data.ventasEfectivo || 0).toLocaleString("es-AR"));
+        movDetalleEl.style.display = "flex";
+      }
+    }
+    const inputUsd = document.getElementById("ccUsdContado");
+    if (inputUsd) inputUsd.value = data.yaCerrado && data.cierreExistente && data.cierreExistente.USD_CONTADO !== undefined && data.cierreExistente.USD_CONTADO !== ""
+      ? Number(data.cierreExistente.USD_CONTADO) : "";
+
     calcularDiferenciasCierreCaja();
     cargarHistorialCierres();
 }
@@ -10677,6 +11000,24 @@ function calcularDiferenciasCierreCaja() {
 
   const totalContado = efectivoContado + transferenciaContado + tarjetaContado;
   actualizarElemento("ccTotalContado", "$" + totalContado.toLocaleString("es-AR"));
+
+  // Dólares: diferencia aparte (no se mezcla con los pesos)
+  const usdEl = document.getElementById("ccUsdDif");
+  if (usdEl) {
+    const esperadoUsd = Number((cierreCajaResumenActual.dolares || {}).esperadoUsd) || 0;
+    const contadoUsd = Number((document.getElementById("ccUsdContado") || {}).value || 0);
+    const dif = Math.round((contadoUsd - esperadoUsd) * 100) / 100;
+    usdEl.textContent = (dif > 0 ? "+" : dif < 0 ? "−" : "") + "US$ " + Math.abs(dif).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    usdEl.classList.remove("cc-dif-ok", "cc-dif-sobra", "cc-dif-falta");
+    usdEl.classList.add(Math.abs(dif) < 0.01 ? "cc-dif-ok" : dif > 0 ? "cc-dif-sobra" : "cc-dif-falta");
+  }
+}
+
+/** Parámetros de la caja de dólares para guardar el cierre (solo depósito) */
+function paramsCierreUsd() {
+  if (!(typeof esModoDeposito === "function" && esModoDeposito()) || !cierreCajaResumenActual) return {};
+  const contado = (document.getElementById("ccUsdContado") || {}).value;
+  return { usdEsperado: Number((cierreCajaResumenActual.dolares || {}).esperadoUsd) || 0, usdContado: Number(contado) || 0 };
 }
 
 function pintarDiferencia(id, valor, esTotal) {
@@ -10702,7 +11043,8 @@ async function guardarCierreCajaForm() {
   const tarjetaContado       = document.getElementById("ccTarjetaContado").value;
   const observaciones        = document.getElementById("ccObservaciones").value;
 
-  if (efectivoContado === "" && transferenciaContado === "" && tarjetaContado === "") {
+  const usdContadoTxt = (document.getElementById("ccUsdContado") || {}).value || "";
+  if (efectivoContado === "" && transferenciaContado === "" && tarjetaContado === "" && usdContadoTxt === "") {
     toast("Ingresá al menos un monto contado", "error");
     return;
   }
@@ -10721,7 +11063,8 @@ async function guardarCierreCajaForm() {
       transferenciaContado:  transferenciaContado || 0,
       tarjetaEsperado:       cierreCajaResumenActual.esperado.TARJETA,
       tarjetaContado:        tarjetaContado || 0,
-      observaciones:         observaciones || ""
+      observaciones:         observaciones || "",
+      ...paramsCierreUsd()
     });
 
     const response = await fetchAPI(API_URL + "?" + params.toString());
@@ -13661,11 +14004,25 @@ let estadoLicenciaActual = { activada: false, modoLimitado: true };
 // todavía tiene un main.js viejo que lee la URL guardada en la PC.)
 const URL_SERVIDOR_LICENCIAS = "https://script.google.com/macros/s/AKfycbygrGvC481UoNPEfCGgY29TW-CU9L0n4lNO0qKLA5IBVI8eSTkjKZyghIlyLbnB4xRi/exec";
 
+let _relojRevisionLicencia = null;
+
 async function aplicarEstadoLicencia() {
   if (typeof window.veekpos === "undefined" || !window.veekpos.obtenerEstadoLicencia) return;
+  const antes = JSON.stringify(estadoLicenciaActual);
   try {
     estadoLicenciaActual = await window.veekpos.obtenerEstadoLicencia();
   } catch (error) { console.error("Error licencia:", error); return; }
+
+  // Mientras esté bloqueada (ej. caja cliente que abrió antes que la caja
+  // servidor), se vuelve a revisar cada 5 s: apenas aparece el servidor, el
+  // aviso rojo se va y se puede vender sin reiniciar la app. Una vez que
+  // queda bien no se revisa sola de nuevo (un corte momentáneo de la red no
+  // bloquea las ventas a mitad del día).
+  clearTimeout(_relojRevisionLicencia);
+  if (estadoLicenciaActual.activada && estadoLicenciaActual.modoLimitado) {
+    _relojRevisionLicencia = setTimeout(aplicarEstadoLicencia, 5000);
+  }
+  const cambio = antes !== JSON.stringify(estadoLicenciaActual);
 
   const pantallaActivacion = document.getElementById("licenseScreenBackdrop");
   const banner = document.getElementById("licenseLimitedBanner");
@@ -13690,7 +14047,7 @@ async function aplicarEstadoLicencia() {
   }
   actualizarBloqueosPorLicencia();
   const configVisible = document.getElementById("configuracion")?.style.display === "block";
-  if (configVisible) mostrarEstadoLicenciaEnConfig();
+  if (configVisible && cambio) mostrarEstadoLicenciaEnConfig();
 }
 
 /**
@@ -14866,11 +15223,13 @@ function tcRender() {
   const inp = document.getElementById("ingresoTcValor");
   const est = document.getElementById("ingresoTcEstado");
   if (!nom || !inp || !est) return;
-  nom.textContent = TC_TIPOS[ingresoTC.tipo] || TC_TIPOS.oficial;
+  nom.textContent = ingresoTC.tipo === "deposito" ? "Depósito" : (TC_TIPOS[ingresoTC.tipo] || TC_TIPOS.oficial);
   if (document.activeElement !== inp) inp.value = ingresoTC.valor || "";
   const cuando = ingresoTC.fecha && !isNaN(new Date(ingresoTC.fecha))
     ? new Date(ingresoTC.fecha).toLocaleString("es-AR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "";
-  if (ingresoTC.manual) {
+  if (ingresoTC.tipo === "deposito" && !ingresoTC.manual) {
+    est.textContent = "Dólar del depósito (fijado a mano)" + (cuando ? " · " + cuando : "");
+  } else if (ingresoTC.manual) {
     est.innerHTML = '<span class="badge bg-warning text-dark">editado a mano</span> hoy — "Traer cotización" vuelve al valor automático';
   } else if (ingresoTC.fallo) {
     est.innerHTML = '<span class="badge bg-danger">sin conexión</span> ' + (ingresoTC.valor ? "usando el último valor guardado" + (cuando ? " (" + cuando + ")" : "") + " — podés editarlo" : "cargalo a mano");
@@ -14908,6 +15267,11 @@ function tcAplicarACampos(forzar) {
 
 /** Trae la cotización de venta del tipo elegido. silencioso=true: sin avisos ni pisar lo que editaste a mano */
 async function tcActualizarAutomatico(silencioso) {
+  // Depósito: el tipo de cambio es el dólar del depósito, fijado a mano
+  if (typeof esModoDeposito === "function" && esModoDeposito() && typeof dolarDelDeposito === "function" && dolarDelDeposito() > 0) {
+    depDolarAplicar();
+    return;
+  }
   const tipo = tcTipoConfigurado();
   const ctrl = new AbortController();
   const corte = setTimeout(() => ctrl.abort(), 8000);
@@ -15014,26 +15378,34 @@ function _dbFechaCorta(f) {
 function dolarBurbujaRender() {
   const el = document.getElementById("dolarBurbuja");
   if (!el) return;
-  const visible = (dbSeccion === "pos" || dbSeccion === "dashboard") && !!dbDatos;
+  // En el depósito se ve siempre (está su dólar fijado a mano), aunque no haya cotización del mercado
+  const dep = typeof esModoDeposito === "function" && esModoDeposito() && typeof depDolarFilasBurbuja === "function";
+  const visible = (dbSeccion === "pos" || dbSeccion === "dashboard") && (!!dbDatos || dep);
   el.classList.toggle("visible", visible);
   if (!visible) return;
 
-  const fechas = DB_TIPOS.map(t => dbDatos.fechas[t]).filter(f => f instanceof Date && !isNaN(f));
+  const fechas = dbDatos ? DB_TIPOS.map(t => dbDatos.fechas[t]).filter(f => f instanceof Date && !isNaN(f)) : [];
   const masNueva = fechas.length ? new Date(Math.max(...fechas)) : null;
-  document.getElementById("dbFilas").innerHTML = DB_TIPOS.filter(t => dbDatos.valores[t] > 0).map(t => {
+  const filasMercado = dbDatos ? DB_TIPOS.filter(t => dbDatos.valores[t] > 0).map(t => {
     const f = dbDatos.fechas[t];
     const tit = f ? `Venta · cotización de ${f.toLocaleString("es-AR", { weekday: "long", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}` : "Venta";
-    return `<div class="db-fila" title="${escapeHtml(tit)}"><span>${TC_TIPOS[t]}</span><b>$${Number(dbDatos.valores[t]).toLocaleString("es-AR", { maximumFractionDigits: 2 })}</b></div>`;
-  }).join("");
+    return { tipo: t, valor: dbDatos.valores[t], html: `<div class="db-fila" title="${escapeHtml(tit)}"><span>${TC_TIPOS[t]}</span><b>$${Number(dbDatos.valores[t]).toLocaleString("es-AR", { maximumFractionDigits: 2 })}</b></div>` };
+  }) : [];
+  document.getElementById("dbFilas").innerHTML = dep ? depDolarFilasBurbuja(filasMercado) : filasMercado.map(f => f.html).join("");
+  const titulo = el.querySelector(".db-tit span");
+  if (titulo) titulo.textContent = dep
+    ? (el.classList.contains("min") && dolarDelDeposito() ? "Dólar dep. $" + dolarDelDeposito().toLocaleString("es-AR", { maximumFractionDigits: 2 }) : "Dólar")
+    : "Dólar venta";
 
   const h = document.getElementById("dbHora");
   if (h) {
-    const sinRed = navigator.onLine === false || dbDatos.desactualizado;
-    h.textContent = sinRed ? "sin actualizar" : (masNueva ? _dbFechaCorta(masNueva) : "");
+    const sinRed = navigator.onLine === false || (dbDatos && dbDatos.desactualizado);
+    h.textContent = !dbDatos ? "" : sinRed ? "sin actualizar" : (masNueva ? _dbFechaCorta(masNueva) : "");
     h.style.color = sinRed ? "var(--amber-600, #b45309)" : "";
   }
-  el.title = "Cotización del dólar (valor de venta, DolarApi). Consultado a las " +
-    new Date(dbDatos.consultado).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }) + ". Tocá para minimizar";
+  el.title = dep ? "Dólar del depósito (fijado a mano) y cotizaciones del mercado. Tocá para minimizar"
+    : "Cotización del dólar (valor de venta, DolarApi). Consultado a las " +
+      new Date(dbDatos.consultado).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }) + ". Tocá para minimizar";
 
   let min = false;
   try { min = localStorage.getItem(DB_LS_MIN) === "1"; } catch (e) {}
@@ -15046,10 +15418,12 @@ function dolarBurbujaAlternar() {
   const min = !el.classList.contains("min");
   el.classList.toggle("min", min);
   try { localStorage.setItem(DB_LS_MIN, min ? "1" : "0"); } catch (e) {}
+  if (typeof esModoDeposito === "function" && esModoDeposito()) dolarBurbujaRender();
 }
 
 async function dolarBurbujaActualizar() {
   if (dbPidiendo) return;
+  if (typeof esModoDeposito === "function" && esModoDeposito() && typeof depDolarRefrescar === "function") depDolarRefrescar();
   if (navigator.onLine === false) { dolarBurbujaRender(); return; }
   dbPidiendo = true;
   const ctrl = new AbortController();
@@ -17115,9 +17489,108 @@ function mostrarAvisoPasswordDeFabrica() {
   (document.querySelector(".content") || document.body).prepend(div);
 }
 
+/* =========================================================
+   MODO DEPÓSITO
+   El backend del depósito es otro Apps Script con el mismo código
+   (MODO_NEGOCIO = DEPOSITO). El panel es el mismo: cambia lo que muestra.
+   En la app de escritorio, cada uno tiene su perfil (ver perfiles.js).
+========================================================= */
+function esModoDeposito() {
+  let m = "";
+  try { m = sessionStorage.getItem("modoNegocio") || ""; } catch (e) {}
+  if (!m && typeof configNegocioCache !== "undefined") m = configNegocioCache.modoNegocio || "";
+  return String(m).toUpperCase() === "DEPOSITO";
+}
+
+/** Lo que no tiene sentido en el depósito (cupones y catálogo web) se oculta; se marca distinto para que no se confunda con el local */
+function aplicarModoNegocio() {
+  const dep = esModoDeposito();
+  document.body.classList.toggle("modo-deposito", dep);
+  let badge = document.getElementById("badgeModoDeposito");
+  if (dep && !badge) {
+    badge = document.createElement("div");
+    badge.id = "badgeModoDeposito";
+    badge.className = "badge-modo-deposito";
+    badge.innerHTML = "<span>●</span> DEPÓSITO";
+    badge.title = "Estás trabajando con el backend del depósito (ventas mayoristas, su stock y su caja)";
+    const marca = document.querySelector(".sidebar-brand");
+    if (marca) marca.after(badge);
+  }
+  if (badge) badge.style.display = dep ? "" : "none";
+
+  const ocultar = (el, si) => {
+    if (si) { el.dataset.ocultoDeposito = "1"; el.style.display = "none"; }
+    else if (el.dataset.ocultoDeposito) { delete el.dataset.ocultoDeposito; el.style.display = ""; }
+  };
+  document.querySelectorAll('#navLinks a[data-target="cupones"], #bottomNavLinks a[data-target="cupones"]').forEach(a => ocultar(a, dep));
+  document.querySelectorAll('.cfg-tab-btn[data-cfg-tab="catalogo"]').forEach(b => ocultar(b, dep));
+  document.querySelectorAll('#navLinks a[data-target="pedidos"]').forEach(a => { a.textContent = dep ? "Pedidos" : "Pedidos web"; });
+  document.querySelectorAll("[data-solo-deposito]").forEach(el => {
+    const destino = el.getAttribute("data-target");
+    el.style.display = dep && (!destino || seccionPermitidaParaRol(destino)) ? "" : "none";
+  });
+  if (dep && !/Depósito/.test(document.title)) document.title = "Depósito · " + document.title;
+  if (!dep) document.title = document.title.replace(/^Depósito · /, "");
+}
+
+/* ---------- Configuración → Sistema: local y depósito (solo app de escritorio) ---------- */
+async function cargarTarjetaPerfiles() {
+  const card = document.getElementById("cardPerfiles");
+  if (!card) return;
+  const puente = window.veekpos;
+  if (!puente || typeof puente.perfilInfo !== "function") { card.style.display = "none"; return; }
+  card.style.display = "";
+  try {
+    const info = await puente.perfilInfo();
+    const enDeposito = info.activo === "deposito";
+    document.getElementById("perfilActualTexto").innerHTML = enDeposito
+      ? "Esta PC está ahora en el <b>depósito</b>. Para volver al local, cerrá sesión e ingresá con la clave del local."
+      : "Esta PC está ahora en el <b>local</b>. Para entrar al depósito, cerrá sesión e ingresá con la clave del depósito.";
+    document.getElementById("perfilOtroLabel").textContent = enDeposito ? "Dirección del backend del local" : "Dirección del backend del depósito";
+    document.getElementById("perfilOtroUrl").value = info.urls[info.otro] || "";
+    document.getElementById("perfilOtroUrl").dataset.perfil = info.otro;
+    document.getElementById("perfilOtroEstado").textContent = "";
+  } catch (e) {
+    document.getElementById("perfilActualTexto").textContent = "No se pudo leer la configuración de esta PC.";
+  }
+}
+
+async function guardarUrlOtroPerfil(soloProbar) {
+  const input = document.getElementById("perfilOtroUrl");
+  const estado = document.getElementById("perfilOtroEstado");
+  const url = input.value.trim();
+  const perfil = input.dataset.perfil;
+  const esperado = perfil === "deposito" ? "DEPOSITO" : "LOCAL";
+  if (url && !/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(url)) {
+    estado.innerHTML = '<span style="color:var(--red-500,#ef4444)">La dirección tiene que terminar en /exec (Apps Script → Implementar → Administrar implementaciones).</span>';
+    return;
+  }
+  if (url) {
+    estado.textContent = "Probando la conexión…";
+    try {
+      const r = await fetch(url + "?action=configuracionNegocio", { cache: "no-store" });
+      const d = await r.json();
+      const modo = (d && d.config && d.config.modoNegocio) || "LOCAL";
+      if (modo !== esperado) {
+        estado.innerHTML = '<span style="color:var(--red-500,#ef4444)">Ese backend responde, pero está configurado como ' + (modo === "DEPOSITO" ? "depósito" : "local") +
+          (esperado === "DEPOSITO" ? '. En su Apps Script ejecutá una vez <b>configurarComoDeposito</b>.' : '.') + '</span>';
+        return;
+      }
+      estado.innerHTML = '<span style="color:var(--green-600,#16a34a)">✓ Conectado con «' + escapeHtml((d.config && d.config.nombre) || "") + '».</span>';
+    } catch (e) {
+      estado.innerHTML = '<span style="color:var(--red-500,#ef4444)">No responde. Revisá la dirección y que la implementación sea "Cualquier usuario".</span>';
+      return;
+    }
+  }
+  if (soloProbar) return;
+  const r = await window.veekpos.perfilFijarUrl(perfil, url);
+  if (r && r.success) toast(url ? "Guardado. Ya se puede entrar con la clave del " + (perfil === "deposito" ? "depósito" : "local") + "." : "Se quitó la dirección.", "success");
+  else toast((r && r.message) || "No se pudo guardar", "error");
+}
+
 const PERMISOS_POR_ROL = {
   admin: null, // null = acceso a todas las secciones
-  vendedor: ["dashboard", "pos", "ventasPOS", "cierreCaja", "movimientosCaja", "pedidos", "clientes"],
+  vendedor: ["dashboard", "pos", "ventasPOS", "cierreCaja", "movimientosCaja", "pedidos", "clientes", "cotizaciones", "traspasos"],
   deposito: ["dashboard", "productos", "ingresoProductos", "proveedores", "reportes"] // en Reportes solo ve "Compras y reposición"
 };
 
