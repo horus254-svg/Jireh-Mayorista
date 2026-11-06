@@ -388,8 +388,13 @@
 
     <!-- CATEGORÍAS -->
 
-    <section class="container categorias-section">
+    <!-- Barra lateral de categorías: siempre visible a la izquierda (también en celular) -->
+    <aside id="sidebar-categorias" class="sidebar-categorias" aria-label="Categorías">
+        <div class="sidebar-titulo">Categorías</div>
         <div id="categoria-chips" class="chip-scroll" role="tablist" aria-label="Filtrar por categoría"></div>
+    </aside>
+
+    <section class="container categorias-section">
 
         <!-- En el celular, ordenar y precio quedan plegados detrás de este botón -->
         <button type="button" class="btn-filtros-movil" id="btn-filtros-movil" aria-expanded="false" aria-controls="filtros-extra" onclick="alternarFiltrosMovil()">

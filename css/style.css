@@ -1996,6 +1996,100 @@ body.modal-open .toast-container{
     align-items:center;
 }
 
+/* =========================================================
+   BARRA LATERAL DE CATEGORÍAS — siempre visible a la izquierda
+   (escritorio y celular). El contenido de la página se corre a la
+   derecha con padding-left en el body.
+========================================================= */
+:root{ --sidebar-w:210px; }
+
+body{ padding-left:var(--sidebar-w); }
+
+.sidebar-categorias{
+    position:fixed;
+    left:0;
+    bottom:0;
+    top:calc(var(--navbar-h) + var(--top-banner-h) + var(--minimo-bar-h));
+    width:var(--sidebar-w);
+    z-index:1020;
+    background:#fff;
+    border-right:1px solid var(--paper-line);
+    overflow-y:auto;
+    overflow-x:hidden;
+    -webkit-overflow-scrolling:touch;
+    overscroll-behavior:contain;
+    padding:14px 10px 24px;
+    scrollbar-width:thin;
+}
+.sidebar-categorias::-webkit-scrollbar{ width:5px; }
+.sidebar-categorias::-webkit-scrollbar-thumb{ background:#dcd7c8; border-radius:10px; }
+
+.sidebar-titulo{
+    font-family:var(--font-display);
+    font-size:.74rem;
+    font-weight:700;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:var(--ink-600);
+    margin:0 6px 10px;
+}
+
+/* Los chips pasan a ser una lista vertical */
+.sidebar-categorias .chip-scroll{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    overflow:visible;
+    padding:0;
+}
+.sidebar-categorias .chip{
+    width:100%;
+    text-align:left;
+    white-space:normal;
+    line-height:1.25;
+    border-radius:10px;
+    padding:9px 12px 9px 24px;
+}
+
+/* Modo celular: barra angosta, siempre a la vista */
+@media (max-width:768px){
+    :root{ --sidebar-w:84px; }
+
+    .sidebar-categorias{
+        padding:8px 5px calc(var(--mobile-cart-bar-h) + 16px);
+    }
+    .sidebar-titulo{ display:none; }
+    .sidebar-categorias .chip-scroll{ gap:5px; }
+    .sidebar-categorias .chip{
+        padding:8px 4px;
+        font-size:.68rem;
+        text-align:center;
+        border-radius:9px;
+        overflow-wrap:anywhere;
+        hyphens:auto;
+    }
+    .sidebar-categorias .chip::before{ display:none; }
+
+    /* Más espacio para la grilla de productos al lado de la barra */
+    body > section.container,
+    body > .container{
+        padding-left:10px;
+        padding-right:10px;
+    }
+
+    /* Los botones flotantes pasan a la derecha para no tapar la barra */
+    .whatsapp-float-text{ left:auto; right:14px; }
+    .scroll-top-btn{ bottom:calc(var(--mobile-cart-bar-h) + 78px); right:18px; }
+
+    /* Las ventanas (carrito, vista rápida) quedan sobre la barra */
+    .toast-container{ left:calc(var(--sidebar-w) + 8px); }
+}
+
+/* Escritorio: el botón de WhatsApp a la derecha para no tapar la barra */
+@media (min-width:769px){
+    .whatsapp-float-text{ left:auto; right:25px; }
+}
+
 /* Paginación del catálogo: "Mostrando X de Y" + Ver más */
 .cargar-mas{display:flex;flex-direction:column;align-items:center;gap:.5rem;padding:1rem 0 2rem}
 .cargar-mas-txt{font-size:.85rem;color:#6c757d}
