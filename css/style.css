@@ -2003,15 +2003,30 @@ body.modal-open .toast-container{
 ========================================================= */
 :root{ --sidebar-w:210px; }
 
-body{ padding-left:var(--sidebar-w); }
+/* Layout de dos columnas debajo del banner */
+.catalogo-layout{
+    display:flex;
+    align-items:flex-start;
+    gap:0;
+    margin-top:8px;
+}
+.catalogo-main{
+    flex:1 1 0;
+    min-width:0;
+}
+.catalogo-main > .container{
+    max-width:100%;
+}
 
+/* Pegajosa: queda fija a la vista mientras se recorre el catálogo,
+   siempre por debajo del navbar y las franjas superiores */
 .sidebar-categorias{
-    position:fixed;
-    left:0;
-    bottom:0;
-    top:calc(var(--navbar-h) + var(--top-banner-h) + var(--minimo-bar-h));
+    position:sticky;
+    flex:0 0 var(--sidebar-w);
     width:var(--sidebar-w);
-    z-index:1020;
+    top:calc(var(--navbar-h) + var(--top-banner-h) + var(--minimo-bar-h));
+    height:calc(100vh - var(--navbar-h) - var(--top-banner-h) - var(--minimo-bar-h));
+    z-index:10;
     background:#fff;
     border-right:1px solid var(--paper-line);
     overflow-y:auto;
@@ -2071,8 +2086,7 @@ body{ padding-left:var(--sidebar-w); }
     .sidebar-categorias .chip::before{ display:none; }
 
     /* Más espacio para la grilla de productos al lado de la barra */
-    body > section.container,
-    body > .container{
+    .catalogo-main > .container{
         padding-left:10px;
         padding-right:10px;
     }
@@ -2081,8 +2095,10 @@ body{ padding-left:var(--sidebar-w); }
     .whatsapp-float-text{ left:auto; right:14px; }
     .scroll-top-btn{ bottom:calc(var(--mobile-cart-bar-h) + 78px); right:18px; }
 
-    /* Las ventanas (carrito, vista rápida) quedan sobre la barra */
-    .toast-container{ left:calc(var(--sidebar-w) + 8px); }
+    /* Deja lugar abajo para la barra del carrito */
+    .sidebar-categorias{
+        height:calc(100vh - var(--navbar-h) - var(--top-banner-h) - var(--minimo-bar-h) - var(--mobile-cart-bar-h));
+    }
 }
 
 /* Escritorio: el botón de WhatsApp a la derecha para no tapar la barra */
