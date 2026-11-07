@@ -7881,6 +7881,22 @@ async function actualizarCatalogoPOSManual() {
   toast("Catálogo actualizado", "success");
 }
 
+/**
+ * Descuenta el stock de una venta en las DOS listas en memoria (POS y
+ * sección Productos). Sin tope en 0: si se vendió sin stock cargado, el
+ * stock real queda negativo y tiene que verse igual en ambos lados.
+ */
+function _descontarStockEnListasEnMemoria(items) {
+  (items || []).forEach(item => {
+    [productosPOS, productosAdminGlobal].forEach(lista => {
+      const p = (lista || []).find(x => String(x.CODIGO) === String(item.CODIGO));
+      if (p && p.STOCK !== undefined) p.STOCK = Number(p.STOCK || 0) - Number(item.cantidad || 0);
+    });
+  });
+  const sec = document.getElementById("productos");
+  if (sec && sec.style.display === "block" && typeof filtrarProductos === "function") filtrarProductos();
+}
+
 async function asegurarProductosPOS() {
   if (productosPOS.length > 0) return;
 
@@ -8275,6 +8291,28 @@ function cerrarEdicionRapidaPOS() {
   _codigoEdicionRapidaPOS = null;
 }
 
+/**
+ * Después de una edición rápida desde el POS, copia los datos a la lista
+ * en memoria de la sección Productos (productosAdminGlobal) y la marca
+ * como vencida. Antes solo se actualizaba la lista del POS, y además se
+ * invalidaba la clave "productosAdmin" cuando la sección Productos usa la
+ * clave "productos": por eso seguía mostrando el stock viejo.
+ */
+function _reflejarEdicionRapidaEnProductos(codigoOriginal, producto) {
+  const a = (productosAdminGlobal || []).find(x => String(x.CODIGO).trim() === String(codigoOriginal).trim());
+  if (a) {
+    a.CODIGO = producto.CODIGO;
+    a.PRECIO = producto.PRECIO;
+    a.STOCK = producto.STOCK;
+    if (producto.ALIAS !== undefined) a.ALIAS = producto.ALIAS;
+    a._textoBusquedaPOS = undefined;
+    a._palabrasBusquedaPOS = undefined;
+  }
+  try { invalidarCache("productosAdmin", "productos"); } catch (e) {}
+  const sec = document.getElementById("productos");
+  if (sec && sec.style.display === "block" && typeof filtrarProductos === "function") filtrarProductos();
+}
+
 async function guardarEdicionRapidaPOS() {
   const codigoOriginal = _codigoEdicionRapidaPOS;
   if (!codigoOriginal) return;
@@ -8342,6 +8380,7 @@ async function guardarEdicionRapidaPOS() {
     producto.PRECIO = Number(precio);
     producto.STOCK = Number(stock);
     producto.ALIAS = alias;
+    _reflejarEdicionRapidaEnProductos(codigoOriginal, producto);
     // El código o el alias pueden haber cambiado: invalidar el texto
     // de búsqueda cacheado para que no quede buscando por el dato viejo.
     producto._textoBusquedaPOS = undefined;
@@ -8357,7 +8396,6 @@ async function guardarEdicionRapidaPOS() {
 
     toast("Producto actualizado", "success");
     cerrarEdicionRapidaPOS();
-    invalidarCache("productosAdmin");
 
   } catch (error) {
     console.error("Error en edición rápida de producto:", error);
@@ -9057,10 +9095,7 @@ async function confirmarFinalizarVenta() {
   posTileFocusIdx = -1;
 
   // Actualizar stock optimistamente en el grid
-  itemsSnapshot.forEach(item => {
-    const p = productosPOS.find(x => String(x.CODIGO) === String(item.CODIGO));
-    if (p && p.STOCK !== undefined) p.STOCK = Math.max(0, Number(p.STOCK) - item.cantidad);
-  });
+  _descontarStockEnListasEnMemoria(itemsSnapshot);
   renderPosGrid();
 
   const btn = document.getElementById("btnFinalizarVenta");
@@ -15284,10 +15319,7 @@ async function consultarCobroMercadoPagoPolling() {
         posTileFocusIdx = -1;
 
         // Stock optimista
-        itemsSnapshot.forEach(item => {
-          const p = productosPOS.find(x => String(x.CODIGO) === String(item.CODIGO));
-          if (p) p.STOCK = Math.max(0, Number(p.STOCK) - item.cantidad);
-        });
+        _descontarStockEnListasEnMemoria(itemsSnapshot);
         renderPosGrid();
 
         setTimeout(() => { cargarMetricas(); invalidarCache("ventasPOS"); }, 500);
