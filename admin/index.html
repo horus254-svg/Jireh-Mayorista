@@ -751,6 +751,7 @@
           placeholder="Código de barras — Enter para buscar"
           style="max-width:340px; font-size:16px;"
           onkeydown="if(event.key==='Enter'){ event.preventDefault(); buscarProductoParaIngreso(); }">
+        <button type="button" class="btn-camera-scan btn-escanear-movil" onclick="escanearHacia('ipCodigoScan', buscarProductoParaIngreso)" title="Escanear con la cámara del teléfono" aria-label="Escanear con la cámara">📷</button>
         <button class="btn btn-primary" onclick="buscarProductoParaIngreso()">Buscar</button>
         <button class="btn btn-outline-secondary" onclick="generarCodigoIngresoAutomatico()" title="Para productos sin código de barras propio">Generar código</button>
         <span class="text-muted align-self-center" id="ipEstadoBusqueda" style="font-size:13px;"></span>
@@ -3025,6 +3026,8 @@
         <div id="actEstado" style="font-size:13.5px;">Cargando…</div>
         <div id="actProgreso" class="act-barra" style="display:none;"><div></div></div>
         <div id="actNotas" class="act-notas" style="display:none;"></div>
+        <!-- Backend publicado, ya bajado en esta PC: se pega a mano en Apps Script -->
+        <div id="actBackend" class="act-backend" style="display:none;"></div>
         <div class="d-flex flex-wrap gap-2 mt-3">
           <button type="button" class="btn btn-outline-secondary btn-sm" id="btnActRevisar" onclick="revisarActualizacionBtn()">↻ Buscar actualizaciones</button>
           <button type="button" class="btn btn-primary btn-sm" id="btnActInstalar" style="display:none;" onclick="instalarActualizacionBtn()">Reiniciar y actualizar ahora</button>
@@ -3032,6 +3035,9 @@
         <style>
           .act-barra { height:5px; background:var(--slate-100, #eef0f3); border-radius:999px; overflow:hidden; margin-top:10px; }
           .act-barra > div { height:100%; width:0; background:var(--indigo-600, #4f46e5); transition:width .3s; }
+          .act-backend { font-size:13px; border:1px solid var(--amber-200, #fde68a); background:#fffbeb; border-radius:8px; padding:10px 12px; margin-top:10px; }
+          .act-backend ol { margin:6px 0 8px 18px; padding:0; }
+          .act-backend li { margin:2px 0; }
           .act-notas { white-space:pre-line; font-size:12.5px; color:var(--slate-500, #64748b); background:var(--slate-50, #f8fafc); border:1px solid var(--slate-100, #eef0f3); border-radius:8px; padding:8px 10px; margin-top:10px; }
         </style>
       </div>
@@ -3570,7 +3576,10 @@
       <div class="row g-2">
         <div class="col-6">
           <label class="form-label">Código <span class="text-muted" style="font-size:11px;">(opcional)</span></label>
-          <input type="text" class="form-control" id="pmCodigo" placeholder="Se genera automático si lo dejás vacío" onchange="avisarCodigoDuplicadoFormulario()">
+          <div class="d-flex gap-2">
+            <input type="text" class="form-control" id="pmCodigo" placeholder="Se genera automático si lo dejás vacío" onchange="avisarCodigoDuplicadoFormulario()">
+            <button type="button" class="btn-camera-scan btn-escanear-movil" onclick="escanearHacia('pmCodigo')" title="Escanear con la cámara del teléfono" aria-label="Escanear con la cámara">📷</button>
+          </div>
         </div>
         <div class="col-6">
           <label class="form-label">Categoría</label>
@@ -3666,7 +3675,10 @@
         <div id="pmCajaWrap" class="row g-2 mt-1" style="display:none;">
           <div class="col-12">
             <label class="form-label">Código de barras de la caja</label>
-            <input type="text" class="form-control form-control-sm" id="pmCodigoCaja" placeholder="Distinto del código del producto suelto" onchange="avisarCodigoDuplicadoFormulario()">
+            <div class="d-flex gap-2">
+              <input type="text" class="form-control form-control-sm" id="pmCodigoCaja" placeholder="Distinto del código del producto suelto" onchange="avisarCodigoDuplicadoFormulario()">
+              <button type="button" class="btn-camera-scan btn-escanear-movil" onclick="escanearHacia('pmCodigoCaja')" title="Escanear con la cámara del teléfono" aria-label="Escanear con la cámara">📷</button>
+            </div>
           </div>
           <div class="col-6">
             <label class="form-label">Unidades por caja</label>

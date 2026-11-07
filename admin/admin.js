@@ -2356,7 +2356,7 @@ function avisarActualizacionUnaVez(estado) {
     toast("La versión " + estado.disponible.version + " está lista: se instala sola al cerrar la app.", "success");
   } else if (estado.estado === "esperando-backend" && obtenerRolActual() === "admin") {
     _avisoActualizacionMostrado = clave;
-    toast("Hay una versión nueva de VeekPOS (" + estado.disponible.version + "), pero antes hay que actualizar el sistema del negocio. Coordiná con soporte.");
+    toast("Hay una versión nueva de VeekPOS (" + estado.disponible.version + "), pero antes hay que actualizar el backend del negocio: ya está bajado, los pasos están en Configuración → Sistema → Actualizaciones.");
   }
 }
 
@@ -2390,14 +2390,15 @@ function mostrarEstadoActualizacion(e) {
     "al-dia": ["Al día", "ok", "Tenés la última versión."],
     "descargando": ["Bajando", "warn", "Bajando la versión " + v + " de fondo… Podés seguir trabajando."],
     "lista": ["Lista", "ok", "La versión " + v + " está lista. Se instala sola la próxima vez que cierres la app (tarda alrededor de un minuto)."],
-    "esperando-backend": ["En espera", "warn", "Hay una versión nueva (" + v + "), pero necesita que el sistema del negocio esté en la " + (disp && disp.backendMinimo) + " o más nueva. Se instala sola en cuanto se actualice. Coordiná con soporte."],
+    "esperando-backend": ["En espera", "warn", "Hay una versión nueva (" + v + "), pero necesita que el sistema del negocio (backend) esté en la " + (disp && disp.backendMinimo) + " o más nueva. Actualizalo con los pasos de abajo: la app se instala sola en cuanto el backend esté al día."],
     "error": ["Error", "bad", "No se pudo bajar la actualización: " + (e.error || "error desconocido") + ". Se vuelve a intentar sola."],
     "desactivada": ["—", "", "Las actualizaciones automáticas funcionan en la app instalada en Windows."]
   };
   const [txtBadge, clase, mensaje] = textos[e.estado] || textos["sin-datos"];
   badge.textContent = txtBadge;
   badge.className = "licencia-badge" + (clase ? " " + clase : "");
-  estadoEl.textContent = mensaje + (e.backendDesactualizado && e.estado === "al-dia" ? " Hay una actualización del sistema del negocio (" + (disp && disp.versionBackend) + "): coordiná con soporte." : "");
+  estadoEl.textContent = mensaje + (e.backendDesactualizado && e.estado === "al-dia" ? " Hay una actualización del sistema del negocio (backend " + (disp && disp.versionBackend) + "): ver abajo." : "");
+  _mostrarBackendBajado(e);
 
   progreso.style.display = e.estado === "descargando" ? "" : "none";
   progreso.firstElementChild.style.width = Math.round(e.progreso || 0) + "%";
@@ -2405,6 +2406,49 @@ function mostrarEstadoActualizacion(e) {
   notas.style.display = mostrarNotas ? "" : "none";
   notas.textContent = mostrarNotas ? "Qué cambia en la " + v + ":\n" + disp.notas : "";
   btnInstalar.style.display = e.estado === "lista" ? "" : "none";
+}
+
+/** El backend publicado ya bajado en esta PC: copiar y pegar en Apps Script (subirlo sigue siendo a mano) */
+function _mostrarBackendBajado(e) {
+  const caja = document.getElementById("actBackend");
+  if (!caja) return;
+  const b = e.backend;
+  const hace = b && e.backendDesactualizado;
+  if (!b || !hace) { caja.style.display = "none"; return; }
+  caja.style.display = "";
+  if (b.estado === "descargando") { caja.innerHTML = `Bajando el backend ${escapeHtml(b.version)}…`; return; }
+  if (b.estado === "error") { caja.innerHTML = `Hay un backend nuevo (${escapeHtml(b.version)}) pero no se pudo bajar: ${escapeHtml(b.error || "")}. Se vuelve a intentar al buscar actualizaciones.`; return; }
+  const tieneManifiesto = (b.archivos || []).includes("appsscript.json");
+  caja.innerHTML = `<b>Backend ${escapeHtml(b.version)} listo para instalar</b> (el negocio tiene la ${escapeHtml(e.versionBackend || "?")}). Ya está bajado en esta PC; subirlo es a mano:
+    <ol>
+      <li>Abrí la planilla del negocio → Extensiones → <b>Apps Script</b>.</li>
+      <li>Tocá <b>Copiar code.gs</b>, en el editor seleccioná todo el archivo <i>Código.gs</i> (Ctrl+A) y pegá (Ctrl+V). Guardá (Ctrl+S).</li>
+      ${tieneManifiesto ? `<li>Si en la lista de archivos ves <i>appsscript.json</i>: tocá <b>Copiar appsscript.json</b> y reemplazalo igual.</li>` : ""}
+      <li>Elegí la función <b>autorizarVeekPOS</b> → ▶ Ejecutar (acepta permisos nuevos si los hay).</li>
+      <li><b>Implementar → Administrar implementaciones → ✏️ editar la existente → Versión: Nueva versión → Implementar.</b> Así la dirección no cambia.</li>
+      <li>Volvé acá y tocá <b>Buscar actualizaciones</b>: tiene que decir backend ${escapeHtml(b.version)}.</li>
+    </ol>
+    <div class="d-flex flex-wrap gap-2">
+      <button type="button" class="btn btn-warning btn-sm fw-bold" onclick="copiarBackendBajado('code.gs')">Copiar code.gs</button>
+      ${tieneManifiesto ? `<button type="button" class="btn btn-outline-secondary btn-sm" onclick="copiarBackendBajado('appsscript.json')">Copiar appsscript.json</button>` : ""}
+      <button type="button" class="btn btn-outline-secondary btn-sm" onclick="abrirCarpetaBackendBajado()">Abrir carpeta</button>
+    </div>
+    <div class="text-muted mt-2" style="font-size:11.5px;">Si hay local y depósito, el mismo code.gs va en los dos (cada uno en su planilla).</div>`;
+}
+
+async function copiarBackendBajado(nombre) {
+  try {
+    const r = await window.veekpos.copiarBackendActualizacion(nombre);
+    if (r && r.success) toast(`${nombre} copiado (${Math.round(r.bytes / 1024)} KB): pegalo en Apps Script`, "success");
+    else toast((r && r.message) || "No se pudo copiar", "error");
+  } catch (e) { toast("No se pudo copiar: " + e.message, "error"); }
+}
+
+async function abrirCarpetaBackendBajado() {
+  try {
+    const r = await window.veekpos.abrirCarpetaBackendActualizacion();
+    if (!r || !r.success) toast((r && r.message) || "No se pudo abrir la carpeta", "error");
+  } catch (e) { toast("No se pudo abrir la carpeta: " + e.message, "error"); }
 }
 
 async function revisarActualizacionBtn() {
@@ -10643,8 +10687,56 @@ let camaraStream = null;
 let camaraDetectorTimer = null;   // usado por la rama BarcodeDetector nativo
 let zxingReader = null;           // usado por la rama fallback ZXing
 let camaraScanActivo = false;     // evita agregar el mismo código dos veces al cerrar
+let camaraScanAlLeer = null;      // qué hacer con el código leído (null = agregar al ticket del POS)
 
-async function abrirCamaraScan() {
+/** ¿Es un celular/tablet? Pantalla táctil y sin mouse, o táctil y angosta. */
+function esDispositivoMovil() {
+  const tactil = (navigator.maxTouchPoints || 0) > 0;
+  const sinMouse = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
+  const angosta = window.innerWidth <= 900;
+  return tactil && (sinMouse || angosta);
+}
+
+/** Marca el <body> con "es-movil" para mostrar los botones 📷 (.btn-escanear-movil) */
+function actualizarModoMovil() {
+  document.body.classList.toggle("es-movil", esDispositivoMovil());
+}
+document.addEventListener("DOMContentLoaded", actualizarModoMovil);
+window.addEventListener("resize", actualizarModoMovil);
+window.addEventListener("orientationchange", actualizarModoMovil);
+
+/**
+ * Abre la cámara y pone el código leído en el campo `inputId`
+ * (disparando "change" para que corran las validaciones del campo).
+ * `despues(codigo)` es opcional: se llama una vez cargado el campo.
+ */
+function escanearHacia(inputId, despues) {
+  abrirCamaraScan((codigo) => {
+    const input = document.getElementById(inputId);
+    if (input) {
+      input.value = codigo;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    if (typeof despues === "function") despues(codigo);
+    else if (input) input.focus();
+  });
+}
+
+/** Un código leído por la cámara: cierra el visor y lo entrega a quien lo pidió */
+function alLeerCodigoCamara(valor) {
+  const codigo = String(valor || "").trim();
+  if (!codigo || !camaraScanActivo) return;
+  const destino = camaraScanAlLeer;
+  cerrarCamaraScan();
+  try { if (navigator.vibrate) navigator.vibrate(60); } catch (e) { /* noop */ }
+  if (destino) destino(codigo);
+  else agregarProductoPorCodigo(codigo);
+}
+
+async function abrirCamaraScan(alLeer) {
+  // el onclick del POS no pasa nada; ignoramos cualquier cosa que no sea una función
+  camaraScanAlLeer = (typeof alLeer === "function") ? alLeer : null;
   const backdrop  = document.getElementById("scanModalBackdrop");
   const videoWrap = document.getElementById("scanVideoWrap");
   const video     = document.getElementById("scanVideo");
@@ -10666,7 +10758,7 @@ async function abrirCamaraScan() {
 
   try {
     camaraStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: "environment" } },
+      video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
       audio: false
     });
     video.srcObject = camaraStream;
@@ -10707,9 +10799,7 @@ function iniciarDeteccionNativa(video) {
     try {
       const codigos = await detector.detect(video);
       if (codigos.length > 0) {
-        const valor = codigos[0].rawValue;
-        cerrarCamaraScan();
-        agregarProductoPorCodigo(valor);
+        alLeerCodigoCamara(codigos[0].rawValue);
       }
     } catch (err) { /* frame errors expected */ }
   }, 350);
@@ -10745,9 +10835,7 @@ async function iniciarDeteccionZXing(video) {
     // callback en cada frame; seguimos escaneando hasta encontrar un match.
     zxingReader.decodeFromVideoElementContinuously(video, (result, err) => {
       if (result && camaraScanActivo) {
-        const valor = result.getText ? result.getText() : result.text;
-        cerrarCamaraScan();
-        agregarProductoPorCodigo(valor);
+        alLeerCodigoCamara(result.getText ? result.getText() : result.text);
       }
       // NotFoundException se dispara en casi todos los frames sin código
       // visible: es esperable, no un error real.
@@ -10766,6 +10854,7 @@ function cerrarCamaraScan() {
   const backdrop = document.getElementById("scanModalBackdrop");
   backdrop.classList.remove("show");
   camaraScanActivo = false;
+  camaraScanAlLeer = null;
 
   if (camaraDetectorTimer) { clearInterval(camaraDetectorTimer); camaraDetectorTimer = null; }
   if (zxingReader) {

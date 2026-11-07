@@ -810,6 +810,9 @@ body.en-pos #pos .page-header{ margin-bottom:14px; }
 }
 .btn-camera-scan:hover{ border-color:var(--navy-900); background:var(--slate-50); }
 .btn-camera-scan.active{ background:var(--green-500); border-color:var(--green-500); color:#fff; }
+/* Botón 📷 dentro de formularios: solo se muestra en celulares/tablets (body.es-movil) */
+.btn-escanear-movil{ display:none; }
+body.es-movil .btn-escanear-movil{ display:flex; }
 
 /* Categories */
 .pos-categories{

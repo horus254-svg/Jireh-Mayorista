@@ -61,6 +61,7 @@ function depRenderSeccionDeposito() {
         <h6 style="margin-bottom:8px;">Nuevo traspaso</h6>
         <div class="d-flex gap-2 flex-wrap">
           <input class="form-control" id="trasBuscar" list="trasProductosLista" style="max-width:520px;" placeholder="Escaneá el código o escribí el producto y elegilo de la lista" onkeydown="if(event.key==='Enter'){event.preventDefault(); depTrasAgregar(this);}" onchange="depTrasAgregar(this)">
+          <button type="button" class="btn-camera-scan btn-escanear-movil" onclick="escanearHacia('trasBuscar')" title="Escanear con la cámara del teléfono" aria-label="Escanear con la cámara">📷</button>
           <datalist id="trasProductosLista"></datalist>
         </div>
         <div class="table-responsive mt-2">
