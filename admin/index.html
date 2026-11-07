@@ -2691,6 +2691,17 @@
         </div>
       </div>
 
+      <!-- ===== REPARAR STOCK DE PEDIDOS (admin) ===== -->
+      <div class="card p-3 mb-3" id="cardRepararStockPedidos">
+        <h6 style="margin-bottom:4px;">Corregir el stock de pedidos viejos</h6>
+        <p class="text-muted" style="font-size:13px;margin-bottom:10px;">Busca pedidos <b>Preparando</b> o <b>Enviados</b> cuyo stock nunca se descontó (por ejemplo los que pasaron directo de Nuevo a Enviado antes de la v2.4.5) y resta esa mercadería del stock. Primero se muestra qué haría; no cambia nada hasta que confirmás. Si ya corregiste el stock a mano o con un inventario, poné una fecha para no tocar los pedidos anteriores.</p>
+        <div class="d-flex flex-wrap gap-2 align-items-end">
+          <div><label class="form-label mb-1" style="font-size:12.5px;">Solo pedidos desde (opcional)</label><input type="date" class="form-control form-control-sm" id="repStockDesde"></div>
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="btnRepStockRevisar" onclick="repararStockPedidos(false)">Revisar</button>
+          <button type="button" class="btn btn-primary btn-sm" id="btnRepStockAplicar" style="display:none;" onclick="repararStockPedidos(true)">Aplicar corrección</button>
+        </div>
+        <div id="repStockResultado" class="mt-3" style="font-size:13px;"></div>
+      </div>
     </div>
 
     <!-- ===== PESTAÑA: COBROS — Medios de cobro ===== -->

@@ -3368,6 +3368,67 @@ async function _leerRespuestaJSON(response) {
   }
 }
 
+/* ---- Corregir el stock de pedidos viejos (Configuración → Pedidos) ---- */
+let _repStockUltimaRevision = null; // { desde } de la última revisión, para aplicar exactamente eso
+
+async function repararStockPedidos(aplicar) {
+  const out = document.getElementById("repStockResultado");
+  const btnAplicar = document.getElementById("btnRepStockAplicar");
+  const desde = (document.getElementById("repStockDesde") || {}).value || "";
+  if (aplicar && (!_repStockUltimaRevision || _repStockUltimaRevision.desde !== desde)) {
+    toast("Primero tocá Revisar con esa misma fecha", "error");
+    return;
+  }
+
+  const ejecutar = async () => {
+    out.innerHTML = '<span class="text-muted">Revisando…</span>';
+    if (btnAplicar) btnAplicar.style.display = "none";
+    try {
+      const response = await fetchAPI(
+        API_URL + "?action=repararStockPedidos&aplicar=" + (aplicar ? "SI" : "NO") + "&desde=" + encodeURIComponent(desde),
+        {}, { timeoutMs: 60000 }
+      );
+      const d = await _leerRespuestaJSON(response);
+      if (!d.success) { out.innerHTML = `<span class="text-danger">${escapeHtml(d.message || "No se pudo revisar")}</span>`; return; }
+
+      const n = d.pedidos.length;
+      let html = "";
+      if (n === 0) {
+        html = '<span class="text-success">✓ No hay pedidos para corregir.</span>';
+        if (d.sinDetalle && d.sinDetalle.length) html += `<div class="text-muted mt-1">Pedidos sin productos cargados (se ignoran): ${d.sinDetalle.map(escapeHtml).join(", ")}</div>`;
+        _repStockUltimaRevision = null;
+      } else {
+        html += aplicar
+          ? `<div class="text-success fw-bold mb-2">✓ Listo: se corrigieron ${n} pedido(s).</div>`
+          : `<div class="fw-bold mb-2">${n} pedido(s) sin stock descontado. Esto restaría del stock:</div>`;
+        html += '<div class="table-responsive"><table class="table table-sm mb-2" style="font-size:12.5px;"><thead><tr><th>Producto</th><th class="text-end">Stock actual</th><th class="text-end">A descontar</th><th class="text-end">Quedaría</th></tr></thead><tbody>' +
+          d.productos.map(x => `<tr><td>${escapeHtml(x.producto || x.codigo)}<div class="text-muted mono" style="font-size:11px;">${escapeHtml(x.codigo)}</div></td><td class="text-end">${x.stockActual}</td><td class="text-end">−${x.aDescontar}</td><td class="text-end ${x.stockResultante < 0 ? "text-danger fw-bold" : ""}">${x.stockResultante}</td></tr>`).join("") +
+          '</tbody></table></div>';
+        html += `<details class="mb-2"><summary>Ver los ${n} pedido(s)</summary><div class="mt-1">${d.pedidos.map(x => `#${escapeHtml(x.pedidoId)} · ${escapeHtml(x.fecha)} · ${escapeHtml(x.cliente)} · ${escapeHtml(x.estado)}`).join("<br>")}</div></details>`;
+        if (d.codigosInexistentes && d.codigosInexistentes.length) html += `<div class="text-warning mb-1">Productos que ya no existen (no se tocan): ${d.codigosInexistentes.map(escapeHtml).join(", ")}</div>`;
+        if (d.sinDetalle && d.sinDetalle.length) html += `<div class="text-muted mb-1">Pedidos sin productos cargados (se ignoran): ${d.sinDetalle.map(escapeHtml).join(", ")}</div>`;
+        if (!aplicar) {
+          html += '<div class="text-muted">Si los números son correctos, tocá <b>Aplicar corrección</b>. Se puede repetir sin riesgo: los pedidos corregidos no vuelven a aparecer.</div>';
+          _repStockUltimaRevision = { desde };
+          if (btnAplicar) btnAplicar.style.display = "";
+        } else {
+          _repStockUltimaRevision = null;
+          if (typeof cargarProductos === "function") cargarProductos();
+        }
+      }
+      out.innerHTML = html;
+    } catch (error) {
+      out.innerHTML = `<span class="text-danger">${escapeHtml(error.message || "Error de conexión")}</span>`;
+    }
+  };
+
+  if (aplicar) {
+    confirmarAccion("¿Descontar del stock los pedidos de la lista? Se puede repetir sin riesgo, pero conviene haber revisado los números.", ejecutar, "Corregir stock de pedidos");
+  } else {
+    await ejecutar();
+  }
+}
+
 async function cambiarEstado(pedidoId, estado, el) {
   pedidoId = String(pedidoId); // los números nuevos (1001…) pueden llegar como número
   if (_pedidosEnProceso.has(pedidoId)) return;
