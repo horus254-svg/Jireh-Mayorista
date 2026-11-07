@@ -1342,7 +1342,7 @@ tr.fila-arrastrable{ cursor:default; }
 
 .scan-modal-backdrop{
   position:fixed; inset:0; background:rgba(7,13,31,.72);
-  display:none; align-items:center; justify-content:center; z-index:200;
+  display:none; align-items:center; justify-content:center; z-index:1300; /* por encima de cualquier ventana (producto, ingreso...) */
 }
 .scan-modal-backdrop.show{ display:flex; }
 
