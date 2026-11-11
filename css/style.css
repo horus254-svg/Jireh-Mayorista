@@ -2274,8 +2274,35 @@ body[data-temporada] .top-banner{ background:linear-gradient(90deg, var(--navy-9
 .beneficios .beneficio-link[data-red="mapa"]{ --red-color:#ea4335; }
 
 @media (max-width:768px){
+    .beneficios{ padding:12px 0 2px; }
     .beneficios .beneficio-item{ font-size:.88rem; }
-    .beneficios .beneficio-link{ padding:5px 13px 5px 6px; gap:7px; }
+
+    /* Celular: solo el logo en un círculo (una sola fila). El nombre queda
+       oculto a la vista pero disponible para lectores de pantalla. */
+    #beneficios-row{
+        flex-wrap:wrap;
+        --bs-gutter-x:.3rem;
+        --bs-gutter-y:.4rem;
+    }
+    .beneficios .beneficio-link{
+        padding:4px;
+        gap:0;
+        border-width:1.5px;
+    }
+    .beneficios .beneficio-link > span{
+        position:absolute;
+        width:1px; height:1px;
+        margin:-1px; padding:0;
+        overflow:hidden;
+        clip:rect(0 0 0 0);
+        white-space:nowrap;
+        border:0;
+    }
+    .beneficios .beneficio-link .bi-icon{
+        width:2.3em;
+        height:2.3em;
+        padding:.55em;
+    }
 }
 @media (prefers-reduced-motion:reduce){
     .beneficios .beneficio-link{ transition:none; }
