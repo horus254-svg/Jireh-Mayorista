@@ -613,6 +613,17 @@ select:focus-visible{
     }
 }
 
+/* En escritorio, Ordenar y Precio van en una sola fila (en el celular siguen
+   plegados detrás del botón "Ordenar y filtrar" y apilados). */
+@media (min-width:769px){
+    .filtros-extra{
+        display:flex;
+        flex-wrap:wrap;
+        align-items:center;
+        gap:0 28px;
+    }
+}
+
 /* =========================================================
    RESULTADOS / EMPTY STATE
 ========================================================= */
@@ -2185,3 +2196,88 @@ body[data-temporada] .top-banner{ background:linear-gradient(90deg, var(--navy-9
 .pr-secundarios{ display:flex; justify-content:center; gap:6px; flex-wrap:wrap; margin-top:6px; }
 .pr-secundarios .btn-link{ font-size:14px; text-decoration:none; }
 .pr-nota{ font-size:12.5px; color:#64748b; margin:6px 0 0; }
+
+
+/* =========================================================
+   REDES Y CONTACTO — botones con el color y el logo de cada red
+   (el data-red lo pone index.html en los enlaces fijos y
+   renderBeneficioTextoLibre() en app.js según el dominio del link)
+========================================================= */
+
+#beneficios-row{
+    justify-content:center;
+    align-items:center;
+    --bs-gutter-x:.5rem;
+    --bs-gutter-y:.6rem;
+}
+#beneficios-row > [class*="col-"]{
+    flex:0 0 auto;
+    width:auto;
+    max-width:100%;
+}
+
+.beneficios .beneficio-item{
+    font-size:.95rem;
+    line-height:1.3;
+}
+
+.beneficios .beneficio-link{
+    --red-color:var(--indigo-600);
+    display:inline-flex;
+    align-items:center;
+    gap:9px;
+    padding:6px 16px 6px 7px;
+    background:#fff;
+    border:1.5px solid var(--paper-line);
+    border-radius:var(--radius-pill);
+    color:var(--ink-900);
+    font-weight:700;
+    text-align:left;
+    transition:border-color .15s, box-shadow .15s, transform .15s;
+}
+.beneficios .beneficio-link:hover,
+.beneficios .beneficio-link:focus-visible{
+    color:var(--ink-900);
+    border-color:var(--red-color);
+    box-shadow:0 3px 10px color-mix(in srgb, var(--red-color) 28%, transparent);
+    transform:translateY(-1px);
+}
+.beneficios .beneficio-link:focus-visible{
+    outline:2px solid var(--red-color);
+    outline-offset:2px;
+}
+
+/* El logo va en blanco sobre un círculo del color de la red */
+.beneficios .beneficio-link .bi-icon{
+    flex:0 0 auto;
+    box-sizing:border-box;
+    width:2em;
+    height:2em;
+    padding:.48em;
+    border-radius:50%;
+    background:var(--red-color);
+    fill:#fff;
+    vertical-align:middle;
+}
+
+.beneficios .beneficio-link[data-red="instagram"]{ --red-color:#e1306c; }
+.beneficios .beneficio-link[data-red="instagram"] .bi-icon{
+    background:radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285aeb 90%);
+}
+.beneficios .beneficio-link[data-red="tiktok"]{ --red-color:#111; }
+.beneficios .beneficio-link[data-red="facebook"]{ --red-color:#1877f2; }
+.beneficios .beneficio-link[data-red="whatsapp"]{ --red-color:#25d366; }
+.beneficios .beneficio-link[data-red="youtube"]{ --red-color:#f00; }
+.beneficios .beneficio-link[data-red="twitter-x"]{ --red-color:#111; }
+.beneficios .beneficio-link[data-red="linkedin"]{ --red-color:#0a66c2; }
+.beneficios .beneficio-link[data-red="telegram"]{ --red-color:#229ed9; }
+.beneficios .beneficio-link[data-red="mapa"]{ --red-color:#ea4335; }
+
+@media (max-width:768px){
+    .beneficios .beneficio-item{ font-size:.88rem; }
+    .beneficios .beneficio-link{ padding:5px 13px 5px 6px; gap:7px; }
+}
+@media (prefers-reduced-motion:reduce){
+    .beneficios .beneficio-link{ transition:none; }
+    .beneficios .beneficio-link:hover{ transform:none; }
+}

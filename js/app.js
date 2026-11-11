@@ -3027,7 +3027,7 @@ function renderBeneficioTextoLibre(idWrap, texto){
         const { nombre, iconoClase } = detectarRedSocial(texto);
 
         wrap.innerHTML = `
-            <a href="${escapeHtml(href)}" class="beneficio-item beneficio-link" target="_blank" rel="noopener">
+            <a href="${escapeHtml(href)}" class="beneficio-item beneficio-link" data-red="${escapeHtml(iconoClase.replace(/^bi-/, ""))}" target="_blank" rel="noopener">
                 <svg class="bi-icon"><use href="#${escapeHtml(iconoClase.replace(/^bi-/, "ic-"))}"></use></svg> <span>${escapeHtml(nombre)}</span>
             </a>
         `;
@@ -3038,10 +3038,10 @@ function renderBeneficioTextoLibre(idWrap, texto){
 
 /* =========================================================
    DESCARGA DE CATÁLOGO EN PDF
-   El PDF ya está generado en el servidor (se arma solo todos los
-   días a las 3 AM, con los productos que tengan stock a esa hora —
-   ver generarCatalogoPDFDiario en code.gs) y guardado en Drive. Acá
-   no se genera nada: solo se pide el link ya listo
+   El PDF lo arma la app de escritorio una vez por día (al abrirse la
+   caja principal, o a mano desde Configuración → Catálogo web) y lo
+   publica en Drive — ver desktop/src/catalogo-pdf.js y subirCatalogoPDF
+   en code.gs. Acá no se genera nada: solo se pide el link ya listo
    (?action=catalogoPDFInfo) y se abre para descargar. Por eso el
    botón responde casi al instante en vez de tener que armar el PDF
    en el navegador del cliente cada vez que lo aprieta.
