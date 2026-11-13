@@ -327,7 +327,7 @@ function avisarPedidosNuevos(nuevos, cantidad) {
 async function chequearPedidosNuevos(forzar) {
   if (_avisoPedDeshabilitado || !navigator.onLine) return;
   const rol = obtenerRolActual();
-  if (rol !== "admin" && rol !== "vendedor") return;
+  if (rol !== "admin" && rol !== "vendedor") return; // el comisionista no ve pedidos
   const ahora = Date.now();
   if (!forzar && document.hidden && ahora - _avisoPedUltimoChequeo < 55000) return;
   _avisoPedUltimoChequeo = ahora;
@@ -3226,7 +3226,7 @@ function recargarPedidos() {
  *  detalle en DETALLE_PEDIDOS. Acción destructiva, por eso pide
  *  confirmación antes de mandar nada al backend. */
 function eliminarPedidosCancelados() {
-  if (obtenerRolActual() === "vendedor") {
+  if (esRolVendedor()) {
     toast("Tu usuario (Vendedor) no tiene permiso para eliminar pedidos", "error");
     return;
   }
@@ -6784,7 +6784,7 @@ function renderPapeleraProductos() {
   const btnVaciar = document.getElementById("btnVaciarPapelera");
   if (!cont) return;
 
-  const esVendedor = obtenerRolActual() === "vendedor";
+  const esVendedor = esRolVendedor();
   if (btnVaciar) btnVaciar.style.display = (_papeleraProductos.length > 0 && !esVendedor) ? "inline-flex" : "none";
   if (contador) contador.textContent = _papeleraProductos.length === 1 ? "1 producto" : `${_papeleraProductos.length} productos`;
 
@@ -8118,7 +8118,7 @@ function _armarTileProductoHTML(p, dataIdxAttr, esPineado) {
         <span class="tile-price">${typeof depPrecioVista === "function" ? depPrecioVista(p.PRECIO, p, true) : "$" + Number(p.PRECIO || 0).toLocaleString("es-AR")}</span>
         ${stockBadge}
       </div>
-      ${obtenerRolActual() === "vendedor" ? "" : `<button type="button" class="tile-edit" title="Editar precio y stock" onclick="event.stopPropagation(); abrirEdicionRapidaPOS('${escapeJsAttr(p.CODIGO)}');">✏️</button>`}
+      ${esRolVendedor() ? "" : `<button type="button" class="tile-edit" title="Editar precio y stock" onclick="event.stopPropagation(); abrirEdicionRapidaPOS('${escapeJsAttr(p.CODIGO)}');">✏️</button>`}
       ${Number(p.UNIDADES_POR_CAJA) > 0 ? `<button type="button" class="tile-caja" title="Agregar 1 caja (${p.UNIDADES_POR_CAJA} uds) a $${Number(p.PRECIO_CAJA || 0).toLocaleString("es-AR")}" onclick="event.stopPropagation(); agregarCajaAlTicket(productosPOS.find(x => String(x.CODIGO)==='${escapeJsAttr(p.CODIGO)}'));">x${p.UNIDADES_POR_CAJA}</button>` : ""}
       <span class="tile-add">+</span>
     </div>`;
@@ -8270,7 +8270,7 @@ function agregarCajaAlTicket(producto) {
 let _codigoEdicionRapidaPOS = null;
 
 function abrirEdicionRapidaPOS(codigo) {
-  if (obtenerRolActual() === "vendedor") {
+  if (esRolVendedor()) {
     toast("Tu usuario (Vendedor) no tiene permiso para modificar precio o stock", "error");
     return;
   }
@@ -13191,7 +13191,7 @@ function renderTablaMovimientosCaja(lista) {
     const fpIcon = iconoFormaPago[fp] || "💵";
     const fpLabel = fp.charAt(0) + fp.slice(1).toLowerCase();
 
-    const esVendedorRol = obtenerRolActual() === "vendedor";
+    const esVendedorRol = esRolVendedor();
     html += `
     <tr>
       <td>${hora}</td>
@@ -13234,7 +13234,7 @@ async function eliminarMovimientoCajaForm(movimientoId) {
   cerrarModalEliminarMov();
   if (!id) return;
 
-  if (obtenerRolActual() === "vendedor") {
+  if (esRolVendedor()) {
     toast("Tu usuario (Vendedor) no tiene permiso para eliminar movimientos de caja", "error");
     return;
   }
@@ -17808,11 +17808,18 @@ async function guardarUrlOtroPerfil(soloProbar) {
 const PERMISOS_POR_ROL = {
   admin: null, // null = acceso a todas las secciones
   vendedor: ["dashboard", "pos", "ventasPOS", "cierreCaja", "movimientosCaja", "pedidos", "clientes", "cotizaciones", "traspasos"],
-  deposito: ["dashboard", "productos", "ingresoProductos", "proveedores", "reportes"] // en Reportes solo ve "Compras y reposición"
+  deposito: ["dashboard", "productos", "ingresoProductos", "proveedores", "reportes"], // en Reportes solo ve "Compras y reposición"
+  comisionista: ["pos"] // vendedor por comisión: solo el Punto de Venta
 };
 
 function obtenerRolActual() {
   return sessionStorage.getItem("rol") || "admin";
+}
+
+/** "vendedor" y "comisionista" tienen las mismas restricciones de edición (el servidor los trata igual). */
+function esRolVendedor() {
+  const r = obtenerRolActual();
+  return r === "vendedor" || r === "comisionista";
 }
 
 function seccionPermitidaParaRol(id) {
@@ -17875,17 +17882,18 @@ async function cargarUsuarios() {
     usuariosGlobal = data.usuarios || [];
 
     if (usuariosGlobal.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-3">Todavía no creaste ningún usuario adicional</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-3">Todavía no creaste ningún usuario adicional</td></tr>`;
       return;
     }
 
-    const etiquetaRol = { admin: "Admin", vendedor: "Vendedor", deposito: "Depósito" };
+    const etiquetaRol = { admin: "Admin", vendedor: "Vendedor", deposito: "Depósito", comisionista: "Vendedor por comisión" };
 
     tbody.innerHTML = usuariosGlobal.map(u => `
       <tr>
         <td>${escapeHtml(u.NOMBRE || "—")}</td>
         <td class="mono">${escapeHtml(u.USERNAME || "—")}</td>
         <td>${etiquetaRol[u.ROL] || escapeHtml(u.ROL || "—")}</td>
+        <td>${u.COMISION_PORC === "" || u.COMISION_PORC === undefined ? "—" : escapeHtml(String(u.COMISION_PORC)) + " %"}</td>
         <td>${String(u.ACTIVO || "SI").toUpperCase() === "NO" ? '<span class="badge bg-secondary">Inactivo</span>' : '<span class="badge bg-success">Activo</span>'}</td>
         <td>
           <button class="btn btn-sm btn-outline-primary" onclick="abrirModalEditarUsuario('${u.USUARIO_ID}')">✏️</button>
@@ -17895,7 +17903,7 @@ async function cargarUsuarios() {
 
   } catch (error) {
     console.error("Error al cargar usuarios:", error);
-    if (tbody) tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-3">Error al cargar los usuarios</td></tr>`;
+    if (tbody) tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-3">Error al cargar los usuarios</td></tr>`;
   }
 }
 
@@ -17907,6 +17915,8 @@ function nuevoUsuario() {
   document.getElementById("umPassword").value = "";
   document.getElementById("umPasswordHint").textContent = "*";
   document.getElementById("umRol").value = "vendedor";
+  document.getElementById("umComision").value = "";
+  actualizarCampoComision();
   document.getElementById("umActivo").checked = true;
   document.getElementById("usuarioModalBackdrop").classList.add("show");
   setTimeout(() => document.getElementById("umNombre").focus(), 80);
@@ -17923,8 +17933,21 @@ function abrirModalEditarUsuario(usuarioId) {
   document.getElementById("umPassword").value = "";
   document.getElementById("umPasswordHint").textContent = "(dejar vacío para no cambiarla)";
   document.getElementById("umRol").value = u.ROL || "vendedor";
+  document.getElementById("umComision").value = (u.COMISION_PORC === "" || u.COMISION_PORC === undefined) ? "" : u.COMISION_PORC;
+  actualizarCampoComision();
   document.getElementById("umActivo").checked = String(u.ACTIVO || "SI").toUpperCase() !== "NO";
   document.getElementById("usuarioModalBackdrop").classList.add("show");
+}
+
+/** El % de comisión solo se pide para los roles que venden (vendedor y vendedor por comisión). */
+function actualizarCampoComision() {
+  const rol = document.getElementById("umRol").value;
+  const caja = document.getElementById("umComisionWrap");
+  if (caja) caja.style.display = (rol === "comisionista" || rol === "vendedor") ? "" : "none";
+  const ayuda = document.getElementById("umComisionHint");
+  if (ayuda) ayuda.textContent = rol === "comisionista"
+    ? "Obligatorio. Solo ve el Punto de Venta y no puede editar productos."
+    : "Opcional. Si lo cargás, aparece en el reporte de comisiones.";
 }
 
 function cerrarModalUsuario() {
@@ -17938,9 +17961,18 @@ async function guardarUsuarioForm() {
   const password = document.getElementById("umPassword").value;
   const rol = document.getElementById("umRol").value;
   const activo = document.getElementById("umActivo").checked;
+  const comisionTxt = (rol === "comisionista" || rol === "vendedor") ? document.getElementById("umComision").value.trim().replace(",", ".") : "";
 
   if (!nombre || !username) {
     toast("Nombre y nombre de usuario son obligatorios", "error");
+    return;
+  }
+  if (comisionTxt !== "" && (!isFinite(Number(comisionTxt)) || Number(comisionTxt) < 0 || Number(comisionTxt) > 100)) {
+    toast("La comisión tiene que ser un número entre 0 y 100", "error");
+    return;
+  }
+  if (rol === "comisionista" && comisionTxt === "") {
+    toast("Indicá el porcentaje de comisión del vendedor", "error");
     return;
   }
   if (!usuarioId && !password) {
@@ -17955,8 +17987,8 @@ async function guardarUsuarioForm() {
 
   try {
     const body = usuarioId
-      ? { action: "editarUsuario", usuarioId, nombre, username, password, rolNuevo: rol, activo }
-      : { action: "crearUsuario", nombre, username, password, rolNuevo: rol };
+      ? { action: "editarUsuario", usuarioId, nombre, username, password, rolNuevo: rol, activo, comisionPorc: comisionTxt }
+      : { action: "crearUsuario", nombre, username, password, rolNuevo: rol, comisionPorc: comisionTxt };
 
     const res = await fetchAPI(API_URL, { method: "POST", body: JSON.stringify(body) });
     const data = await res.json();
@@ -17976,6 +18008,90 @@ async function guardarUsuarioForm() {
   } finally {
     btn.disabled = false;
     btn.innerHTML = textoOriginal;
+  }
+}
+
+/* ===================== COMISIONES DE VENDEDORES (solo admin) ===================== */
+
+/** Mayúsculas y sin tildes, para comparar formas de pago ("Crédito" == "CREDITO"). */
+function _normTxtComision(t) {
+  return String(t || "").trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+/**
+ * Calcula cuánto generó cada vendedor con % de comisión en el período.
+ * Usa el mismo historial que "Ventas POS" (en la app de escritorio sale de la
+ * base local, así que incluye lo vendido sin conexión). Solo cuentan las
+ * ventas cobradas: se descartan las anuladas y las que quedaron a crédito. La venta se asigna al usuario por su NOMBRE o su nombre de
+ * usuario (así es como el POS guarda el campo VENDEDOR).
+ */
+async function calcularComisiones() {
+  const desdeEl = document.getElementById("comDesde");
+  const hastaEl = document.getElementById("comHasta");
+  const cuerpo = document.getElementById("tablaComisiones");
+  const pie = document.getElementById("comisionesPie");
+  if (!cuerpo) return;
+
+  if (!hastaEl.value) hastaEl.value = _hoyISO();
+  if (!desdeEl.value) desdeEl.value = hastaEl.value.slice(0, 8) + "01"; // primer día del mes
+  if (desdeEl.value > hastaEl.value) { toast("La fecha «desde» no puede ser posterior a «hasta»", "error"); return; }
+
+  cuerpo.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">Calculando...</td></tr>';
+  if (pie) pie.textContent = "";
+
+  try {
+    if (!usuariosGlobal.length) {
+      const ru = await fetchAPI(API_URL + "?action=usuarios");
+      usuariosGlobal = ((await ru.json()).usuarios) || [];
+    }
+    const params = new URLSearchParams({ action: "ventasPOSHistorial", desde: desdeEl.value, hasta: hastaEl.value });
+    const res = await fetchAPI(API_URL + "?" + params.toString());
+    const data = await res.json();
+    if (data && data.success === false) throw new Error(data.message || "No se pudieron leer las ventas");
+    const ventas = data.ventas || [];
+
+    const norm = t => String(t || "").trim().toLowerCase();
+    const vendedores = usuariosGlobal.filter(u => (u.ROL === "comisionista" || (u.COMISION_PORC !== "" && u.COMISION_PORC !== undefined)) );
+    const filas = vendedores.map(u => ({ u, pct: Number(u.COMISION_PORC) || 0, cant: 0, total: 0, anuladas: 0, cantCredito: 0, credito: 0 }));
+    const porNombre = {};
+    filas.forEach(f => { porNombre[norm(f.u.NOMBRE)] = f; porNombre[norm(f.u.USERNAME)] = f; });
+
+    ventas.forEach(v => {
+      if (/^RES-/i.test(String(v.VENTA_ID || v.ID || ""))) return; // resumen de ventas viejas: sin vendedor
+      const f = porNombre[norm(v.VENDEDOR)];
+      if (!f) return;
+      if (String(v.ANULADA || "").toUpperCase() === "SI") { f.anuladas++; return; }
+      // Solo se comisiona lo ya cobrado: una venta a crédito (cuenta corriente) todavía no se cobró.
+      if (_normTxtComision(v.FORMA_PAGO) === "CREDITO") { f.cantCredito++; f.credito += Number(v.TOTAL) || 0; return; }
+      f.cant++;
+      f.total += Number(v.TOTAL) || 0;
+    });
+
+    if (!filas.length) {
+      cuerpo.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">Todavía no hay vendedores con comisión. Creá un usuario «Vendedor por comisión» o cargale un % a un vendedor.</td></tr>';
+      return;
+    }
+
+    const fm = n => "$" + Math.round(n).toLocaleString("es-AR");
+    let totVentas = 0, totMonto = 0, totCom = 0;
+    cuerpo.innerHTML = filas.map(f => {
+      const com = f.total * f.pct / 100;
+      totVentas += f.cant; totMonto += f.total; totCom += com;
+      const inactivo = String(f.u.ACTIVO || "SI").toUpperCase() === "NO" ? ' <span class="badge bg-secondary">Inactivo</span>' : "";
+      return `<tr>
+        <td>${escapeHtml(f.u.NOMBRE || f.u.USERNAME)}${inactivo}</td>
+        <td class="text-end">${f.cant}${f.anuladas ? ` <span class="text-muted" style="font-size:11px;">(+${f.anuladas} anuladas)</span>` : ""}</td>
+        <td class="text-end">${fm(f.total)}</td>
+        <td class="text-end">${f.pct} %</td>
+        <td class="text-end fw-bold">${fm(com)}</td>
+        <td class="text-end text-muted">${f.cantCredito ? fm(f.credito) + ' <span style="font-size:11px;">(' + f.cantCredito + ')</span>' : "—"}</td>
+      </tr>`;
+    }).join("") + `<tr class="table-light fw-bold">
+        <td>Total</td><td class="text-end">${totVentas}</td><td class="text-end">${fm(totMonto)}</td><td></td><td class="text-end">${fm(totCom)}</td><td></td></tr>`;
+    if (pie) pie.textContent = "Comisión = total cobrado × porcentaje del vendedor, entre " + desdeEl.value + " y " + hastaEl.value + ". No cuentan las ventas anuladas ni las ventas a crédito (cuenta corriente): esas se muestran aparte, sin comisión, porque todavía no se cobraron.";
+  } catch (error) {
+    console.error("Error al calcular comisiones:", error);
+    cuerpo.innerHTML = '<tr><td colspan="6" class="text-center text-danger py-3">No se pudieron calcular las comisiones. Probá de nuevo.</td></tr>';
   }
 }
 
