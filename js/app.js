@@ -435,14 +435,27 @@ function procesarProductos(listaProductos){
         const productosConStock = (listaProductos || [])
             .filter(p => Number(String(p.STOCK).trim()) > 0);
 
-        // Los productos nuevos se agregan siempre al final de la hoja
-        // de Sheets, así que los últimos N (en el orden original,
-        // antes de reordenar por destacados) son los "recién agregados".
-        const codigosNuevos = new Set(
+        // "Nuevo" = los últimos N productos agregados a la hoja de Sheets, es
+        // decir, los de las filas más abajo (el backend manda _FILA).
+        // No se usa el orden del catálogo: ese sigue la columna ORDEN, que
+        // cambia al reordenar y deja a los productos pegados a mano en Sheets
+        // (sin ORDEN) después de los cargados desde el panel. Tampoco se
+        // descuenta antes el stock: si el último agregado está sin stock, no
+        // le pasa el cartel a uno más viejo; simplemente no se ve.
+        const codigosNuevos = new Set();
+        const conFila = (listaProductos || []).filter(p => Number(p._FILA) > 0);
+        if(conFila.length){
+            conFila
+                .sort((a, b) => Number(b._FILA) - Number(a._FILA))
+                .slice(0, CANTIDAD_PRODUCTOS_NUEVOS)
+                .filter(p => Number(String(p.STOCK).trim()) > 0)
+                .forEach(p => codigosNuevos.add(String(p.CODIGO)));
+        } else {
+            // Backend sin actualizar (no manda _FILA): comportamiento anterior.
             productosConStock
                 .slice(-CANTIDAD_PRODUCTOS_NUEVOS)
-                .map(p => String(p.CODIGO))
-        );
+                .forEach(p => codigosNuevos.add(String(p.CODIGO)));
+        }
 
         estado.productos = productosConStock
         .map(p => ({
