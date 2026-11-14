@@ -2704,6 +2704,7 @@ function mostrarSeccion(id) {
 
   if (id === "pos") {
     asegurarProductosPOS().then(renderPosGrid);
+    actualizarMiComisionHoy();
     setTimeout(() => {
       const input = document.getElementById("posBusqueda");
       if (input) input.focus();
@@ -9128,7 +9129,7 @@ async function confirmarFinalizarVenta() {
   }
 
   // Métricas en segundo plano
-  setTimeout(() => { cargarMetricas(); invalidarCache("ventasPOS"); }, 500);
+  setTimeout(() => { cargarMetricas(); invalidarCache("ventasPOS"); actualizarMiComisionHoy(); }, 500);
 
   } catch(err) {
     console.error("Error en confirmarFinalizarVenta:", err);
@@ -15322,7 +15323,7 @@ async function consultarCobroMercadoPagoPolling() {
         _descontarStockEnListasEnMemoria(itemsSnapshot);
         renderPosGrid();
 
-        setTimeout(() => { cargarMetricas(); invalidarCache("ventasPOS"); }, 500);
+        setTimeout(() => { cargarMetricas(); invalidarCache("ventasPOS"); actualizarMiComisionHoy(); }, 500);
         mpVentaEnCurso = null;
       }
     }
@@ -18012,6 +18013,39 @@ async function guardarUsuarioForm() {
 }
 
 /* ===================== COMISIONES DE VENDEDORES (solo admin) ===================== */
+
+/**
+ * Vendedor por comisión: muestra en el POS cuánto cobró hoy y su comisión.
+ * Lee las ventas del día (incluye las que esta caja todavía no subió),
+ * se queda con las suyas y descarta anuladas y ventas a crédito. El % viene
+ * del login (sessionStorage "comisionPorc").
+ */
+async function actualizarMiComisionHoy() {
+  const caja = document.getElementById("miComisionHoy");
+  if (!caja || obtenerRolActual() !== "comisionista") return;
+  caja.style.display = "";
+  try {
+    const res = await fetchAPI(API_URL + "?action=ventasPOS");
+    const data = await res.json();
+    if (data && data.success === false) return;
+    const norm = t => String(t || "").trim().toLowerCase();
+    const yo = [sessionStorage.getItem("nombreUsuario"), sessionStorage.getItem("usuarioLogueado")].map(norm).filter(Boolean);
+    let cant = 0, total = 0;
+    (data.ventas || []).forEach(v => {
+      if (!yo.includes(norm(v.VENDEDOR))) return;
+      if (String(v.ANULADA || "").toUpperCase() === "SI") return;
+      if (_normTxtComision(v.FORMA_PAGO) === "CREDITO") return; // todavía no se cobró
+      cant++;
+      total += Number(v.TOTAL) || 0;
+    });
+    const pct = Number(sessionStorage.getItem("comisionPorc")) || 0;
+    const fm = n => "$" + Math.round(n).toLocaleString("es-AR");
+    document.getElementById("mchComision").textContent = fm(total * pct / 100);
+    document.getElementById("mchDetalle").textContent = cant + (cant === 1 ? " venta" : " ventas") + " · " + fm(total) + " cobrado · " + pct + " %";
+  } catch (e) {
+    console.warn("No se pudo actualizar mi comisión de hoy:", e);
+  }
+}
 
 /** Mayúsculas y sin tildes, para comparar formas de pago ("Crédito" == "CREDITO"). */
 function _normTxtComision(t) {

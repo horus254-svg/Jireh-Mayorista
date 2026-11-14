@@ -427,6 +427,7 @@ async function aplicarSesion(data, usuario, password){
   sessionStorage.setItem("nombreUsuario", data.nombre || "");
   sessionStorage.setItem("usuarioLogueado", data.usuario || usuario);
   sessionStorage.setItem("modoNegocio", data.modo || "");
+  sessionStorage.setItem("comisionPorc", data.comisionPorc === undefined || data.comisionPorc === null ? "" : String(data.comisionPorc));
   if(password){
     await guardarLoginOfflineCache(usuario, password, data);
     if(tienePerfiles()) { try{ await puenteEscritorio().perfilRegistrarCredencial(usuario, password); }catch(e){} }
@@ -546,6 +547,7 @@ async function guardarLoginOfflineCache(usuario, password, data){
       nombre: data.nombre || "",
       usuario: data.usuario || usuario,
       modo: data.modo || "",
+      comisionPorc: data.comisionPorc === undefined || data.comisionPorc === null ? "" : data.comisionPorc,
       guardadoEn: Date.now()
     }));
   }catch(error){
@@ -640,6 +642,7 @@ document.getElementById("loginForm").addEventListener("submit", async function(e
         sessionStorage.setItem("nombreUsuario", local.nombre || "");
         sessionStorage.setItem("usuarioLogueado", local.usuario || u);
         sessionStorage.setItem("modoNegocio", local.modo || "");
+        sessionStorage.setItem("comisionPorc", local.comisionPorc === undefined ? "" : String(local.comisionPorc));
         window.location.href = "index.html";
         return;
       }
@@ -728,6 +731,7 @@ document.getElementById("loginForm").addEventListener("submit", async function(e
       sessionStorage.setItem("nombreUsuario", cache.nombre || "");
       sessionStorage.setItem("usuarioLogueado", cache.usuario || usuario);
       sessionStorage.setItem("modoNegocio", cache.modo || "");
+      sessionStorage.setItem("comisionPorc", cache.comisionPorc === undefined ? "" : String(cache.comisionPorc));
       window.location.href = "index.html";
       return;
     }

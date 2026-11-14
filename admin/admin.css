@@ -2770,3 +2770,18 @@ a[data-target="pedidos"]{ position:relative; }
 .temp-estado.programado{ background:color-mix(in srgb, var(--blue-500) 12%, #fff); color:var(--blue-500); }
 .temp-estado.vencido, .temp-estado.error{ background:#fef2f2; color:#b91c1c; }
 .sidebar-temporada{ margin-left:6px; font-size:16px; }
+
+/* Vendedor por comisión: cartelito "Mi comisión hoy" en el encabezado del POS */
+.mi-comision-hoy{
+  background:var(--card-bg, #fff);
+  border:1.5px solid #25d366;
+  border-radius:12px;
+  padding:6px 14px;
+  line-height:1.2;
+  text-align:right;
+  min-width:150px;
+}
+.mi-comision-hoy .mch-fila{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; }
+.mi-comision-hoy .mch-label{ font-size:12px; color:#6b7280; font-weight:600; }
+.mi-comision-hoy strong{ font-size:20px; color:#15803d; }
+.mi-comision-hoy .mch-sub{ font-size:11px; color:#6b7280; margin-top:2px; }

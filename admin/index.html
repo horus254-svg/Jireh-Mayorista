@@ -1045,7 +1045,11 @@
   <div id="pos" class="seccion">
     <div class="page-header">
       <div><h1>Punto de Venta</h1><div class="sub">Escaneá, buscá o tocá un producto para agregarlo al ticket</div></div>
-      <div class="d-flex gap-2">
+      <div class="d-flex gap-2 align-items-center flex-wrap justify-content-end">
+        <div id="miComisionHoy" class="mi-comision-hoy" style="display:none;" title="Lo que vendiste y cobraste hoy y la comisión que te corresponde">
+          <div class="mch-fila"><span class="mch-label">Mi comisión hoy</span><strong id="mchComision">$0</strong></div>
+          <div class="mch-sub" id="mchDetalle">0 ventas · $0 cobrado</div>
+        </div>
         <button class="btn-shortcuts-help" id="btnMonedaVistaPOS" data-solo-deposito style="display:none;" onclick="depAlternarMonedaVista()" title="Ver los precios en dólares o en pesos">US$ / $</button>
         <button class="btn-shortcuts-help" id="btnActualizarCatalogo" onclick="actualizarCatalogoPOSManual()" title="Volver a pedir el catálogo">↻ Actualizar catálogo</button>
         <button class="btn-shortcuts-help" id="btnShortcutsHelp" onclick="toggleShortcutsHelp()" title="Atajos de teclado (F1)">Atajos</button>
