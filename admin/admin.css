@@ -2785,3 +2785,27 @@ a[data-target="pedidos"]{ position:relative; }
 .mi-comision-hoy .mch-label{ font-size:12px; color:#6b7280; font-weight:600; }
 .mi-comision-hoy strong{ font-size:20px; color:#15803d; }
 .mi-comision-hoy .mch-sub{ font-size:11px; color:#6b7280; margin-top:2px; }
+
+/* Pedidos: quién los hizo, a simple vista */
+.pedido-vendedor-chip{
+  display:inline-block;
+  margin-left:6px;
+  padding:1px 9px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:700;
+  line-height:1.5;
+  background:#e0f2fe;
+  color:#075985;
+  border:1px solid #bae6fd;
+  vertical-align:middle;
+  white-space:nowrap;
+  font-family:Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  letter-spacing:0;
+}
+.pedido-vendedor-chip.es-web{
+  background:#f1f5f9;
+  color:#64748b;
+  border-color:#e2e8f0;
+  font-weight:600;
+}

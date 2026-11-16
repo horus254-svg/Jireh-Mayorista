@@ -635,7 +635,9 @@ document.getElementById("loginForm").addEventListener("submit", async function(e
       // Solo se entra "al instante" si este equipo además tiene una sesión
       // de dispositivo vigente con el backend; si no, se valida online
       // (así se obtiene un token nuevo y la cola puede sincronizar).
-      const conSesion = window.VeekAuth ? VeekAuth.tieneSesion() : true;
+      // ... y esa sesión tiene que ser de ESTE usuario: si es de otro (el que
+      // usó el equipo antes), se valida online para obtener su propio token.
+      const conSesion = window.VeekAuth ? VeekAuth.tokenEsDe(u) : true;
       if(vigente && conSesion){
         sessionStorage.setItem("admin", "true");
         sessionStorage.setItem("rol", local.rol || "admin");

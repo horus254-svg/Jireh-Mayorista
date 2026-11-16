@@ -52,6 +52,31 @@
     return !vence || vence - 60000 > Date.now();
   }
 
+  /** Usuario (en minúsculas) al que pertenece un token, leído de su cuerpo. "" si no se puede leer. */
+  function usuarioDeToken(t) {
+    try {
+      var cuerpo = String(t || "").split(".")[0].replace(/-/g, "+").replace(/_/g, "/");
+      while (cuerpo.length % 4) cuerpo += "=";
+      var p = JSON.parse(decodeURIComponent(escape(atob(cuerpo))));
+      return String((p && p.u) || "").trim().toLowerCase();
+    } catch (e) { return ""; }
+  }
+
+  /**
+   * El token tiene que ser del usuario que tiene la sesión abierta en el panel.
+   * La app de escritorio recuerda la sesión del ÚLTIMO usuario en el equipo
+   * (para subir la cola offline); si entra otro usuario sin renovar el token
+   * (login rápido sin internet) todo se mandaba al servidor con la identidad
+   * y el ROL del usuario anterior: un admin figuraba como "vendedor".
+   */
+  function tokenEsDelUsuarioActual(t) {
+    if (estado.tipo !== "panel") return true;
+    var actual = String(ss("usuarioLogueado") || "").trim().toLowerCase();
+    if (!actual) return true; // todavía no hay sesión abierta (login en curso)
+    var dueno = usuarioDeToken(t);
+    return !dueno || dueno === actual;
+  }
+
   var VeekAuth = {
     /** opciones: { tipo: "panel"|"stock", urlLogin, apis: [url...] } */
     configurar: function (opciones) {
@@ -89,14 +114,22 @@
     token: function () {
       var c = claves();
       var t = ss(c.token);
-      if (t && vigente(ss(c.vence))) return t;
+      if (t && vigente(ss(c.vence)) && tokenEsDelUsuarioActual(t)) return t;
       var d = ls(c.disp);
-      if (d && vigente(ls(c.dispVence))) {
+      if (d && vigente(ls(c.dispVence)) && tokenEsDelUsuarioActual(d)) {
         ss(c.token, d);
         ss(c.vence, ls(c.dispVence) || "");
         return d;
       }
       return "";
+    },
+
+    /** true si hay una sesión vigente guardada Y es de este usuario (para el login rápido sin servidor). */
+    tokenEsDe: function (usuario) {
+      var c = claves();
+      var t = ss(c.token), d = ls(c.disp);
+      var cand = (t && vigente(ss(c.vence))) ? t : ((d && vigente(ls(c.dispVence))) ? d : "");
+      return !!cand && usuarioDeToken(cand) === String(usuario || "").trim().toLowerCase();
     },
 
     tieneSesion: function () { return !!VeekAuth.token(); },

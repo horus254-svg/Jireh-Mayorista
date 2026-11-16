@@ -556,6 +556,10 @@
             <option value="ENVIADO">Enviado</option>
             <option value="CANCELADO">Cancelado</option>
           </select>
+          <select class="form-select form-select-sm" id="filtroPedidoVendedor" style="max-width:190px;" onchange="filtrarPedidos()" title="Quién cargó el pedido">
+            <option value="">Todos los vendedores</option>
+            <option value="__WEB__">🌐 Web (clientes)</option>
+          </select>
         </div>
       </div>
       <div id="pedidosBusquedaAntiguos" class="pedidos-busqueda-antiguos" role="status"></div>

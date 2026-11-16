@@ -487,6 +487,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   reconectarImpresoraUSBSiPosible();
   iniciarPollingSecciones();
   iniciarAvisoPedidos();
+  verificarRolConServidor();
 
   // Ventas pendientes de sesiones anteriores: aviso + reintento en segundo plano
   actualizarBadgeVentasPendientes(_leerColaVentasPendientes().length);
@@ -3631,10 +3632,38 @@ function limpiarBusquedaPedidos() {
   programarBusquedaPedidosAntiguos(true);
 }
 
+/**
+ * Marca "quién hizo el pedido", visible a simple vista en la lista:
+ * 👤 nombre del vendedor (pedido cargado desde el POS) o 🌐 Web (lo hizo el cliente desde el catálogo).
+ */
+function chipVendedorPedido(p) {
+  const v = String((p && p.VENDEDOR) || "").trim();
+  return v
+    ? `<span class="pedido-vendedor-chip" title="Pedido cargado por ${escapeHtml(v)}">👤 ${escapeHtml(v)}</span>`
+    : `<span class="pedido-vendedor-chip es-web" title="Pedido hecho por el cliente desde el catálogo web">🌐 Web</span>`;
+}
+
+/** Arma las opciones del filtro "Vendedor" con los que aparecen en los pedidos cargados (mantiene la elección). */
+function actualizarOpcionesVendedorPedidos() {
+  const sel = document.getElementById("filtroPedidoVendedor");
+  if (!sel) return;
+  const nombres = [...new Set(pedidosGlobal.concat(_pedidosAntiguos.lista || [])
+    .map(p => String(p.VENDEDOR || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "es"));
+  const firma = nombres.join("|");
+  if (sel.dataset.firma === firma) return;
+  const previo = sel.value;
+  sel.innerHTML = '<option value="">Todos los vendedores</option><option value="__WEB__">🌐 Web (clientes)</option>' +
+    nombres.map(n => `<option value="${escapeHtml(n)}">👤 ${escapeHtml(n)}</option>`).join("");
+  sel.dataset.firma = firma;
+  if (previo && [...sel.options].some(o => o.value === previo)) sel.value = previo;
+}
+
 function filtrarPedidos() {
   const texto = document.getElementById("buscarPedido").value.toLowerCase().trim();
   const textoNum = texto.replace(/\D/g, "");
   const estadoFiltro = (document.getElementById("filtroPedidoEstado")?.value || "").toUpperCase();
+  actualizarOpcionesVendedorPedidos();
+  const vendedorFiltro = document.getElementById("filtroPedidoVendedor")?.value || "";
   const b = _claveBusquedaPedidos();
   const desde = b.desde ? new Date(b.desde + "T00:00:00") : null;
   const hasta = b.hasta ? new Date(b.hasta + "T23:59:59") : null;
@@ -3646,15 +3675,18 @@ function filtrarPedidos() {
       String(p.CLIENTE   || "").toLowerCase().includes(texto) ||
       String(p.DNI       || "").toLowerCase().includes(texto) ||
       String(p.EMPRESA   || "").toLowerCase().includes(texto) ||
+      String(p.VENDEDOR  || "").toLowerCase().includes(texto) ||
       (textoNum.length >= 4 && String(p.TELEFONO || "").replace(/\D/g, "").includes(textoNum)) ||
       !!p._antiguo; // el servidor ya filtró (sin acentos, DNI con guiones, etc.)
     const coincideEstado = !estadoFiltro || String(p.ESTADO || "").toUpperCase() === estadoFiltro;
+    const coincideVendedor = !vendedorFiltro ||
+      (vendedorFiltro === "__WEB__" ? !String(p.VENDEDOR || "").trim() : String(p.VENDEDOR || "").trim() === vendedorFiltro);
     let coincideFecha = true;
     if (desde || hasta) {
       const f = new Date(p.FECHA);
       coincideFecha = !isNaN(f) && (!desde || f >= desde) && (!hasta || f <= hasta);
     }
-    return coincideTexto && coincideEstado && coincideFecha;
+    return coincideTexto && coincideEstado && coincideVendedor && coincideFecha;
   });
   renderPedidos(filtrados);
 }
@@ -3710,7 +3742,7 @@ async function abrirDetallePedido(pedidoId) {
     document.getElementById("pedidoDetalleBody").innerHTML = `
       <div class="config-preview-hint mb-3">
         <span class="ic">${ESTADO_ICONO_PEDIDO[pedido.ESTADO] || "📦"}</span>
-        Pedido <strong>${escapeHtml(pedido.PEDIDO_ID)}</strong> — Estado: <strong>${escapeHtml(pedido.ESTADO)}</strong>
+        Pedido <strong>${escapeHtml(pedido.PEDIDO_ID)}</strong> — Estado: <strong>${escapeHtml(pedido.ESTADO)}</strong> — ${chipVendedorPedido(pedido)}
       </div>
       <div class="mb-2"><strong style="font-size:15px;">${escapeHtml(pedido.CLIENTE)}</strong>${pedido.DNI ? ` · DNI/CUIT: ${escapeHtml(pedido.DNI)}` : ""}</div>
       ${pedido.TELEFONO ? `<div class="mb-1" style="font-size:13px;color:var(--slate-500);">📞 ${escapeHtml(pedido.TELEFONO)}</div>` : ""}
@@ -4941,7 +4973,7 @@ function renderPedidos(listaOriginal) {
       tmp.innerHTML = `<div class="pedido-card estado-${claseEstado}${_pedidosEnProceso.has(String(p.PEDIDO_ID)) ? " pedido-procesando" : ""}" data-pedido-card="${escapeHtml(p.PEDIDO_ID)}">
         <div class="pedido-card-top">
           <div>
-            <div class="pedido-card-id">${escapeHtml(p.PEDIDO_ID)}${p._antiguo ? ' <span class="pedido-antiguo-badge" title="Pedido de hace más de 30 días: no está en la lista general, apareció por la búsqueda">Anterior</span>' : ""}</div>
+            <div class="pedido-card-id">${escapeHtml(p.PEDIDO_ID)} ${chipVendedorPedido(p)}${p._antiguo ? ' <span class="pedido-antiguo-badge" title="Pedido de hace más de 30 días: no está en la lista general, apareció por la búsqueda">Anterior</span>' : ""}</div>
             <div class="pedido-card-cliente">${escapeHtml(p.CLIENTE || p.NOMBRE || "")}${p.EMPRESA ? ` <span style="font-weight:500;color:var(--slate-500);font-size:13px;">· 🚚 ${escapeHtml(p.EMPRESA)}</span>` : ""}</div>
             ${p.DIRECCION ? `<div class="pedido-card-dir">📍 ${escapeHtml(p.DIRECCION)}${p.LOCALIDAD ? ", " + escapeHtml(p.LOCALIDAD) : ""}</div>` : ""}
             <div class="pedido-card-fecha">📅 ${new Date(p.FECHA).toLocaleDateString("es-AR", {day:"2-digit", month:"2-digit", year:"numeric"})}</div>
@@ -9369,6 +9401,7 @@ async function confirmarPedidoAdmin() {
       headers: { "Content-Type": "text/plain;charset=utf-8" }, // evita preflight CORS contra Apps Script
       body: JSON.stringify({
         action: "guardarPedidoAdmin",
+        vendedor: sessionStorage.getItem("nombreUsuario") || sessionStorage.getItem("usuarioLogueado") || "",
         nombre, empresa, direccion, localidad, provincia, codigoPostal, telefono, dni,
         total: totalEnviar,
         moneda: moneda,
@@ -17817,6 +17850,35 @@ function obtenerRolActual() {
   return sessionStorage.getItem("rol") || "admin";
 }
 
+/**
+ * El rol que usa el panel viene del login. En la app de escritorio, el login
+ * rápido (sin esperar al servidor) reutiliza el rol guardado hasta 7 días:
+ * si al usuario lo pasaron de vendedor a admin (o al revés) en ese tiempo, el
+ * panel seguía con el rol viejo, ocultaba secciones y las operaciones salían
+ * marcadas como "vendedor". Acá se le pregunta al servidor cuál es el rol
+ * actual y, si cambió, se corrige y se recarga una vez.
+ */
+async function verificarRolConServidor() {
+  try {
+    if (!window.VeekAuth || !VeekAuth.tieneSesion()) return;
+    if (sessionStorage.getItem("veekEntroSinServidor") === "1") return; // sin conexión: se verifica la próxima vez
+    const res = await fetchAPI(API_URL + "?action=sesionActual");
+    const data = await res.json();
+    if (!data || data.success === false || !data.rol) return;
+    const rolServidor = String(data.rol).trim().toLowerCase();
+    const rolLocal = obtenerRolActual();
+    if (rolServidor === rolLocal) return;
+    const marca = rolLocal + ">" + rolServidor;
+    if (sessionStorage.getItem("rolCorregido") === marca) return; // evita recargar en bucle
+    sessionStorage.setItem("rolCorregido", marca);
+    sessionStorage.setItem("rol", rolServidor);
+    toast("Tu rol cambió a «" + rolServidor + "». Se actualizan los permisos...", "info");
+    setTimeout(() => window.location.reload(), 1200);
+  } catch (e) {
+    console.warn("No se pudo verificar el rol con el servidor:", e);
+  }
+}
+
 /** "vendedor" y "comisionista" tienen las mismas restricciones de edición (el servidor los trata igual). */
 function esRolVendedor() {
   const r = obtenerRolActual();
@@ -18086,7 +18148,7 @@ async function calcularComisiones() {
 
     const norm = t => String(t || "").trim().toLowerCase();
     const vendedores = usuariosGlobal.filter(u => (u.ROL === "comisionista" || (u.COMISION_PORC !== "" && u.COMISION_PORC !== undefined)) );
-    const filas = vendedores.map(u => ({ u, pct: Number(u.COMISION_PORC) || 0, cant: 0, total: 0, anuladas: 0, cantCredito: 0, credito: 0 }));
+    const filas = vendedores.map(u => ({ u, pct: Number(u.COMISION_PORC) || 0, cant: 0, total: 0, anuladas: 0, cantCredito: 0, credito: 0, pedidos: 0 }));
     const porNombre = {};
     filas.forEach(f => { porNombre[norm(f.u.NOMBRE)] = f; porNombre[norm(f.u.USERNAME)] = f; });
 
@@ -18101,6 +18163,37 @@ async function calcularComisiones() {
       f.total += Number(v.TOTAL) || 0;
     });
 
+    // Pedidos que cargó cada vendedor y que ya se cobraron en el período. Al
+    // cobrarse generan una venta "PEDIDO WEB" sin vendedor, por eso se suman
+    // acá a partir del pedido (columna VENDEDOR). Se usa la lista de pedidos
+    // actual (en curso + últimos 30 días) y una búsqueda ampliada para atrás.
+    try {
+      const mapaPedidos = {};
+      const traer = async url => {
+        const r = await fetchAPI(url); const d = await r.json();
+        (d.pedidos || []).forEach(p => { mapaPedidos[String(p.PEDIDO_ID)] = p; });
+      };
+      await traer(API_URL + "?action=pedidos");
+      const d0 = new Date(desdeEl.value + "T00:00:00"); d0.setDate(d0.getDate() - 60);
+      const iso = d => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+      await traer(API_URL + "?" + new URLSearchParams({ action: "buscarPedidos", desde: iso(d0), hasta: hastaEl.value }).toString()).catch(() => {});
+      const ini = new Date(desdeEl.value + "T00:00:00"), fin = new Date(hastaEl.value + "T23:59:59");
+      Object.values(mapaPedidos).forEach(p => {
+        const f = porNombre[norm(p.VENDEDOR)];
+        if (!f) return;
+        if (String(p.COBRADO || "").toUpperCase() !== "SI") return;
+        if (String(p.ESTADO || "").toUpperCase() === "CANCELADO") return;
+        if (String(p.MONEDA || "ARS").toUpperCase() === "USD") return;
+        const fc = new Date(p.FECHA_COBRO);
+        if (isNaN(fc) || fc < ini || fc > fin) return;
+        if (_normTxtComision(p.FORMA_PAGO_COBRO) === "CREDITO") { f.cantCredito++; f.credito += Number(p.TOTAL) || 0; return; }
+        f.cant++; f.pedidos++;
+        f.total += Number(p.TOTAL) || 0;
+      });
+    } catch (e) {
+      console.warn("No se pudieron sumar los pedidos a las comisiones:", e);
+    }
+
     if (!filas.length) {
       cuerpo.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">Todavía no hay vendedores con comisión. Creá un usuario «Vendedor por comisión» o cargale un % a un vendedor.</td></tr>';
       return;
@@ -18114,7 +18207,7 @@ async function calcularComisiones() {
       const inactivo = String(f.u.ACTIVO || "SI").toUpperCase() === "NO" ? ' <span class="badge bg-secondary">Inactivo</span>' : "";
       return `<tr>
         <td>${escapeHtml(f.u.NOMBRE || f.u.USERNAME)}${inactivo}</td>
-        <td class="text-end">${f.cant}${f.anuladas ? ` <span class="text-muted" style="font-size:11px;">(+${f.anuladas} anuladas)</span>` : ""}</td>
+        <td class="text-end">${f.cant}${f.pedidos ? ` <span class="text-muted" style="font-size:11px;">(${f.pedidos} pedido${f.pedidos === 1 ? "" : "s"})</span>` : ""}${f.anuladas ? ` <span class="text-muted" style="font-size:11px;">(+${f.anuladas} anuladas)</span>` : ""}</td>
         <td class="text-end">${fm(f.total)}</td>
         <td class="text-end">${f.pct} %</td>
         <td class="text-end fw-bold">${fm(com)}</td>
@@ -18122,7 +18215,7 @@ async function calcularComisiones() {
       </tr>`;
     }).join("") + `<tr class="table-light fw-bold">
         <td>Total</td><td class="text-end">${totVentas}</td><td class="text-end">${fm(totMonto)}</td><td></td><td class="text-end">${fm(totCom)}</td><td></td></tr>`;
-    if (pie) pie.textContent = "Comisión = total cobrado × porcentaje del vendedor, entre " + desdeEl.value + " y " + hastaEl.value + ". No cuentan las ventas anuladas ni las ventas a crédito (cuenta corriente): esas se muestran aparte, sin comisión, porque todavía no se cobraron.";
+    if (pie) pie.textContent = "Comisión = total cobrado × porcentaje del vendedor, entre " + desdeEl.value + " y " + hastaEl.value + ". Suma las ventas del POS y los pedidos que cargó el vendedor y ya se cobraron en esas fechas. No cuentan las ventas anuladas, los pedidos cancelados ni las ventas a crédito (cuenta corriente): esas se muestran aparte, sin comisión, porque todavía no se cobraron.";
   } catch (error) {
     console.error("Error al calcular comisiones:", error);
     cuerpo.innerHTML = '<tr><td colspan="6" class="text-center text-danger py-3">No se pudieron calcular las comisiones. Probá de nuevo.</td></tr>';
