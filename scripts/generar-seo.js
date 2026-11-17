@@ -6,7 +6,8 @@
  *   /producto/<CODIGO>-<slug>/index.html   una ficha por producto con stock
  *   /categoria/<slug>/index.html           un listado por categoría
  *   index.html (entre SEO-ENLACES:INICIO/FIN)  enlaces visibles a categorías
- *                                          y productos destacados
+ *                                          y tarjetas (foto, nombre, precio) de
+ *                                          algunos productos de cada categoría
  *
  * Cada ficha tiene: título, descripción, precio, imagen, categoría,
  * JSON-LD Product (+ BreadcrumbList), <link rel="canonical"> hacia sí misma,
@@ -337,17 +338,49 @@ ${pie()}
 const MARCA_INICIO = "<!-- SEO-ENLACES:INICIO (lo escribe scripts/generar-seo.js; no editar a mano) -->";
 const MARCA_FIN = "<!-- SEO-ENLACES:FIN -->";
 
+// Productos por categoría que se muestran en la portada (como tarjetas con foto y precio).
+const POR_CATEGORIA_PORTADA = 4;
+
+/**
+ * Elige los productos de una categoría para la portada: primero los marcados
+ * DESTACADO = SI, después los que tienen foto y precio, y al final el resto.
+ * Dentro de cada grupo se respeta el orden del catálogo.
+ */
+function elegirParaPortada(items, n, usados) {
+    const destacado = (f) => String(f.p.DESTACADO || "").trim().toUpperCase() === "SI";
+    const completo = (f) => C.urlHttps(f.p.IMAGEN) && C.parsearPrecio(f.p.PRECIO) !== null;
+    const puntaje = (f) => (destacado(f) ? 2 : 0) + (completo(f) ? 1 : 0);
+    return items
+        .map((f, i) => ({ f, i }))
+        .filter(({ f }) => !usados.has(f.seg))
+        .sort((x, y) => puntaje(y.f) - puntaje(x.f) || x.i - y.i)
+        .slice(0, n)
+        .map(({ f }) => { usados.add(f.seg); return f; });
+}
+
+function tarjetaPortada({ p, seg }) {
+    const d = datosProducto(p, seg);
+    const ancho = 240;
+    return `<li><a href="producto/${esc(seg)}/"><img src="${esc(C.imgTamano(d.imagenPrincipal, ancho))}" alt="${esc(d.nombre)}" width="${ancho}" height="${ancho}" loading="lazy" decoding="async"><span class="n">${esc(d.nombre)}</span>${d.precio !== null ? `<span class="p">$${C.formatearPrecio(d.precio)}</span>` : ""}</a></li>`;
+}
+
 function bloqueEnlaces(plan) {
     const cats = plan.categorias.map(c =>
         `<li><a href="categoria/${esc(c.seg)}/">${esc(c.nombre)}</a> <span class="seo-n">(${c.items.length})</span></li>`).join("\n");
 
-    // Con suficientes destacados se listan solo ellos; si no, se completa con los primeros
-    // del catálogo y el título NO dice "destacados" (para no rotular de más).
-    const dest = plan.fichas.filter(f => String(f.p.DESTACADO || "").trim().toUpperCase() === "SI");
-    const soloDestacados = dest.length >= 8;
-    const elegidos = (soloDestacados ? dest : plan.fichas).slice(0, 24);
-    const prods = elegidos.map(f =>
-        `<li><a href="producto/${esc(f.seg)}/">${esc(String(f.p.PRODUCTO).trim())}</a></li>`).join("\n");
+    // Algunos productos de CADA categoría, para que la portada refleje todo el catálogo.
+    const usados = new Set();
+    const secciones = plan.categorias.map(c => {
+        const elegidos = elegirParaPortada(c.items, POR_CATEGORIA_PORTADA, usados);
+        if (!elegidos.length) return "";
+        const mas = c.items.length > elegidos.length ? ` <a class="seo-vermas" href="categoria/${esc(c.seg)}/">Ver los ${c.items.length} productos de ${esc(c.nombre.toLowerCase())}</a>` : "";
+        return `<section class="seo-cat">
+<h4><a href="categoria/${esc(c.seg)}/">${esc(c.nombre)}</a>${mas}</h4>
+<ul class="seo-grid">
+${elegidos.map(tarjetaPortada).join("\n")}
+</ul>
+</section>`;
+    }).filter(Boolean).join("\n");
 
     return `${MARCA_INICIO}
 <div class="seo-enlaces">
@@ -357,12 +390,10 @@ function bloqueEnlaces(plan) {
 ${cats}
 </ul>
 </div>
-<div>
-<h3>${soloDestacados ? "Productos destacados" : "Productos del catálogo"}</h3>
-<ul>
-${prods}
-</ul>
 </div>
+<div class="seo-productos">
+<h3>Productos por categoría</h3>
+${secciones}
 </div>
 ${MARCA_FIN}`;
 }

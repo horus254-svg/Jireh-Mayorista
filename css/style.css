@@ -2328,3 +2328,15 @@ body[data-temporada] .top-banner{ background:linear-gradient(90deg, var(--navy-9
 .seo-enlaces li{ break-inside:avoid; overflow:hidden; text-overflow:ellipsis; }
 .seo-enlaces a{ color:var(--indigo-700); }
 .seo-n{ color:var(--ink-600); }
+.seo-productos{ margin-top:24px; }
+.seo-cat{ margin:0 0 20px; }
+.seo-cat h4{ font-size:.95rem; font-weight:700; margin:0 0 8px; display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 12px; }
+.seo-cat h4 > a{ color:var(--ink-900); text-decoration:none; }
+.seo-vermas{ font-size:13px; font-weight:500; color:var(--indigo-700); }
+.seo-grid{ list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); gap:10px; }
+.seo-grid li{ background:#fff; border:1px solid var(--paper-line); border-radius:10px; padding:8px; min-width:0; }
+.seo-grid a{ display:block; text-decoration:none; color:var(--ink-900); }
+.seo-grid img{ display:block; width:100%; height:auto; aspect-ratio:1/1; object-fit:contain; }
+.seo-grid .n{ display:block; font-size:13px; line-height:1.3; margin:6px 0 2px; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+.seo-grid .p{ display:block; font-weight:700; font-size:14px; }
+@media (min-width:700px){ .seo-grid{ grid-template-columns:repeat(4, minmax(0, 1fr)); gap:14px; } }
