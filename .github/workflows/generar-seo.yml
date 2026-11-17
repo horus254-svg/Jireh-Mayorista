@@ -8,6 +8,9 @@
 # 4) Verifica (sin red) que todo lo listado existe y es válido; si algo falla,
 #    el job se corta ANTES del commit y no se publica nada roto.
 # Todo en un solo commit.
+# 5) Avisa por IndexNow (Bing, Yandex, Seznam, Naver…) las páginas nuevas,
+#    cambiadas o eliminadas. Si ese aviso falla no se rompe nada: se reintenta
+#    en el próximo run.
 #
 # No hace falta configurar secrets: la URL del sitio y la del backend se
 # leen de config.json. (Si existen los secrets API_URL / SITE_URL, tienen
@@ -57,7 +60,17 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A producto categoria sitemap.xml index.html manifest-catalogo.json Reportes/manifest.json robots.txt
+          git add -A producto categoria sitemap.xml index.html manifest-catalogo.json Reportes/manifest.json robots.txt config.json
           git add -A -- 'google*.html' || true
+          git add -A -- ':(glob)*.txt' || true
           git diff --cached --quiet || git commit -m "chore: regenerar SEO de productos [automático]"
           git push
+
+      - name: Avisar a buscadores por IndexNow (Bing, Yandex…)
+        continue-on-error: true
+        run: node scripts/indexnow.js
+
+      - name: Guardar estado de IndexNow
+        run: |
+          git add -A .github/indexnow-estado.json || true
+          git diff --cached --quiet || (git commit -m "chore: estado IndexNow [automático]" && git push)
