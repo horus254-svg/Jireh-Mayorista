@@ -34,22 +34,13 @@
 
 const fs = require("fs");
 
-// Datos del cliente: config.json (sitioUrl / apiUrl). Las variables de
-// entorno, si están, tienen prioridad.
-let CLIENTE = {};
-try { CLIENTE = JSON.parse(fs.readFileSync(require("path").join(__dirname, "config.json"), "utf8")); } catch (e) {}
+// Datos del cliente: config.json (sitioUrl / apiUrl), leídos por seo-comun.js.
+// Las variables de entorno BASE_URL/SITE_URL y API_URL, si están, tienen prioridad.
+const SEO = require("./scripts/seo-comun.js");
 
-const BASE_URL = String(process.env.BASE_URL || CLIENTE.sitioUrl || "").trim().replace(/\/*$/, "/");
-const API_URL = String(process.env.API_URL || CLIENTE.apiUrlLectura || CLIENTE.apiUrl || "").trim();
-
-function generarSlug(texto) {
-  return String(texto || "")
-    .trim()
-    .toLowerCase()
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
+const CFG = SEO.cargarConfig();
+const BASE_URL = String(process.env.BASE_URL || CFG.siteUrl || "").replace(/\/*$/, "/");
+const API_URL = CFG.apiUrl;
 
 function escapeXml(str) {
   return String(str ?? "").replace(/[&<>"']/g, c => ({
@@ -63,7 +54,7 @@ async function main() {
     process.exit(1);
   }
   if (!API_URL) {
-    console.error("Falta API_URL. Pasala como variable de entorno, ej:\n  API_URL=\"https://script.google.com/macros/s/XXXX/exec\" node generar-sitemap.js");
+    console.error("Falta la URL de la API (apiUrl / apiUrlLectura en config.json, o la variable API_URL).");
     process.exit(1);
   }
 
@@ -80,6 +71,11 @@ async function main() {
 
   console.log("Productos con stock encontrados:", productos.length);
 
+  // Mismo cálculo que scripts/generar-seo.js (seo-comun.js): el sitemap lista
+  // exactamente las páginas que el generador crea, ni más ni menos.
+  const plan = SEO.planificar(productos);
+  plan.advertencias.forEach(a => console.warn("Aviso:", a));
+
   const hoy = new Date().toISOString().slice(0, 10);
   const baseSinBarra = BASE_URL.replace(/\/+$/, "");
 
@@ -87,18 +83,15 @@ async function main() {
     `  <url>\n    <loc>${escapeXml(BASE_URL)}</loc>\n    <lastmod>${hoy}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>1.0</priority>\n  </url>`
   ];
 
-  const codigosVistos = new Set();
-
-  for (const p of productos) {
-    const codigo = String(p.CODIGO ?? "").trim();
-    if (!codigo || codigosVistos.has(codigo)) continue; // evita duplicados si el código se repite
-    codigosVistos.add(codigo);
-
-    const slug = generarSlug(p.PRODUCTO);
-    const loc = `${baseSinBarra}/producto/${encodeURIComponent(codigo)}${slug ? "-" + slug : ""}/`;
-
+  for (const c of plan.categorias) {
     urls.push(
-      `  <url>\n    <loc>${escapeXml(loc)}</loc>\n    <lastmod>${hoy}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`
+      `  <url>\n    <loc>${escapeXml(`${baseSinBarra}/categoria/${c.seg}/`)}</loc>\n    <lastmod>${hoy}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>0.9</priority>\n  </url>`
+    );
+  }
+
+  for (const f of plan.fichas) {
+    urls.push(
+      `  <url>\n    <loc>${escapeXml(`${baseSinBarra}/producto/${f.seg}/`)}</loc>\n    <lastmod>${hoy}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`
     );
   }
 

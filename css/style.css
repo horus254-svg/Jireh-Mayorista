@@ -2308,3 +2308,23 @@ body[data-temporada] .top-banner{ background:linear-gradient(90deg, var(--navy-9
     .beneficios .beneficio-link{ transition:none; }
     .beneficios .beneficio-link:hover{ transform:none; }
 }
+
+
+/* ===== Sección "Sobre Jireh Mayorista" + enlaces a categorías/productos (index.html) ===== */
+.card-product .card-link{ color:inherit; text-decoration:none; display:block; }
+.card-product h5 .card-link{ display:inline; }
+.card-product .card-img-wrap .card-link{ display:block; }
+
+.seo-info{ background:#fff; border-top:1px solid var(--paper-line); padding:28px 16px; margin-top:32px; color:var(--ink-900); }
+.seo-info-inner{ max-width:960px; margin:0 auto; }
+.seo-info h2{ font-size:1.25rem; font-weight:800; margin:0 0 10px; }
+.seo-info h3{ font-size:1rem; font-weight:700; margin:0 0 6px; }
+.seo-info p{ margin:0 0 12px; line-height:1.6; }
+.seo-info-cols{ display:flex; flex-wrap:wrap; gap:8px 32px; margin:8px 0 12px; }
+.seo-info-cols > div{ flex:1 1 260px; }
+.seo-enlaces{ display:flex; flex-wrap:wrap; gap:16px 32px; margin-top:8px; }
+.seo-enlaces > div{ flex:1 1 260px; min-width:0; }
+.seo-enlaces ul{ list-style:none; margin:0; padding:0; columns:2 200px; column-gap:24px; font-size:14px; line-height:1.9; }
+.seo-enlaces li{ break-inside:avoid; overflow:hidden; text-overflow:ellipsis; }
+.seo-enlaces a{ color:var(--indigo-700); }
+.seo-n{ color:var(--ink-600); }

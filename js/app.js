@@ -168,6 +168,9 @@ async function cargarConfigCliente() {
 // que se consideran "recién agregados" y se destacan en el catálogo.
 const CANTIDAD_PRODUCTOS_NUEVOS = 8;
 
+// Días que dura el cartel "Nuevo" desde que se agregó el producto (FECHA_ALTA).
+const DIAS_PRODUCTO_NUEVO = 7;
+
 const PLACEHOLDER_IMG = "data:image/svg+xml;base64," + btoa(
     "<svg xmlns='http://www.w3.org/2000/svg' width='400' height='400'>" +
     "<rect width='100%' height='100%' fill='#eef1f6'/>" +
@@ -443,7 +446,18 @@ function procesarProductos(listaProductos){
         // descuenta antes el stock: si el último agregado está sin stock, no
         // le pasa el cartel a uno más viejo; simplemente no se ve.
         const codigosNuevos = new Set();
-        const conFila = (listaProductos || []).filter(p => Number(p._FILA) > 0);
+        let conFila = (listaProductos || []).filter(p => Number(p._FILA) > 0);
+        // El cartel dura DIAS_PRODUCTO_NUEVO días desde que se agregó el
+        // producto (columna FECHA_ALTA). Un producto sin fecha es viejo. Si el
+        // backend todavía no manda esa columna, solo rige el criterio de filas.
+        if((listaProductos || []).some(p => p.FECHA_ALTA !== undefined)){
+            const ahora = Date.now();
+            const limite = ahora - DIAS_PRODUCTO_NUEVO * 24 * 60 * 60 * 1000;
+            conFila = conFila.filter(p => {
+                const t = new Date(p.FECHA_ALTA).getTime();
+                return isFinite(t) && t >= limite && t <= ahora + 24 * 60 * 60 * 1000;
+            });
+        }
         if(conFila.length){
             conFila
                 .sort((a, b) => Number(b._FILA) - Number(a._FILA))
@@ -735,6 +749,12 @@ function mostrarProductos(lista){
         const categoria = escapeHtml(p.CATEGORIA);
         const imagen = escapeHtml(imgOptimizada(urlHttpSegura(p.IMAGEN), 480));
 
+        // Enlace rastreable a la ficha estática (/producto/CODIGO-slug/). Para el
+        // cliente se sigue abriendo el Quick View (ver el listener de clic más
+        // abajo, que cancela la navegación); para bots y "abrir en pestaña nueva"
+        // es un <a href> normal.
+        const href = escapeHtml(urlEstaticaProducto(p));
+
         const stock = obtenerEstadoStock(p.STOCK);
 
         return `
@@ -749,12 +769,14 @@ function mostrarProductos(lista){
                 ${String(p.OFERTA || "").trim().toUpperCase() === "SI" ? `<div class="ribbon-oferta">🔥 OFERTA</div>` : ""}
 
                 <div class="card-img-wrap">
-                    <img
-                        src="${imagen}"
-                        alt="${nombre}"
-                        loading="lazy"
-                        decoding="async"
-                        onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'">
+                    <a href="${href}" class="card-link" data-action="quickview" tabindex="-1" aria-hidden="true">
+                        <img
+                            src="${imagen}"
+                            alt="${nombre}"
+                            loading="lazy"
+                            decoding="async"
+                            onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'">
+                    </a>
                 </div>
 
                 <div class="ticket-perf"></div>
@@ -763,7 +785,7 @@ function mostrarProductos(lista){
 
                     <small>${categoria}</small>
 
-                    <h5>${nombre}</h5>
+                    <h5><a href="${href}" class="card-link" data-action="quickview">${nombre}</a></h5>
 
                     <div class="price">$${formatearPrecio(p.PRECIO)}</div>
 
@@ -851,6 +873,13 @@ document.getElementById("productos").addEventListener("click", function(e){
 
     const actionEl = e.target.closest("[data-action]");
     if(!actionEl) return;
+
+    // Enlaces <a href> de la tarjeta: clic normal → Quick View (sin navegar);
+    // Ctrl/Cmd/Shift/Alt + clic → el navegador abre la ficha estática como siempre.
+    if(actionEl.tagName === "A"){
+        if(e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button > 0) return;
+        e.preventDefault();
+    }
 
     const card = actionEl.closest(".card-product");
     if(!card) return;
@@ -1200,6 +1229,29 @@ function generarSlug(texto){
         .replace(/^-+|-+$/g, "");
 }
 
+/**
+ * Segmento de URL de la ficha estática: <CODIGO codificado>[-slug].
+ * DEBE coincidir con segmentoProducto() de scripts/seo-comun.js (lo usan el
+ * generador de fichas y el sitemap): si cambia uno, cambiar el otro.
+ */
+function segmentoProductoURL(producto){
+    const codigo = String(producto.CODIGO == null ? "" : producto.CODIGO).trim().replace(/[\/\\]+/g, "-");
+    const slug = generarSlug(producto.PRODUCTO);
+    return encodeURIComponent(codigo) + (slug ? "-" + slug : "");
+}
+
+/** Base pública del sitio (con "/" final): config.json/Sheets, o la URL actual como último recurso. */
+function baseSitioURL(){
+    const configurada = (typeof CONFIG_NEGOCIO !== "undefined" && CONFIG_NEGOCIO && CONFIG_NEGOCIO.URL_SITIO) || "";
+    if(configurada) return configurada.replace(/\/*$/, "/");
+    return urlBase || window.location.href.split("?")[0].split("#")[0];
+}
+
+/** URL canónica de la ficha estática de un producto (/producto/CODIGO-slug/). */
+function urlEstaticaProducto(producto){
+    return baseSitioURL() + "producto/" + segmentoProductoURL(producto) + "/";
+}
+
 function actualizarURLProducto(producto){
 
     if(!producto) return;
@@ -1225,7 +1277,7 @@ function actualizarURLProducto(producto){
     // se lista en sitemap.xml y la que conviene que Google indexe como
     // "la" URL de este producto, para no generar contenido duplicado
     // entre las dos versiones.
-    const urlCanonicaEstatica = urlBase + "producto/" + codigo + (slug ? "-" + slug : "") + "/";
+    const urlCanonicaEstatica = urlEstaticaProducto(producto);
     const tituloProducto = producto.PRODUCTO + (nombreNegocio ? " | " + nombreNegocio : "");
     const descripcionCorta = String(producto.DESCRIPCION || producto.PRODUCTO || "").slice(0, 160);
     const imagenProducto = producto.IMAGEN || "";
@@ -1380,6 +1432,24 @@ function abrirProductoDesdeURL(){
     else mostrarToast("Ese producto ya no está disponible en el catálogo.", "error");
 }
 
+// ?categoria=slug → filtra el catálogo por esa categoría. Lo usan los enlaces
+// "abrir esta categoría en el catálogo" de las páginas /categoria/<slug>/.
+function abrirCategoriaDesdeURL(){
+
+    const params = new URLSearchParams(window.location.search);
+    const param = params.get("categoria");
+    if(!param || params.get("producto")) return;
+
+    const slug = generarSlug(param);
+    const categoria = [...new Set(estado.productos.map(p => String(p.CATEGORIA || "").trim()))]
+        .find(c => c && generarSlug(c) === slug);
+    if(!categoria) return;
+
+    estado.categoria = categoria;
+    document.querySelectorAll("#categoria-chips .chip").forEach(c => c.classList.toggle("active", c.dataset.cat === categoria));
+    aplicarFiltros();
+}
+
 // ?producto=CODIGO-slug → producto. El código puede tener guiones
 // (ej. PRD-1792442698715-885), así que no se corta en el primer "-":
 // se busca el código más largo que coincida con el comienzo del parámetro.
@@ -1400,9 +1470,10 @@ function productoDesdeParametro(param){
 /* Compartir el producto abierto: menú nativo del celular
    (WhatsApp, Instagram, copiar…) o, si no existe, WhatsApp directo. */
 function linkDelProducto(producto){
-    const base = (urlBase || window.location.href.split("?")[0].split("#")[0]);
-    const slug = generarSlug(producto.PRODUCTO);
-    return base + "?producto=" + encodeURIComponent(producto.CODIGO) + (slug ? "-" + slug : "");
+    // Se comparte la URL estática canónica (/producto/CODIGO-slug/): es una
+    // ficha real, con vista previa correcta en WhatsApp/Facebook y la que
+    // indexa Google. Desde esa página, "Comprar en el catálogo" abre la SPA.
+    return urlEstaticaProducto(producto);
 }
 
 async function compartirProducto(producto){
@@ -3109,6 +3180,7 @@ async function descargarCatalogoPDF(){
   actualizarContador();
   await cargarProductos();
   abrirProductoDesdeURL();
+  abrirCategoriaDesdeURL();
 })();
 
 /* =========================================================
