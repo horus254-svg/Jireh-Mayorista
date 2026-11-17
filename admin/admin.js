@@ -5568,6 +5568,7 @@ function nuevoProducto() {
   document.getElementById("pmColorPrimario").value = "";
   document.getElementById("pmGaleriaWrap").innerHTML = "";
   _pmGaleriaContador = 0;
+  cargarFichaProductoFormulario({});
   document.getElementById("pmPublicado").checked = true;
   document.getElementById("pmDestacado").checked = false;
   document.getElementById("pmOferta").checked = false;
@@ -5613,6 +5614,7 @@ function editarProducto(codigo) {
   document.getElementById("pmGaleriaWrap").innerHTML = "";
   _pmGaleriaContador = 0;
   parsearGaleriaAdminString(p.IMAGENES).forEach(f => agregarFilaGaleria(f.color, f.url));
+  cargarFichaProductoFormulario(p);
   document.getElementById("pmPublicado").checked = String(p.PUBLICADO || "").toUpperCase() === "SI";
   document.getElementById("pmDestacado").checked = String(p.DESTACADO || "").toUpperCase() === "SI";
   document.getElementById("pmOferta").checked = String(p.OFERTA || "").toUpperCase() === "SI";
@@ -5633,6 +5635,44 @@ function editarProducto(codigo) {
 function toggleVentaPorCaja() {
   const activo = document.getElementById("pmVentaPorCaja").checked;
   document.getElementById("pmCajaWrap").style.display = activo ? "" : "none";
+}
+
+/* ---- Descripción y características del producto (catálogo web / buscadores) ----
+   Columnas de la hoja PRODUCTOS. Se mandan siempre desde este formulario
+   (vacías incluidas, para poder borrarlas); un cliente que no las manda
+   (app vieja, edición rápida del POS) no las toca — ver actualizarProducto
+   en code.gs. */
+const CAMPOS_FICHA_PRODUCTO = { MARCA: "pmMarca", MATERIAL: "pmMaterial", MEDIDAS: "pmMedidas", CONTENIDO: "pmContenido", EDAD: "pmEdad" };
+
+function cargarFichaProductoFormulario(p) {
+  const desc = document.getElementById("pmDescripcion");
+  if (!desc) return;
+  desc.value = String(p.DESCRIPCION ?? "");
+  Object.entries(CAMPOS_FICHA_PRODUCTO).forEach(([col, id]) => {
+    const el = document.getElementById(id);
+    if (el) el.value = String(p[col] ?? "");
+  });
+  actualizarContadorDescripcion();
+  // Abierto si el producto ya tiene algo cargado; cerrado si está vacío
+  const wrap = document.getElementById("pmFichaWrap");
+  if (wrap) wrap.open = !!(desc.value || Object.keys(CAMPOS_FICHA_PRODUCTO).some(c => String(p[c] ?? "").trim()));
+}
+
+function leerFichaProductoFormulario() {
+  const desc = document.getElementById("pmDescripcion");
+  if (!desc) return null; // panel sin la sección: no se manda nada (el backend conserva lo que había)
+  const out = { DESCRIPCION: desc.value.replace(/\r\n?/g, "\n").trim() };
+  Object.entries(CAMPOS_FICHA_PRODUCTO).forEach(([col, id]) => {
+    const el = document.getElementById(id);
+    if (el) out[col] = el.value.replace(/\s+/g, " ").trim();
+  });
+  return out;
+}
+
+function actualizarContadorDescripcion() {
+  const desc = document.getElementById("pmDescripcion");
+  const cont = document.getElementById("pmDescripcionContador");
+  if (desc && cont) cont.textContent = desc.value.trim().length;
 }
 
 function cerrarModalProducto() {
@@ -6678,6 +6718,7 @@ async function guardarProductoForm() {
       PRECIO_CAJA: precioCaja || 0
     });
     if (esEdicion) params.set("codigoOriginal", codigoOriginal);
+    { const ficha = leerFichaProductoFormulario(); if (ficha) Object.entries(ficha).forEach(([k, v]) => params.set(k, v)); }
     // Alícuota de IVA: solo si el campo está a la vista (facturación de RI);
     // si no, no se manda y el backend conserva la que tenía.
     if (_alicuotaIvaFormulario() !== null) params.set("ALICUOTA_IVA", _alicuotaIvaFormulario());

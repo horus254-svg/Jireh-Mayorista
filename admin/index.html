@@ -3739,6 +3739,40 @@
         </div>
       </div>
 
+      <!-- Descripción y características: se muestran en el catálogo web y en
+           las páginas para buscadores (Google, Bing). Todo opcional. -->
+      <details class="pm-ficha mt-3" id="pmFichaWrap">
+        <summary>Descripción y características <span class="text-muted" style="font-size:11px; font-weight:400;">(catálogo web y buscadores)</span></summary>
+        <div class="pm-ficha-body">
+          <label class="form-label" for="pmDescripcion">Descripción</label>
+          <textarea class="form-control" id="pmDescripcion" rows="4" maxlength="5000" placeholder="Ej: Termo de acero inoxidable con doble pared. Mantiene el agua caliente hasta 12 horas. Ideal para mate." oninput="actualizarContadorDescripcion()"></textarea>
+          <div class="form-text" style="font-size:11px;"><span id="pmDescripcionContador">0</span> caracteres. Escribí 2 o 3 frases propias (qué es, para qué sirve, qué lo diferencia), no solo el nombre repetido.</div>
+          <div class="row g-2 mt-1">
+            <div class="col-6">
+              <label class="form-label" for="pmMarca">Marca</label>
+              <input type="text" class="form-control form-control-sm" id="pmMarca" maxlength="120" placeholder="Ej: Lumilagro">
+            </div>
+            <div class="col-6">
+              <label class="form-label" for="pmMaterial">Material</label>
+              <input type="text" class="form-control form-control-sm" id="pmMaterial" maxlength="120" placeholder="Ej: Acero inoxidable">
+            </div>
+            <div class="col-6">
+              <label class="form-label" for="pmMedidas">Medidas</label>
+              <input type="text" class="form-control form-control-sm" id="pmMedidas" maxlength="120" placeholder="Ej: 30 x 8 cm">
+            </div>
+            <div class="col-6">
+              <label class="form-label" for="pmContenido">Contenido / capacidad</label>
+              <input type="text" class="form-control form-control-sm" id="pmContenido" maxlength="120" placeholder="Ej: 1 litro · set de 6">
+            </div>
+            <div class="col-6">
+              <label class="form-label" for="pmEdad">Edad recomendada</label>
+              <input type="text" class="form-control form-control-sm" id="pmEdad" maxlength="120" placeholder="Ej: +3 años">
+            </div>
+          </div>
+          <div class="form-text" style="font-size:11px;">Los campos vacíos no se muestran. Los colores salen de la foto principal y de la galería.</div>
+        </div>
+      </details>
+
       <div class="pm-switches mt-3">
         <label class="pm-switch">
           <input type="checkbox" id="pmPublicado" checked>

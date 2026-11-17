@@ -1069,6 +1069,48 @@ document.getElementById("qv-thumbs").addEventListener("click", function(e){
     });
 });
 
+/**
+ * Características que se muestran en el detalle (solo las que tienen dato).
+ * Mismas columnas que usan las fichas estáticas (scripts/generar-seo.js).
+ */
+function caracteristicasProducto(producto){
+    const t = (v) => String(v ?? "").replace(/\s+/g, " ").trim();
+    const filas = [
+        ["Marca", t(producto.MARCA)],
+        ["Material", t(producto.MATERIAL)],
+        ["Medidas", t(producto.MEDIDAS)],
+        ["Contenido", t(producto.CONTENIDO)],
+        ["Edad recomendada", t(producto.EDAD)]
+    ];
+    const colores = coloresProducto(producto);
+    if(colores.length > 1) filas.push(["Colores", colores.join(", ")]);
+    const unidades = Number(producto.UNIDADES_POR_CAJA) || 0;
+    if(unidades > 0) filas.push(["Caja", unidades + " unidades"]);
+    return filas.filter(([, v]) => v);
+}
+
+/** Colores del producto: COLOR (foto principal) + los de IMAGENES ("url|color, …"), sin repetir. */
+function coloresProducto(producto){
+    const lista = [];
+    const agregar = (c) => {
+        c = String(c || "").trim();
+        if(c && !lista.some(x => x.toLowerCase() === c.toLowerCase())) lista.push(c);
+    };
+    agregar(producto.COLOR);
+    String(producto.IMAGENES || "").split(",").forEach(par => agregar(par.split("|")[1]));
+    return lista;
+}
+
+/** GTIN (código de barras EAN/UPC) si el código del producto es uno válido. */
+function gtinProducto(codigo){
+    const c = String(codigo ?? "").trim();
+    if(!/^(\d{8}|\d{12,14})$/.test(c)) return "";
+    const d = c.split("").map(Number);
+    const verificador = d.pop();
+    const suma = d.reverse().reduce((s, x, i) => s + x * (i % 2 === 0 ? 3 : 1), 0);
+    return (10 - suma % 10) % 10 === verificador ? c : "";
+}
+
 function abrirQuickView(producto, actualizarUrl){
 
     if(!producto) return;
@@ -1088,6 +1130,13 @@ function abrirQuickView(producto, actualizarUrl){
     const descripcion = String(producto.DESCRIPCION || "").trim();
     descripcionEl.textContent = descripcion;
     descripcionEl.classList.toggle("d-none", !descripcion);
+
+    const caracteristicasEl = document.getElementById("qv-caracteristicas");
+    if(caracteristicasEl){
+        const filas = caracteristicasProducto(producto);
+        caracteristicasEl.innerHTML = filas.map(([k, v]) => `<dt>${escapeHtml(k)}</dt><dd>${escapeHtml(v)}</dd>`).join("");
+        caracteristicasEl.classList.toggle("d-none", !filas.length);
+    }
 
     const stockEl = document.getElementById("qv-stock");
     const stock = obtenerEstadoStock(producto.STOCK);
@@ -1350,8 +1399,13 @@ function actualizarSchemaProducto(producto, url, descripcion, imagen){
         "name": producto.PRODUCTO,
         "description": descripcion,
         "sku": String(producto.CODIGO),
+        "gtin": gtinProducto(producto.CODIGO) || undefined,
+        "brand": String(producto.MARCA || "").trim() ? { "@type": "Brand", "name": String(producto.MARCA).trim() } : undefined,
+        "material": String(producto.MATERIAL || "").trim() || undefined,
+        "color": coloresProducto(producto).join(", ") || undefined,
         "image": imagen || undefined,
         "category": producto.CATEGORIA || undefined,
+        "itemCondition": "https://schema.org/NewCondition",
         "offers": {
             "@type": "Offer",
             "url": url,

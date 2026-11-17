@@ -33,6 +33,8 @@
  */
 
 const fs = require("fs");
+const path = require("path");
+const crypto = require("crypto");
 
 // Datos del cliente: config.json (sitioUrl / apiUrl), leídos por seo-comun.js.
 // Las variables de entorno BASE_URL/SITE_URL y API_URL, si están, tienen prioridad.
@@ -79,26 +81,46 @@ async function main() {
   const hoy = new Date().toISOString().slice(0, 10);
   const baseSinBarra = BASE_URL.replace(/\/+$/, "");
 
-  const urls = [
-    `  <url>\n    <loc>${escapeXml(BASE_URL)}</loc>\n    <lastmod>${hoy}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>1.0</priority>\n  </url>`
-  ];
+  // lastmod REAL: la fecha en que cambió el contenido de cada página, no la
+  // de hoy. Se guarda una huella (hash) de cada página publicada en
+  // .github/sitemap-fechas.json; si la huella no cambió, se conserva la fecha
+  // anterior. Así Google y Bing pueden confiar en lastmod para decidir qué
+  // volver a rastrear (si siempre dice "hoy", lo ignoran).
+  const ESTADO = path.join(SEO.ROOT, ".github", "sitemap-fechas.json");
+  let anterior = {};
+  try { anterior = JSON.parse(fs.readFileSync(ESTADO, "utf8")).urls || {}; } catch (e) {}
+  const estado = {};
+  const fechaDe = (loc, archivoRel) => {
+    let huella = "sin-archivo";
+    try { huella = crypto.createHash("sha256").update(fs.readFileSync(path.join(SEO.ROOT, archivoRel))).digest("hex").slice(0, 20); } catch (e) {}
+    const previo = anterior[loc];
+    const fecha = previo && previo.huella === huella ? previo.fecha : hoy;
+    estado[loc] = { huella, fecha };
+    return fecha;
+  };
+  const entrada = (loc, archivoRel, changefreq, priority) =>
+    `  <url>\n    <loc>${escapeXml(loc)}</loc>\n    <lastmod>${fechaDe(loc, archivoRel)}</lastmod>\n    <changefreq>${changefreq}</changefreq>\n    <priority>${priority}</priority>\n  </url>`;
+
+  const urls = [entrada(BASE_URL, "index.html", "daily", "1.0")];
 
   for (const c of plan.categorias) {
-    urls.push(
-      `  <url>\n    <loc>${escapeXml(`${baseSinBarra}/categoria/${c.seg}/`)}</loc>\n    <lastmod>${hoy}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>0.9</priority>\n  </url>`
-    );
+    urls.push(entrada(`${baseSinBarra}/categoria/${c.seg}/`, `categoria/${SEO.carpetaDeSegmento(c.seg)}/index.html`, "daily", "0.9"));
   }
 
   for (const f of plan.fichas) {
-    urls.push(
-      `  <url>\n    <loc>${escapeXml(`${baseSinBarra}/producto/${f.seg}/`)}</loc>\n    <lastmod>${hoy}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`
-    );
+    urls.push(entrada(`${baseSinBarra}/producto/${f.seg}/`, `producto/${SEO.carpetaDeSegmento(f.seg)}/index.html`, "weekly", "0.8"));
   }
+
+  fs.mkdirSync(path.dirname(ESTADO), { recursive: true });
+  const ordenado = Object.fromEntries(Object.keys(estado).sort().map(k => [k, estado[k]]));
+  fs.writeFileSync(ESTADO, JSON.stringify({ _LEEME: "Lo usa generar-sitemap.js para que lastmod sea la fecha real del último cambio de cada página. No editar.", urls: ordenado }, null, 1) + "\n");
+  const cambiadas = Object.values(estado).filter(x => x.fecha === hoy).length;
+  console.log(`lastmod: ${cambiadas} URLs con cambios hoy, ${urls.length - cambiadas} conservan su fecha anterior.`);
 
   const xml =
     `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join("\n")}\n</urlset>\n`;
 
-  fs.writeFileSync("sitemap.xml", xml, "utf8");
+  fs.writeFileSync(path.join(SEO.ROOT, "sitemap.xml"), xml, "utf8");
   console.log(`Listo: sitemap.xml generado con ${urls.length} URLs.`);
 }
 

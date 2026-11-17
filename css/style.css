@@ -1059,7 +1059,21 @@ select:focus-visible{
     font-size:.92rem;
     line-height:1.5;
     margin:10px 0 0;
+    white-space:pre-line; /* respeta los saltos de línea de la descripción */
+    overflow-wrap:anywhere;
 }
+
+/* Características del producto (marca, material, medidas…) */
+.qv-caracteristicas{
+    display:grid;
+    grid-template-columns:auto 1fr;
+    gap:4px 14px;
+    margin:12px 0 0;
+    font-size:.88rem;
+    line-height:1.4;
+}
+.qv-caracteristicas dt{ color:var(--ink-600); font-weight:500; }
+.qv-caracteristicas dd{ margin:0; color:var(--ink-900); overflow-wrap:anywhere; }
 
 @media (max-width:576px){
     .qv-precio-grande{ font-size:1.6rem; }
