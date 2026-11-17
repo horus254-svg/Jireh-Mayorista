@@ -10,6 +10,7 @@
  *   - manifest-catalogo.json / Reportes/manifest.json ... nombre y color
  *   - robots.txt ........ dirección del sitemap
  *   - archivo de verificación de Google Search Console (si corresponde)
+ *   - clave de IndexNow (<clave>.txt) para Bing, Yandex y otros buscadores
  *
  * Todo lo demás (nombre visible, colores, banner, teléfonos, textos)
  * ya se carga solo desde la hoja CONFIGURACION vía el backend.
@@ -139,5 +140,25 @@ fs.readdirSync(ROOT)
 if (/^google[0-9a-f]+\.html$/i.test(verif)) {
   escribirSiCambia(verif, "google-site-verification: " + verif + "\n");
 }
+
+// ------------------------------------------------------------------
+// 6) Clave de IndexNow (Bing, Yandex, etc.): <clave>.txt en la raíz del sitio
+//    Si config.json no tiene "indexNowClave", se genera una y se guarda ahí.
+//    Cada cliente debe tener la suya (para un cliente nuevo, dejarla vacía).
+// ------------------------------------------------------------------
+let claveIN = String(c.indexNowClave || "").trim();
+if (!/^[a-zA-Z0-9-]{8,128}$/.test(claveIN)) {
+  claveIN = require("crypto").randomBytes(16).toString("hex");
+  let cfg = leer("config.json");
+  if (/"indexNowClave"\s*:\s*"[^"]*"/.test(cfg)) cfg = cfg.replace(/"indexNowClave"\s*:\s*"[^"]*"/, `"indexNowClave": "${claveIN}"`);
+  else if (/"googleVerificacion"\s*:\s*"[^"]*",?/.test(cfg)) cfg = cfg.replace(/("googleVerificacion"\s*:\s*"[^"]*")(,?)/, `$1,\n  "indexNowClave": "${claveIN}"$2`);
+  else cfg = JSON.stringify({ ...c, indexNowClave: claveIN }, null, 2) + "\n";
+  JSON.parse(cfg); // por las dudas: nunca dejar un config.json roto
+  escribirSiCambia("config.json", cfg);
+}
+fs.readdirSync(ROOT)
+  .filter((f) => /^[0-9a-f]{32}\.txt$/i.test(f) && f !== claveIN + ".txt")
+  .forEach((f) => { fs.unlinkSync(path.join(ROOT, f)); cambios++; console.log("🗑️  " + f + " (clave IndexNow anterior)"); });
+escribirSiCambia(claveIN + ".txt", claveIN);
 
 console.log(cambios ? `✅ Datos del cliente aplicados (${cambios} archivo/s).` : "✅ Todo ya estaba al día con config.json.");

@@ -280,6 +280,9 @@ function revisarRobotsLocal() {
     const m = r.match(/^Sitemap:\s*(\S+)/im);
     if (!m || m[1] !== SITE + "/sitemap.xml") warn("robots.txt del repo: la línea Sitemap no apunta a " + SITE + "/sitemap.xml");
     if (/^Disallow:\s*\/\s*$/im.test(r)) err("robots.txt del repo bloquea todo el sitio (Disallow: /)");
+    const claveIN = String(CFG.crudo.indexNowClave || "").trim();
+    if (!claveIN) warn("config.json no tiene indexNowClave (se genera con node scripts/aplicar-cliente.js).");
+    else if (!existe(claveIN + ".txt") || leer(claveIN + ".txt").trim() !== claveIN) err(`Falta ${claveIN}.txt con la clave de IndexNow (correr node scripts/aplicar-cliente.js).`);
     const u = new URL(SITE);
     if (u.pathname.replace(/\/+$/, "")) {
         warn(`robots.txt del repo está en ${SITE}/robots.txt, pero los bots solo leen ${u.origin}/robots.txt (raíz del host). Con --live se comprueba el de la raíz.`);
