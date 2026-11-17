@@ -2890,7 +2890,7 @@ const CACHE_TTL_SECCIONES = {
 
 function invalidarCache(...claves) {
   claves.forEach(c => {
-    try { localStorage.removeItem("vpos_cache_" + c); } catch(e) {}
+    try { localStorage.removeItem(_claveCacheSeccion(c)); localStorage.removeItem("vpos_cache_" + c); } catch(e) {}
     delete ULTIMA_CARGA_SECCION[c];
   });
 }
@@ -3113,9 +3113,20 @@ window.addEventListener("offline", () => actualizarBadgeVentasPendientes(_leerCo
 setInterval(() => sincronizarVentasPendientes(), 30000);
 document.addEventListener("DOMContentLoaded", () => actualizarBadgeVentasPendientes(_leerColaVentasPendientes().length));
 
+/**
+ * Las copias guardadas de cada sección son POR USUARIO: un vendedor solo
+ * ve sus pedidos y clientes, así que en una computadora compartida no
+ * puede aparecerle (ni por un instante) la copia que dejó otro usuario.
+ */
+function _claveCacheSeccion(clave) {
+  let u = "";
+  try { u = (sessionStorage.getItem("usuarioLogueado") || "").trim().toLowerCase(); } catch (e) {}
+  return "vpos_cache_" + (u ? u + "_" : "") + clave;
+}
+
 function cacheGet(clave) {
   try {
-    const raw = localStorage.getItem("vpos_cache_" + clave);
+    const raw = localStorage.getItem(_claveCacheSeccion(clave));
     if (!raw) return null;
     const { ts, data } = JSON.parse(raw);
     return { data, stale: Date.now() - ts > (CACHE_TTL_SECCIONES[clave] || 5 * 60 * 1000) };
@@ -3124,7 +3135,7 @@ function cacheGet(clave) {
 
 function cacheSet(clave, data) {
   try {
-    localStorage.setItem("vpos_cache_" + clave, JSON.stringify({ ts: Date.now(), data }));
+    localStorage.setItem(_claveCacheSeccion(clave), JSON.stringify({ ts: Date.now(), data }));
   } catch(e) {}
 }
 
@@ -3647,6 +3658,9 @@ function chipVendedorPedido(p) {
 function actualizarOpcionesVendedorPedidos() {
   const sel = document.getElementById("filtroPedidoVendedor");
   if (!sel) return;
+  // Solo el admin ve pedidos de varios vendedores: para el resto el filtro no sirve
+  if (obtenerRolActual() !== "admin") { sel.style.display = "none"; sel.value = ""; return; }
+  sel.style.display = "";
   const nombres = [...new Set(pedidosGlobal.concat(_pedidosAntiguos.lista || [])
     .map(p => String(p.VENDEDOR || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "es"));
   const firma = nombres.join("|");
@@ -7092,6 +7106,7 @@ function renderTablaClientes(lista) {
             ${c.ALIAS ? `<span style="font-weight:500;color:var(--slate-500);font-size:13px;">· ${escapeHtml(c.ALIAS)}</span>` : ""}
           </div>
           <div class="pedido-card-dir" style="margin-top:4px; display:flex; flex-wrap:wrap; gap:10px;">
+            ${c.CREADO_POR && obtenerRolActual() === "admin" ? `<span class="pedido-vendedor-chip" title="Cliente cargado por ${escapeHtml(c.CREADO_POR_NOMBRE || c.CREADO_POR)}">👤 ${escapeHtml(c.CREADO_POR_NOMBRE || c.CREADO_POR)}</span>` : ""}
             ${c.EMPRESA   ? `<span>🚚 ${escapeHtml(c.EMPRESA)}</span>` : ""}
             ${c.TELEFONO  ? `<span>📞 ${escapeHtml(c.TELEFONO)}</span>` : ""}
             ${c.DIRECCION ? `<span>📍 ${escapeHtml(c.DIRECCION)}</span>` : ""}

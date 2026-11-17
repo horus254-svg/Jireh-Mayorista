@@ -154,14 +154,19 @@ function validarPagina(rel, tipo) {
             if (!prod.sku) err(P("Product.sku vacío"));
             const imgs = [].concat(prod.image || []);
             if (!imgs.length || imgs.some(u => !/^https:\/\//.test(u))) err(P("Product.image ausente o no https"));
-            const of = prod.offers;
-            if (!of) warn(P("Product sin offers (producto sin precio)"));
-            else {
+            // offers puede ser una oferta o una lista (unidad + caja)
+            const ofertas = [].concat(prod.offers || []);
+            if (!ofertas.length) warn(P("Product sin offers (producto sin precio)"));
+            ofertas.forEach(of => {
                 if (!(Number(of.price) > 0)) err(P("Offer.price inválido"));
                 if (!of.priceCurrency) err(P("Offer.priceCurrency ausente"));
                 if (!/schema\.org\/(InStock|OutOfStock|PreOrder)/.test(of.availability || "")) err(P("Offer.availability inválido"));
                 if (of.url !== url) err(P("Offer.url ≠ canonical"));
-            }
+            });
+            // GTIN: si está, tiene que ser un código de barras válido
+            ["gtin8", "gtin12", "gtin13", "gtin14", "gtin"].forEach(k => {
+                if (prod[k] !== undefined && C.gtin(prod[k]) !== String(prod[k])) err(P(k + " inválido: " + prod[k]));
+            });
             if (prod.url && prod.url !== url) err(P("Product.url ≠ canonical"));
             const h1txt = decodificarEntidades(((html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i) || [])[1] || "").trim());
             if (prod.name && h1txt !== prod.name) err(P("h1 ≠ Product.name"));

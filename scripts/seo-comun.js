@@ -168,8 +168,50 @@ function recortar(texto, max) {
     return (sp > max * 0.6 ? corte.slice(0, sp) : corte).replace(/[\s,.;:–-]+$/, "") + "…";
 }
 
+/* ---------------------------------------------------------------
+ * Datos enriquecidos del producto (todos opcionales; nada se inventa)
+ * ------------------------------------------------------------- */
+
+/** GTIN (EAN-8, UPC-A, EAN-13, GTIN-14) si el código es uno válido (dígito verificador incluido). */
+function gtin(codigo) {
+    const c = String(codigo ?? "").trim();
+    if (!/^(\d{8}|\d{12,14})$/.test(c)) return "";
+    const d = c.split("").map(Number);
+    const verificador = d.pop();
+    const suma = d.reverse().reduce((s, x, i) => s + x * (i % 2 === 0 ? 3 : 1), 0);
+    return (10 - suma % 10) % 10 === verificador ? c : "";
+}
+
+/** Colores: COLOR (foto principal) + los de IMAGENES ("url|color, …"), sin repetir. */
+function colores(p) {
+    const lista = [];
+    const agregar = (c) => {
+        c = String(c || "").replace(/\s+/g, " ").trim();
+        if (c && !lista.some(x => x.toLowerCase() === c.toLowerCase())) lista.push(c);
+    };
+    agregar(p.COLOR);
+    String(p.IMAGENES || "").split(",").forEach(par => agregar(par.split("|")[1]));
+    return lista;
+}
+
+/** Columnas opcionales de la hoja PRODUCTOS que se muestran como características. */
+const CARACTERISTICAS = [
+    ["MARCA", "Marca"], ["MATERIAL", "Material"], ["MEDIDAS", "Medidas"],
+    ["CONTENIDO", "Contenido"], ["EDAD", "Edad recomendada"]
+];
+
+/** [[etiqueta, valor], …] solo con las características que tienen dato. */
+function caracteristicas(p) {
+    const filas = CARACTERISTICAS
+        .map(([col, etiqueta]) => [etiqueta, String(p[col] ?? "").replace(/\s+/g, " ").trim()])
+        .filter(([, v]) => v);
+    const cs = colores(p);
+    if (cs.length) filas.push([cs.length > 1 ? "Colores" : "Color", cs.join(", ")]);
+    return filas;
+}
+
 module.exports = {
     ROOT, cargarConfig, generarSlug, segmentoProducto, segmentoCategoria, carpetaDeSegmento,
     obtenerProductos, planificar, escaparHtml, jsonLd, parsearPrecio, formatearPrecio,
-    urlHttps, imgTamano, recortar
+    urlHttps, imgTamano, recortar, gtin, colores, caracteristicas, CARACTERISTICAS
 };

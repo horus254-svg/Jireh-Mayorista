@@ -21,8 +21,11 @@
  *   - Nombre del negocio: config.json → "empresa"
  *   - Dirección: config.json → "direccionComercial" (o "direccion")
  *   - Por producto: PRODUCTO, CODIGO, CATEGORIA, PRECIO, IMAGEN, IMAGENES,
- *     DESCRIPCION (solo si el producto tiene una propia), UNIDADES_POR_CAJA
- *     y PRECIO_CAJA (si existen).
+ *     COLOR, DESCRIPCION (solo si el producto tiene una propia),
+ *     UNIDADES_POR_CAJA y PRECIO_CAJA, y las características opcionales
+ *     MARCA, MATERIAL, MEDIDAS, CONTENIDO y EDAD (se editan en el panel →
+ *     Productos → "Descripción y características").
+ *   - GTIN: si el CODIGO es un código de barras EAN/UPC válido.
  *
  * Variables de entorno (opcionales; si no están se lee config.json):
  *   SITE_URL → ej: https://usuario.github.io/repo   (sin "/" final)
@@ -74,7 +77,10 @@ function datosProducto(p, seg) {
 
     // Texto factual (solo datos reales) para meta description / JSON-LD cuando
     // el producto no tiene descripción propia.
+    const caracteristicas = C.caracteristicas(p);
+    const marca = String(p.MARCA || "").replace(/\s+/g, " ").trim();
     const partes = [nombre + (categoria ? " — " + categoria : "") + "."];
+    if (caracteristicas.length) partes.push(caracteristicas.map(([k, v]) => k + ": " + v).join(". ") + ".");
     if (precio !== null) partes.push("Precio $" + C.formatearPrecio(precio) + ".");
     partes.push("Venta al por mayor en " + NEGOCIO + ". Envíos a toda Argentina.");
     const descripcionFactual = partes.join(" ");
@@ -87,7 +93,7 @@ function datosProducto(p, seg) {
 
     return { nombre, categoria, categoriaSeg: C.segmentoCategoria(categoria), precio, url, urlCompra, codigoCrudo,
              descripcionPropia, descripcionFactual, descripcionMeta, descripcionSchema, imagenes, imagenPrincipal, sinFoto,
-             unidadesCaja, precioCaja };
+             unidadesCaja, precioCaja, caracteristicas, marca, colores: C.colores(p), gtin: C.gtin(codigoCrudo) };
 }
 
 /* ---------------------------------------------------------------
@@ -117,6 +123,11 @@ h2{font-size:1.15rem;margin:24px 0 8px}
 .btn:hover,.btn:focus{background:#c9440f}
 .desc p{margin:0 0 10px}
 .meta{font-size:14px;color:var(--mute)}
+h2.sub{font-size:1.05rem;margin:18px 0 6px}
+.carac{display:grid;grid-template-columns:auto 1fr;gap:4px 16px;margin:0 0 12px;font-size:15px}
+.carac dt{color:var(--mute)}
+.carac dd{margin:0}
+.intro{max-width:70ch}
 .grid{list-style:none;padding:0;margin:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
 .grid li{background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px}
 .grid a{text-decoration:none;color:var(--ink);display:block}
@@ -188,6 +199,30 @@ function tarjetas(items, ancho) {
  * Ficha de producto
  * ------------------------------------------------------------- */
 
+/**
+ * Ofertas del JSON-LD: el precio por unidad y, si se vende por caja, la caja
+ * como segunda oferta (con la cantidad que incluye). Sin precio: sin ofertas.
+ */
+function ofertasProducto(d) {
+    if (d.precio === null) return undefined;
+    const base = {
+        "@type": "Offer",
+        "url": d.url,
+        "priceCurrency": CFG.moneda,
+        "availability": "https://schema.org/InStock",
+        "itemCondition": "https://schema.org/NewCondition",
+        "seller": { "@type": "Organization", "name": NEGOCIO }
+    };
+    const unidad = { ...base, "price": d.precio };
+    if (!(d.unidadesCaja && d.precioCaja !== null)) return unidad;
+    return [unidad, {
+        ...base,
+        "name": "Caja de " + d.unidadesCaja + " unidades",
+        "price": d.precioCaja,
+        "eligibleQuantity": { "@type": "QuantitativeValue", "value": d.unidadesCaja, "unitText": "unidades" }
+    }];
+}
+
 function htmlProducto(item, plan) {
     const { p, seg } = item;
     const d = datosProducto(p, seg);
@@ -210,16 +245,19 @@ function htmlProducto(item, plan) {
         "description": d.descripcionSchema,
         "image": d.imagenes.length ? d.imagenes.map(u => C.imgTamano(u, 1200)) : [d.imagenPrincipal],
         "sku": d.codigoCrudo,
+        // GTIN solo si el código es un EAN/UPC válido (Google y Bing lo usan para
+        // reconocer el producto exacto). La propiedad específica según el largo.
+        ...(d.gtin ? { [{ 8: "gtin8", 12: "gtin12", 13: "gtin13", 14: "gtin14" }[d.gtin.length]]: d.gtin } : {}),
+        "brand": d.marca ? { "@type": "Brand", "name": d.marca } : undefined,
+        "material": String(p.MATERIAL || "").trim() || undefined,
+        "color": d.colores.length ? d.colores.join(", ") : undefined,
         "category": d.categoria || undefined,
         "url": d.url,
-        "offers": d.precio !== null ? {
-            "@type": "Offer",
-            "url": d.url,
-            "priceCurrency": CFG.moneda,
-            "price": d.precio,
-            "availability": "https://schema.org/InStock",
-            "seller": { "@type": "Organization", "name": NEGOCIO }
-        } : undefined
+        "itemCondition": "https://schema.org/NewCondition",
+        "additionalProperty": d.caracteristicas.length
+            ? d.caracteristicas.map(([k, v]) => ({ "@type": "PropertyValue", "name": k, "value": v }))
+            : undefined,
+        "offers": ofertasProducto(d)
     };
 
     const migas = [{ n: "Inicio", u: SITE_URL + "/" }];
@@ -259,7 +297,11 @@ ${d.categoria ? `<p class="cat">Categoría: ${cat ? `<a href="${esc(SITE_URL + "
 <p class="precio">${d.precio !== null ? "$" + C.formatearPrecio(d.precio) : "Consultá el precio"}</p>
 ${d.unidadesCaja ? `<p class="caja">Por caja (${d.unidadesCaja} unidades)${d.precioCaja !== null ? ": <strong>$" + C.formatearPrecio(d.precioCaja) + "</strong>" : ""}</p>` : ""}
 ${parrafos ? `<div class="desc">\n${parrafos}\n</div>` : ""}
-<p class="meta">Código: ${esc(d.codigoCrudo)} · Venta al por mayor en ${esc(NEGOCIO)}.</p>
+${d.caracteristicas.length ? `<h2 class="sub">Características</h2>
+<dl class="carac">
+${d.caracteristicas.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("\n")}
+</dl>` : ""}
+<p class="meta">Código: ${esc(d.codigoCrudo)}${d.gtin ? ` (código de barras)` : ""} · Venta al por mayor en ${esc(NEGOCIO)}.</p>
 <p><a class="btn" href="${esc(d.urlCompra)}">Comprar en el catálogo</a></p>
 </div>
 </article>
@@ -279,12 +321,48 @@ ${pie()}
  * Página de categoría
  * ------------------------------------------------------------- */
 
+/** "desde $X hasta $Y" (o "a $X" si todos valen lo mismo); "" si no hay precios. */
+function rangoPrecios(cat) {
+    const ps = cat.items.map(it => C.parsearPrecio(it.p.PRECIO)).filter(x => x !== null);
+    if (!ps.length) return "";
+    const min = Math.min(...ps), max = Math.max(...ps);
+    return min === max ? "a $" + C.formatearPrecio(min) : "desde $" + C.formatearPrecio(min) + " hasta $" + C.formatearPrecio(max);
+}
+
+/**
+ * Texto de presentación de la categoría, armado SOLO con datos reales:
+ * cantidad de productos, rango de precios, marcas cargadas y algunos ejemplos.
+ */
+function introCategoria(cat) {
+    const n = cat.items.length;
+    const frases = [];
+    const rango = rangoPrecios(cat);
+    frases.push(`En ${esc(NEGOCIO)} tenemos ${n} ${n === 1 ? "producto" : "productos"} de ${esc(cat.nombre.toLowerCase())} para comprar al por mayor${rango ? ", con precios " + esc(rango) : ""}.`);
+
+    const marcas = [];
+    cat.items.forEach(it => {
+        const m = String(it.p.MARCA || "").replace(/\s+/g, " ").trim();
+        if (m && !marcas.some(x => x.toLowerCase() === m.toLowerCase())) marcas.push(m);
+    });
+    if (marcas.length) frases.push(`Marcas: ${esc(marcas.slice(0, 8).join(", "))}${marcas.length > 8 ? " y más" : ""}.`);
+
+    const ejemplos = cat.items.slice(0, 4).map(it => esc(String(it.p.PRODUCTO).replace(/\s+/g, " ").trim()));
+    if (n > 1) frases.push(`Entre otros: ${ejemplos.join(", ")}.`);
+
+    const cajas = cat.items.filter(it => Number(it.p.UNIDADES_POR_CAJA) > 0).length;
+    if (cajas) frases.push(`${cajas === n ? "Todos se venden" : cajas + (cajas === 1 ? " se vende" : " se venden")} también por caja cerrada.`);
+
+    frases.push("Envíos a toda Argentina.");
+    return `<p class="intro">${frases.join(" ")}</p>`;
+}
+
 function htmlCategoria(cat) {
     const url = SITE_URL + "/categoria/" + cat.seg + "/";
     const n = cat.items.length;
     const titulo = cat.nombre + " al por mayor | " + NEGOCIO;
     const descripcion = C.recortar(
         cat.nombre + ": " + n + (n === 1 ? " producto" : " productos") + " al por mayor en " + NEGOCIO +
+        (rangoPrecios(cat) ? ", " + rangoPrecios(cat) : "") +
         (CFG.direccion ? ", " + CFG.direccion : "") + ". Envíos a toda Argentina.", 158);
     const primera = C.urlHttps(cat.items[0].p.IMAGEN);
 
@@ -320,7 +398,8 @@ ${barraSuperior()}
 <main class="wrap">
 <nav class="crumbs" aria-label="Ruta de navegación"><a href="${esc(SITE_URL)}/">Inicio</a> › ${esc(cat.nombre)}</nav>
 <h1>${esc(cat.nombre)} al por mayor</h1>
-<p>${n} ${n === 1 ? "producto disponible" : "productos disponibles"} en esta categoría de ${esc(NEGOCIO)}. Elegí un producto para ver su ficha o <a href="${esc(SITE_URL + "/?categoria=" + cat.seg)}">abrí esta categoría en el catálogo para armar tu pedido</a>.</p>
+${introCategoria(cat)}
+<p>Elegí un producto para ver su ficha o <a href="${esc(SITE_URL + "/?categoria=" + cat.seg)}">abrí esta categoría en el catálogo para armar tu pedido</a>.</p>
 <ul class="grid">
 ${tarjetas(cat.items, 240)}
 </ul>

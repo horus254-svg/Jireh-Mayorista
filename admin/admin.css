@@ -482,8 +482,17 @@ html,body{
   border-color:var(--blue-500);
   box-shadow:0 0 0 3px rgba(37,99,235,.12);
 }
+/* Desplegables: lugar para la flecha (si no, el texto se metía debajo:
+   "Todos los estados⌄") y texto largo cortado con "…" */
+.form-select{ padding-right:34px; text-overflow:ellipsis; white-space:nowrap; overflow:hidden; background-position:right 12px center; }
+/* Versión compacta (-sm): la regla de arriba la pisaba y los filtros
+   quedaban del mismo alto que un campo normal */
+.form-control-sm, .form-select-sm{ padding:6px 10px; font-size:13.5px; border-radius:8px; min-height:34px; }
+.form-select-sm{ padding-right:30px; background-position:right 9px center; }
+input[type="date"].form-control-sm{ padding-top:5px; padding-bottom:5px; }
 
 .btn{ border-radius:10px; font-weight:600; font-size:14.5px; padding:10px 18px; transition:.15s; border:none; }
+.btn-sm{ font-size:13.5px; padding:6px 12px; border-radius:8px; }
 .btn-primary{ background:var(--navy-900); border:none; }
 .btn-primary:hover{ background:var(--navy-800); }
 .btn-success{ background:var(--green-500); border:none; }
@@ -2693,9 +2702,21 @@ a[data-target="pedidos"]{ position:relative; }
 @media (prefers-reduced-motion: reduce){ .btn-actualizando .giro{ animation:none; } }
 
 /* Pedidos: búsqueda en pedidos anteriores */
-.pedidos-fechas{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; font-size:12.5px; color:var(--slate-500); }
+/* Barra de filtros de Pedidos: búsqueda que se estira, fechas y desplegables
+   en grupos que bajan ENTEROS de línea (antes cada desplegable quedaba en
+   su propio renglón en pantallas de ~1000 px de ancho) */
+.pedidos-filtros{ display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; margin-bottom:1rem; }
+.pedidos-filtros .pedidos-buscar{ flex:1 1 240px; min-width:200px; max-width:420px; }
+.pedidos-filtros-selects{ display:flex; gap:8px; flex:0 1 auto; margin-left:auto; }
+.pedidos-filtros-selects .form-select{ width:auto; min-width:140px; max-width:200px; }
+@media (max-width:640px){
+  .pedidos-filtros .pedidos-buscar{ max-width:none; flex-basis:100%; }
+  .pedidos-filtros-selects{ margin-left:0; flex:1 1 100%; }
+  .pedidos-filtros-selects .form-select{ flex:1 1 0; max-width:none; min-width:0; }
+}
+.pedidos-fechas{ display:flex; flex-wrap:nowrap; align-items:center; gap:8px; font-size:12.5px; color:var(--slate-500); }
 .pedidos-fechas label{ display:flex; align-items:center; gap:5px; margin:0; }
-.pedidos-fechas input{ width:auto; }
+.pedidos-fechas input{ width:auto; max-width:150px; }
 .pedidos-busqueda-antiguos{ font-size:13px; margin:-6px 0 10px; min-height:0; }
 .pedidos-busqueda-antiguos:empty{ display:none; }
 .pedido-antiguo-badge{ display:inline-block; font-size:11px; font-weight:600; color:var(--slate-600,#475569); background:var(--slate-100); border:1px solid var(--slate-200); border-radius:999px; padding:1px 8px; vertical-align:middle; }
@@ -2816,3 +2837,10 @@ a[data-target="pedidos"]{ position:relative; }
 .pm-ficha[open] > summary{ border-bottom:1px solid var(--slate-200); }
 .pm-ficha-body{ padding:10px 12px 12px; }
 .pm-ficha-body .form-label{ font-size:12.5px; margin-bottom:2px; }
+
+/* Botones del encabezado de cada sección: nunca en dos renglones ("↻ / Actualizar") */
+.page-header .btn{ white-space:nowrap; }
+/* El grupo de acciones no se achica (si no entra, baja ENTERO debajo del
+   título); solo se parte en renglones si no entra ni en una línea sola */
+.page-header > div:last-child{ flex-wrap:wrap; flex-shrink:0; max-width:100%; }
+.page-header .form-control, .page-header .form-select{ width:auto; }

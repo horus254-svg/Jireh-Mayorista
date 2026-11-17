@@ -541,22 +541,22 @@
       </div>
     </div>
     <div class="card p-3">
-      <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
-        <input type="text" id="buscarPedido" class="form-control" style="max-width:320px" placeholder="Buscar por pedido, cliente, DNI o teléfono..." oninput="filtrarPedidos(); programarBusquedaPedidosAntiguos()">
+      <div class="pedidos-filtros">
+        <input type="text" id="buscarPedido" class="form-control form-control-sm pedidos-buscar" placeholder="Buscar por pedido, cliente, DNI o teléfono..." oninput="filtrarPedidos(); programarBusquedaPedidosAntiguos()">
         <div class="pedidos-fechas" title="Para buscar pedidos de cualquier fecha, también los más viejos">
           <label>Desde <input type="date" class="form-control form-control-sm" id="pedidosDesde" onchange="filtrarPedidos(); programarBusquedaPedidosAntiguos(true)"></label>
           <label>Hasta <input type="date" class="form-control form-control-sm" id="pedidosHasta" onchange="filtrarPedidos(); programarBusquedaPedidosAntiguos(true)"></label>
           <button type="button" class="btn btn-link btn-sm p-0" id="pedidosLimpiarFechas" onclick="limpiarBusquedaPedidos()" style="display:none;">Quitar fechas</button>
         </div>
-        <div class="d-flex gap-2 ms-auto flex-wrap">
-          <select class="form-select form-select-sm" id="filtroPedidoEstado" style="max-width:160px;" onchange="filtrarPedidos()">
+        <div class="pedidos-filtros-selects">
+          <select class="form-select form-select-sm" id="filtroPedidoEstado" onchange="filtrarPedidos()">
             <option value="">Todos los estados</option>
             <option value="NUEVO">Nuevo</option>
             <option value="PREPARANDO">Preparando</option>
             <option value="ENVIADO">Enviado</option>
             <option value="CANCELADO">Cancelado</option>
           </select>
-          <select class="form-select form-select-sm" id="filtroPedidoVendedor" style="max-width:190px;" onchange="filtrarPedidos()" title="Quién cargó el pedido">
+          <select class="form-select form-select-sm" id="filtroPedidoVendedor" onchange="filtrarPedidos()" title="Quién cargó el pedido">
             <option value="">Todos los vendedores</option>
             <option value="__WEB__">🌐 Web (clientes)</option>
           </select>

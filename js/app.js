@@ -1127,7 +1127,10 @@ function abrirQuickView(producto, actualizarUrl){
     document.getElementById("qv-precio").textContent = "$" + formatearPrecio(producto.PRECIO);
 
     const descripcionEl = document.getElementById("qv-descripcion");
-    const descripcion = String(producto.DESCRIPCION || "").trim();
+    let descripcion = String(producto.DESCRIPCION || "").trim();
+    // Si la "descripción" es solo el nombre repetido, no se muestra (ya está en el título)
+    const soloNombre = (t) => String(t || "").toLowerCase().replace(/[^a-z0-9áéíóúñü]+/g, " ").trim();
+    if(soloNombre(descripcion) === soloNombre(producto.PRODUCTO)) descripcion = "";
     descripcionEl.textContent = descripcion;
     descripcionEl.classList.toggle("d-none", !descripcion);
 
