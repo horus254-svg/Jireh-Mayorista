@@ -2236,7 +2236,9 @@ async function confirmarAnulacionVenta() {
       return;
     }
 
-    toast("Venta anulada — sigue en el historial pero ya no cuenta en caja", "success");
+    toast(data.yaAnulada
+          ? "Esa venta ya estaba anulada (el stock ya se había devuelto)"
+          : "Venta anulada — se devolvió el stock y ya no cuenta en caja", "success");
     if (window.ArcaUI) ArcaUI.trasAnulacion(venta, motivo); // nota de crédito si estaba facturada
     cerrarModalAnulacion();
     cargarVentasPOSHistorial();
