@@ -8,7 +8,7 @@
  *   - index.html ........ <title>, description, canonical, Open Graph,
  *                          Twitter Card, schema.org y verificación de Google
  *   - manifest-catalogo.json / Reportes/manifest.json ... nombre y color
- *   - robots.txt ........ dirección del sitemap
+ *   - robots.txt ........ reglas para Google (Merchant Center) y sitemap
  *   - archivo de verificación de Google Search Console (si corresponde)
  *   - clave de IndexNow (<clave>.txt) para Bing, Yandex y otros buscadores
  *
@@ -124,11 +124,37 @@ actualizarManifest("Reportes/manifest.json", { name: "Reportes — " + empresa, 
 // ------------------------------------------------------------------
 // 4) robots.txt
 // ------------------------------------------------------------------
-if (existe("robots.txt")) {
-  let r = leer("robots.txt");
-  const linea = "Sitemap: " + sitioUrl + "sitemap.xml";
-  r = /^Sitemap:.*$/m.test(r) ? r.replace(/^Sitemap:.*$/m, linea) : r.replace(/\s*$/, "\n\n" + linea + "\n");
+// Se arma entero desde config.json → "robots" (opcional):
+//   "robots": { "bloquear": ["admin/", "precio.html", …] }   páginas internas
+// Googlebot, Googlebot-Image y AdsBot-Google tienen su propio grupo con
+// "Allow: /": es lo que pide Google Merchant Center para poder leer las
+// fichas de producto y sus imágenes.
+//
+// OJO: los buscadores solo leen el robots.txt de la RAÍZ del dominio. Si el
+// sitio está en una subcarpeta (usuario.github.io/Repo/), este archivo no se
+// usa: hay que publicar el mismo contenido en la raíz (en GitHub Pages, un
+// repo llamado "usuario.github.io"). Por eso también se genera
+// robots-raiz.txt, listo para copiar ahí (ver LEEME).
+{
+  const base = new URL(sitioUrl).pathname.replace(/\/?$/, "/"); // "/" o "/Repo/"
+  const bloquear = ((c.robots && c.robots.bloquear) || ["admin/", "login.html", "precio.html", "lector.html", "stock.html", "cobro.html", "Reportes/"])
+    .map(x => base + String(x).replace(/^\/+/, ""));
+  const grupo = (agentes, conAllow) => agentes.map(a => "User-agent: " + a).join("\n") + "\n" +
+    (conAllow ? "Allow: " + base + "\n" : "") + bloquear.map(b => "Disallow: " + b).join("\n");
+  const r = [
+    "# Lo genera scripts/aplicar-cliente.js desde config.json: no editar a mano.",
+    "",
+    "# Google (páginas e imágenes de productos para Search y Merchant Center)",
+    grupo(["Googlebot", "Googlebot-Image", "AdsBot-Google"], true),
+    "",
+    "# Todos los demás",
+    grupo(["*"], true),
+    "",
+    "Sitemap: " + sitioUrl + "sitemap.xml",
+    ""
+  ].join("\n");
   escribirSiCambia("robots.txt", r);
+  if (base !== "/") escribirSiCambia("robots-raiz.txt", r);
 }
 
 // ------------------------------------------------------------------
