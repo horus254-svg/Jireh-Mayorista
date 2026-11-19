@@ -1,0 +1,3681 @@
+{
+ "_LEEME": "Lo usa generar-sitemap.js para que lastmod sea la fecha real del último cambio de cada página. No editar.",
+ "urls": {
+  "https://horus254-svg.github.io/Jireh-Mayorista/": {
+   "huella": "fff7077a1fa196251496",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/categoria/accesorios/": {
+   "huella": "e51cc940dcac235306c2",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/categoria/aluminio/": {
+   "huella": "58eeb2f99b8a658adfe9",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/categoria/bombillas/": {
+   "huella": "4b4b93939470b20ac5e5",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/categoria/ceramica/": {
+   "huella": "b5ba8cc449bbe5631089",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/categoria/cocina/": {
+   "huella": "7e255b703e0daa40124e",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/categoria/electronicos/": {
+   "huella": "23b857430452cca577ff",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/categoria/herramientas/": {
+   "huella": "63825b4e5827b62dfd74",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/categoria/hogar/": {
+   "huella": "774f5d8765b58404588c",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/categoria/juguetes/": {
+   "huella": "0e7e2492456940f88ca2",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/categoria/libreria/": {
+   "huella": "9ff5d61539fadaac45a8",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/categoria/maquillaje/": {
+   "huella": "1aad9f30aab2410063d8",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/categoria/mates/": {
+   "huella": "82da259255db924a6a6f",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/categoria/navidad/": {
+   "huella": "959872bee0bd06aa2f63",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/categoria/ofertas/": {
+   "huella": "ea00aa68a03fa75fb576",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/categoria/pirotecnia/": {
+   "huella": "9062e3b1a2af4347c469",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/categoria/plasticos/": {
+   "huella": "bd688ded8a1803eb2464",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/categoria/set-de-mate/": {
+   "huella": "54144e85f8254e487670",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/categoria/termicos/": {
+   "huella": "7d1a407fba4b8e28335e",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/categoria/verano/": {
+   "huella": "1c9fc4fb81b51cfcc355",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/categoria/vidrio/": {
+   "huella": "eb58679292ee90daf300",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/0550AMAR-regadera-con-pala-y-rastrillo-amor/": {
+   "huella": "8620135d9db80f1af00b",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/07394624173848-set-de-mate-con-pava/": {
+   "huella": "0254c5d6a1cbaed7b228",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/1042011210596-destapador-con-sacacorchos/": {
+   "huella": "bd5d310ef4c6e4ea09ef",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/10M-vaso-de-vidrio-messi-maradona/": {
+   "huella": "21ef6f593d161803a17d",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/1234567890036-individual-estampado/": {
+   "huella": "c6f2cb44a73a35522542",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/1450-mate-doble-asa-con-dije-2-corazon-bombilla/": {
+   "huella": "055ad68ddda5bb73b425",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/148191-botella-serigrafiada-600ml/": {
+   "huella": "c264e0a9796da01ff552",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/15500A-cartera-mochila-marron-y-lunares/": {
+   "huella": "c730c9073a9ba8007d5f",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/1780998103028-vaso-termico-tipo-quencher-1200ml-estampado-con-sorbete/": {
+   "huella": "7f579ddea3fe23767a9a",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/1780998103257-vaso-termico-estampado-con-manija-900ml/": {
+   "huella": "31f28cf4ca64195ce652",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/1780998103325-termo-bolita-1300ml-acero-estampado-con-bombilla-hengda/": {
+   "huella": "e68e3b5709f3d940342c",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/1780998103691-set-de-mate-plus-estampado-1000ml-h10369/": {
+   "huella": "7532d24b897fb88b44dd",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/1780998103820-botella-termica-deportiva-estampada-de-600ml/": {
+   "huella": "a2a393c60d45175bddca",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/1780998103981-set-de-mate-estampado-x4-termo-1300ml-yerbera-mate-180ml-y-bombilla/": {
+   "huella": "0d1a285e6ad562c8742b",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/1780998104070-set-de-utensilios-de-silicona-con-cuchillos-y-tabla-para-cortar/": {
+   "huella": "0187532669aaa7a4177d",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/1780998104193-vaso-chopp-con-strass-710ml-acero-inoxidable/": {
+   "huella": "cc3aab1cb7139a2899d0",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/1780998104322-kit-terere-termico-con-diseno-1500ml-150ml-450ml/": {
+   "huella": "655f6a51cc5795baaf7a",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/1780998300427-set-parrillero-de-acero-inoxidable-de-18-piezas-con-estuche/": {
+   "huella": "9d3a8f68a711ddd0a11a",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/1780998401452-cartera-porta-celular-de-cuero-colores-sujetos-a-disponibilidad/": {
+   "huella": "17e50921c5acbb0f00b4",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/1780998469636-rinonera-yq-sports/": {
+   "huella": "9b2bce15eecf485e8ef5",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/1780998471004-billetera-de-cuero-de-1-cierre-m47100-colores-sujetos-a-disponibilidad/": {
+   "huella": "063fd2a0b48c95835085",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/1780998471011-billetera-dama-cuero-m47101-colores-sujetos-a-disponibilidad/": {
+   "huella": "d1cbd8a5411a527f7640",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/1780998471035-billetera-dama-yq-de-cuero-m47103-colores-sujetos-a-disponibilidad/": {
+   "huella": "ea07086bebe8b5773922",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/1780998474890-billetera-de-cuero-yq-fashion-m47489-colores-sujetos-a-disponibilidad/": {
+   "huella": "deb97ebbf8844608e493",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/1780998476504-bandolera-para-hombre-yq-sports/": {
+   "huella": "5eb0adcf3736d69dba3d",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/1780998478546-billetera-1-cierre-yq-fashion-m47854-de-cuero-colores-sujetos-a-disponibilidad/": {
+   "huella": "3ced267d46ff62c7146a",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/1780998480037-set-de-cuchillos-con-mango-ergonomico-6-piezas/": {
+   "huella": "5d31fb2bcdd089d87d87",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/1780998484462-billetera-dama-de-cuerro-qy-m48446-colores-sujetos-a-disponibilidad/": {
+   "huella": "0d050c51ea0bf16a2cca",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/1780998504597-billetera-para-dama-m50459/": {
+   "huella": "f102b97d0360ccd7e5c0",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/1780998509561-billetera-para-dama-m50956/": {
+   "huella": "254373e62bb2480fa08c",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/1780998509608-billetera-para-dama-m50960/": {
+   "huella": "4f8b3b914e718e54ade3",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/190198496263-cable-usb-c-a-usb-c-para-iphone-15-iphone-16-iphone-17/": {
+   "huella": "795698ae4967275fe848",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/193052090140-pelota-sorpresa-coleccionable-zuru-ballers-42-modelos/": {
+   "huella": "e5016d2554957ce96b4d",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/194582664658-cargador-usb-c-35w-para-iphone/": {
+   "huella": "9fe6109de219f19b13ae",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/2009979000033-luces-led-blancas-en-manguera-5mts/": {
+   "huella": "3ca3e23b52eb0fcc86e6",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/2023150254381-tabla-para-quesos-redonda-con-pizarra/": {
+   "huella": "fbf88e2ee6d80c153b4a",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/2023419836150-cartera-para-mujer-23x15cm-modeloa615/": {
+   "huella": "70ab6b205978af9b8d19",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/2025060116445-cartera-para-mujer-modelo-a1644-3/": {
+   "huella": "310fb6a7811fd59da04c",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/2025060118180-cartera-para-mujer-23x16cm-modelo-a1818-5/": {
+   "huella": "ebc95888b754401a1d37",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/2025060217623-mochila-para-mujer-36x30cm-a1762-6/": {
+   "huella": "1463d82c2d292102d608",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/2025060217630-mochila-para-mujer-36x30cm-a1762-6/": {
+   "huella": "7914c302776fd29b90d3",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/2025060618857-cartera-para-dama-29x13x21cm-colores-sujetos-a-disponibilidad/": {
+   "huella": "7f1547d02014bb0fff36",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/2025070119269-cartera-para-mujer-16x8cm-modelo-a1926-5/": {
+   "huella": "c2647798c72d8d30d2d5",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/2025198312610-morral-para-hombre-con-cerradura-de-combinacion/": {
+   "huella": "e3655d9febb508c1f5fe",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/2025198313013-cartera-para-dama-modelo-a1301-3/": {
+   "huella": "b5c376d8618c0ffcd6c9",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/2025198313235-cartera-para-mujer-28x12x20cm-a1323-5/": {
+   "huella": "40a852177fcfdce6e9ba",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/2025198314447-billetera-para-dama-con-1-cierre-a1444-5/": {
+   "huella": "5d07353453139c4550a9",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/2025198315444-cartera-para-mujer-modelo-a1544-5/": {
+   "huella": "d12cdd6492b3e22fced8",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/2112345688312-paragua-transparente-de-colores/": {
+   "huella": "36a3e96b2be8f26ad002",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/2222-despolvillador-con-dije-corazon/": {
+   "huella": "c1bad54f2888195a636e",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/2505260008486-cartera-de-tela-para-mujer-48x33x14cm-alo-yt-848/": {
+   "huella": "bd71c013cdb584d5b0b4",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/2505601750029-bolso-de-tela-totebag-pfv-02-jinyuan/": {
+   "huella": "af1fe58bcb1daec8b7e0",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/2520-set-de-mate-corazon/": {
+   "huella": "c4e7328bfe857794db44",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/262-candado-25mm/": {
+   "huella": "1634bc0a7675fc41ad12",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/264-candado-38mm/": {
+   "huella": "98f13853c01b0efec4d5",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/3024201810074-bolsa-de-regalo-26x32x10-merry-christmas-4-modelo-surtidos/": {
+   "huella": "55bf3fcb6df4e5f917a2",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/3025199301063-bolsa-de-regalo-navidena-26x32x10-con-relieve/": {
+   "huella": "ebb15b8aaecc652a7f06",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/3440000004580-mate-plastico-estampado-con-bombilla/": {
+   "huella": "9c30c1c2872d78d5d0bb",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/3500OINK-vaso-cafetero-plastico-con-faja-300ml-oink/": {
+   "huella": "05c9a027f4d7f589459a",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/3500P-taza-ceramica-personajes/": {
+   "huella": "607732c689222ad03eaf",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/37342-termo-system-1200ml-tapa-color-inoxidable-dicoe-dc017/": {
+   "huella": "b8441cb85c80bf1160ae",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/410-taza-ceramica/": {
+   "huella": "958972f86198209fea26",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/4168407360540-cucharita-plastica-para-ninos/": {
+   "huella": "a012829588be7b115291",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/4172307351188-bandeja-de-melamina-45x30cm/": {
+   "huella": "9c565dac9ed15231e031",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/4172407320091-plato-hondo-de-melamina/": {
+   "huella": "3995261078413ae44142",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/4275123652122-linga-con-combinacion/": {
+   "huella": "7ea2b992ad25c9380864",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/4750841380286-termo-system-1200ml-acero-liso-bigstar/": {
+   "huella": "d5002ca8eac88870a5fc",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/4894457201549-molde-para-empanadas/": {
+   "huella": "083f3df3684a4ad902f5",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/4894457803439-colitas-unidades/": {
+   "huella": "8c5b620e80307a5098a6",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/4901301434593-cartel-luminoso-neon-arbol-navideno-24x16cm-verde-a-pila-y-usb-c-basepila-y/": {
+   "huella": "1bc94beec2ebb2ec9d91",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/4901301434722-cartel-luminoso-neon-copo-de-nieve-38x33cm-frio-usb-c-base/": {
+   "huella": "1ff77f25e5b55f2085ec",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/4901301434739-cartel-luminoso-neon-reno-navideno-26x17cm-calido-usb-c-base/": {
+   "huella": "36fcce6bd838fa00e969",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/4901301434746-cartel-luminoso-neon-papa-noel-27x20cm/": {
+   "huella": "10f20801307bf916730c",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/4901301434760-cartel-luminoso-neon-muerdago-23x25cm-multi-color-usb-c-base/": {
+   "huella": "36f2a16cbd0a125e7f24",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/500900-vaso-plastico-pastel/": {
+   "huella": "71656553954ba1a80aff",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/5012345678900-esmalte-infantil-en-bolsa/": {
+   "huella": "c3de7eb17635d237930e",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/5015-set-de-limpieza-x3/": {
+   "huella": "0fbc7aae068e59cf1137",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/557P-peine-con-mango-chico-pastel/": {
+   "huella": "1ec8cae51854586a8dca",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/5589-peine-doble-pastel/": {
+   "huella": "454b9e0a9675b94df0e9",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/5658565430012-termo-media-manija-de-acero-1000ml-estampado-con-mate-de-180ml/": {
+   "huella": "d8bbc74a9ff3d6fae8e7",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/5658565430029-kit-terere-completo-con-diseno/": {
+   "huella": "c5c2c55afd10b16edb95",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/5658565430043-set-de-mate-estampado-con-termo-1200ml-yerbero-bombilla-y-mate-150ml/": {
+   "huella": "967b3dd06499c5c1a49a",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/5658565430074-vaso-termico-con-manija-estampado-900ml/": {
+   "huella": "0474b55ab7a84cb10011",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/5658565430098-botella-termica-con-diseno-750ml/": {
+   "huella": "85cda38b75789f270fea",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/5658565430166-botella-termica-con-manija-estampada-750ml-con-protectores-de-silicona/": {
+   "huella": "b32f4c2f49ed83706c1f",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/5658565430173-vaso-autocebante-con-diseno-700ml/": {
+   "huella": "476e772ccb19a9e98de5",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/5658565430227-termo-autocebante-estampado-de-750ml-2-en-1-termo-mate-autocebante-con-sorbete-de-acero/": {
+   "huella": "ee030f34a0133d89e79f",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/5658565543378-vaso-termico-con-manija-reversible-de-900ml-4337/": {
+   "huella": "7564d6b3f910687d111b",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/5658565543385-vaso-termico-con-manija-reversible-de-1200ml/": {
+   "huella": "2a6fd388cfc7439d3f47",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/5658565543996-termo-system-de-acero-1000ml-estampado-con-mate-de-180ml/": {
+   "huella": "11bfb8322f5ec4d7d435",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/5658565547611-vaso-termico-tipo-quencher-1300ml-borde-plateado-con-sorbete/": {
+   "huella": "fabaa8276c523b78ec52",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/5658565549929-termo-dispensador-con-bomba-2500ml-incluye-vaso-termico-y-bombilla/": {
+   "huella": "e1be8dd3a3421b99dbd5",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/601202023752-set-valijita-corazones-con-mate-bombilla/": {
+   "huella": "4f431157c90562b2ba9b",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6283321671812-soporte-para-el-celular-con-ventosa-para-el-parabrisas/": {
+   "huella": "5127704579167a817483",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6398090101177-molde-de-silicona-de-manzanas/": {
+   "huella": "3b5534e14b0ff1cb31d6",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6512913188742-termo-autocebante-estampado-de-750ml-2-en-1-termo-mate-autocebante-con-sorbete-de-acero/": {
+   "huella": "6712ffba9ee62d56c321",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6512943744782-termo-bala-estampado-1000ml/": {
+   "huella": "ad183f75f67a8cb27bf1",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6584621303305-bifera-ceramica-28cm-2-5mm-mango-de-silicona/": {
+   "huella": "18ccb61ac00f87063ecf",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6589124758126-inflador-de-pie-doble-piston/": {
+   "huella": "8cdca498e6ddb21b2b06",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6601900634551-muneco-funko-pop-avengers/": {
+   "huella": "8d0aab51f81271ed7f7c",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6618824000065-balde-cernidor-pala-y-rastrillo-x005/": {
+   "huella": "cd790da25c0e24f5f9fb",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6618825000064-balde-cernidor-pala-y-rastrillo-x006/": {
+   "huella": "f86c3e22bcb0e5e59be1",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/671-termo-con-mate-1-2l-dicoe-dc016/": {
+   "huella": "642ac483fdea7f4703f5",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6764063201814-pilas-aaa-paquete-de-4-unidades/": {
+   "huella": "818d3a10eb2b48b10f76",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6800036000067-lluvia-navidena-colores-surtidos-1-5mts/": {
+   "huella": "3c7763a67577625d2d7d",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6800352300513-set-de-invisibles/": {
+   "huella": "19da2dad79f773a625e0",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6855271122869-bolsa-de-regalo-de-26x32x10/": {
+   "huella": "3eca79351a48723c72e0",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6855271222583-bolsa-de-regalo-de-17-5x24x8-cm/": {
+   "huella": "c4fa3f9d1e68661bc079",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6895400062819-mono-navideno-grande/": {
+   "huella": "d5e1846caf1015e1d8d9",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6900005101488-burbujero-pistola-dinosaurio/": {
+   "huella": "432764542e5cbdf743cd",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6900023886558-set-de-bano-de-ceramica/": {
+   "huella": "2cfe637cc1faf92433a1",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6900523611452-pava-electrica-2000ml-bigstar/": {
+   "huella": "ab86c739797eb36c982e",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6901827622786-calculadora-solar-karuida-kk278/": {
+   "huella": "2149ca4c7fb3e3a015a6",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6902025074865-esferas-navidenas-pequenas-con-brillo-x12/": {
+   "huella": "73b5fc6d620e52715719",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6902026523744-morral-para-hombre-con-3-cierres/": {
+   "huella": "345845c92a76597744b8",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6902605024273-cartera-para-dama-con-2-cierres-a2427-10/": {
+   "huella": "38eac909d78fb0a1db13",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6902605024440-billetera-para-dama-con-2-cierres-a2444-5/": {
+   "huella": "30f4e5ec85f4619eecc7",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6902605824507-bolso-para-dama-grande-52x26cm-a2450-5/": {
+   "huella": "c4dae350cc82c5e49cec",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6905200349048-pelota-de-futbol-n5-270g-colores-surtidos/": {
+   "huella": "170dda8bce8d888e5781",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6905200349055-pelota-baloncesto-n7-caucho-500g/": {
+   "huella": "cdd86386ed48ca33d093",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6905667262034-reloj-de-pared-25cm-en-caja/": {
+   "huella": "d5d6cadd3776dc02863e",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6907412589632-kit-de-mate-completo/": {
+   "huella": "70372ecccfbcb16dcd02",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6910001151301-set-de-6-vasos-de-vidrio-para-capuchino-270ml/": {
+   "huella": "eaea57552d33aeb5b95a",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6910219208682-plancha-para-el-pelo-oogan/": {
+   "huella": "311dfb5dcfbbd1629358",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6911123456107-mamadera-magica/": {
+   "huella": "1301cf60ed396c849257",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6916522074419-set-de-bano-de-6-piezas/": {
+   "huella": "ee27a6af14ef162ef214",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6916522074426-set-de-bano-plastico-y-bambu-4-piezas/": {
+   "huella": "44e6687dee342ad15b90",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6920113303109-cinta-de-alambre-navidena-2-7mx3-8cm-colores-surtidos/": {
+   "huella": "f4f065b1560c2c00de3b",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6920230725990-plancha-para-el-pelo-luo/": {
+   "huella": "3fe6f98291cf092196ca",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6920240148185-secador-de-pelo-luo-con-accesorios/": {
+   "huella": "078d0ce2a80a5a7262cc",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6920243714028-cepillo-negro/": {
+   "huella": "0f3f06269e527f7fa2f4",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6920251121313-cartera-para-dama-con-2-cierres-a2131-10/": {
+   "huella": "55a51f673e96dc06e00f",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6920260349166-pelota-de-futbol-n2-trionda/": {
+   "huella": "29b30a73091ef49702ce",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6920388600712-pista-para-deslizarse-con-agua-500x90cm/": {
+   "huella": "fb3567ec432e2d9cd931",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6920388602594-colchoneta-inflable-multicolores-190x70cm/": {
+   "huella": "b73ec6c0871f41101c57",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6920388607094-inflable-cocodrilo-142x68cm/": {
+   "huella": "569e27efa1f64fe10557",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6920388616928-inflable-bracito-viajes-30x15cm/": {
+   "huella": "9472b4238d8d6744753e",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6920388618649-inflable-de-animales-para-bebe-63x53cm/": {
+   "huella": "4054e05d83578475cc04",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6920388619042-flotador-inflable-para-bebe-73x75cm/": {
+   "huella": "4e98ef81087f89234dfc",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6920388619523-inflable-para-bebe-57x57cm/": {
+   "huella": "5bd428fd4728d79d68cc",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6920388619738-pileta-de-lona-122x122x33cm/": {
+   "huella": "7b0e22878bdb3ea0c99e",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6920388643009-inflable-salvavidas-tucan-128x104x60cm/": {
+   "huella": "b67e4be4a4b9684e254e",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6920388654647-flotador-alpaca-55cm-sunclub/": {
+   "huella": "056631f175acc0421996",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6920388659390-pileta-1-5mx41cm-3d-orange-pool-sunclub/": {
+   "huella": "98359a3d3d6eccad5396",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6920388661904-inflable-salvavidas-oceano-60cm-sunclub/": {
+   "huella": "62f69ff6bc19562b826c",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6920388661935-inflable-salvavidas-dona-unicornio-y-panda-55cm/": {
+   "huella": "5c3f798f772cf5b8e4dc",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6920388662260-inflable-moto-de-agua-91x51cm/": {
+   "huella": "83d9825a9781c0122d11",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6920388662321-inflable-bracito-alpaca-30x15cm/": {
+   "huella": "d94f2ed1d1be0e7fc04b",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6920388662345-pileta-inflable-alpaca-100x30cm/": {
+   "huella": "68a316aefc25cffa11cc",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6920388667029-inflable-salvavidas-60cm/": {
+   "huella": "6cc9b1bcc611773c116b",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6920388667050-inflable-pelota-diseno-50cm-sunclub/": {
+   "huella": "7e8342f65da9176f76b1",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6920388667067-pelota-inflable-pulpo-40cm/": {
+   "huella": "29a65009570d07962322",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6920388667227-inflable-bracitos-dino-23cmx19cm-sunclub/": {
+   "huella": "f5b1f6520c51d4807f8d",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6920388690447-chaleco-salvavidas-de-3-a-6-anos/": {
+   "huella": "086f4f20af556e206a71",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6920388695961-inflable-salvavidas-animales-61x56cm/": {
+   "huella": "0033f1405583eb5dc651",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6920388697354-inflable-bracito-jirafa-22cmx20cm-sunclub/": {
+   "huella": "a2ff65d06529ff5be224",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6922025780252-cafetera-tipo-italiana-de-aluminio-con-capacidad-para-8-tazas/": {
+   "huella": "858c9288616840f6de81",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6922221063968-set-de-soldados-x4-con-accesorios/": {
+   "huella": "2b2e8bbfe4243e68a386",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6922507160046-pistola-lanza-agua-mini-20x11cm-f39/": {
+   "huella": "f17ae32bdeb21698d441",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6922507160091-pistola-lanza-agua-46cmx21cm-352/": {
+   "huella": "1ebd5346ff8008f5bb5f",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6922507160138-pistola-lanza-agua-50cmx23cm-a-01/": {
+   "huella": "447cc567477a5ee57028",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6922507160176-pistola-de-agua-gigante-56x21cm/": {
+   "huella": "8a0cd99cf2427c75cc3b",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6922507160183-pistola-lanza-agua-gigante-928a/": {
+   "huella": "984288b5c3a61cd72b07",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6923450829004-botella-termica-sport-de-acero-750ml-bigstar/": {
+   "huella": "7b9ded7d6c7c735a736e",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6924321014055-cucharon-nylon-con-mango-de-silicona/": {
+   "huella": "4153136ab56b3a539b80",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6925000193214-burbujero-camara-a-pilas-con-asa/": {
+   "huella": "683b4a0975319af995d3",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6925060090072-taza-de-ceramica-con-tapa-y-cucharilla/": {
+   "huella": "1e7179cdbc93e66071c2",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6925105673253-set-de-utensilios-de-silicona-con-cuchillos-y-tabla-para-cortar/": {
+   "huella": "402c59af3ab365ada81c",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6925112171544-rinonera-para-mujer-3-llaveros-2154-10/": {
+   "huella": "35c1050c145e26b78fbe",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6925231139098-binoculares-para-nino-estilo-militar/": {
+   "huella": "487e5629fea39b7fb06f",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6925240758327-set-de-animales-verano-x4-para-el-agua/": {
+   "huella": "eea1d6e2cf8f2c5efd2e",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6925930218018-piloto-impermeable-para-ninos/": {
+   "huella": "4445b5ecb4aa33727b5d",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6926022421583-billetera-para-dama-con-1-cierre-a2158-5/": {
+   "huella": "f1400073f100d799117b",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6926022421637-billetera-para-dama-con-1-cierre-a2163-5/": {
+   "huella": "0358bd4e9e7cd630a4e8",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6926022421903-bolso-48x26cm-modelo-a2190-5/": {
+   "huella": "e0174941f56f7b42390a",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6926022422207-morral-para-mujer-a2220-5/": {
+   "huella": "3d7cc08bc1ed8487e633",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6926042023453-billetera-para-dama-con-2-cierres-a2345-5/": {
+   "huella": "d86829c378ce7f5dc10a",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6926042023460-billetera-para-dama-con-2-cierres-pequena-a2346-5/": {
+   "huella": "330ba798358ce1d94561",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6926042023477-billetera-para-dama-con-2-cierres-a2347-5/": {
+   "huella": "426a10c1d9f827ec2c6b",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6926042023507-monedero-para-dama-con-2-cierres-pequeno-a2350-5/": {
+   "huella": "34beade5f1fd91c71c86",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6926799211677-inflable-salvavida-rueda-90cm-41087/": {
+   "huella": "5964f931093d3f4bd1db",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6926799211738-inflable-pelota-40cm-sunclub-66018/": {
+   "huella": "37910da0095dc3bd800b",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6926799211745-pelota-50cm-color-sunclub-66002/": {
+   "huella": "3293ea8fd000338cc044",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6926799213886-inflable-bracitos-caja-46091/": {
+   "huella": "0bab2e23d4edd1f7046a",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6926799213992-pelota-40cm-color-sunclub-66001/": {
+   "huella": "3f1ad8b4b51f64e546fb",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6926799214135-inflable-auto-pies-salvavida-36003-sunclub/": {
+   "huella": "a373277b985a98fcfac4",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6928886354205-lanza-agua-grande-60cm/": {
+   "huella": "bbd92e4cf325b76f9245",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6928892705121-taza-plastica-perro/": {
+   "huella": "5bb2314fff2b9b239d64",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6928892706166-taza-plastica-disenos/": {
+   "huella": "62c8e5827d0df129eed7",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6931692508823-cutter-luo-con-repuestos/": {
+   "huella": "03998dda7144c1c36c76",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6933724770000-termo-system-de-acero-1000ml/": {
+   "huella": "e0747ee9b74d9b5724e0",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6934030780134-termo-bolita-1300ml-acero-liso-con-bombilla/": {
+   "huella": "07b346af6e686926e09c",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6934112410058-termo-de-acero-1200ml/": {
+   "huella": "066313ac03b5b4849aa7",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6936785422291-peluche-sorpresa-stitch/": {
+   "huella": "72a1b6426a216a1d8040",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6937526503743-destapador-con-sacacorchos/": {
+   "huella": "3d01c6c76ac5684ef1e8",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6938564200434-encendedor-magiclick/": {
+   "huella": "1f3a92d0469171e2bd36",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6941848255204-peluche-sorpresa-labubu/": {
+   "huella": "0144427fe90ff90b5c43",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6941848277442-peluche-llavero-labubu/": {
+   "huella": "0e608866dcd19847fffb",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6942000142981-taper-de-vidrio-tapa-de-plastico-700ml/": {
+   "huella": "5997627992a23a042208",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6942377607328-colchoneta-inflable-verde-183x69cm/": {
+   "huella": "c68d0c86e335040e8152",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6942377607335-colchoneta-inflable-naranja-183x69cm/": {
+   "huella": "f12e1e759c45fa25b575",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6942377607342-colchoneta-inflable-azul-183x69cm/": {
+   "huella": "dd5ecb3176dbfa176bdd",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6942377608615-inflable-dinosaurio-para-bebe-57x57cm/": {
+   "huella": "d00d6913fab36c550109",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6942377609537-pelota-inflable-con-puntos/": {
+   "huella": "d81d60c43d7e00249fc7",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6942377609919-inflable-salvavidas-durazno-50cm/": {
+   "huella": "c8a87495b2386b88293d",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6942377610694-inflable-salvavida-tiburon-55cmx55cm-35475/": {
+   "huella": "ca11b7c42e62b2c3468f",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6942505822081-calculadora-solar-ygano-rh2208b/": {
+   "huella": "5bebbaef16162478fe90",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6948571020253-paleta-de-ping-pong-con-3-pelotas/": {
+   "huella": "2a94c3cab1c5eabe2726",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6948571350015-paletas-de-ping-pong-con-3-pelotas-y-malla/": {
+   "huella": "8ce531193ce415ed851a",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6948726901888-naipes-de-poker-2-mazos-x54-cartas/": {
+   "huella": "2e8df181f162172349c7",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6949818002155-adorno-navideno-puntal-estrella-dorada-14cm/": {
+   "huella": "28800c8ee6ac41e7fda6",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6949818011126-adorno-navideno-puntal-estrella-dorado-y-rojo-13cm/": {
+   "huella": "5c802ebd3a2b98550d53",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6955682143290-taza-batidora-para-cafe-magnetica-420ml/": {
+   "huella": "56d4f73ec649568b488d",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6956001280016-escurridor-para-utensilios-de-cocina/": {
+   "huella": "4f52624357953634b584",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6956702539420-bolsa-navidena-roja-con-exhibidor-pvc-26x32x10/": {
+   "huella": "14a4bd2d42c2c3e9377c",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6957783589885-florero-estilo-tejido/": {
+   "huella": "db95f6b720e7de600d67",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6959556396843-cargador-usb-3-1a-para-auto/": {
+   "huella": "06ebf9c12be43809ae79",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6960920630562-garrafa-termica-plastica-de-500ml/": {
+   "huella": "781989e51af20986a1ab",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6970369983488-lunchera-doble-piso-750ml-con-cubiertos/": {
+   "huella": "d0e6f4366c473c2233ba",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6971026238026-set-de-3-pinceles-finos/": {
+   "huella": "d7abcfce0f6e1ffec8e0",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6972567845353-soporte-para-el-celular-con-ventosa-para-el-parabrisas/": {
+   "huella": "f363e19b922d1d696d3e",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6973457205325-cutter-luo/": {
+   "huella": "1d97b9536b20945621c3",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6974571483125-linterna-led-recargable-lu312/": {
+   "huella": "345cfe5e9079aa2ad523",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6974571483149-linterna-led-recargable-lu314/": {
+   "huella": "ee23ce3d72a35da0d81d",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6974571483156-linterna-led-recargable-lu315/": {
+   "huella": "107e59140d7aa034717b",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6974571483163-linterna-led-recargable-lu316/": {
+   "huella": "05c0630a84865891cb1b",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6974571483170-linterna-led-recargable-lu317/": {
+   "huella": "70c1300d303da7ef426e",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6974571483187-linterna-led-recargable-lu318/": {
+   "huella": "14711de61558f69671b9",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6975308870812-stitch-decorativo-adhesivo-para-celular/": {
+   "huella": "14bb76401eed23df2dfc",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6976018116399-auriculares-bluetooth-open-ear-jl008/": {
+   "huella": "06b84a4f9dadbf8bb642",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6976919369818-peluche-sorpresa-baby-three/": {
+   "huella": "25b7fdc7633ef036943d",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6977050521172-parlante-bluetooth-en-forma-de-astronauta/": {
+   "huella": "51b41591122e9eb6a503",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6977374992108-peluche-sorpresa-naruto/": {
+   "huella": "b5c3d69341c0bd2bce44",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6980010645016-muneca-soy-luna/": {
+   "huella": "07198617bb6258e1183c",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6980441550415-set-de-bano-de-ceramica-de-4-piezas/": {
+   "huella": "c0dda8f14099b6c8d978",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6985214720859-plancha-para-el-pelo-luo/": {
+   "huella": "78da16153f8b52e3e4c1",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6985214791200-secador-de-pelo-serie-premium-ds2440/": {
+   "huella": "94ea784407845b2fa150",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6985754688459-set-de-bano-plastico-y-bambu-3-piezas/": {
+   "huella": "3c43efb2f866c0b17f8d",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6986876560913-delantal-de-cocina-72x66cm/": {
+   "huella": "9b9c31201349132f8966",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6992-vaso-termico-cafe-doble-pico-600ml-dicoe-dc031/": {
+   "huella": "c9225c85da17650b887c",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/700C-canasta-de-plastico-en-colores-pastel/": {
+   "huella": "4ac4bc2a8d3238d10d1b",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7194611179644-set-de-mate-con-termo-y-bandeja/": {
+   "huella": "58386172b72ca3065648",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/727373364125-secador-de-pelo-modelo-dyson-ds2442/": {
+   "huella": "6dfa2fe3aa3b1b7092b5",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/727373365160-maquina-de-coser-pequena-con-pedal/": {
+   "huella": "9025d72d291d385ea1f9",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/727373365436-cafetera-electrica-om-102/": {
+   "huella": "52852137b6d5a0623126",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/727373365474-sandwichera-electrica-om-4004/": {
+   "huella": "3df5573b3b63e10c2ead",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/727373365528-wafflera-3-en-1-waffles-donas-y-cupcakes-om-9102/": {
+   "huella": "e238c30c810e02532d63",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/727373365993-batidora-de-mano-lumabella-500w-lb-52015/": {
+   "huella": "891ed4286dc221172459",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/727373366150-dispenser-de-agua-rc-886/": {
+   "huella": "d6d3b347bdafaae15417",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/727373366440-depilador-r517/": {
+   "huella": "2cc7a69496d1a253db23",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/727373366525-set-de-peluqueria-para-mascotas/": {
+   "huella": "66a40e5b1554062f4592",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/727373366808-monitor-de-presion-sanguinea-usb/": {
+   "huella": "a387a62f128a74908948",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/727373373721-timbre-inalambrico/": {
+   "huella": "d3f2ee00a0ca442d52e1",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/727373380354-control-universal-para-aire-acondicionado-k-1028e/": {
+   "huella": "db7a7ebfb1596bcac031",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/727373384352-humidificador-200ml-usb-c/": {
+   "huella": "b9972483cb902c9365da",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/727373386691-manguera-de-led-multicolor-5mts/": {
+   "huella": "73d6bdc0de1cb8098b84",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/727373386707-manguera-de-led-multicolor-4mts-sa-70/": {
+   "huella": "26facd890d61b4c4c81a",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/727373386721-tira-led-rgb-5mts-con-control-y-app/": {
+   "huella": "3b8a276e49fb4fcf5f8e",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/727373387483-set-de-destornilladores-6-pcs-sd8265/": {
+   "huella": "23d302aa27fc4d0024bc",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/727373387551-luz-de-emergencia-recargable-60-leds/": {
+   "huella": "4aa8d6ce782a2e194cbc",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/727373388190-tira-neon-led-colores-surtidos-5mts/": {
+   "huella": "c2624cd594997c431636",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/727373391572-espejo-led-para-maquillaje-op66134/": {
+   "huella": "15e0c4069648276dbdf4",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/727373393767-drone-con-camara-e88/": {
+   "huella": "ecfe395f61d46413f140",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7394624173848-set-de-mate-con-termo-y-bandeja/": {
+   "huella": "081a0236b265346825b9",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077051215-mochila-lanza-agua-dino-8723/": {
+   "huella": "2e4ab1a96d68696ab74f",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077051857-masa-para-modelar-helado-con-alcancia-17x10cm/": {
+   "huella": "1d1691c3b32b793c9716",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077053912-camioneta-a-friccion-en-bolsa/": {
+   "huella": "c158756572b8715b6060",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077054285-set-de-espada-y-escudo/": {
+   "huella": "c0d2ebc6968f2c5a300c",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077054803-pistola-lanza-dardos-pequena-con-pelotitas/": {
+   "huella": "34551b9b8047832d8aea",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077055077-chifles-x2-animales/": {
+   "huella": "478b20ff59535ce21463",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077057293-juego-de-basquet-en-caja/": {
+   "huella": "436d146748b82836e170",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077057583-autos-miniatura-en-caja-de-15-unidades/": {
+   "huella": "b55649cf32713f6a3a65",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077057613-autos-miniatura-en-caja-de-20-unidades/": {
+   "huella": "729a18036f08e5fb652c",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077057781-muneca-lucy-pop-con-alas/": {
+   "huella": "7090fe68e0bfc0adb962",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077058016-set-de-maquillaje-con-cartera-tiny/": {
+   "huella": "ebc2a81cec94cd493a44",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077058023-super-set-militar/": {
+   "huella": "593ec63e217f524f6f59",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077058696-muneca-tiny-dentista-33x23x5cm/": {
+   "huella": "793a0c7c2bf26c9a2729",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077059754-burbujero-unicornio/": {
+   "huella": "b4b6f2a89ba5c3f82499",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077059983-set-de-helado-tiny/": {
+   "huella": "ee78fbe79aad6eed4e76",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077060026-pistola-lanza-agua-sola-base-x-splash/": {
+   "huella": "e1a462db817582de6a62",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077060170-burbujero-espada-tren/": {
+   "huella": "772bad9261ad6c9c2231",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077060422-juego-de-agua-4-modelos-en-display/": {
+   "huella": "c679aa1ac00c7d771e60",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077060569-set-de-maquillaje-con-cartera-mariposa-disney/": {
+   "huella": "d4eb3ed10aed66935ab5",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077061375-burbujero-electrico-19x6x20-cm/": {
+   "huella": "4fbec628e4a1b96451f8",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077061863-mochila-lanza-agua-militar-base-x/": {
+   "huella": "05e5a9ab71c1ce787c51",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077062242-camion-de-construccion-a-friccion-dinosaurio/": {
+   "huella": "8b882cad474cdabc9bba",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077062303-super-set-militar/": {
+   "huella": "5cb5401a514c5b2730a5",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077063102-muneca-verano-tiny/": {
+   "huella": "98726596ce6b6b40213a",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077063553-labial-tiny/": {
+   "huella": "f9a77874711b99dc9797",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077064673-dispenser-de-agua-delfin-miniatura/": {
+   "huella": "3e0e14e31dbd87fb036c",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077064895-chifles-x3-patos/": {
+   "huella": "ba8ecb69ff0fe5216768",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077064932-dispenser-de-agua-patito-miniatura/": {
+   "huella": "6c9b3fa99d5434e51ac6",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077065045-chifles-x3-autos/": {
+   "huella": "afaa2d7e8f0e26bf38b0",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077066127-camioneta-a-friccion-28x19x18cm/": {
+   "huella": "2a77385d1752cf0291dd",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077066219-set-de-maquillaje-disney/": {
+   "huella": "82812a566945e0388017",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077066448-burbujero-espada-marvel/": {
+   "huella": "1490ae2378fafb9eda26",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077066653-robot-transformer-en-blister/": {
+   "huella": "02238cadd038241cad62",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077066844-patineta-de-dedos/": {
+   "huella": "e2c9129b3e21d76e928e",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077067667-librito-de-bano-babygus/": {
+   "huella": "7769e76afcae366eaa8a",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077067971-librito-de-bano-mundo-dinosaurio-babygus/": {
+   "huella": "3c88e6a168bcbb7fb581",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077068039-chifles-x3-animales/": {
+   "huella": "5bc9ada90bf802f66612",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077069906-set-de-labiales-frozen-tiny/": {
+   "huella": "e941b7e4db1472f83605",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077070247-set-de-herramientas-pequeno/": {
+   "huella": "d265495a6cd94900e3f6",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077070568-super-set-militar/": {
+   "huella": "b0145244c73e5d940628",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077070636-burbujero-espada-spiderman/": {
+   "huella": "142caccd4e45dca374e1",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077070728-burbujero-espada-frozen/": {
+   "huella": "bafde5b67ed321a8fa10",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077071329-burbujero-espada-paleta/": {
+   "huella": "b9ddbbef967f1222fec1",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077071695-set-helados-blister-con-tostador/": {
+   "huella": "825aa304e4f287521750",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077072029-dinosaurio-transformers-25x29x8cm/": {
+   "huella": "00e0b787034e8140ebe8",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077072203-muneca-tiny-fashion/": {
+   "huella": "7d9522a58596e01974ae",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077072401-muneca-tiny-hada-30cm/": {
+   "huella": "e1d4c3d1f7b0be8bce15",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077073286-set-de-espada-con-casco/": {
+   "huella": "e0c444635a05efc53657",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077073668-antiparra-disney-princesas/": {
+   "huella": "93d434488baec7c748db",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077073880-zapato-de-princesa-tiny/": {
+   "huella": "ba01435236025da1cb54",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077074023-autos-a-friccion-x2-spiderman/": {
+   "huella": "f829eb05ad3502accec4",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077074184-mamadera-magica-x2/": {
+   "huella": "99cc36a0ffe468e09d7e",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077074375-camion-militar-a-friccion/": {
+   "huella": "8189900c2d9b2bc7c690",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077074474-lanza-agua-caballito-de-mar-chico-base-x-splash/": {
+   "huella": "a6ba46d137f3094bbe58",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077075471-set-de-heladeria/": {
+   "huella": "6b86a9623f26c89af635",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077081014-pistola-lanza-dardos-x2/": {
+   "huella": "ea552e49ebf2416b0dcb",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077081243-auto-a-control-remoto-spiderman/": {
+   "huella": "11449d536f4f7399ccf6",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077081489-set-de-espada-escudo-y-mascara/": {
+   "huella": "9e5675a762921f1fe36c",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077081748-barrilete-nave-espacial-gigante/": {
+   "huella": "611a36450729eb83c923",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077081809-pistola-lanza-agua-8223-base-x-splash/": {
+   "huella": "76f2f065a7ff322c53ed",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077083179-super-juego-de-pool-43x29x2/": {
+   "huella": "9b116c4b986c19690c4f",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077083353-pistola-de-agua-mini-8496-base-splash/": {
+   "huella": "5630a7882bba22ad9731",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077083421-librito-de-bano-vehiculos-babygus/": {
+   "huella": "e122ca2f3c3d1d8d35ae",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077083933-muneca-de-goma-con-zapatos-y-vestido/": {
+   "huella": "8c1b929989dc49238405",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077085111-escudo-capitan-america-lanza-agua/": {
+   "huella": "c5165606f17d33def0ef",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077085395-labial-disney-x1/": {
+   "huella": "ff5ec167ab333dcc0221",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077085425-lanza-agua-frozen-8689-base-x-splash/": {
+   "huella": "00c9e59f7aa9afca1977",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077085807-pelota-de-futbol-n2-marvel-6-modelos/": {
+   "huella": "43629dd9197a78e3daac",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077085845-cana-de-pescar-grande-con-peces/": {
+   "huella": "bb303737ab3b3be173ac",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077086811-auto-a-friccion-con-accesorios-41x15x15cm/": {
+   "huella": "1be5dcbc648bbdd113e0",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077087443-dinosaurio-que-muerde/": {
+   "huella": "fe8bc513f7ad2e6ecb94",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077089966-camion-de-construccion-a-friccion-24x12x9-cm/": {
+   "huella": "8071a9521bd68c1410d9",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077090078-masas-divertidas-plastikids/": {
+   "huella": "792023ece370fa834d7a",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077090702-lanza-agua-flamenco-mediano-base-x-splash/": {
+   "huella": "d5c884793475382b3fbb",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077090931-labial-tiny-x2/": {
+   "huella": "e925971d66db6b2a9ae6",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077092096-camion-dinosaurio-construccion-32x20x10cm/": {
+   "huella": "9b6498c1712a1862f445",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077092287-camion-dinosaurio-construccion/": {
+   "huella": "41bbd4eaa15542744f4e",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077092737-set-de-unas-tiny/": {
+   "huella": "57d5aeb5c0273121437f",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077093130-set-de-dinosaurios/": {
+   "huella": "5ff9f7a6f2cd609f50cd",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077093451-muneca-para-peinar-con-accesorios-tiny-24x20x8cm/": {
+   "huella": "ddef47d991f64d9d911d",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077093765-set-de-herramientas-con-casco/": {
+   "huella": "8cfe5150375b5b2c4bed",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077095363-varita-con-luz-pequena/": {
+   "huella": "90ab728c90424800ce4b",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077095530-set-2-robots-transformers-en-caja/": {
+   "huella": "d6a1b330ac77561bd83a",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077097152-burbujero-espada-colectivo/": {
+   "huella": "e8132c4a87f123f800cf",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077098456-set-de-maquillaje-con-celular-tiny/": {
+   "huella": "87eaec182f39ca41c940",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077098821-chifles-x5-patos-con-inflable/": {
+   "huella": "3029094962ee085228a1",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077098838-chifles-x4-patos/": {
+   "huella": "6f4aeb57f9b576daaf5c",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077115962-pistola-lanza-agua-boca/": {
+   "huella": "1e683981edf9cdc807f9",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077116945-mochila-lanza-agua-superman-8126/": {
+   "huella": "a3972f625377a8621f6d",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077117072-burbujero-dinosaurio-tiny-a-pilas/": {
+   "huella": "fdf56c12d06ccc9ba54c",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077118017-aro-de-basquet-spiderman/": {
+   "huella": "9b9279f93ab56559e7ad",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077118024-aro-de-basquet-marvel/": {
+   "huella": "42711e563da8fbfbc907",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077118093-muneca-tiny-fantasy/": {
+   "huella": "94565f636ebe52f97ba7",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077118482-mochila-lanza-agua-dona-8269/": {
+   "huella": "204a3876678897174171",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077119113-chifles-x2-animales/": {
+   "huella": "f55e298b2de05f7927ca",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077119793-lamina-con-tatuajes-temporales/": {
+   "huella": "019265fd1db12fb5f3b7",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077120010-muneca-tiny-sirena/": {
+   "huella": "6c0f47ccaa38017763c4",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077120140-set-de-dinosaurios/": {
+   "huella": "7084198bb3caa6bf3047",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077120720-set-de-belleza-con-camara/": {
+   "huella": "da236c9386c0fc6d53a5",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077121000-autos-a-friccion-x2/": {
+   "huella": "5a12f70bbea5e8bdeea3",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077123004-microfono-tiny-25x16x5cm/": {
+   "huella": "e4fd3fd5150bb86d94be",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077123097-microfono-tiny/": {
+   "huella": "4e2d5bf97a8c6720498c",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077123233-set-doctor-tiny-celeste/": {
+   "huella": "8d27b85b993de8d47783",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077123301-auto-a-control-remoto-con-canon-de-hidrogel-con-luces-y-carga-usb/": {
+   "huella": "88d48fcb0f0e579c65ba",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077123950-set-de-bateria-21x18x18cm/": {
+   "huella": "58fbd930d8e257e69b16",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077123974-conjunto-de-animales-25x19x4cm/": {
+   "huella": "edc4e6f2a1a1df699026",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077124001-mochila-de-agua-unicornio-8598/": {
+   "huella": "a5db5340f351b153ce0c",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077124636-camion-a-friccion-dinosaurio-lanza-dardos/": {
+   "huella": "946217a081a3ec75f256",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077125244-torre-apilable-babygus/": {
+   "huella": "45c24c87cd817b86a79d",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077126227-lanza-agua-unicornio-chico-base-x-splash/": {
+   "huella": "de82f49e414ede7e62b7",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077128573-masa-para-modelar-9x9x9cm/": {
+   "huella": "c0d9c385cf75e2e11535",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077130743-pista-lanzadora-con-2-autos/": {
+   "huella": "334e355448b602c6796f",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077131771-camion-de-bomberos-a-friccion/": {
+   "huella": "bf6a6c77f4ec1f2ab794",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077134109-set-de-bijouterie-arcoiris-tiny/": {
+   "huella": "22bdc1d32792a83a355b",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077134796-camion-de-construccion-a-friccion/": {
+   "huella": "a059b6c47bb17042cb6e",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077134864-juego-de-basquet-doble/": {
+   "huella": "489b23542d3af1729abf",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077134994-dinosaurio-de-goma-pequeno-10cm/": {
+   "huella": "e9a4bc6e82ffa15d0215",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077135366-burbujero-dona/": {
+   "huella": "1e1e640206f54114af83",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077135830-chifles-x2-patos/": {
+   "huella": "df72071aa6c9a3243bc7",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077136905-esmaltes-x2-tiny/": {
+   "huella": "0a1807f6b514d6c2a819",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077137841-grua-a-friccion/": {
+   "huella": "ecb8eea895acaa6d8253",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077137902-machila-lanza-agua-river-8562/": {
+   "huella": "2ed7f378506af4f68dbd",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077142500-set-de-maquillaje-con-vaso-tiny/": {
+   "huella": "372756eb3278b5fc4826",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077143088-mochila-lanza-agua-cangrejo-8119/": {
+   "huella": "b3e55cfde8c03d82f415",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077143330-valijita-doctor-39x24x3cm/": {
+   "huella": "cc1df173e63a7a14a15f",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077143446-escopeta-lanza-dardos/": {
+   "huella": "e4b8dd27fa2c7f1ed8b4",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077143729-super-conjunto-de-policia/": {
+   "huella": "d183a2c9e4105902c7dc",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077146454-ponys-x2-en-caja/": {
+   "huella": "2aa50f9b969d765266ac",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077146980-autos-de-metal-x12/": {
+   "huella": "1d7e8514ac84cdc6bb8b",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077147406-set-de-maquillaje-princesa-disney/": {
+   "huella": "369e2499829cfe277a4c",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077149295-carruaje-con-ponys/": {
+   "huella": "949d2ac0496cf3bab70b",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7450077149455-conjunto-de-dinosaurios-22x19x4cm/": {
+   "huella": "c6f2c9664d9fd17dc421",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453038473064-mazo-de-cartas-espanolas/": {
+   "huella": "a2702d1e3229aee3b61c",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077200041-set-de-policia-con-lentes/": {
+   "huella": "65a0ac2505483ad36043",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077200058-conjunto-de-policia-28x21x3cm/": {
+   "huella": "574019ed5179e21e3b67",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077202397-cubo-magico-rubik/": {
+   "huella": "7e0d5a3f46cc6d3d5f5e",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077202496-pistola-lanza-agua-base-x/": {
+   "huella": "c9e3bfe91000bf5cfbd4",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077202700-set-de-granja/": {
+   "huella": "3e5e0abc672f18151194",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077202946-lanza-agua-doble-8281-base-x-splash/": {
+   "huella": "2015bac97c023badf526",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077204049-pizarra-magica-spiderman/": {
+   "huella": "9dc8b35b10a1662349c1",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077204124-set-de-maquillaje-tiny-con-reloj/": {
+   "huella": "f797974c4a9fd52554eb",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077204278-autos-a-friccion-x2-marvel/": {
+   "huella": "d0cd590d6def57d88211",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077204629-librito-de-bano-animales-marinos-babygus/": {
+   "huella": "da4682e2d7da37db1245",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077204735-mochila-lanza-agua-pelota-8738/": {
+   "huella": "55fef24ada5da97b4368",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077206814-camioneta-desarmable/": {
+   "huella": "eb82a960e60e86a848e2",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077207361-pizarra-magica-marvel/": {
+   "huella": "0c0ea5e9860d16e7d3b8",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077207583-masa-para-modelar-con-accesorios-31x22x7cm/": {
+   "huella": "86ae97d87b250e7702d9",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077207965-camion-volcador-truck-a-friccion/": {
+   "huella": "fa8baa51f00141a7c8ec",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077208252-set-de-maquillaje-tiny/": {
+   "huella": "c817d4be8e5b4a33fee0",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077210316-auto-loco-a-friccion/": {
+   "huella": "b5db0355a4f460005dea",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077210538-tiburon-que-muerde/": {
+   "huella": "8ae4b1cb82c101bfc82f",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077211481-muneca-sirena-en-blister/": {
+   "huella": "7f73ff720aec11d51db8",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077211559-camion-de-construccion-a-friccion-en-bolsa/": {
+   "huella": "78b217160b3b31eb43b5",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077211627-camion-de-bomberos-a-friccion/": {
+   "huella": "40ae9324e71d4d8e436b",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077211801-set-de-dulces-con-macarrones/": {
+   "huella": "71f929f88a5b09339edf",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077222845-juego-el-piso-es-lava/": {
+   "huella": "8b23fc78c16e6d04ac2f",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077224689-super-cuatriciclo-con-control-remoto/": {
+   "huella": "4936de2c32d9013f88d9",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077225075-super-transformers/": {
+   "huella": "4ca0dec7a7400380058f",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077225631-sonajero-gatito/": {
+   "huella": "a7dfbf90f730b07c8397",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077226263-set-de-pony-x4-con-accesorios/": {
+   "huella": "d30e9a35d6b936b351af",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077227581-cubo-magico-rubik/": {
+   "huella": "1dd7695d0956aad9cb4f",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077227680-pizarra-magica-casa/": {
+   "huella": "6f2fc1d7b2dd35947778",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077227819-juego-de-agua-spiderman/": {
+   "huella": "7ea85fc809b266ae98c6",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077228618-camion-acoplado-con-autitos/": {
+   "huella": "58d766c97a848c4dbe13",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077228625-set-de-belleza-frozen/": {
+   "huella": "2e9ff81ab4f7c44b4a90",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077228977-set-de-cocina-tiny-de-acero-inoxidable/": {
+   "huella": "2e08b98ffe185d5d225c",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077232035-burbujero-unicornio-x3/": {
+   "huella": "bd0110b254680553eeda",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077233438-juego-de-pesca-doble/": {
+   "huella": "785bfe8b4a315b38e2be",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077233759-burbujero-unicornio-tiny-a-pilas/": {
+   "huella": "377bc1878312201e9a92",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077233988-muneca-tiny-doctora-33x26x6cm/": {
+   "huella": "3cf25a482ce9a210c02e",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077234602-conjunto-de-policia-con-esposas-37x22x4cm/": {
+   "huella": "0ba7a9d8c55ec3b96912",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077235807-pistola-de-agua-gigante-8248/": {
+   "huella": "92d0f617576a9984f91c",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077236040-set-mamadera-magica-con-accesorios-tiny/": {
+   "huella": "7bf3c25c398216f2e94e",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077236309-tren-a-pila-con-pista/": {
+   "huella": "49170cb82fd0bf273e53",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077236415-juego-de-pesca-grande-en-forma-de-nemo/": {
+   "huella": "d9017447ea9864ce3e40",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077236439-pistola-lanza-dardo-2-unidades-35x27x4cm/": {
+   "huella": "3c57397b7f3a94cbd538",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077236651-conjunto-de-policia-22x15x3cm/": {
+   "huella": "566aba09baabda04d546",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077236774-super-escopeta-3-patitos-38x14x2-cm/": {
+   "huella": "611485af11038e034911",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077237030-pistola-lanza-dardos/": {
+   "huella": "2ef77cd15d8eecc9b742",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077237504-dinosaurio-desarmable-pequeno/": {
+   "huella": "291536ee8ef24f50efa6",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077237856-dinosaurio-desarmable/": {
+   "huella": "f044906ebbdcdb02d13c",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077239416-mochila-lanza-agua-tiburon-8118/": {
+   "huella": "b58bf978e696f0768183",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077239614-helicoptero-desarmable/": {
+   "huella": "636f9da3701b54b0f200",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077239645-mochila-de-agua-vaquita-base-x-splash-8155/": {
+   "huella": "f2e38e7fa797c077f754",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077240153-esmalte-x3-tiny/": {
+   "huella": "46a1df3e18d43337fcb6",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077242010-dispenser-de-agua-elefante-miniatura/": {
+   "huella": "91acf1f9cf34af119bf2",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077242126-dinosaurio-a-pila-lanza-dardos-29x16x12cn/": {
+   "huella": "7441cbaa2b207233c916",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077242218-casa-de-munecas-32x22x6-cm/": {
+   "huella": "7b4295a61c4da0e71fd1",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077242768-robot-con-armas/": {
+   "huella": "ceb212dedbc61513e0b8",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077243604-tren-desarmable/": {
+   "huella": "a80aba7b928dbebdd4b5",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453077248630-auto-a-control-remoto-speed-go/": {
+   "huella": "3e330f5f38f2b3e99b2e",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453105000131-muneca-hada-tiny/": {
+   "huella": "1e06fdf11edadffc771c",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453105000346-set-heladeria-tiny-grande/": {
+   "huella": "b2c0a9e4f41c39a15ce0",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453105001961-set-de-cocina-inox-con-accesorios-36x5x26cm/": {
+   "huella": "f5e27873330a4a6aaad0",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453105001985-set-de-cocina-de-acero-inoxidable-tiny/": {
+   "huella": "e2b5dafe1aba56bf3e15",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453105002357-set-de-maquillaje-dino-bebe/": {
+   "huella": "70e932aca6797c2f2ab0",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453105002395-juego-de-pesca-grande-en-forma-de-cangrejo/": {
+   "huella": "2f5fd14ada94dc34801f",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453105003101-burbujero-dona-x3/": {
+   "huella": "c3e41f064cba75dd74f3",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453105003972-set-helados-blister/": {
+   "huella": "b8636c022e953a8eb5dc",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453105004009-camion-acoplado-a-friccion-marvel/": {
+   "huella": "891386ce0d1535a41a96",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453105004023-set-de-unas-tiny/": {
+   "huella": "fab4367fc8d811af9069",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453105004863-mochila-lanza-agua-escudo-superman-8315/": {
+   "huella": "e31303eaec724aa386e9",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453105006003-pizarra-magica-disney/": {
+   "huella": "f462c4de79fd07fec9ae",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453105007017-tiro-al-blanco-avengers/": {
+   "huella": "c0153495abddc75cac27",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453105007284-burbujero-dinosaurio-tiny-a-pilas/": {
+   "huella": "7d008293b9390166a143",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453105007390-camion-a-friccion-con-dinosaurios/": {
+   "huella": "aa7526bca05af47e6e36",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453105007482-lanzador-de-helicoptero/": {
+   "huella": "7f49859ae3064b49ee80",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453105008045-ametralladora-pequena-de-juguete/": {
+   "huella": "d86fc07efc20b05584be",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453105008465-auto-f1-a-friccion-26x10x9cm/": {
+   "huella": "460094168361da258dba",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453105010499-set-doctor-2-colores-8pzas-16-5x18-5x5cm/": {
+   "huella": "b7cfcc09330dc0ac798d",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453105013612-mochila-lanza-agua-atomo-8322/": {
+   "huella": "642db1e17cedbaa6f54b",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453105015029-sillita-hamaca-dino-59x41x27cm/": {
+   "huella": "ee99137d3becadbdddb5",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453105015180-juego-batalla-naval/": {
+   "huella": "9961f83bf58ba907523b",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453105015456-set-mini-mascotas-con-accesorio-88x58x87cm/": {
+   "huella": "bc08dadeee85b3427069",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453105017221-burbujero-stitch-x3/": {
+   "huella": "830eadf79623b7c5656c",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453105017733-mochila-lanza-agua-unicornio-8463/": {
+   "huella": "e7905552380f0e5f0f60",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7453105020382-set-doctora-2-colores-8pzas-tiny-16-5x18-5x5cm/": {
+   "huella": "5887359c05d72248254f",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7510001100100-luces-de-navidad-led-x100-multicolor-220vac-en-bolsa/": {
+   "huella": "d8af8ea190a165ca4f0d",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7510021100045-luces-de-navidad-incandescente-arroz-100-multicolor/": {
+   "huella": "5e68862d2e65c782d699",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/754697464460-hervidor-n14/": {
+   "huella": "37743b36451a162dd6a3",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7751079252168-juego-batalla-de-tortugas/": {
+   "huella": "cb1f3d54df5d9346aaa9",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7751079253233-juego-de-agua-afa-oficial/": {
+   "huella": "dac124f1ff22d6765520",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7751079255015-auto-monster-a-radio-control-con-luces-spiderman/": {
+   "huella": "0a4b01f042a22252efb3",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7751079255367-robot-transformers-en-blister/": {
+   "huella": "5edfa3935bb7d5d9e9a6",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7751079255398-set-de-robots-tranformers-3-piezas/": {
+   "huella": "eeb47546703053cbf9a1",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7751079255671-set-bijouteria-paleta-dulce-tiny/": {
+   "huella": "72a76774850b64c958b4",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7751079256012-set-de-masa-estuche-dinosaurio/": {
+   "huella": "0b44f035731f7a15a956",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7781912031025-espatula-de-bamboo-30cm/": {
+   "huella": "eb3b6b0c32fb85482c67",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7781922202101-pinza-metalica-para-pasta/": {
+   "huella": "58ee39a40bac91f9174d",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7790000160196-guantes-para-cocina/": {
+   "huella": "38f9324ffcdd84b78bff",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7790070507280-set-de-espadas-cobra-kai/": {
+   "huella": "75142fe58123de7475e8",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7790780127426-bolas-navidenas-pequenas-x10/": {
+   "huella": "cd31aa926a933c0db50e",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7790780127617-adorno-monos-navidenos-x3/": {
+   "huella": "ef01857ca68372cb786f",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7790780127662-puntal-estrella-plastico-grande/": {
+   "huella": "84b69117e956d082c296",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7791000000208-botella-termica-deportiva-estampada-de-750ml/": {
+   "huella": "cd460b0bde2d984885a9",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7791000000253-termo-system-1000ml-acero-estampado/": {
+   "huella": "f3b0c0c530514af54521",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7791000000260-termo-solo-system-1l-dicoe-dc013-inoxidable/": {
+   "huella": "05a8b47fcd0bfe6d7e22",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7791234560004-vaso-termico-de-acero-estampado-con-manija-900ml/": {
+   "huella": "a6e1365626164a1e1353",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7791234560059-termo-bolita-estampado-con-flores-1000ml/": {
+   "huella": "371c4ab034bf8e75fae2",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7791762181177-repuesto-de-carpeta-gloria-400-hojas-rayadas-n3-65g-m2/": {
+   "huella": "15ed29f590fb3186e48a",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7791762480188-repuesto-de-carpeta-exito-480-hojas-rayadas-n3-con-margen-reforzado-100g-m2/": {
+   "huella": "2670494109aba4b79f6d",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7791806005001-bombitas-tuky/": {
+   "huella": "27a81fc3472ae702d04f",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7792138974249-super-librito-para-pintar-lleno-de-sorpresas/": {
+   "huella": "ec480020b35d85e8a22c",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7792216050179-repuesto-de-carpeta-rivadavia-480-hojas-cuadriculadas-n3-con-margen-reforzado-88g-m2/": {
+   "huella": "a7800286c19ddef1ca4f",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7792281025201-vaso-de-vidrio-doble-200ml-carol/": {
+   "huella": "b0cebb359184cb80d3b3",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7792281025324-vaso-de-vidrio-doble-320ml-carol/": {
+   "huella": "7c1246f29a14bb5ec765",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7792281025355-taza-de-vidrio-doble-350ml/": {
+   "huella": "08cecbd6844a9a5c9300",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7792281030212-condimentero-salero-pimentero-de-vidrio-con-soporte-metalico/": {
+   "huella": "c967696fc13817ac1734",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7792435003697-camiones-duravit-surtidos/": {
+   "huella": "dd762e673733eb9a4b47",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7792435006858-camion-volcador-duravit/": {
+   "huella": "107671b07de95d71ecbf",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7793876312416-cinta-de-papel-12mmx40m/": {
+   "huella": "4a62f099edee57dd5864",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7793876324419-cinta-de-papel-24mmx40m/": {
+   "huella": "4bbc45094ef947417bd3",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7793876336412-cinta-de-papel-36mmx40m/": {
+   "huella": "1db162420cc40bc711d7",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7793876348415-cinta-de-papel-48mmx40/": {
+   "huella": "2a65184e5d977377ea49",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7794297022212-bidon-termolar-3lts-plastico-con-pico-vertedor/": {
+   "huella": "8b7e852333e5b796c8c0",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7795168001503-bebe-nacho-con-ropa/": {
+   "huella": "16326ae7507799be1fe9",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7795224315544-set-de-azucarera-y-yerbera-plasticas/": {
+   "huella": "086e6e3820e4d2e1a2d8",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7795224315575-vaso-cafetero-zodiaco-600ml/": {
+   "huella": "425251e0df445b30c130",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7795224327264-vaso-plastico-cafetero-seleccion-argentina/": {
+   "huella": "a5cd5f0bae5f2e77ca23",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7795224367222-botella-de-aluminio-500ml-seleccion-argentina/": {
+   "huella": "202955ac444b10a737c1",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7796988000714-mate-plastico-con-bombilla-motivos-varios-equipos-de-futbol-animales-dia-del-padre-argentina/": {
+   "huella": "72d9e10af87c22036713",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7796988014636%207796988014667%207796988014650-yerbera-plastica-pastel/": {
+   "huella": "98807f3a078bcf51d1e2",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7796988017514-mate-con-bombilla-mes-surtidos/": {
+   "huella": "3c4ba6625a92cb8f3662",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7797076016433-camion-volcador-luni-playero/": {
+   "huella": "7c202256aecbf5beb814",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7797076082032-camion-volcador-con-bloques-luni-30x22x20cm/": {
+   "huella": "c37b7f7e4b1b30d320bb",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7797245644160-jarra-plastica-2-litros-magiclick/": {
+   "huella": "1a9aec5860a69d102015",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798040801826-sombra-tejar-3d-shine-art211/": {
+   "huella": "1e514de15e4837538a79",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798040802274-polvo-compacto-tejar-art246/": {
+   "huella": "f43031c2489297563b4d",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798052580610-bloques-de-encastre-x16/": {
+   "huella": "ab703606b676c155eb01",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798052580665-burbujero-x1/": {
+   "huella": "16acf6e6a94ea7b471a9",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798052582195-balde-cortante-con-masas/": {
+   "huella": "b3100318d3e7906d4a5b",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798052582249-yoyo-plastico-6-unidades/": {
+   "huella": "8ae50a9c54faeadf1a23",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798052582317-balde-con-masas/": {
+   "huella": "95ab1e39956efa8532a8",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798052582690-casco-de-construccion-de-juguete/": {
+   "huella": "78e834d5c17d39f0db57",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/779807-set-de-mate-x4-sofia/": {
+   "huella": "dbeb031265cfff483693",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798104180140-avion-megaprice/": {
+   "huella": "4457a3308693dccf488f",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798104180270-tren-con-vagon-megaprice/": {
+   "huella": "2e12326c45bb9c710793",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798104180522-banco-didactico-de-encastre-jugar/": {
+   "huella": "ebef77a16492da2bc95d",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798104180652-colectivo-didactico-megaprice/": {
+   "huella": "3b2c8e5ed1125de1a73c",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798104180676-volcador-con-palas/": {
+   "huella": "b1847546c37642b4e68a",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798104181147-camion-cisterna-plastico/": {
+   "huella": "a69824ee9c891593545a",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798104183073-canasta-con-frutas/": {
+   "huella": "b5db64968f05ebf43996",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798105021053-botella-plastica/": {
+   "huella": "32c5d94454b6b36fbc24",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798105111013-set-terere-plastico-bombilla/": {
+   "huella": "73cc77133f080b8e637d",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798105120268-set-terere-con-termo-irrompible-potes-encastrable-bombilla/": {
+   "huella": "649fa7838edaf2929e3a",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798121287792-jeep-jugar/": {
+   "huella": "6bb1fd95246ac0244f6d",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798121287839-camion-acoplado-con-auto-f1/": {
+   "huella": "a0d12c46a7554e53043f",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798121288003-f1-jugar/": {
+   "huella": "080f136e3c2fd135cb7d",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798121288157-trailer-con-2-autos-jugar/": {
+   "huella": "14136dc1f7489b947f09",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798121288171-trencito-jugar/": {
+   "huella": "9770118293a72aa21e85",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798130320930-bebotito-mimosito-con-sonido/": {
+   "huella": "8d31a264a785972a03ef",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798130321258-bebe-papa-frita/": {
+   "huella": "a7435e00be73b8b8f463",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798130322392-bebe-manu-con-sonido/": {
+   "huella": "3ae512f503c67fd8618f",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798148055015-set-de-mate-sofia-con-pava-y-cocina/": {
+   "huella": "8e6d8491582bad6d6812",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798151810090-set-de-latas-de-2-piezas-azucarera-y-yerbera/": {
+   "huella": "cc761a7c07607395b73f",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798151812308-mate-imperial-plastico-grande/": {
+   "huella": "0b8c69d2d533265aa7e3",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798151812384-mate-imperial-boca-y-river/": {
+   "huella": "149abec564f37fc9500e",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798151812421-mate-imperial-river-millo-en-caja/": {
+   "huella": "c078adfd089ae4086a46",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798151812438-mate-imperial-boca-azul-oro-en-caja/": {
+   "huella": "6a59609520f4947c2d91",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798151819673-mate-autocebante-mate-click-marwal-400ml/": {
+   "huella": "50af2cb7cc5a4b15ada8",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798151819727-mate-plastico-prisma-con-bombilla-marwal/": {
+   "huella": "e52fea2af63b26c3414e",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798159810504-tempera-pote-250gr-marron/": {
+   "huella": "f1a2ae9d8f5501576f4b",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798170041642-vaso-plastico-con-sorbete/": {
+   "huella": "281064c82eb21e230c8f",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798187883914-corrector-base-tejar-art290/": {
+   "huella": "41a9afa9f9598daffff8",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798187884089-mascara-resistente-al-agua-pumped-up-art299/": {
+   "huella": "c670376113c524c2f220",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798187884232-mascara-volumen-2-pasos-tejar-art214/": {
+   "huella": "539acf499a326f479691",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798187885819-esponja-para-maquillaje-mini-paquete-de-8-unidades/": {
+   "huella": "17636ff67be9ae5e14b7",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798187885871-brocha-para-maquillar/": {
+   "huella": "adf2af0afe0b2c996410",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798187886588-lapiz-delineador/": {
+   "huella": "d0170bd79fd6644f9284",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798187888544-sombra-de-color-love-art5016/": {
+   "huella": "75d142c7f18372008115",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798215280272-mate-autocebante-400ml/": {
+   "huella": "af67f9014dd07b915c28",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798215280289-mate-autocebante-de-aluminio/": {
+   "huella": "5379c08a219c8ff784f3",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798215280395-mate-autocebante-plastico-xl-600ml/": {
+   "huella": "730c55e5b1a9a3ee1e29",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798215280432-kit-matero-plastico-de-4-piezas-termo-azucarera-yerbera-mate/": {
+   "huella": "2839e2ff057e7b9fefe9",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798215285116-set-de-4-tazas-transparente-para-cafe-macchiato-doble-capa-duzzi/": {
+   "huella": "f30ecacc76516e9e5022",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798317829461-iluminador-para-ojos-glitter-stars-art2656/": {
+   "huella": "8bcfd78ce08db62e92b6",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798317829478-mascara-bb-tejar-secret-volume-art2657/": {
+   "huella": "db3e22b3f41be86eaf6d",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798317829911-balsamo-labial-frutal-en-pomo-art3036/": {
+   "huella": "ad5a3ab808bddc3b84ee",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798322280011-balde-con-pala-z424/": {
+   "huella": "59cc00418da0828af8c9",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798322280059-balde-con-moldes-pala-y-rastrillo/": {
+   "huella": "f343d716636579fa67bd",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798322280066-balde-cernidor-con-pala-y-rastrillo-z951/": {
+   "huella": "c109bcde1d9e6b2eb288",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798322280264-regadera-con-pala-red-z1046/": {
+   "huella": "3d7e23f04c868250cc56",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798322280271-pala-y-rastrillo-red-z1045/": {
+   "huella": "0bd7f9721dc6846b72aa",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798322282077-balde-castillo-con-pala-j050/": {
+   "huella": "616b57b21515c77a8ec2",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798360010151-valija-juliana-dentista/": {
+   "huella": "7b62cdbac881fc3f54e4",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798370510603-abejitas-cajax12/": {
+   "huella": "1169239f1cb8d119bb39",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798373792228-mascara-gel-love-crazy-art5078/": {
+   "huella": "8405c48e3de50b842cf3",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798373793768-alicate-de-metal/": {
+   "huella": "e874c982941b5518a905",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798373793980-esponja-exfoliadora/": {
+   "huella": "c3e0c07e86efd1b1620a",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798373794246-sombra-para-cejas-3-en-1-art2682/": {
+   "huella": "347d78fecbfb030e5772",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798373794284-rubor-en-polvo-tejar-art2686/": {
+   "huella": "e37c7caf5773ec738fdd",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798373794406-delineador-pumped-up-art2698/": {
+   "huella": "aca9d8f09f99631e9e96",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798373794451-glitter-roll-on-art2703/": {
+   "huella": "3233574d7d25698296cc",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798373794598-rubor-liquido-tejar-art2717/": {
+   "huella": "54361751a92ac634b90a",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798373794895-brillo-labial-tejar-art2747/": {
+   "huella": "ca221479bd08e52609d6",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798373794949-gel-para-cejas/": {
+   "huella": "f2b693f2a3c256d88d1c",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798373794956-balsamo-labial-macarron-art2753/": {
+   "huella": "db76333f12e2a2fabec7",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798373795007-base-liquida-lovecrazy-fit-me-tejar/": {
+   "huella": "c6ce808f16ce55c37ae4",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798373795083-lapiz-labial-love-crazy-cristal-art5312/": {
+   "huella": "36f7c3c2c6d096a58f4d",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798373795311-rubor-en-polvo-love-con-espejo-art5103/": {
+   "huella": "44ed0de52863737dbe0f",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798373795670-lip-gloss-con-acido-hialuronico-tejar-art2771/": {
+   "huella": "e5ad6fe690239f1de6a3",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798373795908-aplicador-de-maquillaje-bolsa-de-10-unidades/": {
+   "huella": "36ae9738124ed848d467",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798373795939-esponja-gota-para-maquillaje-bolsa-de-2-unidades/": {
+   "huella": "7fb05bbf70f2761f6c0d",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798373796448-esponja-facial-x2-mini/": {
+   "huella": "23f3b20f671233e34946",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798373796493-esponja-para-maquillaje-en-forma-de-corazon/": {
+   "huella": "42a8abfcbec6b6588ad6",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798373796509-esponja-corazon-para-maquillaje-2-unidades/": {
+   "huella": "63bf9dfb62a36a59f3d8",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798373796523-esponja-mini-gota/": {
+   "huella": "6714a2ec2b574aeef9d8",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798373797186-pestanas-pelo-a-pelo-14mm-oferta/": {
+   "huella": "5c018f4dc5665427f3ed",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798373799555-glitter-en-barra-art2788/": {
+   "huella": "9dafa91a5ae8d763ee28",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798373799715-brillo-labial-frutal-art2804/": {
+   "huella": "312e9e2d78d11b7236da",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798373799944-brillo-labial-tejar-art2827/": {
+   "huella": "c67e3e26e1f22c7e78e1",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798435990029-taza-plastica-conica-estampada/": {
+   "huella": "0b7d7ca93c5fcb77c0f2",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798435990302-set-duo-yerbero-y-azucarero-estampado/": {
+   "huella": "fec8c0cad0fbdec36017",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798435991750-set-jarra-estampada-mas-4-vasos-modernos-400ml/": {
+   "huella": "61437fd5c0f13562b910",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798435991927-bandeja-estampada-23-5x36cm/": {
+   "huella": "8f9965302d59395619de",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798442840638-encendedor/": {
+   "huella": "d60bee72beb13a3867c0",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798445660035-polvo-compacto-con-espejo-y-esponja-tejar-art2835/": {
+   "huella": "bf668aaa7aa1dd34be1d",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798445661148-esponja-gota/": {
+   "huella": "744d76921f4aa5e9efb2",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7798445661155-esponja-de-latex-huevito/": {
+   "huella": "c251480b9f142cb53c63",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7821362783614-termo-autocebante-500ml-2-en-1-termo-mate-autocebante-con-sorbete-de-acero/": {
+   "huella": "16761047c274217d34e4",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7851104160113-mate-de-acero-inoxidable-180ml-007/": {
+   "huella": "349e2774ff73d4b02d97",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7861098354993-temperas-estilo-kids-22cc-12-colores/": {
+   "huella": "89861418a9e90fc985f1",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7862601286022-botella-termica-de-acero-sport-con-manija-650ml/": {
+   "huella": "b18bd3dd98d6eab1b3f9",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7890000403030-paragua-viajero/": {
+   "huella": "f23ad41f4770b8fa158c",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7890010300862-termo-media-manija-de-acero-1000ml-liso-con-mate-de-180ml/": {
+   "huella": "233b36aa2994185a2574",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7890010305270-termo-system-de-acero-1000ml-liso-con-mate-de-180ml-bigstar/": {
+   "huella": "d71e3d729de38a165fc0",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7892041232686-parlante-bluetooth-en-forma-de-oso/": {
+   "huella": "b821b7c8617b212e565b",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7893095815375-termo-para-cafe-2000ml-con-taza-termica/": {
+   "huella": "9d6749381c812ed86b22",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7896542390333-cargador-3-en-1/": {
+   "huella": "04ab4e8e59ae8f60bf68",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7898068950107-juego-de-cubierto-de-24-piezas-acero-inoxidable-con-mango-plastico/": {
+   "huella": "1a4847e362050e3eaf0b",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7898357419131-set-de-botellas-plasticas-de-3-piezas/": {
+   "huella": "6bbc10a7222101a87228",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7898512670308-jarra-de-vidrio-1000ml/": {
+   "huella": "df2bfd0d2920d23a5a6f",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7898960837100-pop-it-a-pila-varios-personajes-disponibles/": {
+   "huella": "3a42200e6306cb00581b",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7908542149009-vaso-de-vidrio-doble-en-forma-de-osito/": {
+   "huella": "bbc3cfcd50b645ccea1c",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/7960060100016-mate-plastico-rombo/": {
+   "huella": "cd5689888c091343753d",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/8007229334420-audifono-samsung-con-cable/": {
+   "huella": "fd68dc04b8c285a1ce4e",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/80242-termo-solo-dicoe-dc016-acero-inoxidable-colores-1200ml/": {
+   "huella": "97d66e5339175902c87e",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/8105370214186-paragua-para-ninos/": {
+   "huella": "6faa5e4a8021cb7e39da",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/8802202363493-set-de-te-pequeno/": {
+   "huella": "846db51907eaef4ab956",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/8906139180069-taza-ceramica-importada/": {
+   "huella": "fb7b5ca71d4f16843be7",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/9644669916206-cafetera-tipo-prensa-francesa-de-vidrio/": {
+   "huella": "7d61d2388b3eaa5e6357",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/9656594998942-vaso-termico-cervecero-de-510ml-con-destapador-y-parlante-bluetooth/": {
+   "huella": "596225c0af8b47e31c3b",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/9850600217039-paragua/": {
+   "huella": "5eb393da4646210babbf",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/ALFOMBRA-alfombra-de-bano-antideslizante-40-60cm-color/": {
+   "huella": "d4bd860b8891d6c5135f",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/ALUM-mate-de-aluminio-grabado/": {
+   "huella": "9cde0a4a3a21374fd232",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/AMOR7798-balde-con-pala-restrillo-y-molde-amor2/": {
+   "huella": "408756b04d9862a22e54",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/AUESCA-audifonos-estereo-con-cable-plug-3-5mm/": {
+   "huella": "0d60799f1532f95939ed",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/AUPS-adaptador-universal-para-viajes-con-proteccion-de-sobrecarga/": {
+   "huella": "4fd75698e827e31d0f3d",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/AZUCAR-vertedor-de-plastico/": {
+   "huella": "9b99f6c6727b611cf155",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/B7000-strass-para-decorar-unas-con-adhesivo/": {
+   "huella": "7029d6e836b45182fbb9",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/BALAN-balanza-electronica-para-cocina-10kg/": {
+   "huella": "24abe6562f01ebdfc140",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/BAUCL-botella-de-aluminio-500ml-de-colores/": {
+   "huella": "1e7667565b5aa45228ee",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/BBOX7-peluche-sorpresa-stich-doll-fashion/": {
+   "huella": "716250a6fc4d2b286e82",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/BCORB-bombilla-corazon-en-blister/": {
+   "huella": "84c5ea787f833486d4f6",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/BEBE-bebe-gaby-con-ropa/": {
+   "huella": "9b0d4e23ece00cb7ceb2",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/BENGALA-bengala-sobre-x10/": {
+   "huella": "dc76be8d258e30af197f",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/BIHOM-billetera-de-cuero-para-hombre-colores-sujetos-a-disponibilidad/": {
+   "huella": "9eade955537d1e35868b",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/BOCO-bombilla-de-acero-tipo-coco/": {
+   "huella": "7c59dddee989ae278939",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/BOW-bowling-x6-con-2-bolas/": {
+   "huella": "74af8af6984f46256794",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/BRITEJGA-brillo-labial-tejar/": {
+   "huella": "f29064d92e829c0fc2f1",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/CALEF-calefactor-de-cuarzo-2-potencias-400w-800w/": {
+   "huella": "3d22f6e7f4e402ace8fe",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/CDDP4-chop-de-ceramica-de-350ml-equipos-de-futbol/": {
+   "huella": "8fccc9ef05c08bd07837",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/CDDP5-chop-de-ceramica-de-350ml-seleccion-argentina/": {
+   "huella": "1797783caa26855f78df",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/CDDP6-chop-de-ceramica-de-500ml-seleccion-argentina/": {
+   "huella": "9afde08e2c085e0fc8da",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/CDDP7-cenicero-de-ceramica-de-equipos-de-futbol/": {
+   "huella": "accd75e4ffbfd945686a",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/CHVBC-chop-de-vidrio-estilo-botella-cortada/": {
+   "huella": "2bece9156939b858c82b",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/COPAMP-vaso-de-vidrio-con-forma-de-la-copa-mundial-mini/": {
+   "huella": "1cf6f78d7d88f6adae8a",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/COPAMUN-vaso-de-vidrio-con-forma-de-la-copa-mundial/": {
+   "huella": "c95828df4265c010259a",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/COPO-vaso-termico-tipo-quencher-600ml-con-sorbete/": {
+   "huella": "ff476982ecef766314a5",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/COPO2-vaso-termico-tipo-quencher-420ml-con-sorbete/": {
+   "huella": "e8b320ff8fa721b8260e",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/CUBOS-luces-de-navidad-led-cubos-dorados-x20-a-pilas/": {
+   "huella": "0edfc25e1d035262e801",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/CVABR-chop-vidrio-seleccion-argentina/": {
+   "huella": "a36d93a3ad20fa7c0819",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/DAMA-cartera-para-dama/": {
+   "huella": "2afb6c88345d29455197",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/DELI-delineador-retractil/": {
+   "huella": "585f1502da10c3e3aad6",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/DESPPLD-despolvillador-plastico-con-disenos/": {
+   "huella": "86349eda2b46c159188d",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/DISP2-termo-dispensador-con-bomba-electrica-y-parlante-bluetooth-2500ml/": {
+   "huella": "64ac00a52cbd4cf9a2ff",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/DIVASOX1-vaso-del-dibu-500ml/": {
+   "huella": "91f6c5875ed38522ae3e",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/DULZURA-cepillo-limpia-mamadera/": {
+   "huella": "518f3c004085bbb88dc9",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/ESTRELLITAS-estrellitas-en-sobre-5-unidades/": {
+   "huella": "6ed68dd0545f69abecd8",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/GJ-12-set-de-utensilios-de-silicona-con-mango-de-madera-12-piezas/": {
+   "huella": "535697cf1fd7dcd6a583",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/GOBELLO-gomitas-para-el-cabello/": {
+   "huella": "3270976edd414d9756d7",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/HD1006-vaso-termico-doble-pico-900ml-las-guerreras-k-pop/": {
+   "huella": "e156db6dcc192fc0a1d2",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/HD1007-vaso-termico-doble-pico-900ml-spider-man/": {
+   "huella": "72fd2794b8be0a937542",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/HD1021-vaso-termico-quencher-1200ml-spider-man-marvel/": {
+   "huella": "832b3dbb26de324c5e8a",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/HD1022-vaso-termico-quencher-1200ml-stitch/": {
+   "huella": "cab29375d8de82e9752c",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/HD1025-vaso-termico-quencher-1200ml-my-melody/": {
+   "huella": "d499597f5755468ce655",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/HD1028-vaso-termico-quencher-1200ml-media-manija-bombilla-de-metal-stitch/": {
+   "huella": "2cadd1a1feeb5ba96997",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/HD1030-vaso-termico-quencher-1200ml-las-guerreras-k-pop-bombilla-metal/": {
+   "huella": "8ba70abbf2571317c52b",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/HD1156-vaso-termico-cafe-super-mario-620ml/": {
+   "huella": "68517284587d82fffadb",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/HD127-botella-plastica-labubu-750ml-con-stickers/": {
+   "huella": "14bf40706022e8060905",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/HD130-botella-plastica-labubu-600ml/": {
+   "huella": "f465628f099cd07cd851",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/HPLAST-hielera-plastica/": {
+   "huella": "bf936a40a10f4c404767",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/HPLASTBT-hielera-plastica-con-parlante-bluetooth-y-luces-led-multicolor/": {
+   "huella": "cd5f01625ba1468d765c",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/JAZ-aro-perla-x12-pares/": {
+   "huella": "ef5d90455596174c7179",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/KIT-set-de-terere-termo-de-2000ml-con-vaso-termico-de-180ml-yerbera-y-bombilla/": {
+   "huella": "22b5921a0de4d5b8401b",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/KITT3-set-de-mate-de-3-piezas-estampado-incluye-termo-yerbera-mate-y-bombilla/": {
+   "huella": "7d4b61fbe71478f5b5a6",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/LDELI-lapiz-delineador-con-cepillo-love-crazy/": {
+   "huella": "efc7665165015998b016",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/LIGHT-astronauta-proyector-laser/": {
+   "huella": "6535a6829fcc6b2f11ee",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/LIM5015-set-de-limpieza-con-balde/": {
+   "huella": "c487d4b2d9ebdd360fec",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/LIMA-lima-de-unas-decorada/": {
+   "huella": "f7145ce86a35b94c010f",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/LLMAT-lapiz-labial-matte-tejar-duo/": {
+   "huella": "7db302d9620e5f6dc365",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/LUNAR-carrito-de-compra-lunar/": {
+   "huella": "c8f879dff7713952f3a5",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/MATEBO-set-de-mate-de-3-piezas-mate-yerbera-azucarera/": {
+   "huella": "bd12cebd2ac1e808a8be",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/MATEV-mate-de-vidrio-estampado/": {
+   "huella": "ce0c3ec41351703aa064",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/MDMOI1-mate-de-madera-emma/": {
+   "huella": "06e2d8593c0e63427ce1",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/MDMOI2-mate-de-madera-emma/": {
+   "huella": "fce7c9e91d68028c0d70",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/MESSI-pelota-n5-messi-negra/": {
+   "huella": "466211417f56d6bbf56f",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/MPBBR-mate-plastico-con-bombilla-boca-y-river/": {
+   "huella": "c93a1c4f691bcd81f6c0",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/MPLAST-mate-plastico-de-colores/": {
+   "huella": "cb629a87f8a2e42ab51d",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/OJOTAS-ojotas-oferta-para-dama-ninos-y-caballeros/": {
+   "huella": "a24f5702c6e3f22052c1",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PA%C3%91AL-bebe-gaby-con-panal/": {
+   "huella": "e437aba5b9464f5b95cd",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PALA500-pala-chica-playa/": {
+   "huella": "a7b437910a285a181acf",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PASEO-carrito-de-paseo-plastico-para-munecas/": {
+   "huella": "964972e4f45ad9cdb180",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PLANTILLA-plantilla-de-goma-eva-para-calzados/": {
+   "huella": "1f89b98c78f5fa0cce81",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782226323816-alcancia-chica-con-masas/": {
+   "huella": "ce2cfe38a5a63cf76c6b",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782226341150-alcancia-grande-con-masas/": {
+   "huella": "181882f56e3b598b2de2",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782226435117-frisbee-plastico/": {
+   "huella": "92a0b2af20af88c97fcc",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782226483579-rompecabezas-de-carton/": {
+   "huella": "98e7834d6bd10a470958",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782226498965-rompecabezas-de-carton/": {
+   "huella": "8854e6a532595bc4218f",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782226518660-encastre-fibrofacil-animales-medios-de-transporte/": {
+   "huella": "949b6704380e0e1fea14",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782226542192-encastre-fibrofacil-letras-y-numeros/": {
+   "huella": "05040676871627ddfded",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782226585438-domino-de-madera-animales/": {
+   "huella": "f323084a4a9ed295fb9a",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782226604006-domino-de-madera-deportes/": {
+   "huella": "a33f18aac711607e95fc",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782226623506-domino-de-madera-argentina/": {
+   "huella": "c5aa7135c3c2943d578b",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782226670884-generala-en-caja-de-madera/": {
+   "huella": "5db5192ce2907ff26d2c",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782226748979-pizarra-de-madera/": {
+   "huella": "287b8c1e96daae16f4f8",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782226766234-abaco-de-madera/": {
+   "huella": "62a5969a40e1d0e60f45",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782226812380-set-de-mate-x4-sofia/": {
+   "huella": "749a0fdb130c47359631",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782226952845-bebe-bambino-en-caja/": {
+   "huella": "37b25abffe1c547bb418",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782226982748-perrito-a-pilas-ladra-y-mueve-la-cola/": {
+   "huella": "22bc642474abf5a8bc69",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782227046964-caballito-a-pila-que-camina-relincha-y-mueve-la-cola/": {
+   "huella": "531772bca6b235ee7b31",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782227062419-indios-a-caballo/": {
+   "huella": "cb01ba3fbc0811dcefda",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782227117719-auto-loco-plastico-levanta-las-ruedas/": {
+   "huella": "c8667169b3027c67d9ce",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782227137349-camioncito-megaprice/": {
+   "huella": "8cfe5e272c17ada01b43",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782227158182-camioncito-tutu/": {
+   "huella": "712eea1418b6d9f8cca3",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782227218263-camion-volcador-luni/": {
+   "huella": "d79f3f2aed800cad898c",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782227245123-topadora-luni/": {
+   "huella": "978db72da2eb5b32378a",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782227264269-camion-mezclador-luni/": {
+   "huella": "46cfc8ccc2b5a7a41001",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782227420767-pelota-de-goma-boca-y-river/": {
+   "huella": "114bc3621e5aa39a2950",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782227466952-pelota-de-futbol-n2-colores/": {
+   "huella": "cb06cda2eb8ca8fbf974",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782227489170-pelota-de-futbol-n2-boca-y-river/": {
+   "huella": "e2f817ffd7082899e8ec",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782227564099-pelota-de-futbol-n5-boca-y-river/": {
+   "huella": "ce5853e068ce9c3a57b8",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782227609340-pelota-de-futbol-n5-boca-y-river-calidad-pesada/": {
+   "huella": "03fbb99c388f6f89d19f",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782227662167-dinosaurio-de-goma-pequeno/": {
+   "huella": "0a6f64e40b07b8ddc336",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782227684377-dinosaurio-de-goma-pequeno/": {
+   "huella": "9d1de634b1f37117115e",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782227710924-dinosaurio-de-goma-gigante/": {
+   "huella": "37492b6b5f6474295c99",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782227910145-loteria-plastica/": {
+   "huella": "b6ed573517aece5a8e3b",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782227927383-damas-plastica/": {
+   "huella": "93fbfd1b96d4c31b29b3",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782227989149-domino-de-madera/": {
+   "huella": "851b467a30e9cb1384be",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782228102098-yenga-didactico-con-dado/": {
+   "huella": "244e3257211602ee0b08",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782228121456-yenga-capibara-con-dado/": {
+   "huella": "a019236454d68f6dc4c6",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782228193577-ladrillos-sofia-x24/": {
+   "huella": "30a342edaf31a74c3041",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782228211195-balde-con-ladrillos-x24-sofia/": {
+   "huella": "dac176d776ca8b86996f",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782228577356-bebe-con-pelela/": {
+   "huella": "a7f9baef3185092e218f",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782228622637-indios-con-canoa/": {
+   "huella": "43ba944a63729f8de99e",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782228682430-bolitas-de-cristal-x50/": {
+   "huella": "0858fafd36b640e3e42e",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782228727343-tractor-luni/": {
+   "huella": "a66f0dae0397d7c2b27a",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782228937564-auto-f1-grande/": {
+   "huella": "7e821d340d21baac131f",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782229036878-carrito-de-compra-plastico/": {
+   "huella": "36f4464947f3c99dae6a",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782229280522-bolsa-de-boxeo/": {
+   "huella": "93f3fb4bcf32b46ebd84",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782229299632-bolsa-de-boxeo-grande/": {
+   "huella": "fc0dbd442085f34f46a2",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782229324807-dinosaurio-de-goma-mediano/": {
+   "huella": "a82a78033946c6cb2c12",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782229338581-dinosaurio-de-goma-mediano/": {
+   "huella": "8a081ed20ca41524515a",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782229378468-dinosaurio-de-goma-grande/": {
+   "huella": "dc00a183c8a7dbe6f94d",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782229454625-bowling-x6-con-bola/": {
+   "huella": "0b1a754f8d87c531c81a",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782229794722-set-de-guerrero/": {
+   "huella": "e048ba4904f1149d78c0",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782231743805-yoyo-plastico-deportes/": {
+   "huella": "4bf0c2d8a621d4487444",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782234690799-muneca-para-peinar-tiny/": {
+   "huella": "3e32c2ac0f3710b2cac4",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782309858206-laser-con-luz-uv-detector-de-billetes-falsos/": {
+   "huella": "17ed6a9ec3c468c96521",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782421056845-autos-chocadores-a-control-remoto-con-baterias-recargables/": {
+   "huella": "cae53c49de5aa24dcd75",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782486172150-auto-f1-plastico-gigante-rojo/": {
+   "huella": "dbc15cf0a9ccf91657eb",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782487981378-esmalte-para-unas/": {
+   "huella": "89370bca370951ac80ee",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782578814335-set-de-herramientas-sofia/": {
+   "huella": "7b458362a92229eb19c2",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782579410730-set-de-juego-doctor-a-domicilio-gigante/": {
+   "huella": "cd3396c844b9e1b6e07a",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782580485918-set-de-fibrones-36-piezas/": {
+   "huella": "e6e61200841a3ce689b8",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782580757834-set-de-fibrones-48-piezas/": {
+   "huella": "43584ec277c7e6b43fb3",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782580793777-set-de-fibrones-60-piezas/": {
+   "huella": "93311a0a63c2f3e2e58d",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782580817511-set-de-fibrones-80-piezas/": {
+   "huella": "7cbb85e3d8d4fa53d41f",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1782580848742-set-de-fibrones-120-piezas/": {
+   "huella": "e92b21513b12fbfa59ae",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1783091412672-cinta-de-embalar-100mts/": {
+   "huella": "3be0d5c080775bab2d37",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1783098750481-paleta-de-ping-pong-personajes-variados/": {
+   "huella": "c628fde83032981e993a",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1783098783504-tejo-de-madera/": {
+   "huella": "d429f40fc793904327f1",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1783184035943-set-de-herramientas-de-94-piezas/": {
+   "huella": "ef363dbd344e9233d690",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1783184482440-bateria-de-litio-de-24v-recargable-para-herramientas/": {
+   "huella": "7908f946833f32105f2b",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1783185135947-balde-con-ladrillos-de-240-piezas/": {
+   "huella": "024231d19eef753bdff4",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1783185184426-balde-con-ladrillos-de-120-piezas/": {
+   "huella": "5c20f03a33d246af1691",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1783185243215-balde-con-ladrillos-de-60-piezas/": {
+   "huella": "484d50f9c4d012108b47",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1783341192902-bolso-lona-pequeno-45x35x25-cm/": {
+   "huella": "fb5c90776c325e35e8a1",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1783341241458-bolso-lona-mediano-60x40x24/": {
+   "huella": "7607ed9a34afb851a6f3",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1783341285544-bolso-lona-grande-85x40x24-cm/": {
+   "huella": "62a3246dc4a1a1e382cc",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1783341353993-bolso-lona-gigante-105x45x24-cm/": {
+   "huella": "a7058f967f963c4efea6",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1783363726542-mate-imperial-grande/": {
+   "huella": "77b04a2df25ad62626c6",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1783365338174-yoyo-emoji/": {
+   "huella": "c22b2d48a8bd57fc7926",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1783371409347-auto-cars-gigante/": {
+   "huella": "0bfaa134c8fdede803fb",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1783371549966-pelota-goma-personajes/": {
+   "huella": "467c0e2c90dfd505d655",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1783429739227-pelota-n5-reforzada/": {
+   "huella": "aa5a860318fec6772b30",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1783511284694-aro-de-luz-multicolor-26cm/": {
+   "huella": "e215f018a024b102dd83",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1783511312536-aro-de-luz-multicolor-33cm/": {
+   "huella": "1c783de3c12767050e9c",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1783520911194-corneta-vuvuzuela/": {
+   "huella": "14cac3dbdcbbd5d25a52",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1783522505589-botella-plastica-con-pastillero/": {
+   "huella": "04c03406e41ea1b4c83a",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1783528802170-cucharita-carol-x1/": {
+   "huella": "5f298b2b19178689d61a",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1783528897727-tenedor-carol-x1/": {
+   "huella": "ff908fcfc88c3a23855f",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1783528950348-cuchara-carol-x1/": {
+   "huella": "dc91303396423be71f44",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1783534919322-portasube-consultar-disenos-disponibles/": {
+   "huella": "6098c997dd0ec5826c0c",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1783535092134-lentes-de-lectura/": {
+   "huella": "75cfcdf944b78162c9fc",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1783543967082-bebe-lloron/": {
+   "huella": "4110378f9a9a6f972f91",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1783701448659-vaso-de-aluminio-un-poco-de-ruido/": {
+   "huella": "474a91b94ef9c4b62c39",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1783705255908-munequera/": {
+   "huella": "db070cf08c43928bb77e",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1783705298785-rodillera/": {
+   "huella": "a9fb0811e5a79a469f7c",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1783775183881-colgante-para-celular/": {
+   "huella": "eb88af1231db1579c54d",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1783776204585-vaso-de-aluminio-grabado/": {
+   "huella": "c8514837a6e6dd93fb5d",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1783782604134-libro-para-colorear/": {
+   "huella": "a9aa7319a1bd6cddde05",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1783788743398-set-de-latas-de-2-piezas-azucarera-y-yerbera-delgadas/": {
+   "huella": "e46ffc2ce02bdc0b9bef",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1783793977529-mate-con-asa-y-bombilla-argentina/": {
+   "huella": "d59bf21ba41cb8520c5e",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1783965559272-bebe-con-ropa-y-mamadera/": {
+   "huella": "dd8cfeb3c2a61d91b17b",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1783965724200-auto-f1-arizona/": {
+   "huella": "d95bf24306da7a1dd659",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1783971913438-dinosaurio-de-goma-super-gigante/": {
+   "huella": "1f403fb73d8d28a9b1c7",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1783972650917-pelota-de-goma-10/": {
+   "huella": "b6ccd1a7fe3fc49da3b5",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1783976163876-carrito-de-paseo-para-munecas/": {
+   "huella": "e4cffce8c3cbdf1ddf49",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1784040269811-pulsera-labubu/": {
+   "huella": "9e691464a6d40fb03d78",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1784040554890-bebe-plastico-pequeno/": {
+   "huella": "e5dcad195dbb1f7d59a9",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1784228558190-taza-ceramica-perrito-con-cuchara/": {
+   "huella": "bd70ca3deb7e97dbed13",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1784316767671-peluches-oferta/": {
+   "huella": "23e6207690142b3ac477",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1784661010100-lata-vertedora-afa/": {
+   "huella": "8da93740166eedbad349",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1785251764336-pelota-de-goma-sandia/": {
+   "huella": "0e8585a34ea629f7a3b4",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1786019006312-rack-para-bano/": {
+   "huella": "5bcc08e11de5278a9ac6",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1786109363866-domino-escuela/": {
+   "huella": "5d0dd5828d0a90c57c83",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1786474697899-pulsera-labubu-stitch-grande/": {
+   "huella": "de1e06b788254e1a22ea",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1786650429172-armario-plegable-moderno-74x37x110-cm/": {
+   "huella": "f879944350b6c051db37",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1786654794810-peluche-labubu-grande/": {
+   "huella": "24cf7f2682c8158fa245",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1786716854274-mate-plastico-doble/": {
+   "huella": "1fa47ab1540c47ad6f96",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1787236471377-mate-de-vidrio-estampado-pequeno/": {
+   "huella": "61a7dc9cacb7dbd46454",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1787241961126-chop-de-vidrio-boca-y-river-455ml/": {
+   "huella": "69c71d717376f2943c1f",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1787258035665-vaso-plastico-350ml/": {
+   "huella": "1d5d717e89fabe78b83c",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1787258215250-despolvillador-plastico-transparente/": {
+   "huella": "3eccf5863743acaa5a08",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1787313552970-mate-plastico-con-bombilla/": {
+   "huella": "249786c5215f92f7f0c3",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1787313790469-mate-con-asa-boca-y-river/": {
+   "huella": "67d27176b3d7abca61fd",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1787313959061-mate-plastico/": {
+   "huella": "978c0ce879a4b9e0b86b",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1787314730575-mate-plastico/": {
+   "huella": "f75da3c26e1cdb2e7369",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1787315118797-mate-barril/": {
+   "huella": "edd5eb7d44ef84b035da",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1787325142659-yerbero-yerba-pack-marwal/": {
+   "huella": "7227db621caf5318cb6b",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1787344142904-mate-autocebante-plastico-colores/": {
+   "huella": "33fa9e44de6147641c1a",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1787344249848-mate-autocebante-plastico-estampado/": {
+   "huella": "de33f4c2f22db9eded7b",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1787418685702-vaso-cafetero-estampado-oink/": {
+   "huella": "99544a1849abf5d16e16",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1787418750038-vaso-cafetero-estampado-473ml/": {
+   "huella": "582ea786fcd351f6f390",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1787580852908-rinonera-con-lentejuelas/": {
+   "huella": "f0666e462b4135894781",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1787580955681-rinonera-de-cuerina/": {
+   "huella": "5195380928aaf2107d85",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1787854299653-raviolera-de-plastico-para-18-ravioles/": {
+   "huella": "7d9b4d7992c85999ab87",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1787864915913-lata-alcancia/": {
+   "huella": "b9b97b6bcfed01b35b5a",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1787947465310-mate-plastico-de-colores/": {
+   "huella": "857f70c63cd06d96d303",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1788021325955-lazo-para-el-cabello-con-elastico/": {
+   "huella": "241c5fc502aec04b033f",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1788528497894-porta-mate/": {
+   "huella": "dbc97af6833169f523e7",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1788622315272-bolsitas-de-organza/": {
+   "huella": "ffd47c4356c6b168e890",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1791564366355-109-antiparra-economica/": {
+   "huella": "8b0e08614ec22ec4af0b",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1792588536271-663-luces-de-navidad-led-blancas-x100-220vac-en-caja/": {
+   "huella": "c36228ae1815799aae60",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1792589796215-229-luces-de-navidad-cilindro-x20-multicolor-a-pilas/": {
+   "huella": "0cc0057ee0da324e0202",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1794859151661-881-ventilador-de-mesa-luo-40w/": {
+   "huella": "622c4adea355eac29aa9",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1795028545180-848-cuentos-clasicos/": {
+   "huella": "4e2710c93a487f2cf948",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/REGALO-bolsa-de-regalo-21-5x18x7-5cm/": {
+   "huella": "de1d7bdf71fdd442ed36",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/S1600-set-de-mate-plastico-3-piezas/": {
+   "huella": "d3d65f8691aefba4757e",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/SACOX12-saca-comedon-por-docena/": {
+   "huella": "e5302b02f49c8c01bd3d",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/SCAUV3-soporte-magnetico-para-el-celular/": {
+   "huella": "6479bc03122e7e3a793c",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/SD2006-taladro-inalambrico-a-baterias/": {
+   "huella": "5d27277321cb71541a34",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/SETMX3P-set-de-mate-plastico-de-3-piezas-con-personajes-azucarera-yerbera-mate/": {
+   "huella": "4072a3ce94e83b75cf3d",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/SETUT2-set-de-utensilios-de-silicona-con-cuchillos-y-tabla-para-cortar/": {
+   "huella": "54b0ea1fe372c4b5a286",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/SLALA-set-de-latas-azucareras/": {
+   "huella": "ebe41c7dc694b089bcad",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/SLALAB-set-de-latas-azucareras-con-tapa-de-bambu/": {
+   "huella": "7d40d289b6996cda5966",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/SLALAB2-set-de-latas-azucareras-con-tapa-de-bambu/": {
+   "huella": "3a30c67c120b321e5351",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/SM3AR-set-de-mate-3-piezas-mate-yerbera-azucarera-seleccion-argentina/": {
+   "huella": "739697a1902c54f3e5e7",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/SM3BR-set-de-mate-3-piezas-mate-yerbera-azucarera-boca-y-river/": {
+   "huella": "650b3a1b39df3e794be1",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/SPAMPA-set-de-mate-pampa-plastico-de-4-piezas/": {
+   "huella": "341e109ade4e8204bd52",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/STITCH-pelota-n5-stitch/": {
+   "huella": "30d8fe3eaea952c759e8",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/STPL3ES-set-de-mate-plastico-estampado-de-3-piezas/": {
+   "huella": "0c8df8ebca232f6d2e17",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/SUPER-adhesivo-instantaneo-3-gramos-precio-por-unidad/": {
+   "huella": "7342b6b00c2d5a151c80",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/TAPON-tapon-de-termo-system/": {
+   "huella": "931f22800a86df284ac8",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/TCARG-taza-ceramica-motivo-argentina/": {
+   "huella": "7a48e9834d6a9e7f5aa8",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/TCFUT-taza-ceramica-motivo-equipos-de-futbol/": {
+   "huella": "5152998c4c333c3e7fe7",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/TCGFP-tazon-ceramico-equipos-de-futbol/": {
+   "huella": "f7fa00bd769c94e6cbea",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/TEJIDO-individual-tejido/": {
+   "huella": "c32e2a2fa26b79a6bddf",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/TGENK1-taza-ceramica-genko-seleccion-argentina/": {
+   "huella": "c1fbcc9c6169eea11caf",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/THANOS-espada-doble-de-thanos-plastica-110cm/": {
+   "huella": "d9ed794b78b788b5297c",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/TLABU-toalla-grande-labubu/": {
+   "huella": "7d21d8cf4dda5e211978",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/TMELA-taza-de-melamina/": {
+   "huella": "9baadf1ec38482d21a12",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/TTPB1-termo-para-terere-de-2500ml-con-parlante-bluetooth/": {
+   "huella": "dca8de43e09de88fee81",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/TURBY-bebe-con-jardinera/": {
+   "huella": "9e6dccb005771e0f7310",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/UTEN-set-de-utensillo-silicona-oferta/": {
+   "huella": "1372a3e512ffba627528",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/VINO-bolsa-porta-vino/": {
+   "huella": "e40cdbab9e931e1a7c02",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/VMELA-vaso-de-melanina/": {
+   "huella": "755bdfccc9953a991f64",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/VOGUE-botella-plastica-doble-pico-labubu-580ml/": {
+   "huella": "5f94e629cc3055b1dd96",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/VPBR-vaso-de-vidrio-tipo-pinta-boca-y-river/": {
+   "huella": "5361e593d1942298369f",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/VTDDP3-vaso-termico-cafetero-520ml-doble-pico/": {
+   "huella": "898956d4b094ae7f54b3",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/VTQDS4-vaso-termico-tipo-quencher-1200ml-marmolado-con-sorbete/": {
+   "huella": "96213d8993fe4529b013",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/X2105-billetera-1-cierre-x2105-de-cuero-colores-sujetos-a-disponibilidad/": {
+   "huella": "f3234188005917c7ce9b",
+   "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/X2106-billetera-dama-doble-cierre-x2106-colores-sujetos-a-disponibilidad/": {
+   "huella": "e2ee875b661a69ed4bc4",
+   "fecha": "2026-11-19"
+  }
+ }
+}
