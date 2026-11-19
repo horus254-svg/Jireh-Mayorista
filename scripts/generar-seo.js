@@ -179,12 +179,29 @@ ${extraHead || ""}
 </head>`;
 }
 
+/** Texto del pie: la "descripcion" de config.json (antes estaba fijo el rubro de un cliente). */
+function textoPie() {
+    const d = String(CFG.crudo.descripcion || "").trim();
+    if (!d) return `<strong>${esc(NEGOCIO)}</strong>`;
+    return d.toLowerCase().startsWith(NEGOCIO.toLowerCase())
+        ? `<strong>${esc(NEGOCIO)}</strong>${esc(d.slice(NEGOCIO.length))}`
+        : `<strong>${esc(NEGOCIO)}</strong> — ${esc(d)}`;
+}
+
+/** Enlaces a las páginas legales que existan (las genera scripts/generar-politicas.js). */
+function enlacesLegales() {
+    const links = [["devoluciones", "Política de devoluciones"], ["arrepentimiento", "Botón de arrepentimiento"]]
+        .filter(([r]) => fs.existsSync(path.join(ROOT, r, "index.html")))
+        .map(([r, t]) => `<a href="${esc(SITE_URL)}/${r}/">${t}</a>`);
+    return links.length ? `\n<p>${links.join(" · ")}</p>` : "";
+}
+
 function pie() {
     const wa = CFG.whatsapp ? ` · <a href="https://wa.me/${CFG.whatsapp}">Consultas por WhatsApp</a>` : "";
     return `<footer>
 <div class="wrap">
-<p><strong>${esc(NEGOCIO)}</strong> — venta al por mayor de bazar, regalería, juguetes y artículos para el hogar.${CFG.direccion ? "<br>" + esc(CFG.direccion) + "." : ""} Envíos a toda Argentina.</p>
-<p><a href="${esc(SITE_URL)}/">Ver el catálogo completo</a>${wa}</p>
+<p>${textoPie()}${CFG.direccion && !String(CFG.crudo.descripcion || "").includes(CFG.direccion) ? "<br>" + esc(CFG.direccion) + "." : ""}</p>
+<p><a href="${esc(SITE_URL)}/">Ver el catálogo completo</a>${wa}</p>${enlacesLegales()}
 </div>
 </footer>`;
 }

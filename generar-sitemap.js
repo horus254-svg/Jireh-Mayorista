@@ -111,6 +111,12 @@ async function main() {
     urls.push(entrada(`${baseSinBarra}/producto/${f.seg}/`, `producto/${SEO.carpetaDeSegmento(f.seg)}/index.html`, "weekly", "0.8"));
   }
 
+  // Páginas legales (scripts/generar-politicas.js): la de devoluciones va al
+  // sitemap para que Google (y Merchant Center) la encuentre.
+  if (fs.existsSync(path.join(SEO.ROOT, "devoluciones", "index.html"))) {
+    urls.push(entrada(`${baseSinBarra}/devoluciones/`, "devoluciones/index.html", "monthly", "0.3"));
+  }
+
   fs.mkdirSync(path.dirname(ESTADO), { recursive: true });
   const ordenado = Object.fromEntries(Object.keys(estado).sort().map(k => [k, estado[k]]));
   fs.writeFileSync(ESTADO, JSON.stringify({ _LEEME: "Lo usa generar-sitemap.js para que lastmod sea la fecha real del último cambio de cada página. No editar.", urls: ordenado }, null, 1) + "\n");
