@@ -19,6 +19,17 @@
   "googleVerificacion": "google1a690aa2baf89ec2.html",
   "indexNowClave": "70ed2b55d6393a4df64b2353aee053f2",
 
+  "feedGoogle": {
+    "_LEEME": "Feed de productos para Google Merchant Center (feed-google.xml). activo: false para no generarlo. titulos: 'normalizar' (MAYÚSCULAS → Normal) u 'original'. marcaPorDefecto: solo si los productos son de marca propia. excluirCategorias / excluirCodigos: lo que no puede ir a Google (pirotecnia, armas, etc.). categoriasGoogle: opcional, categoría propia → categoría de Google.",
+    "activo": true,
+    "titulos": "normalizar",
+    "marcaPorDefecto": "",
+    "excluirCategorias": ["PIROTECNIA"],
+    "excluirCodigos": [],
+    "categoriasGoogle": {},
+    "agregarCaracteristicas": true
+  },
+
   "version": "1.1",
   "generadoEn": "2026-10-07"
 }
