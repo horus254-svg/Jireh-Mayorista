@@ -741,6 +741,61 @@ function _ejecutarAccionConfirmada() {
   if (typeof fn === "function") fn();
 }
 
+/**
+ * Igual que confirmarAccion, pero devuelve una promesa: true si se
+ * aceptó, false si se canceló o se cerró el modal. Cancelar solo le
+ * saca la clase "show" al modal, así que se detecta con un observer
+ * (mismo criterio que confirmarAccionDestructiva en la app de escritorio).
+ */
+function confirmarAccionAsync(mensaje, titulo) {
+  return new Promise((resolve) => {
+    const backdrop = document.getElementById("modalConfirmGenericoBackdrop");
+    if (!backdrop) { resolve(window.confirm ? window.confirm(mensaje) : true); return; }
+    let resuelto = false;
+    const terminar = (valor) => {
+      if (resuelto) return;
+      resuelto = true;
+      observador.disconnect();
+      resolve(valor);
+    };
+    const observador = new MutationObserver(() => {
+      if (!backdrop.classList.contains("show")) terminar(false);
+    });
+    confirmarAccion(mensaje, () => terminar(true), titulo);
+    observador.observe(backdrop, { attributes: true, attributeFilter: ["class"] });
+  });
+}
+
+/**
+ * Pedidos sin preparar (Nuevo, sin stock descontado) que incluyen alguno
+ * de estos productos. Si no se puede consultar (sin internet, backend
+ * viejo), devuelve [] y la acción sigue como siempre.
+ */
+async function consultarPedidosAbiertosConProductos(codigos) {
+  const lista = (codigos || []).map(c => String(c || "").trim()).filter(Boolean);
+  if (!lista.length) return [];
+  try {
+    const params = new URLSearchParams({ action: "pedidosAbiertosConProductos", codigos: lista.join(",") });
+    const response = await fetchAPI(API_URL + "?" + params.toString(), {}, { timeoutMs: 10000 });
+    const data = await response.json();
+    return data && data.success && Array.isArray(data.pedidos) ? data.pedidos : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+/** Texto de aviso para el modal de confirmación ("" si no hay pedidos). */
+function textoAvisoPedidosAbiertos(pedidos, queSeHace) {
+  if (!pedidos || !pedidos.length) return "";
+  const n = pedidos.length;
+  const ids = pedidos.slice(0, 8).map(p => "#" + p.PEDIDO_ID + (p.CLIENTE ? " (" + p.CLIENTE + ")" : "")).join(", ") +
+    (n > 8 ? ` y ${n - 8} más` : "");
+  const consecuencia = queSeHace === "eliminar"
+    ? "Si lo eliminás, esos pedidos no se van a poder pasar a Preparando hasta que restaures el producto o lo quites del pedido."
+    : "El pedido no cambia: revisá si todavía lo vas a poder entregar.";
+  return `⚠️ ${n === 1 ? "Hay 1 pedido sin preparar" : `Hay ${n} pedidos sin preparar`} con ${queSeHace === "eliminar" ? "este producto" : "estos productos"}: ${ids}. ${consecuencia}`;
+}
+
 /** Resets the form (and the saved sheet values) back to the generic empty defaults */
 function restablecerConfigNegocio() {
   confirmarAccion(
@@ -3444,23 +3499,29 @@ async function repararStockPedidos(aplicar) {
   }
 }
 
-async function cambiarEstado(pedidoId, estado, el) {
+async function cambiarEstado(pedidoId, estado, el, confirmarSinStock) {
   pedidoId = String(pedidoId); // los números nuevos (1001…) pueden llegar como número
   if (_pedidosEnProceso.has(pedidoId)) return;
   _pedidosEnProceso.add(pedidoId);
   _marcarPedidoProcesando(pedidoId, el, "Guardando…");
-  let ok = false, mensaje = "";
+  let ok = false, mensaje = "", pedirConfirmacion = null;
   try {
     const response = await fetchAPI(
       API_URL +
       "?action=actualizarEstado" +
       "&pedidoId=" + encodeURIComponent(pedidoId) +
-      "&estado="   + encodeURIComponent(estado),
+      "&estado="   + encodeURIComponent(estado) +
+      // El backend avisa si no alcanza el stock (en vez de dejarlo en negativo sin decir nada)
+      "&verificarStock=SI" +
+      (confirmarSinStock ? "&confirmarSinStock=SI" : ""),
       {},
       { timeoutMs: 30000 }
     );
     const data = await _leerRespuestaJSON(response);
-    if (!data.success) {
+    if (!data.success && data.requiereConfirmacion) {
+      pedirConfirmacion = data.message || "No alcanza el stock para este pedido.";
+      mensaje = "falta stock";
+    } else if (!data.success) {
       mensaje = data.message || "No se pudo actualizar el pedido";
     } else {
       ok = true;
@@ -3478,6 +3539,17 @@ async function cambiarEstado(pedidoId, estado, el) {
     _terminarPedidoProcesando(pedidoId, el, true, "✓ Guardado");
     toast(`Pedido ${pedidoId}: estado cambiado a ${estado}`, "success");
     _refrescarPedidosConDestello(pedidoId);
+  } else if (pedirConfirmacion) {
+    // No alcanza el stock: se pregunta antes de dejarlo en negativo
+    _terminarPedidoProcesando(pedidoId, el, false, "Falta stock");
+    const seguir = await confirmarAccionAsync(
+      pedirConfirmacion + `\n\n¿Pasar el pedido ${pedidoId} a ${estado} igual?`,
+      "⚠️ No alcanza el stock"
+    );
+    if (seguir) {
+      if (el && el.tagName === "SELECT") el.value = estado;
+      await cambiarEstado(pedidoId, estado, el, true);
+    }
   } else {
     _terminarPedidoProcesando(pedidoId, el, false, "✕ No se guardó");
     toast(`No se pudo cambiar el estado: ${mensaje}`, "error");
@@ -6677,6 +6749,22 @@ function avisarCodigoDuplicadoFormulario() {
   return msg;
 }
 
+/**
+ * Al guardar la edición de un producto: si se lo está ocultando (estaba
+ * publicado y ahora no) y está en pedidos sin preparar, pide confirmación.
+ * Devuelve false si la persona canceló. La usa también la app de escritorio.
+ */
+async function confirmarOcultarProductoConPedidos(codigoOriginal, publicado) {
+  if (!codigoOriginal || publicado !== "NO") return true;
+  const actual = (typeof productosAdminGlobal !== "undefined" ? productosAdminGlobal : [])
+    .find(p => String(p.CODIGO) === String(codigoOriginal));
+  const estabaPublicado = !actual || String(actual.PUBLICADO || "SI").trim().toUpperCase() !== "NO";
+  if (!estabaPublicado) return true;
+  const aviso = textoAvisoPedidosAbiertos(await consultarPedidosAbiertosConProductos([codigoOriginal]), "ocultar");
+  if (!aviso) return true;
+  return confirmarAccionAsync(aviso + "\n\n¿Ocultar el producto igual?", "⚠️ Producto en pedidos");
+}
+
 async function guardarProductoForm() {
   const codigoOriginal = document.getElementById("pmCodigoOriginal").value.trim();
   const codigo   = document.getElementById("pmCodigo").value.trim();
@@ -6708,6 +6796,9 @@ async function guardarProductoForm() {
   if (avisarCodigoDuplicadoFormulario()) return;
 
   const esEdicion = !!codigoOriginal;
+
+  // Se oculta un producto que estaba publicado: avisar si está en pedidos sin preparar
+  if (!(await confirmarOcultarProductoConPedidos(codigoOriginal, publicado))) return;
   const btn = document.getElementById("btnGuardarProducto");
   const textoOriginal = btn.innerHTML;
   btn.disabled = true;
@@ -6772,12 +6863,19 @@ async function guardarProductoForm() {
  * de texto deja de responder hasta recargar. Por eso en todo el panel
  * se usa este patrón de modal propio en vez de confirm() nativo.
  */
-function eliminarProducto(codigo) {
+async function eliminarProducto(codigo) {
   window._codigoProductoParaEliminar = codigo;
+
+  // Avisa si el producto está en pedidos que todavía no se prepararon
+  const aviso = textoAvisoPedidosAbiertos(await consultarPedidosAbiertosConProductos([codigo]), "eliminar");
 
   const backdrop = document.getElementById("modalEliminarProdBackdrop");
   const texto = document.getElementById("modalEliminarProdTexto");
-  if (texto) texto.textContent = `¿Mover el producto "${codigo}" a la papelera? Lo vas a poder restaurar desde Productos → Papelera.`;
+  if (texto) {
+    texto.style.whiteSpace = "pre-line";
+    texto.textContent = `¿Mover el producto "${codigo}" a la papelera? Lo vas a poder restaurar desde Productos → Papelera.` +
+      (aviso ? "\n\n" + aviso : "");
+  }
   if (backdrop) backdrop.classList.add("show");
 }
 
@@ -13509,7 +13607,7 @@ function _textoCambioLote(cambios) {
   return partes.join(", ");
 }
 
-function aplicarCambioLote(cambios) {
+async function aplicarCambioLote(cambios) {
   cerrarMenuLote();
   const codigos = obtenerCodigosSeleccionados();
   if (codigos.length === 0) { toast("Seleccioná al menos un producto", "error"); return; }
@@ -13529,7 +13627,9 @@ function aplicarCambioLote(cambios) {
   const accion = _textoCambioLote(cambios);
   const mensaje = `¿${accion.charAt(0).toUpperCase() + accion.slice(1)}: ${codigos.length === 1 ? "1 producto" : codigos.length + " productos"}?` +
     (yaEstan ? ` (${yaEstan} ya estaba${yaEstan === 1 ? "" : "n"} así)` : "") +
-    (cambios.PUBLICADO === "NO" ? "\n\nLos productos ocultos no se ven en la página ni en el POS, pero no se borran: se vuelven a mostrar con \"Mostrar (publicar)\" (filtro \"Ocultos\")." : "");
+    (cambios.PUBLICADO === "NO" ? "\n\nLos productos ocultos no se ven en la página ni en el POS, pero no se borran: se vuelven a mostrar con \"Mostrar (publicar)\" (filtro \"Ocultos\")." : "") +
+    // Productos que se ocultan y están en pedidos sin preparar: se avisa
+    (cambios.PUBLICADO === "NO" ? (t => t ? "\n\n" + t : "")(textoAvisoPedidosAbiertos(await consultarPedidosAbiertosConProductos(codigos), "ocultar")) : "");
 
   confirmarAccion(mensaje, async () => {
     const btn = document.getElementById("btnCambiarLote");
