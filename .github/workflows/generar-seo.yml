@@ -53,6 +53,14 @@ jobs:
           BASE_URL: ${{ secrets.SITE_URL }}
         run: node generar-sitemap.js
 
+      - name: Generar feed de Google Merchant Center
+        # Si falla (por ejemplo, la API tarda), no frena el resto: queda el feed anterior
+        continue-on-error: true
+        env:
+          API_URL: ${{ secrets.API_URL }}
+          SITE_URL: ${{ secrets.SITE_URL }}
+        run: node scripts/generar-feed-google.js
+
       - name: Verificar SEO (sitemap, fichas, JSON-LD, canonical, imágenes, enlaces)
         run: node scripts/verificar-seo.js
 
@@ -63,6 +71,8 @@ jobs:
           git add -A producto categoria sitemap.xml index.html manifest-catalogo.json Reportes/manifest.json robots.txt config.json
           git add -A -- 'google*.html' || true
           git add -A -- ':(glob)*.txt' || true
+          git add -A .github/sitemap-fechas.json || true
+          git add -A feed-google.xml || true
           git diff --cached --quiet || git commit -m "chore: regenerar SEO de productos [automático]"
           git push
 
