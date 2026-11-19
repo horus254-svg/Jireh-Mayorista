@@ -77,6 +77,7 @@ jobs:
           git add -A .github/sitemap-fechas.json || true
           git add -A feed-google.xml || true
           git add -A devoluciones arrepentimiento || true
+          git add -A robots-raiz.txt || true
           git diff --cached --quiet || git commit -m "chore: regenerar SEO de productos [automático]"
           git push
 
