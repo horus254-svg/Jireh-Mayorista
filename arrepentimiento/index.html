@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Botón de arrepentimiento | Jireh Mayorista</title>
+<meta name="description" content="Solicitá la revocación de tu compra en Jireh Mayorista dentro de los 10 días corridos desde que la recibiste (Ley 24.240, art. 34).">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://horus254-svg.github.io/Jireh-Mayorista/arrepentimiento/">
+<link rel="icon" href="https://horus254-svg.github.io/Jireh-Mayorista/favicon.ico">
+<meta name="theme-color" content="#241536">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://horus254-svg.github.io/Jireh-Mayorista/arrepentimiento/">
+<meta property="og:title" content="Botón de arrepentimiento | Jireh Mayorista">
+<meta property="og:description" content="Solicitá la revocación de tu compra en Jireh Mayorista dentro de los 10 días corridos desde que la recibiste (Ley 24.240, art. 34).">
+<meta property="og:site_name" content="Jireh Mayorista">
+<meta property="og:locale" content="es_AR">
+
+<style>
+:root{--c:#241536;--tx:#1f2430;--mute:#5b6270;--line:#e6e8ee}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;color:var(--tx);line-height:1.6;background:#fafafb}
+.top{background:var(--c);color:#fff}
+.top a{color:#fff;text-decoration:none;font-weight:700}
+.wrap{max-width:760px;margin:0 auto;padding:18px 20px}
+main.wrap{background:#fff;border:1px solid var(--line);border-radius:14px;margin:24px auto;padding:28px 28px 20px}
+h1{font-size:1.7rem;line-height:1.25;margin:0 0 6px}
+h2{font-size:1.15rem;margin:26px 0 8px}
+.act{color:var(--mute);font-size:14px;margin:0 0 18px}
+.destacado{background:#f4f6fb;border-left:4px solid var(--c);padding:12px 16px;border-radius:8px;margin:14px 0}
+ul,ol{padding-left:22px}
+li{margin:4px 0}
+a{color:var(--c)}
+.btn{display:inline-block;background:var(--c);color:#fff;text-decoration:none;padding:11px 18px;border-radius:10px;font-weight:600;border:0;font-size:15px;cursor:pointer}
+.btn-sec{background:#fff;color:var(--c);border:2px solid var(--c)}
+label{display:block;font-weight:600;font-size:14px;margin:12px 0 4px}
+input,textarea{width:100%;padding:10px 12px;border:1px solid #cfd3dc;border-radius:8px;font:inherit}
+.codigo{font-family:ui-monospace,Consolas,monospace;font-size:1.3rem;font-weight:700;letter-spacing:.04em}
+.oculto{display:none}
+footer{color:var(--mute);font-size:14px;text-align:center}
+@media (max-width:600px){main.wrap{margin:12px;padding:20px 16px}}
+</style>
+</head>
+<body>
+<div class="top"><div class="wrap"><a href="https://horus254-svg.github.io/Jireh-Mayorista/">Jireh Mayorista</a></div></div>
+<main class="wrap">
+<h1>Botón de arrepentimiento</h1>
+<p>Si compraste como consumidor final, podés <strong>revocar tu compra dentro de los 10 días corridos</strong> desde que recibiste el pedido (artículo 34 de la Ley 24.240 y artículo 1110 del Código Civil y Comercial). No necesitás registrarte ni explicar el motivo.</p>
+<p>No aplica a productos comprados para reventa o para un proceso productivo, ni a productos usados o consumidos. Ver la <a href="https://horus254-svg.github.io/Jireh-Mayorista/devoluciones/">política de devoluciones</a>.</p>
+
+<form id="form-arr">
+<label for="arr-nombre">Nombre y apellido</label>
+<input id="arr-nombre" required autocomplete="name">
+<label for="arr-dni">DNI</label>
+<input id="arr-dni" required inputmode="numeric">
+<label for="arr-pedido">Número de pedido</label>
+<input id="arr-pedido" required>
+<label for="arr-fecha">Fecha en que recibiste el pedido</label>
+<input id="arr-fecha" type="date" required>
+<label for="arr-obs">Comentario (opcional)</label>
+<textarea id="arr-obs" rows="3"></textarea>
+<p style="margin-top:16px"><button class="btn" type="submit">Solicitar arrepentimiento</button></p>
+</form>
+
+<div id="resultado" class="oculto destacado">
+<p>Tu código de arrepentimiento es:</p>
+<p class="codigo" id="arr-codigo"></p>
+<p>Guardalo. Para completar la solicitud, envianos el mensaje ya armado por WhatsApp. Te confirmamos la recepción dentro de las 24 horas y coordinamos la devolución, sin costo para vos.</p>
+<p><a class="btn" id="arr-enviar" href="#" target="_blank" rel="noopener">Enviar solicitud por WhatsApp</a></p>
+</div>
+</main>
+<footer class="wrap">
+<p><a href="https://horus254-svg.github.io/Jireh-Mayorista/">Volver al catálogo</a> · <a href="https://horus254-svg.github.io/Jireh-Mayorista/devoluciones/">Política de devoluciones</a> · <a href="https://horus254-svg.github.io/Jireh-Mayorista/arrepentimiento/">Botón de arrepentimiento</a></p>
+</footer>
+<script>
+
+(function(){
+  var WA = "5491140975795", EMAIL = "", NEG = "Jireh Mayorista";
+  var f = document.getElementById("form-arr"), res = document.getElementById("resultado");
+  f.addEventListener("submit", function(ev){
+    ev.preventDefault();
+    var d = new Date(), p = function(n){ return String(n).padStart(2, "0"); };
+    var codigo = "ARR-" + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + "-" + Math.random().toString(36).slice(2, 6).toUpperCase();
+    var v = function(id){ return (document.getElementById(id).value || "").trim(); };
+    var texto = "SOLICITUD DE ARREPENTIMIENTO (revocación de compra)\n" +
+      "Código: " + codigo + "\nNombre: " + v("arr-nombre") + "\nDNI: " + v("arr-dni") +
+      "\nN° de pedido: " + v("arr-pedido") + "\nFecha de recepción: " + v("arr-fecha") +
+      (v("arr-obs") ? "\nComentario: " + v("arr-obs") : "");
+    document.getElementById("arr-codigo").textContent = codigo;
+    var a = document.getElementById("arr-enviar");
+    a.href = WA ? "https://wa.me/" + WA + "?text=" + encodeURIComponent(texto)
+               : "mailto:" + EMAIL + "?subject=" + encodeURIComponent("Arrepentimiento " + codigo + " - " + NEG) + "&body=" + encodeURIComponent(texto);
+    f.classList.add("oculto"); res.classList.remove("oculto");
+    a.focus();
+  });
+})();
+</script>
+</body>
+</html>
