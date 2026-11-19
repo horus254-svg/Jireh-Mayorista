@@ -82,9 +82,12 @@ function cortar(s, max) {
 function descripcion(p, titulo) {
     const propia = String(p.DESCRIPCION || "").replace(/\r\n?/g, "\n").trim();
     const soloNombre = (x) => norm(x).replace(/[^A-Z0-9]+/g, " ").trim();
-    if (propia && soloNombre(propia) !== soloNombre(p.PRODUCTO)) return cortar(propia.replace(/\n+/g, " ").replace(/\s+/g, " "), 5000);
-    // Sin descripción propia: una armada solo con datos reales
-    const partes = [titulo + (p.CATEGORIA ? " — " + normalizarTitulo(p.CATEGORIA) : "") + "."];
+    const tienePropia = propia && soloNombre(propia) !== soloNombre(p.PRODUCTO);
+    if (tienePropia && propia.length >= 70) return cortar(propia.replace(/\n+/g, " ").replace(/\s+/g, " "), 5000);
+    // Sin descripción propia (o muy corta, como "Caja x12"): se completa con datos reales
+    const partes = [];
+    if (tienePropia) partes.push(propia.replace(/\s+/g, " ").replace(/[.\s]*$/, "."));
+    partes.push(titulo + (p.CATEGORIA ? " — " + normalizarTitulo(p.CATEGORIA) : "") + ".");
     if (OPC.agregarCaracteristicas) {
         const car = C.caracteristicas(p);
         if (car.length) partes.push(car.map(([k, v]) => k + ": " + v).join(". ") + ".");

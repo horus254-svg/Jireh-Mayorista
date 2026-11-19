@@ -85,8 +85,13 @@ function datosProducto(p, seg) {
     partes.push("Venta al por mayor en " + NEGOCIO + ". Envíos a toda Argentina.");
     const descripcionFactual = partes.join(" ");
 
-    const descripcionMeta = C.recortar(descripcionPropia || descripcionFactual, 158);
-    const descripcionSchema = C.recortar(descripcionPropia || descripcionFactual, 5000);
+    // Una descripción propia corta ("Caja x12") sola no alcanza para Google: se
+    // completa con el texto factual. Larga (70+ caracteres) se usa tal cual.
+    const descripcionBase = descripcionPropia.length >= 70
+        ? descripcionPropia
+        : [descripcionPropia.replace(/\s+/g, " ").replace(/[.\s]*$/, descripcionPropia ? "." : ""), descripcionFactual].filter(Boolean).join(" ");
+    const descripcionMeta = C.recortar(descripcionBase, 158);
+    const descripcionSchema = C.recortar(descripcionBase, 5000);
 
     const unidadesCaja = Number(p.UNIDADES_POR_CAJA) > 0 ? Number(p.UNIDADES_POR_CAJA) : 0;
     const precioCaja = unidadesCaja ? C.parsearPrecio(p.PRECIO_CAJA) : null;
