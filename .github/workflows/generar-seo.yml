@@ -41,6 +41,9 @@ jobs:
       - name: Aplicar datos del cliente (config.json)
         run: node scripts/aplicar-cliente.js
 
+      - name: Páginas legales (devoluciones y botón de arrepentimiento)
+        run: node scripts/generar-politicas.js
+
       - name: Generar páginas de producto y categoría (/producto/, /categoria/)
         env:
           API_URL: ${{ secrets.API_URL }}
@@ -73,6 +76,7 @@ jobs:
           git add -A -- ':(glob)*.txt' || true
           git add -A .github/sitemap-fechas.json || true
           git add -A feed-google.xml || true
+          git add -A devoluciones arrepentimiento || true
           git diff --cached --quiet || git commit -m "chore: regenerar SEO de productos [automático]"
           git push
 
