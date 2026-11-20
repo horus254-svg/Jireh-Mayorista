@@ -2,20 +2,20 @@
  "_LEEME": "Lo usa generar-sitemap.js para que lastmod sea la fecha real del último cambio de cada página. No editar.",
  "urls": {
   "https://horus254-svg.github.io/Jireh-Mayorista/": {
-   "huella": "8671da1859a132678a68",
-   "fecha": "2026-11-19"
+   "huella": "edc413e46c5d994825d5",
+   "fecha": "2026-11-20"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/categoria/accesorios/": {
-   "huella": "04d86c81f76ca249b287",
-   "fecha": "2026-11-19"
+   "huella": "e44ef923e01629380952",
+   "fecha": "2026-11-20"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/categoria/aluminio/": {
    "huella": "ca7a39f29c185bdf4959",
    "fecha": "2026-11-19"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/categoria/bombillas/": {
-   "huella": "562872f8b8d657d1755d",
-   "fecha": "2026-11-19"
+   "huella": "b406ff269b48be72eb4d",
+   "fecha": "2026-11-20"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/categoria/ceramica/": {
    "huella": "d7d155a85b364a854274",
@@ -58,8 +58,8 @@
    "fecha": "2026-11-19"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/categoria/ofertas/": {
-   "huella": "86ad49887c4028d349e4",
-   "fecha": "2026-11-19"
+   "huella": "ff40f21a1eb35ed3442e",
+   "fecha": "2026-11-20"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/categoria/pirotecnia/": {
    "huella": "ba839594601bed35cbaf",
@@ -74,8 +74,8 @@
    "fecha": "2026-11-19"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/categoria/termicos/": {
-   "huella": "e8def01d3fc2076f342a",
-   "fecha": "2026-11-19"
+   "huella": "783190313c02f122ccf7",
+   "fecha": "2026-11-20"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/categoria/verano/": {
    "huella": "4a21f57cf78cbc5a9603",
@@ -118,20 +118,16 @@
    "fecha": "2026-11-19"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/15500A-cartera-mochila-marron-y-lunares/": {
-   "huella": "1576d400db59661724b5",
-   "fecha": "2026-11-19"
-  },
-  "https://horus254-svg.github.io/Jireh-Mayorista/producto/1780998103028-vaso-termico-tipo-quencher-1200ml-estampado-con-sorbete/": {
-   "huella": "f6c3c36cb4ace5d87715",
-   "fecha": "2026-11-19"
+   "huella": "9c591362de516e652bb5",
+   "fecha": "2026-11-20"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/1780998103257-vaso-termico-estampado-con-manija-900ml/": {
    "huella": "b36076f97ce2bb07a67d",
    "fecha": "2026-11-19"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/1780998103325-termo-bolita-1300ml-acero-estampado-con-bombilla-hengda/": {
-   "huella": "ce77113c0d51c5527506",
-   "fecha": "2026-11-19"
+   "huella": "c7069ab5059c0dbb99c5",
+   "fecha": "2026-11-20"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/1780998103691-set-de-mate-plus-estampado-1000ml-h10369/": {
    "huella": "086a0edb9c28e7bf3a66",
@@ -302,12 +298,12 @@
    "fecha": "2026-11-19"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/262-candado-25mm/": {
-   "huella": "ba9e942a7ee5345af5be",
-   "fecha": "2026-11-19"
+   "huella": "a847e0699b601f3b2249",
+   "fecha": "2026-11-20"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/264-candado-38mm/": {
-   "huella": "fa8de483e199af29ba38",
-   "fecha": "2026-11-19"
+   "huella": "dd5ca7051f24c2204006",
+   "fecha": "2026-11-20"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/3024201810074-bolsa-de-regalo-26x32x10-merry-christmas-4-modelo-surtidos/": {
    "huella": "2f6c6b25eec93105b486",
@@ -354,8 +350,8 @@
    "fecha": "2026-11-19"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/4750841380286-termo-system-1200ml-acero-liso-bigstar/": {
-   "huella": "5a532ea5bb3bf15d52d8",
-   "fecha": "2026-11-19"
+   "huella": "abb86989e99b392f0a89",
+   "fecha": "2026-11-20"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/4894457201549-molde-para-empanadas/": {
    "huella": "b171166166d4fd592f8e",
@@ -429,9 +425,9 @@
    "huella": "794fa35926a2f3f608d9",
    "fecha": "2026-11-19"
   },
-  "https://horus254-svg.github.io/Jireh-Mayorista/producto/5658565430111-botella-termica-con-deseno-750ml/": {
-   "huella": "02d7f3664314c566b9af",
-   "fecha": "2026-11-19"
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/5658565430111-botella-termica-con-diseno-750ml/": {
+   "huella": "7c751e53eafdb9eb6bba",
+   "fecha": "2026-11-20"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/5658565430166-botella-termica-con-manija-estampada-750ml-con-protectores-de-silicona/": {
    "huella": "b41481374b4c129a01cf",
@@ -441,17 +437,21 @@
    "huella": "a78aaccb76bac1d554cf",
    "fecha": "2026-11-19"
   },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/5658565430180-botella-termica-sport-con-diseno-750ml/": {
+   "huella": "0a72cb489a61a4f20796",
+   "fecha": "2026-11-20"
+  },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/5658565430227-termo-autocebante-estampado-de-750ml-2-en-1-termo-mate-autocebante-con-sorbete-de-acero/": {
-   "huella": "633045a0804916c670e8",
-   "fecha": "2026-11-19"
+   "huella": "459357d437073cb5b968",
+   "fecha": "2026-11-20"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/5658565430241-kit-jarra-para-terere-2000ml/": {
-   "huella": "ea0be762020b8b7f9335",
-   "fecha": "2026-11-19"
+   "huella": "9d81c4eaec77f099420b",
+   "fecha": "2026-11-20"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/5658565543378-vaso-termico-con-manija-reversible-de-900ml-4337/": {
-   "huella": "73157bbfd28438cd227f",
-   "fecha": "2026-11-19"
+   "huella": "e8f1dd00ff400b40bd4e",
+   "fecha": "2026-11-20"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/5658565543385-vaso-termico-con-manija-reversible-de-1200ml/": {
    "huella": "3a5fb1e7702261ef535e",
@@ -482,8 +482,8 @@
    "fecha": "2026-11-19"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/6512913188742-termo-autocebante-estampado-de-750ml-2-en-1-termo-mate-autocebante-con-sorbete-de-acero/": {
-   "huella": "05e3457e5d364694c1e7",
-   "fecha": "2026-11-19"
+   "huella": "c8f3c78fcc74ccd3bde6",
+   "fecha": "2026-11-20"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/6512943744782-termo-bala-estampado-1000ml/": {
    "huella": "4f6236b7f7bde855699d",
@@ -548,6 +548,10 @@
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/6900202411281-vaso-termico-860ml-con-sorbete/": {
    "huella": "548c3ddea5d3ebb2779c",
    "fecha": "2026-11-19"
+  },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/6900523011832-termo-dispensador-con-bomba-2-5l-vaso-termico-bombilla/": {
+   "huella": "3e133c25bf8dd4994a8f",
+   "fecha": "2026-11-20"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/6900523611452-pava-electrica-2000ml-bigstar/": {
    "huella": "a8b065f96fb0cab57da0",
@@ -2098,8 +2102,8 @@
    "fecha": "2026-11-19"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/7791000000208-botella-termica-deportiva-estampada-de-750ml/": {
-   "huella": "98354bcedd769a7eeb71",
-   "fecha": "2026-11-19"
+   "huella": "aaba7002965a8ceddf06",
+   "fecha": "2026-11-20"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/7791000000253-termo-system-1000ml-acero-estampado/": {
    "huella": "1a1d80426166c55bccc1",
@@ -2110,12 +2114,12 @@
    "fecha": "2026-11-19"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/7791234560004-vaso-termico-de-acero-estampado-con-manija-900ml/": {
-   "huella": "baebe9bc9728e069c4a4",
-   "fecha": "2026-11-19"
+   "huella": "a7c9147c65550f16e6f4",
+   "fecha": "2026-11-20"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/7791234560059-termo-bolita-estampado-con-flores-1000ml/": {
-   "huella": "762be78efc02a1f89edd",
-   "fecha": "2026-11-19"
+   "huella": "f8a6bf71eced0ab8b862",
+   "fecha": "2026-11-20"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/7791762181177-repuesto-de-carpeta-gloria-400-hojas-rayadas-n3-65g-m2/": {
    "huella": "cadef81c43f642388031",
@@ -2610,8 +2614,8 @@
    "fecha": "2026-11-19"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/7864349431849-termo-bolita-1300ml-con-strass/": {
-   "huella": "eb708a13c09d42770751",
-   "fecha": "2026-11-19"
+   "huella": "88e904957655bbf7d751",
+   "fecha": "2026-11-20"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/7890000403030-paragua-viajero/": {
    "huella": "8e93bafb9343e18af753",
@@ -2666,8 +2670,8 @@
    "fecha": "2026-11-19"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/8105370214186-paragua-para-ninos/": {
-   "huella": "2a5ec59c4c8b65a2a1d2",
-   "fecha": "2026-11-19"
+   "huella": "dde0c23e7f20ecf1efe8",
+   "fecha": "2026-11-20"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/8802202363493-set-de-te-pequeno/": {
    "huella": "9c4a31e095ef23b5c10a",
@@ -2730,8 +2734,8 @@
    "fecha": "2026-11-19"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/BCORB-bombilla-corazon-en-blister/": {
-   "huella": "2dd36b1ba0010ccd2b01",
-   "fecha": "2026-11-19"
+   "huella": "3328d71f9dc8ca96c78f",
+   "fecha": "2026-11-20"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/BEBE-bebe-gaby-con-ropa/": {
    "huella": "e1df87c0f7447c1d0371",
@@ -2746,8 +2750,8 @@
    "fecha": "2026-11-19"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/BOCO-bombilla-de-acero-tipo-coco/": {
-   "huella": "3d46b0aadd36884e1857",
-   "fecha": "2026-11-19"
+   "huella": "77ddd846609f927c94f0",
+   "fecha": "2026-11-20"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/BOW-bowling-x6-con-2-bolas/": {
    "huella": "186565aee73cd019d0fb",
@@ -2818,16 +2822,16 @@
    "fecha": "2026-11-19"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/DISP2-termo-dispensador-con-bomba-electrica-y-parlante-bluetooth-2500ml/": {
-   "huella": "734745d1e1b74c5b9b25",
-   "fecha": "2026-11-19"
+   "huella": "c7b1b5bc023493dd53f3",
+   "fecha": "2026-11-20"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/DIVASOX1-vaso-del-dibu-500ml/": {
    "huella": "1db95ba420d3a0a8feac",
    "fecha": "2026-11-19"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/DULZURA-cepillo-limpia-mamadera/": {
-   "huella": "aa0e0afdfd6e29b82451",
-   "fecha": "2026-11-19"
+   "huella": "9dff49eb26e26d6aa4d5",
+   "fecha": "2026-11-20"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/ESTRELLITAS-estrellitas-en-sobre-5-unidades/": {
    "huella": "989ca29306a80e6b0f41",
@@ -2862,8 +2866,8 @@
    "fecha": "2026-11-19"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/HD1028-vaso-termico-quencher-1200ml-media-manija-bombilla-de-metal-stitch/": {
-   "huella": "593d0c708c71bcb355f1",
-   "fecha": "2026-11-19"
+   "huella": "9bdc3ec4e72a57abbb59",
+   "fecha": "2026-11-20"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/HD1030-vaso-termico-quencher-1200ml-las-guerreras-k-pop-bombilla-metal/": {
    "huella": "3e7b14c7dbed1f89345a",
@@ -2898,8 +2902,8 @@
    "fecha": "2026-11-19"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/KITT3-set-de-mate-de-3-piezas-estampado-incluye-termo-yerbera-mate-y-bombilla/": {
-   "huella": "c3416137835523d1bbfa",
-   "fecha": "2026-11-19"
+   "huella": "530b20023910f865303d",
+   "fecha": "2026-11-20"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/LDELI-lapiz-delineador-con-cepillo-love-crazy/": {
    "huella": "d068589e21a8d77f5754",
@@ -2957,9 +2961,13 @@
    "huella": "be8c68514f19ddd07acc",
    "fecha": "2026-11-19"
   },
+  "https://horus254-svg.github.io/Jireh-Mayorista/producto/OFERTATE-termo-oferta/": {
+   "huella": "4bc70a960a34d50dca53",
+   "fecha": "2026-11-20"
+  },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/OJOTAS-ojotas-oferta-para-dama-ninos-y-caballeros/": {
-   "huella": "f8a6a43c903372f60adb",
-   "fecha": "2026-11-19"
+   "huella": "45963ea0f4e3488231a4",
+   "fecha": "2026-11-20"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/PA%C3%91AL-bebe-gaby-con-panal/": {
    "huella": "8a5747dd5f17d7e0e436",
@@ -3270,20 +3278,20 @@
    "fecha": "2026-11-19"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1783341192902-bolso-lona-pequeno-45x35x25-cm/": {
-   "huella": "47a1acce05629eaf7fbe",
-   "fecha": "2026-11-19"
+   "huella": "26d9d39565d8533b9c83",
+   "fecha": "2026-11-20"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1783341241458-bolso-lona-mediano-60x40x24/": {
-   "huella": "b6883613ed61da5f91a6",
-   "fecha": "2026-11-19"
+   "huella": "7be23a64a930b31deaa7",
+   "fecha": "2026-11-20"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1783341285544-bolso-lona-grande-85x40x24-cm/": {
-   "huella": "7b6bb12807b80ab3fc3e",
-   "fecha": "2026-11-19"
+   "huella": "f53f8abdf53a8b257473",
+   "fecha": "2026-11-20"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1783341353993-bolso-lona-gigante-105x45x24-cm/": {
-   "huella": "38ca893cbc7c50e84cdf",
-   "fecha": "2026-11-19"
+   "huella": "1ee700f2f1bb821bc9a7",
+   "fecha": "2026-11-20"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1783363726542-mate-imperial-grande/": {
    "huella": "c094ec5c919b6b165abe",
@@ -3343,10 +3351,6 @@
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1783543967082-bebe-lloron/": {
    "huella": "854e6f3121e633ba98b4",
-   "fecha": "2026-11-19"
-  },
-  "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1783689019569-bombilla-chata-de-colores/": {
-   "huella": "3317cd981956f94daca9",
    "fecha": "2026-11-19"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/PRD-1783701448659-vaso-de-aluminio-un-poco-de-ruido/": {
@@ -3654,16 +3658,16 @@
    "fecha": "2026-11-19"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/TTPB1-termo-para-terere-de-2500ml-con-parlante-bluetooth/": {
-   "huella": "b3829e009618fa267fed",
-   "fecha": "2026-11-19"
+   "huella": "46827c14790ef9c08bc6",
+   "fecha": "2026-11-20"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/TURBY-bebe-con-jardinera/": {
    "huella": "62e3cbb9b06d5f2460df",
    "fecha": "2026-11-19"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/UTEN-set-de-utensillo-silicona-oferta/": {
-   "huella": "564d0b6e30ecca103c9d",
-   "fecha": "2026-11-19"
+   "huella": "a38d91e59889a767576f",
+   "fecha": "2026-11-20"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/VINO-bolsa-porta-vino/": {
    "huella": "afb7d3e39d3be9e54800",
@@ -3686,8 +3690,8 @@
    "fecha": "2026-11-19"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/VTQDS4-vaso-termico-tipo-quencher-1200ml-marmolado-con-sorbete/": {
-   "huella": "b13592d6f238e352da0e",
-   "fecha": "2026-11-19"
+   "huella": "b7fc1248ca3e9c48b961",
+   "fecha": "2026-11-20"
   },
   "https://horus254-svg.github.io/Jireh-Mayorista/producto/X2105-billetera-1-cierre-x2105-de-cuero-colores-sujetos-a-disponibilidad/": {
    "huella": "b68737f0c1b31a29df6c",
