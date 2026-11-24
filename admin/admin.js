@@ -3259,7 +3259,11 @@ async function _cargarPedidosImpl() {
     // hace falta destruir y reconstruir toda la lista — eso es lo que
     // hacía "saltar" la pantalla al principio cada vez que el polling
     // de 15s se disparaba, aunque no hubiera pedidos nuevos.
-    const firma = p => p.PEDIDO_ID + "|" + p.ESTADO + "|" + p.COBRADO + "|" + p.FORMA_PAGO_COBRO + "|" + p.TOTAL;
+    // Incluye los datos del cliente: si no, al corregir el teléfono con
+    // "Editar cliente" la tarjeta no se redibujaba y seguía mostrando el
+    // aviso ⚠️ (y el link de WhatsApp) del número viejo.
+    const firma = p => [p.PEDIDO_ID, p.ESTADO, p.COBRADO, p.FORMA_PAGO_COBRO, p.TOTAL,
+      p.CLIENTE, p.TELEFONO, p.DNI, p.EMPRESA, p.DIRECCION, p.LOCALIDAD, p.PROVINCIA, p.PDF_URL].join("|");
     const cambio = !pedidosGlobal
       || pedidosGlobal.length !== data.pedidos.length
       || pedidosGlobal.some((p, i) => firma(p) !== firma(data.pedidos[i]));
@@ -3973,6 +3977,18 @@ async function guardarEdicionClientePedido() {
     const accion = data.cliente && data.cliente.accion === "creado" ? "y se creó el cliente en Clientes" : "y en Clientes";
     toast(`Datos del cliente actualizados en el pedido ${accion}`, "success");
     if (data.pdfError) toast("Ojo: no se pudo regenerar el PDF del pedido", "error");
+
+    // La tarjeta del pedido se actualiza al instante con los datos nuevos
+    // (teléfono → aviso ⚠️ y link de WhatsApp), sin esperar la recarga.
+    const pedLocal = (pedidosGlobal || []).find(x => String(x.PEDIDO_ID) === String(pedidoId));
+    if (pedLocal) {
+      Object.assign(pedLocal, {
+        CLIENTE: cuerpo.nombre, DNI: cuerpo.dni, TELEFONO: cuerpo.telefono, DIRECCION: cuerpo.direccion,
+        LOCALIDAD: cuerpo.localidad, CODIGO_POSTAL: cuerpo.codigoPostal, PROVINCIA: cuerpo.provincia, EMPRESA: cuerpo.empresa
+      });
+      if (data.pdfUrl) pedLocal.PDF_URL = data.pdfUrl;
+      try { redibujarSinSalto("tablaPedidos", filtrarPedidos); } catch (e) {}
+    }
 
     // Que Clientes, el selector de clientes y la lista de pedidos vean los datos nuevos
     _clientesPedidoCache = [];
@@ -4923,42 +4939,44 @@ function _remitoAsegurarModal() {
 
 /**
  * Normaliza un número de teléfono argentino al formato internacional
- * que requiere wa.me (sin +, sin espacios, con código de país).
- * Maneja: 011XXXXXXXX, 15XXXXXXXX, 9XXXXXXXX, 54911XXXXXXXX, etc.
+ * que requiere wa.me (sin +, sin espacios, con código de país):
+ * 549 + área + número = 13 dígitos.
+ * Acepta, en cualquier combinación: +54 / 0054, el 9 de celular, el 0
+ * de larga distancia y el 15 después del área. Ejemplos que dan
+ * 5491123456789: "11 2345-6789", "011 15 2345-6789", "15 2345-6789",
+ * "9 11 2345 6789", "+54 9 11 2345-6789", "+54 11 15 2345-6789".
+ * Devuelve null si no lo reconoce (ej. un número de otro país): la
+ * tarjeta muestra el botón igual, con ⚠️.
  */
 function normalizarTelefonoWA(tel) {
   if (!tel) return null;
 
   // Quita todo lo que no sea dígito
   let num = String(tel).replace(/\D/g, "");
+  if (!num) return null;
 
-  // Si ya empieza con 54 y tiene 13 dígitos → ya está listo
-  if (num.startsWith("54") && num.length === 13) return num;
+  if (num.startsWith("00")) num = num.slice(2);                 // 0054…
+  if (num.startsWith("54") && num.length >= 12) num = num.slice(2); // código de país
+  if (num.startsWith("9") && num.length >= 11) num = num.slice(1);  // 9 de celular (ningún área argentina empieza con 9)
+  num = num.replace(/^0+/, "");                                  // 0 de larga distancia
 
-  // Si empieza con 54 pero le falta el 9 de celular (5411XXXXXXXX → 54911XXXXXXXX)
-  if (num.startsWith("54") && num.length === 12) return "549" + num.slice(2);
-
-  // Quita el 0 inicial de área si lo tiene (0351... → 351...)
-  if (num.startsWith("0")) num = num.slice(1);
-
-  // Quita el 15 de celular si lo tiene después del área (351158... → 35158...)
-  // Área argentina: 2-4 dígitos, luego el número. El 15 aparece en posición variable.
-  // Estrategia: si el número tiene exactamente 10 dígitos (área 2-4 + número 6-8)
-  // lo armamos directo. Si tiene 11, probablemente tenga el 15 incluido.
-  if (num.length === 11 && num.charAt(2) === "1" && num.charAt(3) === "5") {
-    num = num.slice(0, 2) + num.slice(4); // quita el 15 tras el área de 2 dígitos
-  } else if (num.length === 11 && num.charAt(3) === "1" && num.charAt(4) === "5") {
-    num = num.slice(0, 3) + num.slice(5); // quita el 15 tras el área de 3 dígitos
-  } else if (num.length === 11 && num.charAt(4) === "1" && num.charAt(5) === "5") {
-    num = num.slice(0, 4) + num.slice(6); // quita el 15 tras el área de 4 dígitos
+  // 15 de celular después del área (2, 3 o 4 dígitos). Con área 11 es
+  // seguro que el área tiene 2 dígitos; si no, se prueba con 3 y con 4.
+  if (num.length === 12) {
+    const posiciones = num.startsWith("11") ? [2] : [3, 4];
+    for (const pos of posiciones) {
+      if (num.substr(pos, 2) === "15") { num = num.slice(0, pos) + num.slice(pos + 2); break; }
+    }
   }
 
-  // Agrega código de país Argentina + 9 de celular
-  // (WA Argentina requiere 549 + área + número = 13 dígitos total)
-  if (num.length === 10) return "549" + num;
-  if (num.length === 8)  return "5491" + num; // número corto sin área, asume GBA
+  // Celular sin área: se asume Buenos Aires (11)
+  if (num.length === 10 && num.startsWith("15")) num = "11" + num.slice(2);
+  if (num.length === 8) num = "11" + num;
 
-  return null; // no se pudo normalizar — el botón no se muestra
+  // Las áreas argentinas empiezan con 1, 2 o 3: cualquier otra cosa es
+  // un número mal escrito (ej. "+54 9 11 2345 678", al que le falta un dígito)
+  if (num.length === 10 && /^[123]/.test(num)) return "549" + num;
+  return null;
 }
 
 /** Genera el mensaje de WhatsApp según el estado del pedido */
@@ -5639,6 +5657,7 @@ let productosAdminGlobal = [];
 function nuevoProducto() {
   window._pmStockOriginal = null; // no aplica en modo creación — ver editarProducto
   document.getElementById("productModalTitle").textContent = "+ Nuevo Producto";
+  { const bh = document.getElementById("btnHistorialProducto"); if (bh) bh.style.display = "none"; }
   document.getElementById("pmCodigoOriginal").value = "";
   document.getElementById("pmCodigo").value = "";
   document.getElementById("pmCodigo").disabled = false;
@@ -5686,6 +5705,7 @@ function editarProducto(codigo) {
   window._pmStockOriginal = Number(p.STOCK || 0);
 
   document.getElementById("productModalTitle").textContent = "Editar Producto";
+  { const bh = document.getElementById("btnHistorialProducto"); if (bh) bh.style.display = ""; }
   document.getElementById("pmCodigoOriginal").value = p.CODIGO;
   document.getElementById("pmCodigo").value = p.CODIGO;
   document.getElementById("pmNombre").value = p.PRODUCTO || "";
@@ -6931,6 +6951,131 @@ async function _postPapelera(cuerpo) {
     data.message = "El backend todavía no tiene la papelera: agregá el archivo PapeleraYClientes.gs en Apps Script y publicá una nueva versión (ver LEEME).";
   }
   return data;
+}
+
+/* ===================== HISTORIAL DE CAMBIOS DE PRODUCTOS (v2.5.1) ===================== */
+
+let _historialProductos = [];
+let _historialCodigo = "";   // "" = todos los productos
+let _historialHayMas = false;
+
+function _fechaInputHistorial(d) {
+  const z = n => String(n).padStart(2, "0");
+  return d.getFullYear() + "-" + z(d.getMonth() + 1) + "-" + z(d.getDate());
+}
+
+/**
+ * Abre el historial. Con código: solo ese producto (sin límite de
+ * fechas). Sin código: todos los productos de los últimos 7 días.
+ */
+function abrirHistorialProductos(codigo, nombre) {
+  const backdrop = document.getElementById("historialProductosModalBackdrop");
+  if (!backdrop) return;
+  _historialCodigo = String(codigo || "").trim();
+  const titulo = document.getElementById("historialProductosTitulo");
+  if (titulo) titulo.textContent = _historialCodigo
+    ? `Historial de ${nombre || "producto"} (${_historialCodigo})`
+    : "Historial de cambios de productos";
+  const verTodos = document.getElementById("btnHistorialVerTodos");
+  if (verTodos) verTodos.style.display = _historialCodigo ? "inline-flex" : "none";
+
+  const hoy = new Date();
+  const hace7 = new Date(); hace7.setDate(hoy.getDate() - 7);
+  const desde = document.getElementById("historialDesde");
+  const hasta = document.getElementById("historialHasta");
+  if (desde) desde.value = _historialCodigo ? "" : _fechaInputHistorial(hace7);
+  if (hasta) hasta.value = _historialCodigo ? "" : _fechaInputHistorial(hoy);
+  const buscar = document.getElementById("historialBuscar");
+  if (buscar) buscar.value = "";
+
+  backdrop.classList.add("show");
+  cargarHistorialProductos();
+}
+
+function cerrarHistorialProductos() {
+  const backdrop = document.getElementById("historialProductosModalBackdrop");
+  if (backdrop) backdrop.classList.remove("show");
+}
+
+async function cargarHistorialProductos() {
+  const cont = document.getElementById("historialProductosLista");
+  if (!cont) return;
+  cont.innerHTML = `<div class="text-center text-muted py-4">Cargando historial...</div>`;
+  const params = new URLSearchParams({ action: "historialProductos", limite: "1000" });
+  if (_historialCodigo) params.set("codigo", _historialCodigo);
+  const desde = (document.getElementById("historialDesde") || {}).value || "";
+  const hasta = (document.getElementById("historialHasta") || {}).value || "";
+  if (desde) params.set("desde", desde);
+  if (hasta) params.set("hasta", hasta);
+  try {
+    const response = await fetchAPI(API_URL + "?" + params.toString(), {}, { timeoutMs: 30000 });
+    const data = await _leerRespuestaJSON(response);
+    if (!data || !data.success) {
+      let msg = (data && data.message) || "No se pudo cargar el historial";
+      if (/no v[aá]lida|desconocida|no reconocida|invalid/i.test(msg)) msg = "El backend todavía no tiene el historial: publicá el Code.gs de la versión 2.5.1 (ver LEEME).";
+      cont.innerHTML = `<div class="text-center text-danger py-4" style="font-size:13px;">${escapeHtml(msg)}</div>`;
+      return;
+    }
+    _historialProductos = data.movimientos || [];
+    _historialHayMas = !!data.hayMas;
+    renderHistorialProductos();
+  } catch (error) {
+    console.error("Error al cargar el historial de productos:", error);
+    cont.innerHTML = `<div class="text-center text-danger py-4" style="font-size:13px;">Error de conexión al cargar el historial. Revisá tu internet.</div>`;
+  }
+}
+
+function renderHistorialProductos() {
+  const cont = document.getElementById("historialProductosLista");
+  const resumen = document.getElementById("historialProductosResumen");
+  if (!cont) return;
+
+  const filtro = normalizarBusquedaPOS((document.getElementById("historialBuscar") || {}).value || "");
+  const lista = _historialProductos.filter(m => {
+    if (filtro && !normalizarBusquedaPOS([m.PRODUCTO, m.CODIGO, m.USUARIO, m.REFERENCIA, m.ACCION, m.ANTES, m.DESPUES].join(" ")).includes(filtro)) return false;
+    return true;
+  });
+
+  if (resumen) {
+    resumen.textContent = _historialProductos.length === 0 ? "" :
+      `${lista.length === 1 ? "1 cambio" : lista.length + " cambios"}` +
+      (lista.length !== _historialProductos.length ? ` (de ${_historialProductos.length})` : "") +
+      (_historialHayMas ? " — se muestran los 1000 más recientes: acotá las fechas para ver más atrás." : "");
+  }
+
+  if (_historialProductos.length === 0) {
+    cont.innerHTML = `<div class="text-center text-muted py-5" style="font-size:13.5px;">No hay cambios registrados ${_historialCodigo ? "para este producto" : "en esas fechas"}.<br><span style="font-size:12px;">El historial empieza a registrarse desde la versión 2.5.1. Las ventas, pedidos e ingresos de mercadería tienen su propio registro.</span></div>`;
+    return;
+  }
+  if (lista.length === 0) {
+    cont.innerHTML = `<div class="text-center text-muted py-4" style="font-size:13px;">Ningún cambio coincide con el filtro</div>`;
+    return;
+  }
+
+  const nombreCampo = { STOCK: "Stock", PRODUCTO: "Nombre", CODIGO: "Código" };
+  const fmtValor = v => v === "" || v === null || v === undefined ? "—" : escapeHtml(String(v));
+  cont.innerHTML = lista.map(m => {
+    const dif = m.DIFERENCIA === "" || m.DIFERENCIA === null || m.DIFERENCIA === undefined ? "" : Number(m.DIFERENCIA);
+    const difHtml = dif === "" || isNaN(dif) || dif === 0 ? "" :
+      ` <strong style="color:${dif > 0 ? "var(--green-600, #16a34a)" : "var(--red-600, #dc2626)"};">(${dif > 0 ? "+" : ""}${dif.toLocaleString("es-AR")})</strong>`;
+    const [dia, hora] = String(m.FECHA || "").split(" ");
+    const diaTxt = dia ? dia.split("-").reverse().join("/") : "";
+    return `
+    <div style="padding:8px 4px; border-bottom:1px solid var(--slate-200); font-size:13px;">
+      <div class="d-flex justify-content-between gap-2 flex-wrap">
+        <div style="min-width:0;">
+          <span style="font-weight:600;">${escapeHtml(m.PRODUCTO || "(sin nombre)")}</span>
+          <span style="font-family:var(--font-mono); font-size:11.5px; color:var(--slate-500);"> ${escapeHtml(m.CODIGO)}</span>
+        </div>
+        <div style="font-size:11.5px; color:var(--slate-500); white-space:nowrap;">${escapeHtml(diaTxt)} ${escapeHtml((hora || "").slice(0, 5))} · ${escapeHtml(m.USUARIO || "sin usuario")}</div>
+      </div>
+      <div style="margin-top:2px;">
+        <span class="badge bg-primary" style="font-weight:500;">${escapeHtml(m.ACCION)}</span>
+        ${escapeHtml(nombreCampo[m.CAMPO] || m.CAMPO || "")}: ${fmtValor(m.ANTES)} → ${fmtValor(m.DESPUES)}${difHtml}
+      </div>
+      ${m.REFERENCIA ? `<div style="font-size:11.5px; color:var(--slate-500); margin-top:2px;">${escapeHtml(m.REFERENCIA)}</div>` : ""}
+    </div>`;
+  }).join("");
 }
 
 function abrirPapeleraProductos() {

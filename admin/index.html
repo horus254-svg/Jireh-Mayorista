@@ -575,6 +575,7 @@
         <button class="btn btn-outline-secondary btn-sm" id="btnMonedaVistaProductos" data-solo-deposito style="display:none;" onclick="depAlternarMonedaVista()" title="Ver los precios en dólares o en pesos">US$ / $</button>
         <button class="btn btn-outline-secondary btn-sm" onclick="actualizarCatalogoProductosManual()">↻ Actualizar</button>
         <button class="btn btn-outline-primary btn-sm" onclick="abrirOrdenCatalogo()" title="Elegir en qué orden aparecen categorías y productos en la página">↕️ Ordenar catálogo</button>
+        <button class="btn btn-outline-secondary btn-sm" onclick="abrirHistorialProductos()" title="Quién editó stock, nombre o código de los productos, y cuándo">🕘 Historial</button>
         <button class="btn btn-outline-secondary btn-sm" onclick="abrirPapeleraProductos()" title="Productos eliminados — se pueden restaurar">Papelera</button>
         <button class="btn btn-success" onclick="nuevoProducto()">+ Nuevo Producto</button>
       </div>
@@ -3505,6 +3506,36 @@
   </div>
 </div>
 
+<!-- ===== MODAL HISTORIAL DE CAMBIOS DE PRODUCTOS (v2.5.1) ===== -->
+<div class="product-modal-backdrop" id="historialProductosModalBackdrop" style="z-index:270;"><!-- arriba del modal de producto, desde donde también se abre -->
+  <div class="product-modal" style="width:min(860px, 96vw);">
+    <div class="product-modal-header">
+      <h6 id="historialProductosTitulo">Historial de cambios de productos</h6>
+      <button onclick="cerrarHistorialProductos()">✕</button>
+    </div>
+    <div class="product-modal-body">
+      <div class="d-flex flex-wrap gap-2 mb-2 align-items-end">
+        <div>
+          <label class="form-label mb-0" style="font-size:11.5px;">Desde</label>
+          <input type="date" class="form-control form-control-sm" id="historialDesde">
+        </div>
+        <div>
+          <label class="form-label mb-0" style="font-size:11.5px;">Hasta</label>
+          <input type="date" class="form-control form-control-sm" id="historialHasta">
+        </div>
+        <button type="button" class="btn btn-primary btn-sm" onclick="cargarHistorialProductos()">Buscar</button>
+      </div>
+      <input type="text" class="form-control form-control-sm mb-2" id="historialBuscar" placeholder="Filtrar por producto, código, usuario o referencia..." oninput="renderHistorialProductos()" autocomplete="off">
+      <div id="historialProductosResumen" style="font-size:11.5px; color:var(--slate-500); margin-bottom:6px;"></div>
+      <div id="historialProductosLista" style="max-height:56vh; overflow-y:auto;"></div>
+    </div>
+    <div class="product-modal-actions">
+      <button class="btn btn-outline-secondary" id="btnHistorialVerTodos" style="display:none; margin-right:auto;" onclick="abrirHistorialProductos()">Ver todos los productos</button>
+      <button class="btn btn-outline-secondary" onclick="cerrarHistorialProductos()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <div class="product-modal-backdrop" id="papeleraProductosModalBackdrop">
   <div class="product-modal" style="width:min(640px, 94vw);">
     <div class="product-modal-header">
@@ -3790,6 +3821,7 @@
     </div>
 
     <div class="product-modal-actions">
+      <button class="btn btn-outline-secondary" id="btnHistorialProducto" style="display:none; margin-right:auto;" onclick="abrirHistorialProductos(document.getElementById('pmCodigoOriginal').value, document.getElementById('pmNombre').value)" title="Cambios de stock, nombre y código de este producto">🕘 Historial</button>
       <button class="btn btn-outline-secondary" onclick="cerrarModalProducto()">Cancelar</button>
       <button class="btn btn-success" id="btnGuardarProducto" onclick="guardarProductoForm()">Guardar Producto</button>
     </div>
