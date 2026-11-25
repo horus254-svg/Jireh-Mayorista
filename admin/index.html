@@ -2742,6 +2742,100 @@
     <!-- ===== PESTAÑA: COBROS — Medios de cobro ===== -->
     <div class="cfg-tab-pane" id="cfgTab-cobros">
 
+      <!-- Pagos online en la página web (v2.7.0) — solo admin -->
+      <div class="card p-3 mt-3" id="cardPagosOnlineWeb" style="display:none;">
+        <h6 style="margin-bottom:6px;">Pagos online en la página web</h6>
+        <p class="text-muted" style="font-size:13px; margin-bottom:10px;">
+          Al confirmar el pedido en tu página, el cliente puede elegir pagar en el momento. Cuando el pago se acredita, el pedido queda <b>cobrado</b> solo (igual que marcarlo a mano). Si no activás ninguno, todo sigue como hasta ahora (se coordina por WhatsApp).
+        </p>
+        <div id="pagosWebEstado" class="config-preview-hint mb-3">Cargando...</div>
+
+        <div class="mb-3">
+          <label class="form-label mb-1" style="font-size:12.5px;">Dirección de tu página web <span class="text-muted" style="font-size:11px;">(adonde vuelve el cliente después de pagar)</span></label>
+          <input type="url" class="form-control form-control-sm" id="cfgPagosWebUrl" placeholder="https://mitienda.com.ar/">
+        </div>
+
+        <div style="border-top:1px solid var(--slate-200); padding-top:10px;">
+          <label class="d-flex align-items-center gap-2 mb-2" style="font-weight:600; cursor:pointer;">
+            <input type="checkbox" id="cfgPagosWebMpActivo"> Mercado Pago <span class="text-muted" style="font-weight:400; font-size:12.5px;">— tarjetas, dinero en cuenta, efectivo en Rapipago / Pago Fácil</span>
+          </label>
+          <label class="form-label mb-1" style="font-size:12.5px;">Access Token de producción <span class="text-muted" style="font-size:11px;">(Mercado Pago Developers → Tus integraciones → tu aplicación → Credenciales de producción)</span></label>
+          <input type="password" class="form-control form-control-sm mb-1" id="cfgPagosWebMpToken" placeholder="APP_USR-... (dejalo vacío para no cambiarlo)" autocomplete="new-password">
+          <div class="text-muted" id="cfgPagosWebMpTokenActual" style="font-size:12px;"></div>
+        </div>
+
+        <div style="border-top:1px solid var(--slate-200); padding-top:10px; margin-top:10px;">
+          <label class="d-flex align-items-center gap-2 mb-2" style="font-weight:600; cursor:pointer;">
+            <input type="checkbox" id="cfgPagosWebUalaActivo"> Ualá Bis <span class="text-muted" style="font-weight:400; font-size:12.5px;">— tarjetas de crédito, débito y prepagas (desde $100)</span>
+          </label>
+          <div class="row g-2 mb-1">
+            <div class="col-12 col-md-4"><label class="form-label mb-1" style="font-size:12.5px;">Usuario (username)</label><input type="text" class="form-control form-control-sm" id="cfgPagosWebUalaUsuario" autocomplete="off"></div>
+            <div class="col-12 col-md-4"><label class="form-label mb-1" style="font-size:12.5px;">Client ID</label><input type="text" class="form-control form-control-sm" id="cfgPagosWebUalaClientId" autocomplete="off"></div>
+            <div class="col-12 col-md-4"><label class="form-label mb-1" style="font-size:12.5px;">Client Secret</label><input type="password" class="form-control form-control-sm" id="cfgPagosWebUalaSecret" placeholder="(sin cambios)" autocomplete="new-password"></div>
+          </div>
+          <label class="d-flex align-items-center gap-2" style="font-size:13px; cursor:pointer;">
+            <input type="checkbox" id="cfgPagosWebUalaPrueba"> Modo prueba (credenciales de test de Ualá; no cobra de verdad)
+          </label>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-3">
+          <div class="d-flex gap-2">
+            <button class="btn btn-outline-danger btn-sm" id="btnPagosWebQuitarMp" onclick="quitarCredencialPagosWeb('mp')" style="display:none;">Quitar Mercado Pago</button>
+            <button class="btn btn-outline-danger btn-sm" id="btnPagosWebQuitarUala" onclick="quitarCredencialPagosWeb('uala')" style="display:none;">Quitar Ualá</button>
+          </div>
+          <button class="btn btn-success btn-sm" id="btnGuardarPagosWeb" onclick="guardarConfigPagosWeb()">Guardar</button>
+        </div>
+        <p class="text-muted" style="font-size:11.5px; margin:10px 0 0;">Las credenciales se guardan en el servidor (propiedades del script), no en la planilla, y se prueban antes de guardarlas. El servidor revisa los pagos pendientes cada 10 minutos.</p>
+      </div>
+
+      <!-- Con qué se cobra con QR (v2.6.0) — solo visible en la app de escritorio -->
+      <div class="card p-3 mt-3" id="cardProveedorCobro" style="display:none;">
+        <h6 style="margin-bottom:6px;">Cobro con QR — ¿con qué cobrar?</h6>
+        <p class="text-muted" style="font-size:13px; margin-bottom:10px;">
+          Elegí qué usa el botón "Transferencia" → "Generar QR" del POS. Las tres opciones conviven: podés cambiar cuando quieras.
+        </p>
+        <div id="cobroProveedorClienteAviso" class="config-preview-hint mb-2" style="display:none;"></div>
+        <div id="cobroProveedorSinNada" class="config-preview-hint mb-2" style="display:none;">Todavía no hay ningún medio configurado. Configurá Mercado Pago o Ualá Bis (más abajo) y vas a poder elegirlo acá.</div>
+        <div id="cobroProveedorOpciones">
+          <label class="d-flex gap-2 mb-2" style="cursor:pointer;">
+            <input type="radio" name="cobroProveedor" value="mp" onchange="cambiarProveedorCobroQR(this.value)">
+            <span><b>Mercado Pago — API actual</b><br><span class="text-muted" style="font-size:12.5px;">La que se usa hasta ahora. QR interoperable: se paga con cualquier billetera o app de banco.</span></span>
+          </label>
+          <label class="d-flex gap-2 mb-2" style="cursor:pointer;">
+            <input type="radio" name="cobroProveedor" value="mp_orders" onchange="cambiarProveedorCobroQR(this.value)">
+            <span><b>Mercado Pago — API nueva (Orders)</b><br><span class="text-muted" style="font-size:12.5px;">Misma cuenta y mismo QR interoperable, con la API que Mercado Pago recomienda de acá en adelante. Si cancelás el cobro, la orden se anula en Mercado Pago.</span></span>
+          </label>
+          <label class="d-flex gap-2 mb-1" style="cursor:pointer;">
+            <input type="radio" name="cobroProveedor" value="uala" onchange="cambiarProveedorCobroQR(this.value)">
+            <span><b>Ualá Bis</b><br><span class="text-muted" style="font-size:12.5px;">Muestra un link de pago como QR: el cliente lo escanea con la cámara y paga con tarjeta (crédito, débito o prepaga). La venta se registra como Tarjeta. Desde $100.</span></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Credenciales de Ualá Bis (v2.6.0) — solo visible en la app de escritorio -->
+      <div class="card p-3 mt-3" id="cardUalaBis" style="display:none;">
+        <h6 style="margin-bottom:6px;">Ualá Bis — Credenciales</h6>
+        <p class="text-muted" style="font-size:13px; margin-bottom:10px;">
+          Están en el email de bienvenida de Ualá Bis y en la app/web de Ualá Bis (sección de integraciones / API).
+        </p>
+        <div id="ualaEstadoBox" class="config-preview-hint mb-3">Cargando estado...</div>
+        <div class="row g-2 mb-2">
+          <div class="col-12 col-md-4"><label class="form-label mb-1" style="font-size:12.5px;">Usuario (username)</label><input type="text" class="form-control form-control-sm" id="cfgUalaUsuario" autocomplete="off"></div>
+          <div class="col-12 col-md-4"><label class="form-label mb-1" style="font-size:12.5px;">Client ID</label><input type="text" class="form-control form-control-sm" id="cfgUalaClientId" autocomplete="off"></div>
+          <div class="col-12 col-md-4"><label class="form-label mb-1" style="font-size:12.5px;">Client Secret</label><input type="password" class="form-control form-control-sm" id="cfgUalaSecret" autocomplete="new-password" placeholder="(sin cambios)"></div>
+        </div>
+        <label class="d-flex align-items-center gap-2 mb-2" style="font-size:13px; cursor:pointer;">
+          <input type="checkbox" id="cfgUalaPrueba"> Modo prueba (credenciales de test de Ualá; no cobra de verdad)
+        </label>
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-2">
+          <button class="btn btn-outline-danger btn-sm" id="btnQuitarUala" onclick="quitarConfigUala()" style="display:none;">Quitar configuración</button>
+          <div class="d-flex gap-2">
+            <button class="btn btn-outline-secondary btn-sm" onclick="probarConfigUalaBtn()">Probar conexión</button>
+            <button class="btn btn-success btn-sm" id="btnGuardarUala" onclick="guardarConfigUalaForm()">Guardar</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Tarjeta Mercado Pago — solo visible en Electron -->
       <div class="card p-3 mt-3" id="cardMercadoPago" style="display:none;">
         <h6 style="margin-bottom:6px;">Mercado Pago — Cobro con QR</h6>
@@ -3598,8 +3692,9 @@
 <!-- ===== MODAL QR MERCADO PAGO ===== -->
 <div class="receipt-backdrop" id="mpQrBackdrop">
   <div class="receipt-modal" style="max-width:360px;">
-    <h4 style="margin-bottom:4px;">Cobrar con Mercado Pago</h4>
+    <h4 style="margin-bottom:4px;" id="mpQrTitulo">Cobrar con Mercado Pago</h4>
     <div class="text-muted" style="font-size:13px; margin-bottom:14px;" id="mpQrMontoLabel">$0</div>
+    <div class="text-muted" id="mpQrAyuda" style="font-size:12.5px; margin:-8px 0 12px; display:none;"></div>
     <div id="mpQrEsperando">
       <img id="mpQrImagen" src="" alt="QR de cobro" style="width:240px; height:240px; display:block; margin:0 auto 14px; border-radius:12px; border:1px solid var(--slate-200);">
       <div class="d-flex align-items-center justify-content-center gap-2" style="font-size:13.5px; color:var(--slate-500);">

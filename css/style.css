@@ -2211,6 +2211,20 @@ body[data-temporada] .top-banner{ background:linear-gradient(90deg, var(--navy-9
 .pr-secundarios .btn-link{ font-size:14px; text-decoration:none; }
 .pr-nota{ font-size:12.5px; color:#64748b; margin:6px 0 0; }
 
+/* ===== Pagos online (v2.7.0) ===== */
+.pago-online-box{ margin-top:12px; }
+.pago-online-titulo{ font-weight:700; font-size:15px; margin-bottom:6px; }
+.pago-opcion{ display:flex; align-items:flex-start; gap:10px; padding:10px 12px; border:1px solid #e2e8f0; border-radius:12px; margin-bottom:6px; cursor:pointer; background:#fff; transition:border-color .15s, background .15s; }
+.pago-opcion:hover{ border-color:#94a3b8; }
+.pago-opcion:has(input:checked){ border-color:#16a34a; background:#f0fdf4; }
+.pago-opcion input{ margin-top:4px; flex:0 0 auto; }
+.pago-opcion span{ display:flex; flex-direction:column; line-height:1.25; }
+.pago-opcion b{ font-size:14.5px; }
+.pago-opcion small{ color:#64748b; font-size:12.5px; margin-top:2px; }
+.pr-aviso-pago{ background:#fff7ed; color:#9a3412; border:1px solid #fed7aa; border-radius:10px; padding:8px 12px; font-size:13.5px; margin-bottom:10px; text-align:left; }
+.pr-check.pendiente{ background:#f59e0b; box-shadow:0 8px 24px rgba(245,158,11,.35); }
+.pr-check.error{ background:#dc2626; box-shadow:0 8px 24px rgba(220,38,38,.35); }
+
 
 /* =========================================================
    REDES Y CONTACTO — botones con el color y el logo de cada red

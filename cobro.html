@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <title>Pantalla de cobro</title>
 <!--
-  Pantalla de cobro con QR de Mercado Pago para el celular o la tablet que
+  Pantalla de cobro con QR (Mercado Pago o Ualá Bis) para el celular o la tablet que
   mira el cliente. Muestra el QR que genera la caja (VeekPOS de escritorio),
   el monto, y "¡Pago recibido!" cuando entra el pago.
 
@@ -97,7 +97,7 @@
   <button id="empezar" type="button">
     <div class="icono">📱</div>
     <div class="grande">Pantalla de cobro</div>
-    <div class="chico">Dejá este teléfono a la vista del cliente. Cuando la caja genere un cobro con QR de Mercado Pago, aparece acá.</div>
+    <div class="chico">Dejá este teléfono a la vista del cliente. Cuando la caja genere un cobro con QR (Mercado Pago o Ualá Bis), aparece acá.</div>
     <div class="boton">Tocá para empezar</div>
   </button>
 
@@ -141,6 +141,12 @@
   }
 
   /* ---------- pantalla ---------- */
+  function textoEscanear(proveedor) {
+    // v2.7.0: con Ualá Bis el QR abre una página de pago con tarjeta (se escanea con la cámara)
+    if (proveedor === "uala") return 'Escaneá con la cámara del celular y pagá con <b>tarjeta</b>';
+    return 'Escaneá con <b>Mercado Pago</b> para pagar';
+  }
+
   function render(estado) {
     if (estado.activo && estado.pagada) {
       tarjeta.className = "pagada";
@@ -150,7 +156,7 @@
       tarjeta.innerHTML =
         '<div class="marco"></div>' +
         '<div class="monto">' + plata(estado.monto) + '</div>' +
-        '<div class="sub pulso">Escaneá con <b>Mercado Pago</b> para pagar</div>';
+        '<div class="sub pulso">' + textoEscanear(estado.proveedor) + '</div>';
       const marco = tarjeta.querySelector(".marco");
       let dibujado = false;
       // Con el texto del QR se dibuja acá, nítido al tamaño de la pantalla

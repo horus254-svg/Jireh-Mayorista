@@ -2705,6 +2705,7 @@ function mostrarSeccion(id) {
 
     cargarConfigNegocioForm();
     actualizarEstadoUSBPrint();
+    cargarConfigPagosWeb(); // pagos online de la página web (v2.7.0, solo admin)
     // En Electron: mostrar tarjetas específicas de escritorio
     if (typeof window.veekpos !== "undefined" || typeof window.posOffline !== "undefined") {
       const bridge = window.veekpos || window.posOffline;
@@ -2755,6 +2756,8 @@ function mostrarSeccion(id) {
         tMp.style.display = "block";
         if (typeof mostrarEstadoMercadoPagoEnConfig === "function") mostrarEstadoMercadoPagoEnConfig();
       }
+      // Proveedor del cobro con QR y Ualá Bis (v2.6.0)
+      if (typeof cargarConfigProveedorCobro === "function") cargarConfigProveedorCobro();
     }
     actualizarPestanasConfigVisibles();
     setTimeout(actualizarPestanasConfigVisibles, 600); // la tarjeta de licencia se muestra async
@@ -3262,7 +3265,7 @@ async function _cargarPedidosImpl() {
     // Incluye los datos del cliente: si no, al corregir el teléfono con
     // "Editar cliente" la tarjeta no se redibujaba y seguía mostrando el
     // aviso ⚠️ (y el link de WhatsApp) del número viejo.
-    const firma = p => [p.PEDIDO_ID, p.ESTADO, p.COBRADO, p.FORMA_PAGO_COBRO, p.TOTAL,
+    const firma = p => [p.PEDIDO_ID, p.ESTADO, p.COBRADO, p.FORMA_PAGO_COBRO, p.TOTAL, p.PAGO_ONLINE,
       p.CLIENTE, p.TELEFONO, p.DNI, p.EMPRESA, p.DIRECCION, p.LOCALIDAD, p.PROVINCIA, p.PDF_URL].join("|");
     const cambio = !pedidosGlobal
       || pedidosGlobal.length !== data.pedidos.length
@@ -5062,6 +5065,12 @@ function renderPedidos(listaOriginal) {
         : "";
       const badgeCobrado = estaCobrado
         ? `<span class="pedido-cobrado-badge">✓ Cobrado <span class="pedido-cobrado-forma">${formaPagoActual}</span></span>` : "";
+      // Pago online desde la página web (v2.7.0): "PENDIENTE · Mercado Pago", "PAGADO · Ualá Bis"...
+      const pagoOnline = String(p.PAGO_ONLINE || "");
+      const badgePagoOnline = !pagoOnline ? "" : (/^PAGADO/.test(pagoOnline)
+        ? `<div class="mt-1"><span class="pedido-pago-online pagado" title="${escapeHtml(pagoOnline)}">💳 ${escapeHtml(pagoOnline.replace(/^PAGADO · /, "Pagó online con "))}</span></div>`
+        : `<div class="mt-1"><span class="pedido-pago-online pendiente" title="El cliente eligió pagar online y todavía no se acreditó">⏳ ${escapeHtml(pagoOnline.replace(/^PENDIENTE · /, "Pago online pendiente · "))}</span>
+             <button type="button" class="btn btn-link btn-sm p-0 ms-1" style="font-size:11.5px;" onclick="verificarPagoOnlinePanel('${escapeHtml(p.PEDIDO_ID)}', this)">Verificar</button></div>`);
       const selectCobrado = estaCobrado
         ? `<div class="pedido-cobrado-controles">
              <span class="pedido-cobrado-badge">✓ Cobrado</span>
@@ -5088,6 +5097,7 @@ function renderPedidos(listaOriginal) {
             <div class="pedido-card-total">$${Number(p.TOTAL || 0).toLocaleString("es-AR")}</div>
             <div class="mt-1"><span class="pedido-estado-badge ${claseEstado}">${estadoIcono[p.ESTADO] || ""} ${escapeHtml(p.ESTADO)}</span></div>
             ${badgeCobrado ? `<div class="mt-1">${badgeCobrado}</div>` : ""}
+            ${badgePagoOnline}
           </div>
         </div>
         <div class="pedido-card-controls">
@@ -5116,6 +5126,103 @@ function renderPedidos(listaOriginal) {
   };
 
   requestAnimationFrame(renderChunk);
+}
+
+/* ===================== PAGOS ONLINE DE LA PÁGINA WEB (v2.7.0) ===================== */
+
+/** Pregunta al proveedor si ya se acreditó el pago online de un pedido */
+async function verificarPagoOnlinePanel(pedidoId, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = "Verificando…"; }
+  try {
+    const r = await fetchAPI(API_URL, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "verificarPagoPedido", pedidoId: String(pedidoId) }) }, { timeoutMs: 45000 });
+    const j = await _leerRespuestaJSON(r);
+    if (!j || !j.success) { toast((j && j.message) || "No se pudo verificar el pago", "error"); return; }
+    const textos = { PAGADO: "✓ Pago acreditado: el pedido quedó cobrado", RECHAZADO: "El pago fue rechazado (el cliente puede reintentar)", PENDIENTE: "Todavía no se acreditó el pago", SIN_PAGO: "Este pedido no tiene pagos online" };
+    toast("Pedido " + pedidoId + ": " + (textos[j.estado] || j.estado), j.estado === "PAGADO" ? "success" : "info");
+    if (j.estado === "PAGADO") { invalidarCache("pedidos"); setTimeout(() => { try { recargarPedidos(); } catch (e) {} }, 300); }
+  } catch (e) {
+    toast("No se pudo verificar el pago (sin conexión)", "error");
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = "Verificar"; }
+  }
+}
+
+async function cargarConfigPagosWeb() {
+  const card = document.getElementById("cardPagosOnlineWeb");
+  if (!card) return;
+  const esAdmin = obtenerRolActual() === "admin";
+  const enDeposito = typeof esModoDeposito === "function" && esModoDeposito(); // el depósito no tiene catálogo web
+  card.style.display = esAdmin && !enDeposito ? "block" : "none";
+  if (card.style.display === "none") { actualizarPestanasConfigVisibles(); return; }
+  actualizarPestanasConfigVisibles();
+  const estado = document.getElementById("pagosWebEstado");
+  try {
+    const r = await fetchAPI(API_URL + "?action=configPagosOnline", {}, { timeoutMs: 30000 });
+    const c = await _leerRespuestaJSON(r);
+    if (!c || !c.success) { estado.textContent = (c && c.message) || "No se pudo leer la configuración (¿backend actualizado a la 2.7.0?)."; return; }
+    _pintarConfigPagosWeb(c);
+  } catch (e) {
+    estado.textContent = "No se pudo leer la configuración (sin conexión).";
+  }
+}
+
+function _pintarConfigPagosWeb(c) {
+  const estado = document.getElementById("pagosWebEstado");
+  const linea = (nombre, x) => x.disponible ? `<div style="color:var(--green-600); font-weight:600;">✓ ${nombre}: activo en la página</div>`
+    : (x.configurado ? `<div class="text-muted">${nombre}: configurado, desactivado</div>` : `<div class="text-muted">${nombre}: sin configurar</div>`);
+  estado.innerHTML = linea("Mercado Pago", c.mp) + linea("Ualá Bis" + (c.uala.prueba ? " (modo prueba)" : ""), c.uala);
+  // Si todavía no se cargó, se propone la "URL del catálogo" ya configurada en Catálogo web
+  const urlCatalogo = String((configNegocioCache && configNegocioCache.urlCatalogo) || "").trim();
+  document.getElementById("cfgPagosWebUrl").value = c.urlSitio || (/^https:\/\//i.test(urlCatalogo) ? urlCatalogo.replace(/\/+$/, "") + "/" : "");
+  document.getElementById("cfgPagosWebMpActivo").checked = !!c.mp.activo;
+  document.getElementById("cfgPagosWebMpToken").value = "";
+  document.getElementById("cfgPagosWebMpTokenActual").textContent = c.mp.configurado ? "Token guardado: " + c.mp.tokenParcial : "";
+  document.getElementById("cfgPagosWebUalaActivo").checked = !!c.uala.activo;
+  document.getElementById("cfgPagosWebUalaUsuario").value = c.uala.usuario || "";
+  document.getElementById("cfgPagosWebUalaClientId").value = c.uala.clientId || "";
+  document.getElementById("cfgPagosWebUalaSecret").value = "";
+  document.getElementById("cfgPagosWebUalaPrueba").checked = !!c.uala.prueba;
+  document.getElementById("btnPagosWebQuitarMp").style.display = c.mp.configurado ? "inline-block" : "none";
+  document.getElementById("btnPagosWebQuitarUala").style.display = c.uala.configurado ? "inline-block" : "none";
+}
+
+async function _enviarConfigPagosWeb(cuerpo, btn) {
+  const texto = btn ? btn.innerHTML : "";
+  if (btn) { btn.disabled = true; btn.innerHTML = "Verificando…"; }
+  try {
+    const r = await fetchAPI(API_URL, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(Object.assign({ action: "guardarConfigPagosOnline" }, cuerpo)) }, { timeoutMs: 60000 });
+    const c = await _leerRespuestaJSON(r);
+    if (!c || !c.success) { toast((c && c.message) || "No se pudo guardar", "error"); return false; }
+    _pintarConfigPagosWeb(c);
+    return true;
+  } catch (e) {
+    toast("No se pudo guardar (sin conexión)", "error");
+    return false;
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = texto; }
+  }
+}
+
+async function guardarConfigPagosWeb() {
+  const v = id => document.getElementById(id).value.trim();
+  const ok = await _enviarConfigPagosWeb({
+    urlSitio: v("cfgPagosWebUrl"),
+    mpActivo: document.getElementById("cfgPagosWebMpActivo").checked ? "SI" : "NO",
+    mpToken: v("cfgPagosWebMpToken"),
+    ualaActivo: document.getElementById("cfgPagosWebUalaActivo").checked ? "SI" : "NO",
+    ualaUsuario: v("cfgPagosWebUalaUsuario"),
+    ualaClientId: v("cfgPagosWebUalaClientId"),
+    ualaSecret: v("cfgPagosWebUalaSecret"),
+    ualaPrueba: document.getElementById("cfgPagosWebUalaPrueba").checked ? "SI" : "NO"
+  }, document.getElementById("btnGuardarPagosWeb"));
+  if (ok) toast("Pagos online guardados. La página los ofrece desde el próximo pedido.", "success");
+}
+
+async function quitarCredencialPagosWeb(cual) {
+  const nombre = cual === "mp" ? "Mercado Pago" : "Ualá Bis";
+  if (!await confirmarAccionAsync("¿Quitar las credenciales de " + nombre + " de la página web? Los clientes ya no van a poder pagar online con " + nombre + ".", "Quitar " + nombre)) return;
+  const ok = await _enviarConfigPagosWeb(cual === "mp" ? { quitarMp: "SI", mpActivo: "NO" } : { quitarUala: "SI", ualaActivo: "NO" });
+  if (ok) toast(nombre + " quitado de la página web", "success");
 }
 
 /* ===================== PRODUCTOS (tabla admin) ===================== */
@@ -9122,6 +9229,7 @@ let mfvTipoDescuento = "PORCENTAJE";
 let mfvModoDescuento = "DESCUENTO"; // "DESCUENTO" | "RECARGO"
 let mfvFormaPago = "EFECTIVO";
 let mfvMpDisponible = false; // cacheado al abrir el modal — ¿hay MP configurado y usable?
+let mfvProveedorQR = "";      // "mp" | "mp_orders" | "uala" ("" = no se sabe: caja cliente o versión web) — v2.6.0
 let mfvGenerarQR = false;    // elección del cajero cuando la forma de pago es TRANSFERENCIA:
                               // true = generar QR para que el cliente escanee y pague ahí mismo;
                               // false (default) = el cliente ya transfirió directo al alias/CVU,
@@ -9220,6 +9328,11 @@ async function verificarMpDisponibleParaModal() {
     } catch (error) {
       mfvMpDisponible = false;
     }
+    // Con Ualá Bis (cobra con tarjeta) el QR se ofrece también al elegir "Tarjeta"
+    mfvProveedorQR = "";
+    if (mfvMpDisponible && typeof bridge.obtenerConfigCobroQR === "function") {
+      try { const c = await bridge.obtenerConfigCobroQR(); mfvProveedorQR = (c && c.proveedor) || ""; } catch (e) {}
+    }
   }
   mfvActualizarVisibilidadQR();
 }
@@ -9229,8 +9342,18 @@ function mfvActualizarVisibilidadQR() {
   const wrap = document.getElementById("mfvQrWrap");
   if (!wrap) return;
 
-  const mostrar = mfvFormaPago === "TRANSFERENCIA" && mfvMpDisponible;
+  const conTarjetaUala = mfvFormaPago === "TARJETA" && mfvProveedorQR === "uala";
+  const mostrar = mfvMpDisponible && (mfvFormaPago === "TRANSFERENCIA" || conTarjetaUala);
   wrap.style.display = mostrar ? "block" : "none";
+  // Textos según la forma de pago (v2.6.0)
+  {
+    const lbl = wrap.querySelector(".mfv-label");
+    const bNo = document.getElementById("mfvQrNo");
+    const bSi = document.getElementById("mfvQrSi");
+    if (lbl) lbl.textContent = conTarjetaUala ? "¿Cómo se cobra con tarjeta?" : "¿Cómo se cobra la transferencia?";
+    if (bNo) bNo.textContent = conTarjetaUala ? "Ya la cobré" : "Ya me transfirió";
+    if (bSi) bSi.textContent = conTarjetaUala ? "Generar QR de Ualá" : "Generar QR";
+  }
   if (!mostrar) mfvGenerarQR = false; // si se oculta (no hay MP, o cambiaron de forma de pago), nunca queda "generar QR" activo por error
 
   const btnSi = document.getElementById("mfvQrSi");
@@ -9382,7 +9505,7 @@ async function confirmarFinalizarVenta() {
   // era obligatorio siempre que MP estuviera configurado, y si la
   // generación del QR fallaba por cualquier motivo, la venta quedaba
   // completamente bloqueada sin forma de simplemente registrarla.
-  if (mfvFormaPago === "TRANSFERENCIA" && mfvGenerarQR) {
+  if ((mfvFormaPago === "TRANSFERENCIA" || mfvFormaPago === "TARJETA") && mfvGenerarQR) {
     const bridge = window.veekpos || window.posOffline;
     if (bridge && typeof bridge.mercadoPagoDisponible === "function") {
       const mpDisponible = await bridge.mercadoPagoDisponible().catch(() => false);
@@ -15351,6 +15474,125 @@ async function guardarConfigRed() {
 }
 
 
+/* ===================== PROVEEDOR DEL COBRO CON QR + UALÁ BIS (v2.6.0) ===================== */
+
+async function cargarConfigProveedorCobro() {
+  const bridge = window.veekpos;
+  const card = document.getElementById("cardProveedorCobro");
+  const cardUala = document.getElementById("cardUalaBis");
+  if (!bridge || typeof bridge.obtenerConfigCobroQR !== "function" || !card) return;
+  card.style.display = "block";
+
+  let cfg;
+  try { cfg = await bridge.obtenerConfigCobroQR(); }
+  catch (e) { return; }
+
+  const aviso = document.getElementById("cobroProveedorClienteAviso");
+  const opciones = document.getElementById("cobroProveedorOpciones");
+  if (cfg.esCliente) {
+    // Como Mercado Pago: el cobro con QR lo resuelve la caja servidor
+    if (aviso) { aviso.style.display = "block"; aviso.textContent = "Esta caja cobra a través de la caja servidor: el proveedor y las credenciales se configuran ahí."; }
+    if (opciones) opciones.style.display = "none";
+    if (cardUala) cardUala.style.display = "none";
+    return;
+  }
+  if (aviso) aviso.style.display = "none";
+  if (opciones) opciones.style.display = "block";
+  if (cardUala) cardUala.style.display = "block";
+
+  // Solo se muestran los medios que están configurados (v2.7.0)
+  const configurados = { mp: !!cfg.mpConfigurado, mp_orders: !!cfg.mpConfigurado, uala: !!(cfg.uala && cfg.uala.configurado) };
+  let alguno = false;
+  document.querySelectorAll('input[name="cobroProveedor"]').forEach(r => {
+    const hay = !!configurados[r.value];
+    alguno = alguno || hay;
+    const fila = r.closest("label");
+    if (fila) { fila.style.display = hay ? "" : "none"; fila.classList.toggle("d-flex", hay); }
+    r.checked = hay && r.value === cfg.proveedor;
+  });
+  if (opciones) opciones.style.display = alguno ? "block" : "none";
+  { const sinNada = document.getElementById("cobroProveedorSinNada"); if (sinNada) sinNada.style.display = alguno ? "none" : "block"; }
+
+  const u = cfg.uala || {};
+  const box = document.getElementById("ualaEstadoBox");
+  if (box) {
+    box.innerHTML = u.configurado
+      ? `<div style="color:var(--green-600); font-weight:600;">✓ Configurado${u.prueba ? " (modo prueba)" : ""}</div><div class="text-muted" style="font-size:12.5px; margin-top:2px;">Usuario: ${escapeHtml(u.usuario || "")}</div>`
+      : `<span class="text-muted">No configurado.</span>`;
+  }
+  const campo = (id, v) => { const el = document.getElementById(id); if (el && !el.value) el.value = v || ""; };
+  campo("cfgUalaUsuario", u.usuario);
+  campo("cfgUalaClientId", u.clientId);
+  const chk = document.getElementById("cfgUalaPrueba");
+  if (chk) chk.checked = !!u.prueba;
+  const btnQuitar = document.getElementById("btnQuitarUala");
+  if (btnQuitar) btnQuitar.style.display = u.configurado ? "inline-block" : "none";
+}
+
+async function cambiarProveedorCobroQR(proveedor) {
+  try {
+    const r = await window.veekpos.fijarProveedorCobroQR(proveedor);
+    if (!r || !r.success) {
+      toast((r && r.message) || "No se pudo cambiar el proveedor", "error");
+    } else {
+      const nombres = { mp: "Mercado Pago (API actual)", mp_orders: "Mercado Pago (API nueva)", uala: "Ualá Bis" };
+      toast("El cobro con QR ahora usa " + nombres[proveedor], "success");
+    }
+  } catch (e) {
+    toast("No se pudo cambiar el proveedor", "error");
+  }
+  cargarConfigProveedorCobro(); // vuelve a marcar el que quedó realmente guardado
+}
+
+function _datosFormUala() {
+  return {
+    usuario: document.getElementById("cfgUalaUsuario").value.trim(),
+    clientId: document.getElementById("cfgUalaClientId").value.trim(),
+    clientSecret: document.getElementById("cfgUalaSecret").value.trim(),
+    prueba: document.getElementById("cfgUalaPrueba").checked
+  };
+}
+
+async function guardarConfigUalaForm() {
+  const btn = document.getElementById("btnGuardarUala");
+  const texto = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = "Verificando...";
+  try {
+    const r = await window.veekpos.guardarConfigUala(_datosFormUala());
+    if (!r || !r.success) { toast((r && r.message) || "No se pudieron guardar las credenciales de Ualá", "error"); return; }
+    document.getElementById("cfgUalaSecret").value = "";
+    toast("Ualá Bis configurado. Elegilo arriba para cobrar con él.", "success");
+    cargarConfigProveedorCobro();
+  } catch (e) {
+    toast("Error al guardar la configuración de Ualá", "error");
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = texto;
+  }
+}
+
+async function probarConfigUalaBtn() {
+  try {
+    const r = await window.veekpos.probarConfigUala(_datosFormUala());
+    toast(r && r.success ? "Conexión con Ualá Bis correcta" : ((r && r.message) || "No se pudo conectar con Ualá"), r && r.success ? "success" : "error");
+  } catch (e) {
+    toast("Error al probar la conexión con Ualá", "error");
+  }
+}
+
+async function quitarConfigUala() {
+  if (!await confirmarAccionAsync("¿Quitar las credenciales de Ualá Bis? Si estaba elegido para cobrar, se vuelve a Mercado Pago.", "Quitar Ualá Bis")) return;
+  try {
+    await window.veekpos.borrarConfigUala();
+    ["cfgUalaUsuario", "cfgUalaClientId", "cfgUalaSecret"].forEach(id => { const el = document.getElementById(id); if (el) el.value = ""; });
+    toast("Configuración de Ualá Bis eliminada", "success");
+    cargarConfigProveedorCobro();
+  } catch (e) {
+    toast("Error al quitar la configuración", "error");
+  }
+}
+
 async function mostrarEstadoMercadoPagoEnConfig() {
   const box = document.getElementById("mpEstadoBox");
   const formularioWrap = document.getElementById("mpFormularioWrap");
@@ -15524,6 +15766,12 @@ function abrirModalQRDePrueba() {
 
 async function iniciarCobroMercadoPago(total) {
   if (typeof window.enviarTokenAlProcesoPrincipal === "function") window.enviarTokenAlProcesoPrincipal(); // para avisar el QR a la pantalla del celular
+  // El proveedor (Mercado Pago o Ualá Bis) lo decide Configuración → Cobros;
+  // el título y la forma de pago se ajustan cuando responde
+  mpNombreProveedorActual = "Mercado Pago";
+  mpFormaPagoCobro = "TRANSFERENCIA";
+  { const t = document.getElementById("mpQrTitulo"); if (t) t.textContent = "Cobrar con QR"; }
+  { const a = document.getElementById("mpQrAyuda"); if (a) { a.textContent = ""; a.style.display = "none"; } }
   document.getElementById("mpQrMontoLabel").textContent = "$" + Number(total).toLocaleString("es-AR");
   document.getElementById("mpQrError").style.display = "none";
   document.getElementById("mpQrEsperando").style.display = "block";
@@ -15546,6 +15794,10 @@ async function iniciarCobroMercadoPago(total) {
     }
 
     mpReferenciaActual = referencia;
+    mpNombreProveedorActual = resultado.nombreProveedor || "Mercado Pago";
+    mpFormaPagoCobro = resultado.formaPago || "TRANSFERENCIA";
+    { const t = document.getElementById("mpQrTitulo"); if (t) t.textContent = "Cobrar con " + mpNombreProveedorActual; }
+    { const a = document.getElementById("mpQrAyuda"); if (a && resultado.ayuda) { a.textContent = resultado.ayuda; a.style.display = "block"; } }
     document.getElementById("mpQrImagen").src = resultado.qrImagenDataUrl;
     mpPollingIniciadoEn = Date.now();
     mpProcesandoConfirmacion = false;
@@ -15564,6 +15816,8 @@ async function iniciarCobroMercadoPago(total) {
 
 let mpPollingIntervalId = null;
 let mpReferenciaActual  = null;
+let mpNombreProveedorActual = "Mercado Pago"; // con qué se está cobrando (v2.6.0)
+let mpFormaPagoCobro = "TRANSFERENCIA";       // Ualá Bis cobra con tarjeta → "TARJETA"
 let mpVentaEnCurso      = null; // { subtotal, total, itemsSnapshot, recibido }
 
 // Dos problemas reales que tenía este polling, arreglados acá:
@@ -15604,11 +15858,17 @@ async function consultarCobroMercadoPagoPolling() {
     // esta esperaba su propia respuesta — no hacer nada, ya se procesó.
     if (mpProcesandoConfirmacion) return;
 
+    // El cobro ya no se puede pagar (venció o se canceló en el proveedor)
+    if (resultado.success && !resultado.pagada && resultado.finalizada) {
+      mostrarErrorCobroMercadoPago("El cobro venció o fue anulado en " + mpNombreProveedorActual + ". Si el cliente todavía va a pagar, generá el QR de nuevo.");
+      return;
+    }
+
     if (resultado.success && resultado.pagada) {
       mpProcesandoConfirmacion = true; // a partir de acá, ninguna otra vuelta en vuelo va a duplicar esto (ver comentario arriba)
       detenerPollingMercadoPago();
       document.getElementById("mpQrBackdrop").classList.remove("show");
-      toast("Pago de Mercado Pago confirmado ✓", "success");
+      toast("Pago de " + mpNombreProveedorActual + " confirmado ✓", "success");
 
       if (mpVentaEnCurso) {
         const { subtotal, total, itemsSnapshot, recibido } = mpVentaEnCurso;
@@ -15625,9 +15885,12 @@ async function consultarCobroMercadoPagoPolling() {
           ventaIdTemp: ventaId,
           total, subtotal,
           descuento: subtotal - total,
-          formaPago: "TRANSFERENCIA",
+          formaPago: mpFormaPagoCobro,
           vendedor: sessionStorage.getItem("nombreUsuario") || sessionStorage.getItem("usuarioLogueado") || "",
-          observaciones: etiquetaDescuento ? (ajusteModoPOS === "RECARGO" ? "Recargo: " : "Descuento: ") + etiquetaDescuento : "",
+          observaciones: [
+            etiquetaDescuento ? (ajusteModoPOS === "RECARGO" ? "Recargo: " : "Descuento: ") + etiquetaDescuento : "",
+            mpNombreProveedorActual !== "Mercado Pago" ? "Cobrado con " + mpNombreProveedorActual : ""
+          ].filter(Boolean).join(" · "),
           carrito: itemsSnapshot
         });
         if (guardadoMP && guardadoMP.ventaId) ventaId = guardadoMP.ventaId;
@@ -15637,7 +15900,7 @@ async function consultarCobroMercadoPagoPolling() {
           ventaId, items: itemsSnapshot, total, subtotal,
           descuento: subtotal - total,
           descuentoEtiqueta: etiquetaDescuento,
-          formaPago: "TRANSFERENCIA", fecha: new Date(), recibido: 0
+          formaPago: mpFormaPagoCobro, fecha: new Date(), recibido: 0
         };
 
         mostrarRecibo(ventaId, itemsSnapshot, total, subtotal, subtotal - total, recibido);
@@ -15690,6 +15953,7 @@ function cancelarCobroMercadoPago() {
   mpPollingIniciadoEn = null;
   const backdrop = document.getElementById("mpQrBackdrop");
   if (backdrop) backdrop.classList.remove("show");
+  const referenciaCancelada = mpReferenciaActual; // con la API nueva de MP, se anula la orden
   mpReferenciaActual = null;
   mpVentaEnCurso = null;
 
@@ -15699,7 +15963,7 @@ function cancelarCobroMercadoPago() {
   // hay ninguna pantalla conectada, ni si esto corre en la versión web.
   const bridge = window.veekpos || window.posOffline;
   if (bridge && typeof bridge.cancelarCobroQR === "function") {
-    bridge.cancelarCobroQR().catch(() => {});
+    bridge.cancelarCobroQR(referenciaCancelada).catch(() => {});
   }
 
   toast("Cobro cancelado — el ticket sigue abierto", "info");
