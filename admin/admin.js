@@ -475,6 +475,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     for (let i = 0; i < 60 && !window.__posOfflineListo; i++) await new Promise(r => setTimeout(r, 50));
   }
   mostrarSeccion(seccionPermitidaParaRol("pos") ? "pos" : "dashboard");
+  // Venta que quedó a medias si el programa/navegador se cerró de golpe
+  recuperarVentaEnCursoPOS();
 
   // Quitar el loading ya mismo
   const cat = document.getElementById("loadingCat");
@@ -8985,6 +8987,118 @@ function vaciarTicketPOS() {
   renderTicketPOS();
 }
 
+/* ===================================================================
+   VENTA EN CURSO — guardado automático y recuperación (v2.8.0)
+   Cada cambio del ticket (agregar, quitar, cantidad, descuento) se
+   guarda en esta computadora. Si el programa o el navegador se cierra
+   de golpe (corte de luz, cuelgue, se cerró la pestaña), al volver a
+   abrir el panel el ticket aparece tal como estaba.
+   - Navegador y escritorio: localStorage (se escribe al instante).
+   - Escritorio: además en la SQLite de la caja (config_local), que se
+     graba en disco enseguida y sobrevive aunque Windows mate el
+     proceso antes de que Chromium vuelque el localStorage.
+   Cuando la venta se cobra, se convierte en pedido o se vacía el
+   ticket, lo guardado se borra solo (el ticket queda vacío).
+=================================================================== */
+const CLAVE_VENTA_EN_CURSO = "vpos_venta_en_curso";
+const VENTA_EN_CURSO_VIGENCIA_MS = 7 * 24 * 60 * 60 * 1000; // más vieja que una semana: se descarta
+let _ventaEnCursoLista = false;   // no se guarda nada hasta haber intentado recuperar (si no, el primer render vacío la borraría)
+let _ventaEnCursoTimerSQLite = null;
+
+function _puenteEscritorioVentaEnCurso() {
+  const b = window.veekpos;
+  return b && typeof b.fijarConfigLocal === "function" && typeof b.obtenerConfigLocal === "function" ? b : null;
+}
+
+function _datosVentaEnCursoPOS() {
+  if (!ticketPOS.length) return null;
+  const motivo = (document.getElementById("descuentoMotivoInput") || {}).value || "";
+  return {
+    v: 1,
+    ts: Date.now(),
+    items: ticketPOS.map(i => Object.assign({}, i)),
+    descuento: { tipo: descuentoTipoPOS, valor: descuentoValorPOS, activo: descuentoActivoPOS, modo: ajusteModoPOS, motivo },
+    cobroQR: mpVentaEnCurso ? { total: mpVentaEnCurso.total, desde: Date.now() } : null
+  };
+}
+
+function guardarVentaEnCursoPOS() {
+  if (!_ventaEnCursoLista) return;
+  const datos = _datosVentaEnCursoPOS();
+  const texto = datos ? JSON.stringify(datos) : "";
+  try {
+    if (texto) localStorage.setItem(CLAVE_VENTA_EN_CURSO, texto);
+    else localStorage.removeItem(CLAVE_VENTA_EN_CURSO);
+  } catch (e) { /* almacenamiento lleno o bloqueado: no frena la venta */ }
+
+  const puente = _puenteEscritorioVentaEnCurso();
+  if (!puente) return;
+  // Se agrupan los cambios seguidos (escaneo rápido) en una sola escritura;
+  // vaciar el ticket se graba al instante.
+  clearTimeout(_ventaEnCursoTimerSQLite);
+  const grabar = () => { try { Promise.resolve(puente.fijarConfigLocal(CLAVE_VENTA_EN_CURSO, texto)).catch(() => {}); } catch (e) {} };
+  if (!texto) grabar(); else _ventaEnCursoTimerSQLite = setTimeout(grabar, 250);
+}
+
+function _leerVentaGuardada(texto) {
+  try {
+    const d = JSON.parse(texto || "null");
+    if (!d || !Array.isArray(d.items) || !d.items.length) return null;
+    if (!(Number(d.ts) > 0) || Date.now() - Number(d.ts) > VENTA_EN_CURSO_VIGENCIA_MS) return null;
+    d.items = d.items.filter(i => i && i.CODIGO !== undefined && Number(i.cantidad) > 0)
+      .map(i => Object.assign({}, i, { PRECIO: Number(i.PRECIO) || 0, cantidad: Number(i.cantidad) }));
+    return d.items.length ? d : null;
+  } catch (e) { return null; }
+}
+
+/** Se llama una vez al abrir el panel. Si quedó una venta sin terminar, la vuelve a poner en el ticket. */
+async function recuperarVentaEnCursoPOS() {
+  let guardada = null;
+  try { guardada = _leerVentaGuardada(localStorage.getItem(CLAVE_VENTA_EN_CURSO)); } catch (e) {}
+  const puente = _puenteEscritorioVentaEnCurso();
+  if (puente) {
+    try {
+      const deSQLite = _leerVentaGuardada(await puente.obtenerConfigLocal(CLAVE_VENTA_EN_CURSO, ""));
+      if (deSQLite && (!guardada || Number(deSQLite.ts) > Number(guardada.ts))) guardada = deSQLite;
+    } catch (e) {}
+  }
+
+  // Si mientras se leía ya se empezó otra venta, se respeta la nueva
+  if (guardada && ticketPOS.length === 0) {
+    ticketPOS = guardada.items;
+    const d = guardada.descuento || {};
+    if (d.activo && Number(d.valor) > 0) {
+      descuentoTipoPOS = d.tipo === "MONTO" ? "MONTO" : "PORCENTAJE";
+      descuentoValorPOS = Number(d.valor) || 0;
+      descuentoActivoPOS = true;
+      ajusteModoPOS = d.modo === "RECARGO" ? "RECARGO" : "DESCUENTO";
+      const input = document.getElementById("descuentoValorInput");
+      if (input) { input.value = descuentoValorPOS; input.placeholder = descuentoTipoPOS === "PORCENTAJE" ? "Ej: 10" : "Ej: 500"; }
+      const motivo = document.getElementById("descuentoMotivoInput");
+      if (motivo) motivo.value = d.motivo || "";
+    }
+    _ventaEnCursoLista = true;
+    renderTicketPOS();
+
+    const unidades = guardada.items.reduce((a, i) => a + Number(i.cantidad || 0), 0);
+    const hora = new Date(Number(guardada.ts)).toLocaleString("es-AR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+    toast(`Se recuperó la venta que quedó sin terminar (${unidades} unidad${unidades === 1 ? "" : "es"}, ${hora}). Si no la querés, vaciá el ticket.`, "success");
+    if (guardada.cobroQR) {
+      setTimeout(() => toast(`Había un cobro con QR en espera por $${Number(guardada.cobroQR.total || 0).toLocaleString("es-AR")}: revisá en Mercado Pago / Ualá si ya se acreditó antes de cobrar de nuevo.`, "error"), 1500);
+    }
+  } else {
+    _ventaEnCursoLista = true;
+    guardarVentaEnCursoPOS(); // deja lo guardado igual al ticket actual (o lo borra si está vacío)
+  }
+
+  // El motivo del descuento no pasa por renderTicketPOS: se guarda al escribirlo
+  const motivo = document.getElementById("descuentoMotivoInput");
+  if (motivo && !motivo.__guardaVenta) {
+    motivo.addEventListener("input", () => guardarVentaEnCursoPOS());
+    motivo.__guardaVenta = true;
+  }
+}
+
 /* ---- ticket rendering ---- */
 
 function renderTicketPOS() {
@@ -9069,6 +9183,7 @@ function renderTicketPOS() {
   if (printBtn) printBtn.disabled = ticketPOS.length === 0;
 
   actualizarUIDescuentoPOS();
+  guardarVentaEnCursoPOS();
 }
 
 /* ---- discount ---- */
@@ -14010,7 +14125,8 @@ const ETQ_FABRICA = {
   verNegocio: false, verNombre: true, verCategoria: false, verPrecio: true, verPrecioCaja: false,
   verBarras: true, verCodigo: true, verFecha: false, textoExtra: "",
   tamPrecio: "auto", tamNombre: "1", lineasNombre: "2", altoBarras: "0.26", alineacion: "center", decimales: "0",
-  precioResaltado: false, negrita: true
+  precioResaltado: false, negrita: true,
+  colorFondo: "#ffffff", colorLetra: "#000000", colorPrecio: "#000000", colorResFondo: "#000000", colorResLetra: "#ffffff"
 };
 
 const _ETQ_CAMPOS = {
@@ -14018,8 +14134,34 @@ const _ETQ_CAMPOS = {
   copias: "etqCantidadCopias", borde: "etqBorde", verNegocio: "etqVerNegocio", verNombre: "etqVerNombre", verCategoria: "etqVerCategoria",
   verPrecio: "etqVerPrecio", verPrecioCaja: "etqVerPrecioCaja", verBarras: "etqVerBarras", verCodigo: "etqVerCodigo", verFecha: "etqVerFecha",
   textoExtra: "etqTextoExtra", tamPrecio: "etqTamPrecio", tamNombre: "etqTamNombre", lineasNombre: "etqLineasNombre",
-  altoBarras: "etqAltoBarras", alineacion: "etqAlineacion", decimales: "etqDecimales", precioResaltado: "etqPrecioResaltado", negrita: "etqNegrita"
+  altoBarras: "etqAltoBarras", alineacion: "etqAlineacion", decimales: "etqDecimales", precioResaltado: "etqPrecioResaltado", negrita: "etqNegrita",
+  colorFondo: "etqColorFondo", colorLetra: "etqColorLetra", colorPrecio: "etqColorPrecio", colorResFondo: "etqColorResFondo", colorResLetra: "etqColorResLetra"
 };
+
+/** Solo colores #rrggbb (van dentro de un style=""; cualquier otra cosa vuelve al de fábrica) */
+function _colorEtq(v, def) {
+  return /^#[0-9a-f]{6}$/i.test(String(v || "")) ? String(v).toLowerCase() : def;
+}
+
+/** Contraste WCAG entre dos colores #rrggbb (1 = iguales, 21 = negro/blanco) */
+function _contrasteColores(a, b) {
+  const lum = (hex) => {
+    const c = [1, 3, 5].map(i => parseInt(hex.substr(i, 2), 16) / 255)
+      .map(v => v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  };
+  const l1 = lum(a), l2 = lum(b);
+  return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+}
+
+/** Botones de combinaciones rápidas de colores */
+function _aplicarColoresRapidosEtq(btn) {
+  const poner = (id, v) => { const el = document.getElementById(id); if (el && v) el.value = v; };
+  poner("etqColorFondo", btn.dataset.fondo);
+  poner("etqColorLetra", btn.dataset.letra);
+  poner("etqColorPrecio", btn.dataset.precio);
+  actualizarPreviewEtiquetas();
+}
 
 function _configEtiquetasGuardada() {
   try { return Object.assign({}, ETQ_FABRICA, JSON.parse(localStorage.getItem("vpos_etq_config") || "{}")); }
@@ -14062,6 +14204,7 @@ function leerConfigEtiquetas() {
   cfg.separacion = num(cfg.separacion, 0, 15, 3) || 0;
   cfg.margen = cfg.papel === "ROLLO" ? 0 : (Number(cfg.margen) >= 0 ? Math.min(25, Number(cfg.margen)) : 8);
   cfg.copias = Math.max(1, Math.min(50, Math.floor(Number(cfg.copias) || 1)));
+  ["colorFondo", "colorLetra", "colorPrecio", "colorResFondo", "colorResLetra"].forEach(k => { cfg[k] = _colorEtq(cfg[k], ETQ_FABRICA[k]); });
   return cfg;
 }
 
@@ -14113,7 +14256,10 @@ function _htmlEtiqueta(p, cfg, idSvg) {
   if (cfg.verNombre) partes.push(`<div class="etq-nombre" style="font-size:${pt(tamNombreMm)};-webkit-line-clamp:${lineas};font-weight:${cfg.negrita ? 700 : 400}">${escapeHtml(p.PRODUCTO || "")}</div>`);
   if (cfg.verCategoria && p.CATEGORIA) partes.push(`<div class="etq-chico" style="font-size:${chico}">${escapeHtml(p.CATEGORIA)}</div>`);
   if (cfg.textoExtra) partes.push(`<div class="etq-extra" style="font-size:${pt(Math.max(2.2, Math.min(H * 0.09, 4)))}">${escapeHtml(cfg.textoExtra)}</div>`);
-  if (cfg.verPrecio) partes.push(`<div class="etq-precio${cfg.precioResaltado ? " resaltado" : ""}" style="font-size:${pt(tamPrecioMm)}">${_precioEtiqueta(p.PRECIO, cfg)}</div>`);
+  const colorPrecio = cfg.precioResaltado
+    ? `background:${_colorEtq(cfg.colorResFondo, "#000000")};color:${_colorEtq(cfg.colorResLetra, "#ffffff")};`
+    : `color:${_colorEtq(cfg.colorPrecio, "#000000")};`;
+  if (cfg.verPrecio) partes.push(`<div class="etq-precio${cfg.precioResaltado ? " resaltado" : ""}" style="font-size:${pt(tamPrecioMm)};${colorPrecio}">${_precioEtiqueta(p.PRECIO, cfg)}</div>`);
   if (cfg.verPrecioCaja && Number(p.UNIDADES_POR_CAJA) > 0 && Number(p.PRECIO_CAJA) > 0) {
     partes.push(`<div class="etq-chico" style="font-size:${chico}">Caja x${escapeHtml(p.UNIDADES_POR_CAJA)}: <b>${_precioEtiqueta(p.PRECIO_CAJA, cfg)}</b></div>`);
   }
@@ -14124,7 +14270,12 @@ function _htmlEtiqueta(p, cfg, idSvg) {
   if (cfg.verFecha) partes.push(`<div class="etq-chico" style="font-size:${chico}">${fecha}</div>`);
   const borde = cfg.borde === "ninguno" ? "none" : (cfg.borde === "solido" ? "0.2mm solid #555" : "0.25mm dashed #999");
   const pad = Math.max(0.8, Math.min(H, W) * 0.05).toFixed(1);
-  return `<div class="etq" style="width:${W}mm;height:${H}mm;padding:${pad}mm;border:${borde};text-align:${cfg.alineacion};align-items:${cfg.alineacion === "left" ? "flex-start" : "center"}">${partes.join("")}</div>`;
+  // Colores: fondo y letras de toda la etiqueta. Los textos chicos (categoría,
+  // código, fecha) usan el mismo color de letra salvo con el negro de fábrica,
+  // donde quedan en gris oscuro como siempre.
+  const fondo = _colorEtq(cfg.colorFondo, "#ffffff"), letra = _colorEtq(cfg.colorLetra, "#000000");
+  const colores = `background:${fondo};color:${letra};` + (letra !== "#000000" ? `--etq-letra-sec:${letra};` : "");
+  return `<div class="etq" style="${colores}width:${W}mm;height:${H}mm;padding:${pad}mm;border:${borde};text-align:${cfg.alineacion};align-items:${cfg.alineacion === "left" ? "flex-start" : "center"}">${partes.join("")}</div>`;
 }
 
 function _dibujarBarrasEtiquetas(cont, items) {
@@ -14219,6 +14370,14 @@ function abrirModalEtiquetas() {
     });
     papel.__conCambio = true;
   }
+  const rapidos = document.getElementById("etqColoresRapidos");
+  if (rapidos && !rapidos.__conClick) {
+    rapidos.addEventListener("click", (ev) => {
+      const btn = ev.target.closest("button[data-fondo]");
+      if (btn) _aplicarColoresRapidosEtq(btn);
+    });
+    rapidos.__conClick = true;
+  }
   _etqHojaPreview = 0;
   document.getElementById("etiquetasModalBackdrop").classList.add("show");
   actualizarPreviewEtiquetas();
@@ -14263,6 +14422,11 @@ function actualizarPreviewEtiquetas() {
   if (hojaOpc) hojaOpc.style.display = cfg.papel === "ROLLO" ? "none" : "";
   const medHoja = document.getElementById("etqMedidasHoja");
   if (medHoja) medHoja.style.display = cfg.papel === "HOJA" ? "" : "none";
+  // Con precio resaltado se eligen sus propios colores; sin resaltar, el "Precio" de arriba
+  const coloresRes = document.getElementById("etqColoresResaltado");
+  if (coloresRes) coloresRes.style.display = cfg.precioResaltado ? "" : "none";
+  const colorPrecio = document.getElementById("etqColorPrecio");
+  if (colorPrecio) colorPrecio.disabled = !!cfg.precioResaltado;
   const hoja = _hojaEtiquetas(cfg);
 
   const { productos, lista } = _listaEtiquetas(cfg);
@@ -14332,6 +14496,13 @@ function actualizarPreviewEtiquetas() {
   // Los códigos se revisan en TODOS los productos elegidos, no solo en los que se ven
   const finos = cfg.verBarras ? [...new Set(productos.map(p => String(p.CODIGO)))].filter(c => _codigoMuyFinoParaEtiqueta(c, cfg)) : [];
   if (finos.length && info) info.textContent += ` ⚠️ ${finos.length === 1 ? "El código " + finos[0] + " es largo" : finos.length + " códigos son largos"} para este ancho: las barras quedan muy finas y puede costar leerlas. Usá una etiqueta más ancha.`;
+  if (info) {
+    const fondo = cfg.colorFondo;
+    if (cfg.papel === "ROLLO" && fondo !== "#ffffff") info.textContent += " ⚠️ Las impresoras de etiquetas (térmicas) imprimen solo en negro: el color de fondo no va a salir.";
+    const pocoContraste = [cfg.colorLetra, cfg.precioResaltado ? null : cfg.colorPrecio].filter(Boolean).some(c => _contrasteColores(c, fondo) < 3)
+      || (cfg.precioResaltado && cfg.verPrecio && _contrasteColores(cfg.colorResLetra, cfg.colorResFondo) < 3);
+    if (pocoContraste) info.textContent += " ⚠️ Hay letras con poco contraste con su fondo: pueden costar leerse.";
+  }
   const sinLugar = _ajustarEtiquetas(marco);
   if (sinLugar && info) info.textContent += " ⚠️ No entra todo en la etiqueta (se corta abajo): sacá algún dato o elegí un tamaño más grande.";
   const nota = _etqModoPreview === "real"
@@ -15782,6 +15953,7 @@ async function iniciarCobroMercadoPago(total) {
   const itemsSnapshot = [...ticketPOS]; // snapshot antes de limpiar
   const recibido = Number(document.getElementById("mfvRecibido")?.value) || 0;
   mpVentaEnCurso = { subtotal, total, itemsSnapshot, recibido };
+  guardarVentaEnCursoPOS(); // si se corta acá, al volver se avisa que había un cobro con QR en espera
 
   try {
     const referencia = "veekpos" + Date.now();
@@ -15956,6 +16128,7 @@ function cancelarCobroMercadoPago() {
   const referenciaCancelada = mpReferenciaActual; // con la API nueva de MP, se anula la orden
   mpReferenciaActual = null;
   mpVentaEnCurso = null;
+  guardarVentaEnCursoPOS();
 
   // Avisa también a la pantalla/tablet del cliente (si hay una conectada)
   // que este cobro se canceló, para que no se quede mostrando un QR

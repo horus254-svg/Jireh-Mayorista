@@ -4228,9 +4228,32 @@
                 <select class="form-select form-select-sm" id="etqDecimales"><option value="0">Sin decimales</option><option value="2">Con centavos</option></select></div>
             </div>
             <div class="etq-checks mt-2">
-              <label><input type="checkbox" id="etqPrecioResaltado"> Precio resaltado (fondo negro, letra blanca)</label>
+              <label><input type="checkbox" id="etqPrecioResaltado"> Precio resaltado (con fondo propio)</label>
               <label><input type="checkbox" id="etqNegrita" checked> Nombre en negrita</label>
             </div>
+          </div>
+
+          <div class="etq-grupo">
+            <div class="etq-grupo-tit">Colores</div>
+            <div class="etq-colores-rapidos" id="etqColoresRapidos">
+              <button type="button" data-fondo="#ffffff" data-letra="#000000" data-precio="#000000" title="Blanco y negro"><span style="background:#ffffff;color:#000000">$</span></button>
+              <button type="button" data-fondo="#fff200" data-letra="#000000" data-precio="#000000" title="Amarillo oferta"><span style="background:#fff200;color:#000000">$</span></button>
+              <button type="button" data-fondo="#ffffff" data-letra="#000000" data-precio="#d4141c" title="Precio en rojo"><span style="background:#ffffff;color:#d4141c">$</span></button>
+              <button type="button" data-fondo="#d4141c" data-letra="#ffffff" data-precio="#ffffff" title="Rojo liquidación"><span style="background:#d4141c;color:#ffffff">$</span></button>
+              <button type="button" data-fondo="#0b5ed7" data-letra="#ffffff" data-precio="#ffffff" title="Azul"><span style="background:#0b5ed7;color:#ffffff">$</span></button>
+              <button type="button" data-fondo="#16a34a" data-letra="#ffffff" data-precio="#ffffff" title="Verde"><span style="background:#16a34a;color:#ffffff">$</span></button>
+              <button type="button" data-fondo="#111111" data-letra="#ffffff" data-precio="#fff200" title="Negro y amarillo"><span style="background:#111111;color:#fff200">$</span></button>
+            </div>
+            <div class="row g-2 mt-1">
+              <div class="col-4"><label class="form-label">Fondo</label><input type="color" class="form-control form-control-sm form-control-color w-100" id="etqColorFondo" value="#ffffff"></div>
+              <div class="col-4"><label class="form-label">Letras</label><input type="color" class="form-control form-control-sm form-control-color w-100" id="etqColorLetra" value="#000000"></div>
+              <div class="col-4"><label class="form-label">Precio</label><input type="color" class="form-control form-control-sm form-control-color w-100" id="etqColorPrecio" value="#000000"></div>
+            </div>
+            <div class="row g-2 mt-1" id="etqColoresResaltado">
+              <div class="col-6"><label class="form-label">Fondo del precio resaltado</label><input type="color" class="form-control form-control-sm form-control-color w-100" id="etqColorResFondo" value="#000000"></div>
+              <div class="col-6"><label class="form-label">Letra del precio resaltado</label><input type="color" class="form-control form-control-sm form-control-color w-100" id="etqColorResLetra" value="#ffffff"></div>
+            </div>
+            <div class="text-muted mt-1" style="font-size:11px;">El código de barras se imprime siempre negro sobre blanco para que el lector lo pueda leer.</div>
           </div>
 
           <button type="button" class="btn btn-link btn-sm p-0" onclick="restablecerConfigEtiquetas()">Volver a la configuración de fábrica</button>
